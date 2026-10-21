@@ -12,7 +12,7 @@ export default defineConfig({
   testDir: './tests',
   workers: 1,
   timeout: 120_000,
-  use: { baseURL, trace: 'retain-on-failure' },
+  use: { baseURL, trace: 'retain-on-failure', actionTimeout: 10_000, navigationTimeout: 15_000 },
   projects: [
     { name: 'desktop', use: { viewport: { width: 1440, height: 900 } } },
     { name: 'mobile', use: { viewport: { width: 320, height: 740 } } },

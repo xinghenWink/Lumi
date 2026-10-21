@@ -1,6 +1,6 @@
 # M1 验收记录
 
-日期：2026-10-22。分支：`codex/m1-accounts-admin`。PR 暂以 `codex/m0-foundation` 为 base。
+日期：2026-10-22。分支：`codex/m1-accounts-admin`。[PR #2](https://github.com/xinghenWink/Lumi/pull/2) 暂以 `codex/m0-foundation` 为 base。
 
 ## 实现范围
 
@@ -13,18 +13,18 @@
 - [x] 用户管理、设置与审计均请求真实 API；没有演示身份切换、模拟认证或积分余额。
 - [x] OpenAPI 与前端类型同步；文档、运行配置和 CI 更新。
 
-## 已运行的本地检查
+## 验证记录
 
 - [x] Go 单元测试通过，含密码、JWT、加密、SMTP 本地投递、CSRF、输入与设置缓存。
 - [x] golangci-lint 0 issues（含 integration 编译检查），gofmt 通过。
 - [x] 前端 10 项 Vitest 通过，类型检查与 ESLint 通过。
 - [x] Vue 生产构建通过，保持路由拆包，登录首屏 JS gzip 低于 250 KB。
 - [x] 4 项桌面 / 320px 访客浏览器检查通过，截图复核；含服务未就绪状态、路由守卫、主题持久化、SPA 回退。
-- [ ] 真实 PG/Redis 集成测试，包括并发注册、轮换重放、禁用/删除失效、并发管理员操作与审计失败回滚。
+- [x] CI 真实 PG/Redis 集成测试，包括验证码耗尽/过期、并发注册、轮换重放、禁用/删除失效、并发管理员操作与审计失败回滚。
 - [ ] 完整账号与后台浏览器流程。
 - [ ] 最新代码 GitHub CI 与完整 Compose 验证。
 
-本机 Docker 引擎仍不可用；集成与完整浏览器结果须以实际远程运行记录更新，不能以编译通过代替。
+本机 Docker 引擎不可用，真实依赖测试在 CI 执行。并发启动测试发现 M0 创建同名 schema 后会改变默认查找路径，导致出现第二张迁移版本表；已固定 `public.goose_db_version` 与业务连接 `search_path=lumi,public`，并通过并发/重复迁移、每条版本只记录一次及无影子版本表的回归检查。未修改既有 SQL 迁移。
 
 ## 阶段边界
 

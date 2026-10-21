@@ -40,7 +40,7 @@ export default {
     loginDescription: 'Continue your conversations and creations.',
     registerDescription: 'A space of your own for every idea.',
     email: 'Email address',
-    emailPlaceholder: 'you@example.com',
+    emailPlaceholder: "you{'@'}example.com",
     password: 'Password',
     passwordHint: '8–128 characters, including a letter and a number',
     nickname: 'Display name',

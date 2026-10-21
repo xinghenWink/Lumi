@@ -40,7 +40,7 @@ export default {
     loginDescription: '登录后继续你的对话与创作。',
     registerDescription: '给灵感一个属于自己的空间。',
     email: '邮箱地址',
-    emailPlaceholder: 'you@example.com',
+    emailPlaceholder: "you{'@'}example.com",
     password: '密码',
     passwordHint: '8–128 个字符，包含字母和数字',
     nickname: '昵称',

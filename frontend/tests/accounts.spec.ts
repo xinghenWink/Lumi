@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
+import { observeErrors } from './browser-errors'
 
 async function login(page: Page, email: string, password: string) {
   await page.goto('/login')
@@ -36,7 +37,7 @@ test('M1 real registration, sessions, administration, settings and audit', async
   if (!adminEmail || !adminPassword || !baseURL)
     throw new Error('E2E bootstrap configuration is missing')
   const errors: string[] = []
-  page.on('pageerror', (error) => errors.push(error.message))
+  observeErrors(page, errors)
   await login(page, adminEmail, adminPassword)
   await accountMenu(page)
   await page.getByRole('menuitem', { name: '管理后台', exact: true }).click()
@@ -54,7 +55,7 @@ test('M1 real registration, sessions, administration, settings and audit', async
     viewport: info.project.use.viewport ?? { width: 1440, height: 900 },
   })
   const member = await memberContext.newPage()
-  member.on('pageerror', (error) => errors.push(error.message))
+  observeErrors(member, errors)
   try {
     await member.goto('/register')
     await member.getByLabel('昵称', { exact: true }).fill('创作者')
@@ -94,7 +95,11 @@ test('M1 real registration, sessions, administration, settings and audit', async
     expect(await member.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     )
-    await member.screenshot({ path: info.outputPath('profile-dark.png'), fullPage: true })
+    await member.screenshot({
+      path: info.outputPath('profile-dark.png'),
+      fullPage: true,
+      animations: 'disabled',
+    })
 
     let row = await users(page, email)
     const id = await row.locator('code.user-id').innerText()
@@ -118,7 +123,11 @@ test('M1 real registration, sessions, administration, settings and audit', async
     await row.getByRole('link').click()
     await expect(page.getByRole('heading', { name: '管理已改名', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: '最近会话', exact: true })).toBeVisible()
-    await page.screenshot({ path: info.outputPath('user-detail.png'), fullPage: true })
+    await page.screenshot({
+      path: info.outputPath('user-detail.png'),
+      fullPage: true,
+      animations: 'disabled',
+    })
 
     await page.goto('/admin/audit')
     await page.getByRole('textbox', { name: '对象 ID', exact: true }).fill(id)
@@ -126,7 +135,11 @@ test('M1 real registration, sessions, administration, settings and audit', async
     await expect(page.getByText('修改用户', { exact: true }).first()).toBeVisible()
     await page.getByText('查看变更', { exact: true }).first().click()
     expect((await page.locator('pre').allTextContents()).join('')).not.toContain(email)
-    await page.screenshot({ path: info.outputPath('audit.png'), fullPage: true })
+    await page.screenshot({
+      path: info.outputPath('audit.png'),
+      fullPage: true,
+      animations: 'disabled',
+    })
 
     await page.goto('/admin/settings/mail')
     await page.getByLabel('SMTP 密码', { exact: true }).fill(`${randomBytes(16).toString('hex')}`)
