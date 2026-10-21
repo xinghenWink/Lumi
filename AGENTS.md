@@ -1,0 +1,8 @@
+- 代码与注释用英文；用户可见文案全部走 i18n（zh-CN 为主）。
+- Go：`gofmt`、`golangci-lint`（启用 errcheck、govet、staticcheck、gosec）；错误用 `fmt.Errorf("...: %w", err)` 包装；`context` 贯穿调用链；不使用全局可变状态。
+- TypeScript：`strict`；ESLint + Prettier；禁止 `any`（例外需注释说明）。
+- 提交遵循 Conventional Commits；每个里程碑一个分支/PR，PR 描述附验收清单勾选情况。
+- 不得拷贝参考项目代码；不得提交任何密钥；`.env` 加入 `.gitignore`。
+- 新增依赖要在 `docs/DECISIONS.md` 记理由；依赖版本锁定（`go.sum`、`pnpm-lock.yaml`）。
+- 每个功能随 PR 附：迁移文件、测试、OpenAPI 更新、必要文档。
+- SQL 迁移只增不改（forward-only）。
