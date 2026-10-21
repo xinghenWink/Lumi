@@ -1,0 +1,39 @@
+package migrations
+
+import (
+	"context"
+	"embed"
+	"fmt"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
+	"github.com/pressly/goose/v3/lock"
+)
+
+// files is read-only; migration state belongs to a per-call Provider.
+//
+//go:embed *.sql
+var files embed.FS
+
+func Up(ctx context.Context, pool *pgxpool.Pool) (resultErr error) {
+	sqlDB := stdlib.OpenDBFromPool(pool)
+	defer func() {
+		if err := sqlDB.Close(); err != nil && resultErr == nil {
+			resultErr = fmt.Errorf("close migration database: %w", err)
+		}
+	}()
+	locker, err := lock.NewPostgresSessionLocker()
+	if err != nil {
+		return fmt.Errorf("create migration advisory lock: %w", err)
+	}
+	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, files,
+		goose.WithSessionLocker(locker), goose.WithDisableGlobalRegistry(true))
+	if err != nil {
+		return fmt.Errorf("create migration provider: %w", err)
+	}
+	if _, err := provider.Up(ctx); err != nil {
+		return fmt.Errorf("apply migrations: %w", err)
+	}
+	return nil
+}

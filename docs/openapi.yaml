@@ -1,0 +1,117 @@
+openapi: 3.1.0
+info:
+  title: Lumi API
+  version: 0.0.0
+  description: M0 infrastructure endpoints. Business endpoints will be added with their milestones.
+servers:
+  - url: /
+paths:
+  /healthz:
+    get:
+      operationId: getLiveness
+      summary: Check process liveness without contacting dependencies
+      responses:
+        '200':
+          description: Process is alive
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /readyz:
+    get:
+      operationId: getReadiness
+      summary: Check PostgreSQL and Redis connectivity
+      responses:
+        '200':
+          description: Dependencies are ready
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Readiness'
+        '503':
+          description: A dependency is unavailable or unconfigured
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/version:
+    get:
+      operationId: getVersion
+      summary: Return build metadata
+      responses:
+        '200':
+          description: Build version
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Version'
+components:
+  headers:
+    RequestID:
+      description: Server-generated request identifier
+      schema:
+        type: string
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+    Readiness:
+      type: object
+      additionalProperties: false
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        checks:
+          type: object
+          additionalProperties: false
+          required: [postgres, redis]
+          properties:
+            postgres:
+              type: string
+              enum: [ok]
+            redis:
+              type: string
+              enum: [ok]
+    Version:
+      type: object
+      additionalProperties: false
+      required: [version, commit, build_time]
+      properties:
+        version:
+          type: string
+        commit:
+          type: string
+        build_time:
+          type: string
+          description: RFC3339 for release builds; unknown for local development
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+          description: Diagnostic fallback; clients translate the error code using i18n
+        request_id:
+          type: string

@@ -1,0 +1,35 @@
+name: lumi-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: lumi
+      POSTGRES_PASSWORD: lumi-dev-only
+      POSTGRES_DB: lumi
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - postgres-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U lumi -d lumi']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes', '--requirepass', 'lumi-dev-only']
+    ports:
+      - '127.0.0.1:6379:6379'
+    volumes:
+      - redis-dev:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'REDISCLI_AUTH=lumi-dev-only redis-cli ping | grep -q PONG']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-dev:
+  redis-dev:
