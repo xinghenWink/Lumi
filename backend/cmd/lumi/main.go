@@ -13,12 +13,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/xinghenWink/Lumi/backend/internal/config"
+	"github.com/xinghenWink/Lumi/backend/internal/http/account"
 	"github.com/xinghenWink/Lumi/backend/internal/http/handler"
 	"github.com/xinghenWink/Lumi/backend/internal/http/router"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db"
 	platformlogger "github.com/xinghenWink/Lumi/backend/internal/platform/logger"
+	"github.com/xinghenWink/Lumi/backend/internal/platform/password"
 	platformredis "github.com/xinghenWink/Lumi/backend/internal/platform/redis"
+	"github.com/xinghenWink/Lumi/backend/internal/user"
 	"github.com/xinghenWink/Lumi/backend/migrations"
 	"github.com/xinghenWink/Lumi/backend/web"
 )
@@ -49,8 +54,13 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 	if command == "healthcheck" {
 		return healthcheck(ctx, os.Getenv("HTTP_ADDR"))
 	}
-	if command != "serve" && command != "migrate" || len(args) > 1 {
-		return fmt.Errorf("usage: lumi [serve|migrate|healthcheck]")
+	resetEmail := ""
+	if command == "admin" && len(args) == 4 && args[1] == "reset-password" && args[2] == "--email" {
+		command = "reset-admin"
+		resetEmail = args[3]
+	}
+	if command != "serve" && command != "migrate" && command != "reset-admin" || (command != "reset-admin" && len(args) > 1) {
+		return fmt.Errorf("usage: lumi [serve|migrate|healthcheck|admin reset-password --email address]")
 	}
 	cfg, err := config.Load(os.Getenv)
 	if err != nil {
@@ -59,9 +69,11 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 	}
 	logger = platformlogger.New(os.Stdout, cfg.LogLevel)
 	health := handler.Health{}
+	var database *pgxpool.Pool
+	var cache *platformredis.Client
 	startup, cancelStartup := context.WithTimeout(ctx, 60*time.Second)
 	defer cancelStartup()
-	if command == "migrate" && cfg.DatabaseURL == "" {
+	if (command == "migrate" || command == "reset-admin") && cfg.DatabaseURL == "" {
 		return fmt.Errorf("DATABASE_URL is required for migrations")
 	}
 	if cfg.DatabaseURL != "" {
@@ -71,6 +83,7 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 			return fmt.Errorf("open database: %w", err)
 		}
 		defer pool.Close()
+		database = pool
 		if err := migrations.Up(startup, pool); err != nil {
 			logger.Error("database migration failed")
 			return fmt.Errorf("migrate database: %w", err)
@@ -81,8 +94,19 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 		logger.Info("database migrations completed")
 		return nil
 	}
+	if command == "reset-admin" {
+		passwords, err := password.New(startup)
+		if err != nil {
+			return err
+		}
+		if err := user.New(database, passwords).ResetAdminPassword(startup, resetEmail, cfg.AdminResetPassword); err != nil {
+			return fmt.Errorf("reset administrator password: %w", err)
+		}
+		logger.Info("administrator password reset completed")
+		return nil
+	}
 	if cfg.RedisURL != "" {
-		cache, err := platformredis.Open(startup, cfg.RedisURL)
+		cache, err = platformredis.Open(startup, cfg.RedisURL)
 		if err != nil {
 			logger.Error("Redis connection failed")
 			return fmt.Errorf("open Redis: %w", err)
@@ -94,6 +118,11 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 		}()
 		health.Redis = cache.Ping
 	}
+	accounts, err := configureAccounts(startup, cfg, database, cache, logger)
+	if err != nil {
+		logger.Error("account service initialization failed")
+		return fmt.Errorf("initialize accounts: %w", err)
+	}
 	if cfg.DatabaseURL == "" || cfg.RedisURL == "" {
 		logger.Warn("development without dependencies; readiness will return 503")
 	}
@@ -101,13 +130,14 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("load frontend: %w", err)
 	}
-	engine, err := router.New(logger, health, handler.Version{Version: version, Commit: commit, BuildTime: buildTime}, content)
+	engine, err := router.New(logger, health, handler.Version{Version: version, Commit: commit, BuildTime: buildTime}, content,
+		account.Routes(accounts, account.Security{Origins: cfg.AllowedOrigins(), CookieSecure: cfg.CookieSecure, TrustedProxies: cfg.TrustedProxies}, logger))
 	if err != nil {
 		return fmt.Errorf("create router: %w", err)
 	}
 	server := &http.Server{
 		Addr: cfg.HTTPAddress, Handler: engine,
-		ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 		// No WriteTimeout: future SSE responses can legitimately last minutes.
 	}

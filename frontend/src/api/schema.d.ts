@@ -55,6 +55,215 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/public/config': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** getPublicConfig */
+    get: operations['getPublicConfig']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/login': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** login */
+    post: operations['login']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/register': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** register */
+    post: operations['register']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/send-code': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** sendVerificationCode */
+    post: operations['sendVerificationCode']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/refresh': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** refreshSession */
+    post: operations['refreshSession']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/logout': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** logout */
+    post: operations['logout']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/me': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** getMe */
+    get: operations['getMe']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /** updateMe */
+    patch: operations['updateMe']
+    trace?: never
+  }
+  '/api/v1/me/password': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** changePassword */
+    post: operations['changePassword']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/users': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listUsers */
+    get: operations['listUsers']
+    put?: never
+    /** createUser */
+    post: operations['createUser']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/users/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** getUserDetail */
+    get: operations['getUserDetail']
+    put?: never
+    post?: never
+    /** deleteUser */
+    delete: operations['deleteUser']
+    options?: never
+    head?: never
+    /** updateUser */
+    patch: operations['updateUser']
+    trace?: never
+  }
+  '/api/v1/admin/settings/{group}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** getSettings */
+    get: operations['getSettings']
+    /** saveSettings */
+    put: operations['saveSettings']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/audit-logs': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listAuditLogs */
+    get: operations['listAuditLogs']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -85,8 +294,215 @@ export interface components {
       message: string
       request_id: string
     }
+    User: {
+      /** Format: uuid */
+      id: string
+      /** Format: email */
+      email: string
+      nickname: string
+      /** @enum {string} */
+      role: 'user' | 'admin'
+      /** @enum {string} */
+      status: 'active' | 'disabled'
+      /** @enum {string} */
+      locale: 'zh-CN' | 'en'
+      timezone: string
+      /** Format: date-time */
+      created_at: string
+      /** Format: date-time */
+      last_login_at: string | null
+      last_login_ip: string
+    }
+    AuthResult: {
+      access_token: string
+      /** @enum {string} */
+      token_type: 'Bearer'
+      expires_in: number
+      user: components['schemas']['User']
+    }
+    LoginInput: {
+      /** Format: email */
+      email: string
+      password: string
+    }
+    RegisterInput: {
+      /** Format: email */
+      email: string
+      /** @description Must contain a letter and a digit. */
+      password: string
+      nickname: string
+      code?: string
+      /** @enum {boolean} */
+      accept_terms: true
+    }
+    SendCodeInput: {
+      /** Format: email */
+      email: string
+      /**
+       * @default zh-CN
+       * @enum {string}
+       */
+      locale: 'zh-CN' | 'en'
+    }
+    CodeSent: {
+      retry_after: number
+    }
+    CreateUserInput: {
+      /** Format: email */
+      email: string
+      /** @description Must contain a letter and a digit. */
+      password: string
+      nickname: string
+      /** @enum {string} */
+      role: 'user' | 'admin'
+    }
+    UpdateUserInput: {
+      /** Format: email */
+      email?: string
+      /** @description Must contain a letter and a digit. */
+      password?: string
+      nickname?: string
+      /** @enum {string} */
+      role?: 'user' | 'admin'
+      /** @enum {string} */
+      status?: 'active' | 'disabled'
+    }
+    UpdateSelfInput: {
+      nickname?: string
+      /** @enum {string} */
+      locale?: 'zh-CN' | 'en'
+      timezone?: string
+    }
+    PasswordInput: {
+      current_password: string
+      /** @description Must contain a letter and a digit. */
+      new_password: string
+    }
+    UserPage: {
+      items: components['schemas']['User'][]
+      next_cursor: string
+    }
+    Session: {
+      /** Format: uuid */
+      id: string
+      device: string
+      ip: string
+      user_agent: string
+      /** Format: date-time */
+      created_at: string
+      /** Format: date-time */
+      expires_at: string
+      /** Format: date-time */
+      revoked_at: string | null
+    }
+    UserDetail: {
+      user: components['schemas']['User']
+      sessions: components['schemas']['Session'][]
+    }
+    DeleteUserInput: {
+      /**
+       * Format: email
+       * @description Must match the account email. Self deletion is not allowed here.
+       */
+      email: string
+    }
+    SiteSettings: {
+      name: string
+      description: string
+      footer: string
+      contact: string
+      terms_url: string
+      privacy_url: string
+    }
+    RegistrationSettings: {
+      enabled: boolean
+      email_verification_enabled: boolean
+      domain_allowlist: string[]
+      domain_blocklist: string[]
+      login_failure_limit: number
+      login_lock_minutes: number
+      login_per_minute: number
+      register_per_minute: number
+      code_per_minute: number
+    }
+    MailSettings: {
+      host: string
+      port: number
+      username: string
+      from: string
+      /** @enum {string} */
+      encryption: 'starttls' | 'tls' | 'none'
+      password_configured: boolean
+    }
+    MailSettingsInput: {
+      host: string
+      port: number
+      username: string
+      from: string
+      /** @enum {string} */
+      encryption: 'starttls' | 'tls' | 'none'
+      /** @description Omit to preserve the stored secret; empty string clears it. */
+      password?: string
+    }
+    SettingsView: {
+      site: components['schemas']['SiteSettings']
+      registration: components['schemas']['RegistrationSettings']
+      mail: components['schemas']['MailSettings']
+      env_overrides: string[]
+    }
+    SettingsUpdate:
+      | {
+          site: components['schemas']['SiteSettings']
+        }
+      | {
+          registration: components['schemas']['RegistrationSettings']
+        }
+      | {
+          mail: components['schemas']['MailSettingsInput']
+        }
+    PublicConfig: {
+      site: components['schemas']['SiteSettings']
+      registration_enabled: boolean
+      email_verification_enabled: boolean
+    }
+    AuditRecord: {
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      actor_id: string | null
+      action: string
+      target_type: string
+      /** Format: uuid */
+      target_id: string | null
+      before: {
+        [key: string]: unknown
+      } | null
+      after: {
+        [key: string]: unknown
+      } | null
+      ip: string
+      /** Format: date-time */
+      created_at: string
+    }
+    AuditPage: {
+      items: components['schemas']['AuditRecord'][]
+      next_cursor: string
+    }
   }
-  responses: never
+  responses: {
+    /** @description Validation, authorization, conflict, rate limit or service failure. Translate code in the client. */
+    APIError: {
+      headers: {
+        'X-Request-ID': components['headers']['RequestID']
+        /** @description Seconds to wait after a rate limit. */
+        'Retry-After'?: number
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['Error']
+      }
+    }
+  }
   parameters: never
   requestBodies: never
   headers: {
@@ -168,6 +584,482 @@ export interface operations {
           'application/json': components['schemas']['Version']
         }
       }
+    }
+  }
+  getPublicConfig: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PublicConfig']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  login: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        Origin?: string
+        Referer?: string
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LoginInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AuthResult']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  register: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        Origin?: string
+        Referer?: string
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RegisterInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      201: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AuthResult']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  sendVerificationCode: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        Origin?: string
+        Referer?: string
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SendCodeInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CodeSent']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  refreshSession: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        Origin?: string
+        Referer?: string
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AuthResult']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  logout: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        Origin?: string
+        Referer?: string
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      204: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getMe: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['User']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  updateMe: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        Origin?: string
+        Referer?: string
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateSelfInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['User']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  changePassword: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        Origin?: string
+        Referer?: string
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PasswordInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      204: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listUsers: {
+    parameters: {
+      query?: {
+        cursor?: string
+        limit?: number
+        from?: string
+        until?: string
+        search?: string
+        role?: 'user' | 'admin'
+        status?: 'active' | 'disabled'
+        sort?: 'created_at' | 'last_login_at'
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  createUser: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        Origin?: string
+        Referer?: string
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateUserInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      201: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['User']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getUserDetail: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserDetail']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  deleteUser: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        Origin?: string
+        Referer?: string
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeleteUserInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      204: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  updateUser: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        Origin?: string
+        Referer?: string
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateUserInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['User']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getSettings: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        group: 'site' | 'registration' | 'mail'
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SettingsView']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  saveSettings: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        Origin?: string
+        Referer?: string
+      }
+      path: {
+        group: 'site' | 'registration' | 'mail'
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SettingsUpdate']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SettingsView']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listAuditLogs: {
+    parameters: {
+      query?: {
+        cursor?: string
+        limit?: number
+        from?: string
+        until?: string
+        actor_id?: string
+        target_id?: string
+        action?: string
+        target_type?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AuditPage']
+        }
+      }
+      default: components['responses']['APIError']
     }
   }
 }

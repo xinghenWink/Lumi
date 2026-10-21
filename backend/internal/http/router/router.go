@@ -11,7 +11,7 @@ import (
 	"github.com/xinghenWink/Lumi/backend/web"
 )
 
-func New(logger *slog.Logger, health handler.Health, version handler.Version, content fs.FS) (*gin.Engine, error) {
+func New(logger *slog.Logger, health handler.Health, version handler.Version, content fs.FS, options ...func(*gin.Engine) error) (*gin.Engine, error) {
 	engine := gin.New()
 	if err := engine.SetTrustedProxies(nil); err != nil {
 		return nil, fmt.Errorf("configure trusted proxies: %w", err)
@@ -20,6 +20,11 @@ func New(logger *slog.Logger, health handler.Health, version handler.Version, co
 	engine.GET("/healthz", health.Live)
 	engine.GET("/readyz", health.Ready)
 	engine.GET("/api/version", version.Get)
+	for _, option := range options {
+		if err := option(engine); err != nil {
+			return nil, fmt.Errorf("configure HTTP routes: %w", err)
+		}
+	}
 	engine.NoRoute(web.Handler(content))
 	return engine, nil
 }

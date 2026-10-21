@@ -15,6 +15,16 @@ export default ts.config(
     languageOptions: {
       globals: {
         document: 'readonly',
+        navigator: 'readonly',
+        localStorage: 'readonly',
+        DOMException: 'readonly',
+        Headers: 'readonly',
+        Event: 'readonly',
+        MediaQueryListEvent: 'readonly',
+        HTMLSelectElement: 'readonly',
+        URLSearchParams: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
         window: 'readonly',
         fetch: 'readonly',
         AbortController: 'readonly',
@@ -25,6 +35,7 @@ export default ts.config(
       },
     },
     rules: {
+      'vue/multiline-html-element-content-newline': 'off',
       'vue/multi-word-component-names': 'error',
       'vue/html-self-closing': ['error', { html: { void: 'always' } }],
       'vue/max-attributes-per-line': 'off',
