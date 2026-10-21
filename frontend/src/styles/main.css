@@ -387,6 +387,7 @@ input[type='checkbox'] {
   margin-bottom: 35px;
 }
 .auth-story h1 {
+  text-wrap: balance;
   font-size: clamp(28px, 3vw, 40px);
   font-weight: 650;
   letter-spacing: -0.7px;

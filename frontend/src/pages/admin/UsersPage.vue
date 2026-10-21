@@ -323,20 +323,17 @@ async function toggle(user: User) {
             </tbody>
           </table>
         </div>
-        <div class="pagination">
-          <span>{{ t('common.page', { page: pageNumber }) }}</span>
-          <div>
-            <button
-              class="button compact"
-              :disabled="pageNumber === 1 || loading"
-              @click="previous"
-            >
-              <ChevronLeft :size="15" />{{ t('common.previous') }}</button
-            ><button class="button compact" :disabled="!page.next_cursor || loading" @click="next">
-              {{ t('common.next') }}<ChevronRight :size="15" />
-            </button>
-          </div></div
-      ></template>
+      </template>
+      <div v-if="page && !loading" class="pagination">
+        <span>{{ t('common.page', { page: pageNumber }) }}</span>
+        <div>
+          <button class="button compact" :disabled="pageNumber === 1 || loading" @click="previous">
+            <ChevronLeft :size="15" />{{ t('common.previous') }}</button
+          ><button class="button compact" :disabled="!page.next_cursor || loading" @click="next">
+            {{ t('common.next') }}<ChevronRight :size="15" />
+          </button>
+        </div>
+      </div>
     </div>
     <ModalDialog
       v-model:open="modalOpen"

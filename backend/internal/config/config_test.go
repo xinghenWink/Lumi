@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"strings"
 	"testing"
 )
@@ -43,5 +45,41 @@ func TestLoad(t *testing.T) {
 				t.Fatal("configuration error leaked a credential")
 			}
 		})
+	}
+}
+
+func TestAccountSecurityConfiguration(t *testing.T) {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatal(err)
+	}
+	env := map[string]string{
+		"JWT_SECRET": rand.Text() + rand.Text(), "ENCRYPTION_KEY": base64.StdEncoding.EncodeToString(key),
+		"COOKIE_SECURE": "true", "PUBLIC_BASE_URL": "https://lumi.test",
+	}
+	cfg, err := Load(func(key string) string { return env[key] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.ValidateAccounts(); err != nil {
+		t.Fatal(err)
+	}
+	for _, mutate := range []func(*Config){
+		func(c *Config) { c.JWTSecret = "short" },
+		func(c *Config) { c.EncryptionKey = nil },
+		func(c *Config) { c.PublicBaseURL = "http://lumi.test" },
+		func(c *Config) { c.AdminEmail = "admin@lumi.test" },
+	} {
+		invalid := cfg
+		mutate(&invalid)
+		if err := invalid.ValidateAccounts(); err == nil {
+			t.Fatal("unsafe account configuration accepted")
+		}
+	}
+	for _, origin := range []string{"https://lumi.test/path", "https://user:private@lumi.test", "https://lumi.test?token=private"} {
+		env["PUBLIC_BASE_URL"] = origin
+		if _, err := Load(func(key string) string { return env[key] }); err == nil || strings.Contains(err.Error(), "private") {
+			t.Fatal("origin validation accepted invalid input or exposed credentials")
+		}
 	}
 }

@@ -9,6 +9,7 @@ import ApiNotice from '../components/ApiNotice.vue'
 import { useAuthStore } from '../stores/auth'
 import { useSiteStore } from '../stores/site'
 import { safeRedirect, validEmail, validPassword } from '../features/accounts/utils'
+import { ApiError } from '../api/transport'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -60,6 +61,7 @@ async function sendCode() {
     seconds.value = await auth.sendCode(email.value.trim(), locale.value === 'en' ? 'en' : 'zh-CN')
     notice.value = t('auth.codeSent')
   } catch (failure) {
+    if (failure instanceof ApiError && failure.retryAfter) seconds.value = failure.retryAfter
     error.value = failure
   } finally {
     sending.value = false

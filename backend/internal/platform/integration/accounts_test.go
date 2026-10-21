@@ -335,6 +335,29 @@ func TestM1Accounts(t *testing.T) {
 		expectStatus(t, f.call(t, otherClient, "GET", "/api/v1/me", other.AccessToken, nil), 401)
 		member = f.login(t, memberClient, email, value)
 	})
+	t.Run("verification codes expire and stop after five failures", func(t *testing.T) {
+		for _, target := range []string{"exhausted@lumi.test", "expired@lumi.test"} {
+			expectStatus(t, f.call(t, memberClient, "POST", "/api/v1/auth/send-code", "", auth.CodeInput{Email: target}), 200)
+			input := auth.RegisterInput{Email: target, Password: rand.Text() + "Aa1", Nickname: "Verification", AcceptTerms: true}
+			if strings.HasPrefix(target, "exhausted") {
+				input.Code = "wrong!"
+				for range 5 {
+					expectStatus(t, f.call(t, memberClient, "POST", "/api/v1/auth/register", "", input), 400)
+				}
+				var attempts int
+				if err := f.pool.QueryRow(f.ctx, "SELECT attempts FROM verification_codes WHERE target=$1 AND used_at IS NULL", target).Scan(&attempts); err != nil || attempts != 5 {
+					t.Fatalf("verification limit was not persisted: %d %v", attempts, err)
+				}
+			} else if _, err := f.pool.Exec(f.ctx, "UPDATE verification_codes SET expires_at=now() - interval '1 second' WHERE target=$1", target); err != nil {
+				t.Fatal(err)
+			}
+			input.Code = f.sender.code(target)
+			expectStatus(t, f.call(t, memberClient, "POST", "/api/v1/auth/register", "", input), 400)
+			if _, err := query.New(f.pool).GetUserByEmail(f.ctx, target); !errors.Is(err, pgx.ErrNoRows) {
+				t.Fatal("rejected verification created an account")
+			}
+		}
+	})
 	t.Run("administrator CRUD revocation and deletion confirmation", func(t *testing.T) {
 		path := "/api/v1/admin/users/" + member.User.ID.String()
 		response := f.call(t, adminClient, "PATCH", path, admin.AccessToken, user.UpdateInput{Status: pointer("disabled")})
