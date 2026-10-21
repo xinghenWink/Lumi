@@ -33,13 +33,15 @@
 
 Windows 未安装 Make，本机执行了其等价命令。未把无法运行的项目标记为通过。
 
-## 尚待完成的 M0 DoD
+## 远程验收与 M0 DoD
 
-- [ ] Docker 引擎启动后，完整 Compose 栈首页与 `/readyz` 实测。
-- [ ] 真实 PG / Redis 集成测试通过，包括并发启动迁移、重复迁移与 Redis 中断。
-- [ ] 远程 GitHub Actions 全绿。
+代码版本 `1080a1f` 的 [GitHub CI](https://github.com/xinghenWink/Lumi/actions/runs/39653373637) 已全部通过，包含 quality 与 container 两个任务。改动由 [M0 草稿 PR #1](https://github.com/xinghenWink/Lumi/pull/1) 承载。
+
+- [x] 完整 Compose 栈首页、`/readyz` 与版本接口实测（GitHub Ubuntu runner）。
+- [x] 真实 PG / Redis 集成测试通过，包括并发启动迁移、重复迁移与 Redis 中断。
+- [x] 远程 GitHub Actions 全绿，`make lint test`、代码生成、构建与浏览器冒烟全部通过。
 - [ ] 实际发布 `v0.0.1` 并验证 GHCR amd64 / arm64 镜像。
 
 本机 Docker CLI 存在，但 `dockerDesktopLinuxEngine` 管道不可用。启动 Docker Desktop 的操作被自动审批以 `blocked by policy` 拒绝。集成测试返回无法创建 Docker provider；没有跳过测试或用模拟依赖替代。
 
-以上外部验证完成前，M0 保持待验收，不进入 M1。账号、积分和真实模型能力均未实现，原型的演示入口与本地业务数据没有移植。
+本机环境限制已通过远程真实容器验证补齐。M0 工程与容器检查通过，剩余版本发布验收尚未完成，因此暂不进入 M1。账号、积分和真实模型能力均未实现，原型的演示入口与本地业务数据没有移植。
