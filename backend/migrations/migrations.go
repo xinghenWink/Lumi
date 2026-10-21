@@ -17,7 +17,9 @@ import (
 var files embed.FS
 
 func Up(ctx context.Context, pool *pgxpool.Pool) (resultErr error) {
-	sqlDB := stdlib.OpenDBFromPool(pool)
+	// Keep migration sessions outside the application pool. Advisory locks and
+	// migration connection state must remain owned by this Provider until close.
+	sqlDB := stdlib.OpenDB(*pool.Config().ConnConfig)
 	defer func() {
 		if err := sqlDB.Close(); err != nil && resultErr == nil {
 			resultErr = fmt.Errorf("close migration database: %w", err)
