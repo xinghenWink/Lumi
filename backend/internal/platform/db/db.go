@@ -18,6 +18,8 @@ func Open(ctx context.Context, connectionURL string) (*pgxpool.Pool, error) {
 	cfg.MinConns = 1
 	cfg.MaxConnLifetime = 30 * time.Minute
 	cfg.ConnConfig.ConnectTimeout = 5 * time.Second
+	// Keep business queries in the same schema even when POSTGRES_USER changes.
+	cfg.ConnConfig.RuntimeParams["search_path"] = "lumi,public"
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("create PostgreSQL pool: %w", err)

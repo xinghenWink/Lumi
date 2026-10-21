@@ -23,6 +23,8 @@
 
 认证参考：[OWASP 密码存储](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)、[JWT 校验选项](https://golang-jwt.github.io/jwt/usage/parse/)、[Reka Dialog](https://reka-ui.com/docs/components/dialog)。
 
+补充：迁移使用独立连接与 PostgreSQL session lock；迁移版本表固定为 `public.goose_db_version`，业务连接固定 `search_path=lumi,public`。M0 首次创建的同名 schema 会改变 PostgreSQL 默认 `$user,public` 查找结果；显式限定可避免并发启动创建第二张版本表，并使业务表位置不受数据库用户名影响。保留并发迁移、重复执行和两条版本记录各一次的集成检查。
+
 ## M0（2026-10-22）
 
 以下为 M0（2026-10-22）决策。依赖版本锁定在 `backend/go.mod` / `backend/go.sum` 与根目录 `pnpm-lock.yaml`。

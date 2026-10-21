@@ -30,6 +30,9 @@ func Up(ctx context.Context, pool *pgxpool.Pool) (resultErr error) {
 		return fmt.Errorf("create migration advisory lock: %w", err)
 	}
 	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, files,
+		// M0 creates a schema named after the default role. An unqualified version
+		// table can otherwise move from public to lumi during concurrent startup.
+		goose.WithTableName("public.goose_db_version"),
 		goose.WithSessionLocker(locker), goose.WithDisableGlobalRegistry(true))
 	if err != nil {
 		return fmt.Errorf("create migration provider: %w", err)
