@@ -1,6 +1,6 @@
 # M1 验收记录
 
-日期：2026-10-22。分支：`codex/m1-accounts-admin`。[PR #2](https://github.com/xinghenWink/Lumi/pull/2) 暂以 `codex/m0-foundation` 为 base。
+日期：2026-10-22。分支：`codex/m1-accounts-admin`。[PR #2](https://github.com/xinghenWink/Lumi/pull/2) 随 M0 合并后以 `main` 为目标分支；用户已授权合并两个阶段。
 
 ## 实现范围
 
@@ -26,7 +26,7 @@
 - [x] 30 天保留边界、并发/重复清理、会话清理、审计保留及审计失败回滚的真实数据库检查通过。
 - [x] GitHub CI 通过，含 Docker 镜像构建与完整 Compose 栈验证。
 
-业务实现 `da83817` 的[完整 CI 记录](https://github.com/xinghenWink/Lumi/actions/runs/39702932364)包含上述真实依赖、清理、浏览器及容器检查。后续文档与本地默认配置的状态见 [PR 最新 Checks](https://github.com/xinghenWink/Lumi/pull/2/checks)。已下载并复核真实账号的登录/注册、深色资料、用户详情与审计截图；[桌面与手机截图产物](https://github.com/xinghenWink/Lumi/actions/runs/39702303779/artifacts/12393826386)由 CI 保留。
+同步 M0 发布门禁后的 `27b5c23` 的[完整 CI 记录](https://github.com/xinghenWink/Lumi/actions/runs/39705795803)包含上述真实依赖、清理、浏览器及容器检查，全部通过。验收文档更新后的状态见 [PR 最新 Checks](https://github.com/xinghenWink/Lumi/pull/2/checks)。已下载并复核真实账号的登录/注册、深色资料、用户详情与审计截图；[桌面与手机截图产物](https://github.com/xinghenWink/Lumi/actions/runs/39702303779/artifacts/12393826386)由 CI 保留。
 
 本机 Docker 引擎不可用，真实依赖测试在 CI 执行。并发启动测试发现 M0 创建同名 schema 后会改变默认查找路径，导致出现第二张迁移版本表；已固定 `public.goose_db_version` 与业务连接 `search_path=lumi,public`，并通过并发/重复迁移、每条版本只记录一次及无影子版本表的回归检查。未修改既有 SQL 迁移。
 
@@ -34,4 +34,4 @@
 
 F-AUTH-03 的注册积分及 F-ADM-03 的初始积分、余额筛选和积分详情在 M2；模型/聊天/图像能力在 M3～M5。M1 不写入积分流水，也不显示示例余额。头像上传和 P1 账号设备管理、找回密码与 Turnstile 等不在本阶段。
 
-M0 发布仍待验收；用户已明确授权直接进入 M1，本阶段不自动合并 PR 或发布版本。
+M0 发布验收已完成：[v0.0.1](https://github.com/xinghenWink/Lumi/releases/tag/v0.0.1) 的 amd64 / arm64 镜像均通过完整生产 Compose 验证，详见 `M0_ACCEPTANCE.md`。用户随后要求完成验收并合并 M0 / M1，合并顺序为 PR #1 → PR #2。`v0.0.1` 保留纯 M0 内容，M1 合并后的镜像由 main 的 `edge` / `sha-*` 发布提供。
