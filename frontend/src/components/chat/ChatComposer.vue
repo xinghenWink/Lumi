@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ArrowUp, Square } from 'lucide-vue-next'
 import { useChatStore } from '../../stores/chat'
 import { useModelStore } from '../../stores/models'
+import { useAuthStore } from '../../stores/auth'
 import ModelPicker from '../catalog/ModelPicker.vue'
 import ApiNotice from '../ApiNotice.vue'
 import { images, type ImageFile } from '../../api/images'
@@ -14,6 +15,7 @@ const { t } = useI18n(),
   router = useRouter(),
   chat = useChatStore(),
   models = useModelStore()
+const auth = useAuthStore()
 const pending = ref(false),
   error = ref<unknown>(null)
 const references = ref<ImageFile[]>([]),
@@ -21,21 +23,36 @@ const references = ref<ImageFile[]>([]),
 const vision = computed(
   () => models.items.chat.find((m) => m.id === models.selected.chat)?.capabilities.vision === true,
 )
+let uploadController: AbortController | undefined
+function resetReferences() {
+  uploadController?.abort()
+  references.value = []
+  uploading.value = false
+}
+watch(() => [chat.active, auth.user?.id], resetReferences)
+onUnmounted(resetReferences)
 async function upload(event: Event) {
   const input = event.target
   if (!(input instanceof HTMLInputElement)) return
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
+  uploadController?.abort()
+  const controller = new AbortController()
+  uploadController = controller
+  const owner = auth.user?.id,
+    conversation = chat.active
   uploading.value = true
   error.value = null
   try {
     if (references.value.length >= 4) throw new ApiError('INVALID_INPUT')
-    references.value = [...references.value, await images.upload(file)]
+    const uploaded = await images.upload(file, controller.signal)
+    if (!controller.signal.aborted && owner === auth.user?.id && conversation === chat.active)
+      references.value = [...references.value, uploaded]
   } catch (e) {
-    error.value = e
+    if (!controller.signal.aborted) error.value = e
   } finally {
-    uploading.value = false
+    if (!controller.signal.aborted) uploading.value = false
   }
 }
 const key = computed(() => (props.image ? 'image-draft' : chat.active || 'new'))
@@ -56,7 +73,8 @@ async function send() {
   )
     return
   const text = draft.value,
-    oldKey = key.value
+    oldKey = key.value,
+    referenceIDs = vision.value ? references.value.map((file) => file.id) : []
   pending.value = true
   error.value = null
   try {
@@ -68,7 +86,7 @@ async function send() {
       model_id: models.selected.chat,
       action: 'send',
       content: text,
-      reference_file_ids: vision.value ? references.value.map((file) => file.id) : [],
+      reference_file_ids: referenceIDs,
     })
     references.value = []
   } catch (failure) {
@@ -134,7 +152,7 @@ function enter(event: KeyboardEvent) {
             v-else
             class="button primary chat-send"
             :aria-label="t('chat.send')"
-            :disabled="image || pending || !draft.trim() || !models.selected.chat"
+            :disabled="image || pending || uploading || !draft.trim() || !models.selected.chat"
           >
             <ArrowUp :size="19" />
           </button>
