@@ -12,6 +12,8 @@
 | ADR-052 | 流文本按 animation frame 合并，消息 shallowRef 不可变更新，Markdown 缓存已完成块；编辑器独立组件，IntersectionObserver 控制跟随滚动。原始 HTML 关闭，图片不自动向外站加载，链接过滤危险协议。                                        |
 | ADR-053 | 首次完成后调用标题模型，10 秒失败回退首句 20 字；先保存回答再生成标题，手动重命名不会被覆盖。首文本前按优先级回退路由，流开始后保留内容并报错；加权路由 / 熔断 / 断线续传仍属 P1。                                                   |
 
+ADR-054：新增仅开发依赖 Lighthouse 13.5.0，验收登录后的桌面冷 HTTP 缓存性能；使用隔离的临时 Chromium profile，不保存认证报告。其 Node 下限为 22.19，工作区同步提高下限。工具链 OpenTelemetry API 固定 1.9.0，满足 SDK 声明的 <1.10 peer 范围。另以真实 fixture 流测量 60 个增量的平台额外延迟、交互事件上界与长任务比例，报告注明 CI 环境及测量边界。Shiki 使用 core + JavaScript 正则引擎及显式语法按需加载，避免携带 WASM 与无关语言。
+
 Markdown 安全与按需加载依据：[markdown-it](https://markdown-it.github.io/markdown-it/)、[DOMPurify](https://github.com/cure53/DOMPurify)、[Shiki](https://shiki.style/guide/bundles)、[KaTeX](https://katex.org/docs/options)。
 
 ## M3（2026-10-22）

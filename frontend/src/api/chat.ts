@@ -140,11 +140,11 @@ export async function consumeChat(
         }
         if (data.length) {
           const value: unknown = JSON.parse(data.join('\n'))
+          if (done) throw new ApiError('RESPONSE_INVALID')
           const event = parseEvent(type, value)
           onEvent(event)
           if (event.type === 'done') {
             done = true
-            return
           }
         }
         match = buffer.match(/\r?\n\r?\n/)
@@ -153,7 +153,7 @@ export async function consumeChat(
     }
     if (!done) throw new ApiError('CHAT_INTERRUPTED')
   } finally {
-    await reader.cancel().catch(() => undefined)
+    if (!done) await reader.cancel().catch(() => undefined)
     reader.releaseLock()
   }
 }

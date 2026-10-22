@@ -6,6 +6,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { record } from '../src/api/transport'
 import { defaultCapabilities } from '../src/api/catalog-contracts'
 import { observeErrors } from './browser-errors'
+import { streamPerformance, desktopLighthouse } from './chat-performance'
 
 async function login(page: Page, email: string, password: string) {
   await page.goto('/login')
@@ -141,6 +142,7 @@ test('M4 real streaming history stop editing isolation and bounded rendering', a
   })
   const member = await memberContext.newPage()
   observeErrors(member, errors)
+  let cleanup: (() => Promise<void>) | undefined
   try {
     let auth = await login(page, adminEmail, adminPassword)
     const api = async (method: string, path: string, body?: unknown) => {
@@ -178,6 +180,12 @@ test('M4 real streaming history stop editing isolation and bounded rendering', a
       note: '',
     })
     if (typeof channel?.id !== 'string') throw new Error('No channel')
+    const channelID = channel.id
+    let modelID = ''
+    cleanup = async () => {
+      await api('DELETE', '/admin/upstreams/' + channelID)
+      if (modelID) await api('DELETE', '/admin/models/' + modelID)
+    }
     const model = await api('POST', '/admin/models', {
       version: 0,
       display_name: modelName,
@@ -206,6 +214,7 @@ test('M4 real streaming history stop editing isolation and bounded rendering', a
       ],
     })
     if (typeof model?.id !== 'string') throw new Error('No model')
+    modelID = model.id
     await page.goto('/admin/chat-settings')
     await page.getByLabel('每用户每分钟请求数', { exact: true }).fill('0')
     await page.getByLabel('全局 system prompt', { exact: true }).fill('用中文回答，保留上下文。')
@@ -389,6 +398,9 @@ test('M4 real streaming history stop editing isolation and bounded rendering', a
     await dialog.getByRole('button', { name: '确认删除', exact: true }).click()
     await expect(dialog).not.toBeVisible()
     expect((await api('GET', '/conversations'))?.items).toEqual([])
+    await streamPerformance(page, auth.token, info)
+    if (info.project.name === 'desktop')
+      await desktopLighthouse(baseURL, memberEmail, memberPassword, info)
     const performanceID = randomUUID()
     execFileSync('go', ['run', '-tags=integration', './internal/testsupport/chatseed'], {
       cwd: fileURLToPath(new URL('../../backend', import.meta.url)),
@@ -425,13 +437,15 @@ test('M4 real streaming history stop editing isolation and bounded rendering', a
     expect(badCalls).toBeGreaterThan(3)
     expect(systemSeen).toBe(true)
     expect(errors).toEqual([])
-    await api('DELETE', '/admin/upstreams/' + channel.id)
-    await api('DELETE', '/admin/models/' + model.id)
   } finally {
-    await memberContext.close()
-    server.closeAllConnections()
-    await new Promise<void>((resolve, reject) =>
-      server.close((error) => (error ? reject(error) : resolve())),
-    )
+    try {
+      await cleanup?.()
+    } finally {
+      await memberContext.close()
+      server.closeAllConnections()
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      )
+    }
   }
 })
