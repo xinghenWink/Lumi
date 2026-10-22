@@ -2,7 +2,7 @@
 
 AI 对话与图像创作平台。Go + Gin + PostgreSQL 16 + Redis 7，以及 Vue 3 + TypeScript + Vite。
 
-当前阶段：**M5 生图功能已实现，正在完成验收**。M0 / M1 已合并，M2 / M3 / M4 已验收待审查；M5 的 PR #6 基于 M4，提供生图会话、参考图、异步任务、原子扣费退款、图库、头像与后台图像配置。验收状态见 M5 记录。
+当前阶段：**M5 生图开发完成**。M0 / M1 已合并，M2 / M3 / M4 已验收待审查；M5 的 PR #6 基于 M4，提供生图会话、参考图、异步任务、原子扣费退款、图库、头像与后台图像配置。验收证据见 [M5 记录](docs/M5_ACCEPTANCE.md) 与 [PR 检查](https://github.com/xinghenWink/Lumi/pull/6/checks)。
 
 - [需求清单](docs/REQUIREMENTS.md)
 - [开发分析与计划](docs/DEVELOPMENT_PLAN.md)
