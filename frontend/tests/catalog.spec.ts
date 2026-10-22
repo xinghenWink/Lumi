@@ -166,6 +166,7 @@ test('M3 real channel configuration import routing and safe model selection', as
       .click()
     await expect(picker).toContainText(chatName)
     // The modal menu intentionally hides background controls from the accessibility tree.
+    await picker.scrollIntoViewIfNeeded()
     const triggerBox = await picker.boundingBox()
     await picker.click()
     const menu = member.getByRole('menu', { name: '可用模型', exact: true })
