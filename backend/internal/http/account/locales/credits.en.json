@@ -1,4 +1,5 @@
 {
+  "user_headers":["ID","Email","Nickname","Role","Status","Created at"],
   "ledger_headers": ["Entry ID", "User ID", "Type", "Bucket", "Credit change", "Bucket balance after", "Total balance after", "Reference type", "Reference ID", "Operator ID", "Note", "Time (UTC)"],
   "code_headers": ["Code ID", "Batch ID", "Redeem code", "Credits per code", "Allowed uses", "Used count", "Status", "Expiry (UTC)", "Created (UTC)"],
   "types": {"signup_bonus":"Registration gift","daily_grant":"Daily gift","daily_expire":"Daily expiry","redeem":"Redemption","admin_adjust":"Administrator adjustment","image_charge":"Image charge","image_refund":"Image refund"},

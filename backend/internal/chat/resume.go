@@ -48,7 +48,7 @@ func (s *Service) StartBuffered(ctx context.Context, actor user.Actor, id uuid.U
 		return nil
 	}
 	first := make(chan error, 1)
-	work, stopWork := context.WithCancel(context.WithoutCancel(ctx))
+	work, stopWork := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Minute)
 	stopLifetime := context.AfterFunc(s.lifetime, stopWork)
 	s.workers.Add(1)
 	go func() {

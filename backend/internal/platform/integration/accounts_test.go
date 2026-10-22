@@ -102,6 +102,11 @@ func newAccountFixture(t *testing.T) *fixture {
 	if err := migrations.Up(ctx, pool); err != nil {
 		t.Fatalf("account migrations: %v", err)
 	}
+	// Legacy account scenarios exercise many invalid signups from one fixture IP.
+	// M6 quota tests explicitly enable their own limit; production defaults stay unchanged.
+	if _, err := pool.Exec(ctx, "UPDATE settings SET value=jsonb_set(value,'{register_per_ip_day}','0') WHERE key='operations'"); err != nil {
+		t.Fatal(err)
+	}
 	redisContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ContainerRequest: testcontainers.ContainerRequest{Image: "redis:7-alpine", ExposedPorts: []string{"6379/tcp"}, Cmd: []string{"redis-server", "--requirepass", "integration-only"}, WaitingFor: wait.ForLog("Ready to accept connections")}, Started: true})
 	testcontainers.CleanupContainer(t, redisContainer)
 	if err != nil {

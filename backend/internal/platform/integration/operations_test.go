@@ -4,10 +4,12 @@ package integration_test
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/netip"
 	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -18,6 +20,7 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/jobs"
 	"github.com/xinghenWink/Lumi/backend/internal/operations"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
+	"github.com/xinghenWink/Lumi/backend/internal/settings"
 	"github.com/xinghenWink/Lumi/backend/internal/user"
 )
 
@@ -26,6 +29,61 @@ func (m *captureMailer) SendReset(_ context.Context, email, link, _ string) erro
 	defer m.mu.Unlock()
 	m.codes[email+":reset"] = link
 	return nil
+}
+
+func TestM6RegistrationQuotaAndChallengeSecrets(t *testing.T) {
+	f := newAccountFixture(t)
+	actor := creditActor(t, f)
+	snapshot, err := f.services.Settings.Read(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registration := snapshot.Registration
+	registration.EmailVerificationEnabled = false
+	if _, err := f.services.Settings.Save(f.ctx, actor, "registration", settings.Update{Registration: &registration}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := settings.OperationsInput{RegisterPerIPDay: 1, CircuitFailures: 5, CircuitSeconds: 60, SensitiveWords: []string{}}
+	if _, err := f.services.Settings.SaveOperations(f.ctx, actor, cfg); err != nil {
+		t.Fatal(err)
+	}
+	client := auth.Client{IP: netip.MustParseAddr("198.51.100.5"), UserAgent: "M6 quota"}
+	input := auth.RegisterInput{Email: "one@quota.test", Password: "Quota-password-1", Nickname: "Quota", AcceptTerms: true}
+	if _, err := f.services.Auth.Register(f.ctx, input, client); err != nil {
+		t.Fatal(err)
+	}
+	input.Email = "two@quota.test"
+	if _, err := f.services.Auth.Register(f.ctx, input, client); creditCode(err) != "REGISTRATION_IP_LIMIT" {
+		t.Fatalf("IP quota bypass: %v", err)
+	}
+	secret := "fixture-only-challenge-secret"
+	cfg.RegisterPerIPDay = 0
+	cfg.TurnstileEnabled = true
+	cfg.TurnstileSiteKey = "public-fixture"
+	cfg.TurnstileHostname = "lumi.test"
+	cfg.TurnstileSecret = &secret
+	view, err := f.services.Settings.SaveOperations(f.ctx, actor, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(view)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), secret) || strings.Contains(string(encoded), "turnstile_secret_encrypted") {
+		t.Fatal("challenge secret escaped administration DTO")
+	}
+	if _, err := f.services.Auth.Register(f.ctx, input, client); creditCode(err) != "CHALLENGE_REQUIRED" {
+		t.Fatalf("challenge bypass: %v", err)
+	}
+	cfg.TurnstileEnabled = false
+	cfg.TurnstileSecret = nil
+	if _, err := f.services.Settings.SaveOperations(f.ctx, actor, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.services.Auth.Register(f.ctx, input, client); err != nil {
+		t.Fatalf("disabled quota did not allow signup: %v", err)
+	}
 }
 func TestM6PasswordResetIsSingleUseAndRevokesSessions(t *testing.T) {
 	f := newAccountFixture(t)

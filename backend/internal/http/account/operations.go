@@ -430,11 +430,12 @@ func (h *Handler) exportUsers(c *gin.Context) {
 	}
 	var buffer bytes.Buffer
 	writer := csv.NewWriter(&buffer)
-	headers := []string{"ID", "邮箱", "昵称", "角色", "状态", "注册时间"}
-	if p.User.Locale == "en" {
-		headers = []string{"ID", "Email", "Nickname", "Role", "Status", "Created at"}
+	catalog, catalogErr := loadCSVCatalog(p.User.Locale)
+	if catalogErr != nil {
+		h.fail(c, catalogErr)
+		return
 	}
-	if err := writer.Write(headers); err != nil {
+	if err := writer.Write(catalog.UserHeaders); err != nil {
 		h.fail(c, err)
 		return
 	}

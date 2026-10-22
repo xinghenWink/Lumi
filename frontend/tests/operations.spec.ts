@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { observeErrors } from './browser-errors'
 
-test('M6 dashboard, preferences, announcements, batches, exports and maintenance', async ({
+test('M6 dashboard, preferences, announcements, exports and system information', async ({
   page,
 }, info) => {
   const email = process.env.E2E_ADMIN_EMAIL,
