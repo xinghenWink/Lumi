@@ -253,6 +253,7 @@ export default {
       credit_ledger: '积分流水',
       upstream: '上游渠道',
       model: '平台模型',
+      chat: '聊天设置',
     },
     actions: {
       credits: { adjust: '调整积分', initialize: '发放初始积分', pricing_update: '修改价格与赠送' },

@@ -156,6 +156,7 @@ function previous() {
             'credit_ledger',
             'upstream',
             'model',
+            'chat',
           ]"
           :key="type"
           :value="type"

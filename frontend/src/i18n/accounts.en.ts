@@ -263,6 +263,7 @@ export default {
       credit_ledger: 'Credit ledger',
       upstream: 'Upstream channel',
       model: 'Platform model',
+      chat: 'Chat settings',
     },
     actions: {
       credits: {

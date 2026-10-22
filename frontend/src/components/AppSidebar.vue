@@ -17,6 +17,7 @@ import {
 } from 'lucide-vue-next'
 import BrandMark from './BrandMark.vue'
 import AccountMenu from './AccountMenu.vue'
+import ChatSidebar from './chat/ChatSidebar.vue'
 import { useSiteStore } from '../stores/site'
 const props = defineProps<{ admin: boolean }>()
 const emit = defineEmits<{ navigate: [] }>()
@@ -28,6 +29,7 @@ const links = computed(() =>
         { path: '/admin/users', key: 'nav.users', icon: Users },
         { path: '/admin/upstreams', key: 'nav.upstreams', icon: Server },
         { path: '/admin/models', key: 'nav.models', icon: Boxes },
+        { path: '/admin/chat-settings', key: 'nav.chatSettings', icon: MessageSquare },
         { path: '/admin/pricing', key: 'nav.pricing', icon: SlidersHorizontal },
         { path: '/admin/redeem-codes', key: 'nav.redeemCodes', icon: Ticket },
         { path: '/admin/credit-ledger', key: 'nav.creditLedger', icon: Coins },
@@ -37,6 +39,7 @@ const links = computed(() =>
     : [
         { path: '/chat', key: 'nav.chat', icon: MessageSquare },
         { path: '/me/credits', key: 'nav.credits', icon: Coins },
+        { path: '/me/chats', key: 'nav.chatHistory', icon: MessageSquare },
       ],
 )
 </script>
@@ -63,7 +66,8 @@ const links = computed(() =>
         }}<span class="soon-badge">{{ t('nav.comingSoon') }}</span>
       </RouterLink>
     </nav>
-    <div class="sidebar-spacer" />
+    <ChatSidebar v-if="!admin" @navigate="emit('navigate')" />
+    <div v-else class="sidebar-spacer" />
     <RouterLink
       v-if="admin"
       class="sidebar-link back-workspace"

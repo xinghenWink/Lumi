@@ -272,8 +272,11 @@ func (s *Service) Stream(ctx context.Context, actor user.Actor, id uuid.UUID, in
 	assistant.Content = content
 	assistant.Status = status
 	assistant.Meta = metadata
-	if status == "completed" && r.first {
-		title := s.title(ctx, config, input.ModelID, r.user.Content, content)
+	if r.first {
+		title := fallbackTitle(r.user.Content)
+		if status == "completed" {
+			title = s.title(ctx, config, input.ModelID, r.user.Content, content)
+		}
 		titleCtx, titleCancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
 		row, titleErr := s.q.AutoTitleConversation(titleCtx, query.AutoTitleConversationParams{ID: id, Title: title})
 		titleCancel()
