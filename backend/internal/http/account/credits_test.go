@@ -14,3 +14,12 @@ func TestCSVFormulaInjection(t *testing.T) {
 		}
 	}
 }
+
+func TestCSVTranslations(t *testing.T) {
+	for _, locale := range []string{"zh-CN", "en"} {
+		catalog, err := loadCSVCatalog(locale)
+		if err != nil || len(catalog.LedgerHeaders) != 12 || len(catalog.CodeHeaders) != 9 || len(catalog.Types) != 7 || len(catalog.States) != 4 {
+			t.Fatalf("CSV translations locale=%s error=%v", locale, err)
+		}
+	}
+}

@@ -12,6 +12,7 @@ const message = computed(() =>
     : t('errors.UNKNOWN_ERROR'),
 )
 const requestId = computed(() => (props.error instanceof ApiError ? props.error.requestId : ''))
+const retryAfter = computed(() => (props.error instanceof ApiError ? props.error.retryAfter : 0))
 </script>
 
 <template>
@@ -19,7 +20,10 @@ const requestId = computed(() => (props.error instanceof ApiError ? props.error.
     <AlertCircle :size="17" aria-hidden="true" />
     <div>
       {{ message
-      }}<span v-if="requestId" class="request-reference"
+      }}<span v-if="retryAfter" class="request-reference">{{
+        t('credits.retryAfter', { seconds: retryAfter })
+      }}</span
+      ><span v-if="requestId" class="request-reference"
         >{{ t('common.requestId') }} {{ requestId }}</span
       >
     </div>

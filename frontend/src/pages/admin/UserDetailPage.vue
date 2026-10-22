@@ -7,6 +7,9 @@ import { accounts } from '../../api/accounts'
 import type { UserDetail } from '../../api/contracts'
 import { useTime } from '../../features/accounts/time'
 import ApiNotice from '../../components/ApiNotice.vue'
+import CreditOverview from '../../components/credits/CreditOverview.vue'
+import CreditLedgerTable from '../../components/credits/CreditLedgerTable.vue'
+import RedemptionRecords from '../../components/credits/RedemptionRecords.vue'
 const route = useRoute()
 const { t } = useI18n()
 const formatTime = useTime()
@@ -14,11 +17,16 @@ const data = shallowRef<UserDetail | null>(null)
 const loading = ref(false)
 const error = shallowRef<unknown>(null)
 const notice = ref('')
+const tab = ref('profile'),
+  creditRevision = ref(0)
 let controller: AbortController | null = null
 let generation = 0
 watch(
   () => route.params.id,
-  () => void load(),
+  () => {
+    tab.value = route.query.tab === 'credits' ? 'credits' : 'profile'
+    void load()
+  },
   { immediate: true },
 )
 onUnmounted(() => controller?.abort())
@@ -65,7 +73,38 @@ async function copy() {
     <div v-if="loading" class="loading-state" role="status">{{ t('common.loading') }}</div>
     <button v-else-if="error" class="button" @click="load">{{ t('common.retry') }}</button
     ><template v-else-if="data"
-      ><section class="panel">
+      ><nav class="credit-tabs" :aria-label="t('admin.users.detailDescription')">
+        <button
+          :class="{ active: tab === 'profile' }"
+          :aria-current="tab === 'profile' ? 'page' : undefined"
+          @click="tab = 'profile'"
+        >
+          {{ t('admin.users.profileTab') }}
+        </button>
+        <button
+          :class="{ active: tab === 'credits' }"
+          :aria-current="tab === 'credits' ? 'page' : undefined"
+          @click="tab = 'credits'"
+        >
+          {{ t('credits.ledger') }}
+        </button>
+        <button
+          :class="{ active: tab === 'records' }"
+          :aria-current="tab === 'records' ? 'page' : undefined"
+          @click="tab = 'records'"
+        >
+          {{ t('credits.records') }}
+        </button>
+      </nav>
+      <div v-if="tab === 'credits'" class="stack">
+        <CreditOverview
+          :key="data.user.id"
+          :user-id="data.user.id"
+          @changed="creditRevision++"
+        /><CreditLedgerTable admin :user-id="data.user.id" :refresh-token="creditRevision" />
+      </div>
+      <RedemptionRecords v-else-if="tab === 'records'" admin :user-id="data.user.id" />
+      <section v-if="tab === 'profile'" class="panel">
         <div class="panel-title">
           <h2>{{ t('admin.users.profileTab') }}</h2>
         </div>
@@ -118,7 +157,7 @@ async function copy() {
         </dl>
         <p v-if="notice" class="panel-notice" role="status">{{ notice }}</p>
       </section>
-      <section class="panel data-panel">
+      <section v-if="tab === 'profile'" class="panel data-panel">
         <div class="panel-title">
           <h2>{{ t('admin.users.sessions') }}</h2>
           <p>{{ t('admin.users.sessionsDescription') }}</p>

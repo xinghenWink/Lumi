@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './credits.css';
 
 @theme {
   --font-sans: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;

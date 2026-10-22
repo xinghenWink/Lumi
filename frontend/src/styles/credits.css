@@ -1,0 +1,349 @@
+.credit-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 26px;
+}
+.credit-summary-grid > *,
+.credit-section,
+.credit-overview,
+.credit-usage,
+.pricing-panel {
+  min-width: 0;
+}
+.credit-overview,
+.credit-usage,
+.pricing-panel {
+  padding: 25px;
+}
+.credit-heading,
+.section-heading,
+.credit-bucket-label,
+.credit-reset,
+.code-copy,
+.selection-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.credit-heading,
+.section-heading {
+  justify-content: space-between;
+}
+.section-heading {
+  flex-wrap: wrap;
+  margin-bottom: 15px;
+}
+.section-heading h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+}
+.credit-heading .eyebrow {
+  color: var(--muted);
+  font-size: 13px;
+}
+.credit-total {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 7px;
+  color: var(--muted);
+}
+.credit-total strong {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  letter-spacing: -0.055em;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.credit-total strong.long-balance {
+  font-size: clamp(1.15rem, 2.5vw, 1.75rem);
+}
+.credit-watermark {
+  color: var(--accent);
+  opacity: 0.55;
+  flex: 0 0 auto;
+}
+.credit-buckets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 24px;
+  gap: 20px;
+}
+.credit-buckets > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.credit-buckets > div + div {
+  border-left: 1px solid var(--line);
+  padding-left: 20px;
+}
+.credit-bucket-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+.credit-buckets strong {
+  margin: 6px 0 1px;
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.credit-buckets > div > span:last-child,
+.credit-reset {
+  color: var(--muted);
+  font-size: 12px;
+}
+.credit-buckets > div:first-child strong {
+  color: var(--accent);
+}
+.credit-rail {
+  height: 5px;
+  margin-top: 19px;
+  background: var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.credit-rail > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.credit-reset {
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 11px 0 0;
+}
+.credit-reset > span {
+  flex-basis: 100%;
+}
+.redeem-form {
+  margin-top: 20px;
+  padding-top: 17px;
+  border-top: 1px solid var(--line);
+}
+.redeem-form > div {
+  display: flex;
+  gap: 9px;
+  margin-top: 8px;
+}
+.redeem-form input {
+  min-width: 0;
+  flex: 1;
+}
+.redeem-form .button {
+  flex: 0 0 auto;
+}
+.credit-tabs {
+  display: flex;
+  gap: 24px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  margin: 0 0 22px;
+}
+.credit-tabs button {
+  flex: 0 0 auto;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 10px 0 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.credit-tabs button.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.credit-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.credit-filters .field {
+  flex: 1 1 145px;
+  min-width: 0;
+}
+.credit-filters .code-search {
+  flex-basis: 210px;
+}
+.credit-filters > .field-hint {
+  flex-basis: 100%;
+}
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+.credit-positive {
+  color: var(--green);
+  font-weight: 600;
+}
+.compact-id {
+  font-size: 11px;
+  display: block;
+  max-width: 225px;
+  overflow-wrap: anywhere;
+}
+.credit-note {
+  min-width: 160px;
+  max-width: 300px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.credit-section table {
+  min-width: 680px;
+}
+.usage-summary {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 20px;
+  margin: 18px 0 22px;
+}
+.usage-summary > div > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.usage-summary > div > strong {
+  display: block;
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+}
+.quality-totals {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  gap: 10px;
+}
+.quality-totals > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.quality-totals strong {
+  display: block;
+  color: var(--text);
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+.usage-chart {
+  margin: 0;
+}
+.usage-chart figcaption {
+  font-size: 12px;
+  color: var(--muted);
+}
+.usage-bars {
+  display: grid;
+  grid-template-columns: repeat(30, minmax(0, 1fr));
+  gap: 4px;
+  height: 110px;
+  margin: 10px 0 7px;
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+  list-style: none;
+}
+.usage-bars li {
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+}
+.usage-bars li span {
+  width: 100%;
+  min-height: 2px;
+  background: var(--accent);
+  border-radius: 3px 3px 0 0;
+}
+.usage-bars li span.zero-usage {
+  background: var(--line);
+}
+.chart-axis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 11px;
+}
+.pricing-panel .form-grid {
+  margin-top: 17px;
+}
+.pricing-table {
+  min-width: 780px;
+}
+.pricing-table td:first-child {
+  min-width: 230px;
+}
+.pricing-table td:nth-child(4) {
+  width: 145px;
+}
+.pricing-table input:not([type='checkbox']) {
+  min-height: 36px;
+}
+.size-rule {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 32px;
+  gap: 12px;
+  align-items: end;
+  margin: 12px 0;
+  max-width: 620px;
+}
+.size-rule .icon-button {
+  margin-bottom: 5px;
+}
+.pricing-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.selection-toolbar {
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  background: var(--accent-soft);
+  border-radius: 10px;
+}
+.selection-toolbar > span {
+  margin-right: auto;
+  color: var(--accent);
+}
+.redeem-table {
+  min-width: 900px;
+}
+.code-copy {
+  gap: 6px;
+}
+.code-copy code {
+  white-space: nowrap;
+  font-size: 12px;
+}
+@media (max-width: 1050px) {
+  .credit-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 520px) {
+  .credit-overview,
+  .credit-usage,
+  .pricing-panel {
+    padding: 18px;
+  }
+  .credit-buckets {
+    gap: 12px;
+  }
+  .credit-buckets > div + div {
+    padding-left: 12px;
+  }
+  .credit-heading {
+    flex-wrap: wrap;
+  }
+  .redeem-form > div {
+    flex-direction: column;
+  }
+  .usage-bars {
+    gap: 2px;
+  }
+  .credit-tabs {
+    gap: 20px;
+  }
+}

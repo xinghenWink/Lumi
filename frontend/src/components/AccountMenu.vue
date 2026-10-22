@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from 'reka-ui'
-import { ChevronsUpDown, LogOut, Settings2, Shield, UserRound } from 'lucide-vue-next'
+import { ChevronsUpDown, LogOut, Settings2, Shield, UserRound, Coins } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
@@ -65,6 +65,9 @@ async function logout() {
             class="menu-item"
             @select="router.push('/admin/users')"
             ><Shield :size="16" />{{ t('nav.admin') }}</DropdownMenuItem
+          >
+          <DropdownMenuItem class="menu-item" @select="router.push('/me/credits')"
+            ><Coins :size="16" />{{ t('nav.credits') }}</DropdownMenuItem
           >
           <DropdownMenuItem class="menu-item" @select="theme.toggle"
             ><Settings2 :size="16" />{{

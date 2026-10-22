@@ -2,7 +2,17 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowLeft, ClipboardList, Image, MessageSquare, Settings2, Users } from 'lucide-vue-next'
+import {
+  ArrowLeft,
+  ClipboardList,
+  Image,
+  MessageSquare,
+  Settings2,
+  Users,
+  Coins,
+  Ticket,
+  SlidersHorizontal,
+} from 'lucide-vue-next'
 import BrandMark from './BrandMark.vue'
 import AccountMenu from './AccountMenu.vue'
 import { useSiteStore } from '../stores/site'
@@ -14,10 +24,16 @@ const links = computed(() =>
   props.admin
     ? [
         { path: '/admin/users', key: 'nav.users', icon: Users },
+        { path: '/admin/pricing', key: 'nav.pricing', icon: SlidersHorizontal },
+        { path: '/admin/redeem-codes', key: 'nav.redeemCodes', icon: Ticket },
+        { path: '/admin/credit-ledger', key: 'nav.creditLedger', icon: Coins },
         { path: '/admin/settings', key: 'nav.settings', icon: Settings2 },
         { path: '/admin/audit', key: 'nav.audit', icon: ClipboardList },
       ]
-    : [{ path: '/chat', key: 'nav.chat', icon: MessageSquare }],
+    : [
+        { path: '/chat', key: 'nav.chat', icon: MessageSquare },
+        { path: '/me/credits', key: 'nav.credits', icon: Coins },
+      ],
 )
 </script>
 <template>

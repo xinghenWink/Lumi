@@ -412,14 +412,19 @@ func (h *Handler) exportLedger(c *gin.Context) {
 		h.fail(c, err)
 		return
 	}
+	catalog, err := loadCSVCatalog(current.User.Locale)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
 	writer := beginCSV(c, "lumi-credit-ledger.csv")
-	if err := csvRow(writer, []string{"id", "user_id", "type", "bucket", "delta", "bucket_balance_after", "total_after", "ref_type", "ref_id", "operator_id", "note", "created_at"}); err != nil {
+	if err := csvRow(writer, catalog.LedgerHeaders); err != nil {
 		h.csvFailure(c, err)
 		return
 	}
 	for {
 		for _, r := range page.Items {
-			if err := csvRow(writer, []string{r.ID.String(), r.UserID.String(), r.Type, r.Bucket, strconv.FormatInt(r.Delta, 10), strconv.FormatInt(r.BucketBalanceAfter, 10), strconv.FormatInt(r.TotalAfter, 10), r.RefType, uuidCell(r.RefID), uuidCell(r.OperatorID), r.Note, r.CreatedAt.Format(time.RFC3339Nano)}); err != nil {
+			if err := csvRow(writer, []string{r.ID.String(), r.UserID.String(), catalog.Types[r.Type], catalog.Buckets[r.Bucket], strconv.FormatInt(r.Delta, 10), strconv.FormatInt(r.BucketBalanceAfter, 10), strconv.FormatInt(r.TotalAfter, 10), r.RefType, uuidCell(r.RefID), uuidCell(r.OperatorID), r.Note, r.CreatedAt.Format(time.RFC3339Nano)}); err != nil {
 				h.csvFailure(c, err)
 				return
 			}
@@ -466,8 +471,13 @@ func (h *Handler) exportCodes(c *gin.Context) {
 		h.fail(c, err)
 		return
 	}
+	catalog, err := loadCSVCatalog(current.User.Locale)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
 	writer := beginCSV(c, "lumi-redeem-codes.csv")
-	if err := csvRow(writer, []string{"id", "batch_id", "code", "credits", "max_uses", "used_count", "status", "expires_at", "created_at"}); err != nil {
+	if err := csvRow(writer, catalog.CodeHeaders); err != nil {
 		h.csvFailure(c, err)
 		return
 	}
@@ -477,7 +487,7 @@ func (h *Handler) exportCodes(c *gin.Context) {
 			if r.ExpiresAt != nil {
 				expiry = r.ExpiresAt.Format(time.RFC3339Nano)
 			}
-			if err := csvRow(writer, []string{r.ID.String(), r.BatchID.String(), r.Code, strconv.FormatInt(r.Credits, 10), strconv.Itoa(int(r.MaxUses)), strconv.Itoa(int(r.UsedCount)), r.Status, expiry, r.CreatedAt.Format(time.RFC3339Nano)}); err != nil {
+			if err := csvRow(writer, []string{r.ID.String(), r.BatchID.String(), r.Code, strconv.FormatInt(r.Credits, 10), strconv.Itoa(int(r.MaxUses)), strconv.Itoa(int(r.UsedCount)), catalog.States[r.Status], expiry, r.CreatedAt.Format(time.RFC3339Nano)}); err != nil {
 				h.csvFailure(c, err)
 				return
 			}

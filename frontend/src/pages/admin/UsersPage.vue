@@ -25,6 +25,7 @@ const filters = reactive({
   minBalance: '',
   maxBalance: '',
 })
+let applied = { ...filters }
 const page = shallowRef<UserPage | null>(null)
 const loading = ref(false)
 const error = shallowRef<unknown>(null)
@@ -61,16 +62,16 @@ async function load() {
   error.value = null
   try {
     const query = new URLSearchParams({
-      search: filters.search.trim(),
-      role: filters.role,
-      status: filters.status,
-      sort: filters.sort,
+      search: applied.search.trim(),
+      role: applied.role,
+      status: applied.status,
+      sort: applied.sort,
       limit: '20',
       cursor: cursors.value.at(-1) ?? '',
     })
-    addDateRange(query, filters.from, filters.until)
-    if (filters.minBalance !== '') query.set('min_balance', filters.minBalance)
-    if (filters.maxBalance !== '') query.set('max_balance', filters.maxBalance)
+    addDateRange(query, applied.from, applied.until)
+    if (applied.minBalance !== '') query.set('min_balance', String(applied.minBalance))
+    if (applied.maxBalance !== '') query.set('max_balance', String(applied.maxBalance))
     const result = await accounts.list(query, controller.signal)
     if (current === generation) page.value = result
   } catch (failure) {
@@ -86,6 +87,7 @@ async function load() {
   }
 }
 function search() {
+  applied = { ...filters }
   cursors.value = ['']
   void load()
 }
@@ -305,7 +307,11 @@ async function toggle(user: User) {
                   >
                 </td>
                 <td class="numeric">
-                  <strong>{{ user.total_credits?.toLocaleString() ?? '—' }}</strong>
+                  <RouterLink
+                    :to="{ path: `/admin/users/${user.id}`, query: { tab: 'credits' } }"
+                    :aria-label="`${t('credits.adjust')} ${user.email}`"
+                    ><strong>{{ user.total_credits?.toLocaleString() ?? '—' }}</strong></RouterLink
+                  >
                   <span v-if="user.total_credits !== undefined" class="table-secondary">{{
                     t('credits.split', {
                       daily: user.daily_balance,
