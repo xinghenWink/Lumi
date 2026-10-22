@@ -2,7 +2,7 @@
 
 验收日期：2026-10-22。基线为已验收的 M3 `a4318df`，分支 `codex/m4-chat`，[PR #5](https://github.com/xinghenWink/Lumi/pull/5) 暂基于尚未合并的 M3 PR #4。未合并前序阶段，未发布新镜像或版本。
 
-当前状态：**M4 开发验收通过，可进入 PR 审查**。功能提交 `d2fe57d` 的 [CI 39779410937](https://github.com/xinghenWink/Lumi/actions/runs/39779410937) 全部通过，包括真实 PG / Redis、全部 12 项浏览器和生产 Compose；最终截图已下载复核。归档复验发现的测试采集 / IP 共享问题已修正，复验结果后补。
+当前状态：**M4 开发验收通过，可进入 PR 审查**。功能提交 `d2fe57d` 的 [CI 39779410937](https://github.com/xinghenWink/Lumi/actions/runs/39779410937) 全部通过，包括真实 PG / Redis、全部 12 项浏览器和生产 Compose；最终截图已下载复核。归档复验补充了真实响应副本采集与测试客户端 IP 隔离，最新提交的复验状态见 [PR 检查](https://github.com/xinghenWink/Lumi/pull/5/checks)。
 
 ## 功能清单
 
