@@ -219,6 +219,19 @@ test('M4 real streaming history stop editing isolation and bounded rendering', a
     await expect(page.getByRole('button', { name: '选择模型', exact: true })).toContainText(
       modelName,
     )
+    await page.evaluate(() => {
+      const nativeFetch = window.fetch.bind(window)
+      const capture = window as Window & { lumiChatWire?: Promise<string> }
+      // Tee the real browser response before Chromium evicts a completed streaming body.
+      window.fetch = async (input, init) => {
+        const response = await nativeFetch(input, init)
+        if (response.headers.get('Content-Type')?.startsWith('text/event-stream')) {
+          capture.lumiChatWire = response.clone().text()
+          window.fetch = nativeFetch
+        }
+        return response
+      }
+    })
     const stream = page.waitForResponse(
       (r) =>
         r.url().includes('/conversations/') &&
@@ -240,7 +253,12 @@ test('M4 real streaming history stop editing isolation and bounded rendering', a
     expect(await page.locator('.chat-markdown script,.chat-markdown img').count()).toBe(0)
     const streamed = await stream
     expect(streamed.headers()['x-accel-buffering']).toBe('no')
-    const wireResponse = await streamed.text()
+    const wireResponse = await page.evaluate(async () => {
+      const response = (window as Window & { lumiChatWire?: Promise<string> }).lumiChatWire
+      if (!response) throw new Error('No captured browser SSE response')
+      return response
+    })
+    expect(wireResponse).toContain('event: done')
     for (const value of [
       key,
       wire,

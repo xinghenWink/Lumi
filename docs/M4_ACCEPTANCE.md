@@ -2,7 +2,7 @@
 
 验收日期：2026-10-22。基线为已验收的 M3 `a4318df`，分支 `codex/m4-chat`，[PR #5](https://github.com/xinghenWink/Lumi/pull/5) 暂基于尚未合并的 M3 PR #4。未合并前序阶段，未发布新镜像或版本。
 
-当前状态：**M4 开发验收通过，可进入 PR 审查**。功能提交 `d2fe57d` 的 [CI 39779410937](https://github.com/xinghenWink/Lumi/actions/runs/39779410937) 全部通过，包括真实 PG / Redis、全部 12 项浏览器和生产 Compose；最终截图已下载复核。后续归档只更新文档。
+当前状态：**M4 开发验收通过，可进入 PR 审查**。功能提交 `d2fe57d` 的 [CI 39779410937](https://github.com/xinghenWink/Lumi/actions/runs/39779410937) 全部通过，包括真实 PG / Redis、全部 12 项浏览器和生产 Compose；最终截图已下载复核。归档复验发现的测试采集 / IP 共享问题已修正，复验结果后补。
 
 ## 功能清单
 
@@ -61,6 +61,8 @@
 - 每种视口执行 60 次顺序 SSE 请求，首文本往返减去 fixture 内部处理时间；保留认证、事务、首文本前回退、HTTP 转发开销，检查 p95 <100ms。无 Content-Encoding，并检查 X-Accel-Buffering。该结果限于 CI 本地链路，不代表生产并发负载。
 
 本地 Docker engine 不可用；真实依赖与 Compose 在 Actions 验证。此前失败运行未计入最终通过，包括正常 SSE 结束时过早取消 reader 导致 CDP 取 body 失败、CSP 阻止生成样式 / 内嵌字体和 ESLint 缺少 DOM 类型全局的问题。
+
+归档提交 CI 39780381938 中，Chromium 偶发无法通过 CDP 返回已结束的 SSE body。浏览器测试改为发送前 tee 真实 fetch 响应，读取副本后检查 done 与字段边界，不拦截或替换服务端响应。后续积分页因两个视口共用 loopback IP，在一分钟内触发已有 refresh 60 次限额；仅在 E2E 配置中为视口分配独立测试客户端 IP，并显式信任 loopback 代理。生产限额与默认代理信任不变。
 
 ## 实例验证与阶段范围
 

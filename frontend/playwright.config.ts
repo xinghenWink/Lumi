@@ -14,8 +14,20 @@ export default defineConfig({
   timeout: 120_000,
   use: { baseURL, trace: 'retain-on-failure', actionTimeout: 10_000, navigationTimeout: 15_000 },
   projects: [
-    { name: 'desktop', use: { viewport: { width: 1440, height: 900 } } },
-    { name: 'mobile', use: { viewport: { width: 320, height: 740 } } },
+    {
+      name: 'desktop',
+      use: {
+        viewport: { width: 1440, height: 900 },
+        extraHTTPHeaders: { 'X-Forwarded-For': '198.18.0.1' },
+      },
+    },
+    {
+      name: 'mobile',
+      use: {
+        viewport: { width: 320, height: 740 },
+        extraHTTPHeaders: { 'X-Forwarded-For': '198.18.0.2' },
+      },
+    },
   ],
   webServer: {
     command: `go build -tags=production -o ${serverBinary} ./cmd/lumi && ${serverBinary} serve`,
@@ -26,6 +38,8 @@ export default defineConfig({
     env: {
       APP_ENV: 'test',
       UPSTREAM_ALLOW_PRIVATE_NETWORKS: 'true',
+      // Viewport projects represent separate clients while retaining real IP rate limits.
+      TRUSTED_PROXIES: '127.0.0.1',
       HTTP_ADDR: `127.0.0.1:${new URL(baseURL).port || '18080'}`,
       PUBLIC_BASE_URL: baseURL,
       DATABASE_URL: process.env.E2E_DATABASE_URL ?? '',
