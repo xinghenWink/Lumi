@@ -225,6 +225,9 @@ func (s *Service) views(ctx context.Context, rows []query.ImageTask, viewer uuid
 	byTask := map[uuid.UUID][]Item{}
 	for _, item := range items {
 		view := Item{Position: item.Position, Status: item.Status, FileID: item.FileID, ErrorCode: item.ErrorCode}
+		if item.FileDeletedAt != nil {
+			view.FileID = nil
+		}
 		if content && item.FileID != nil && item.FileDeletedAt == nil && item.FileSize != nil && item.FileCreatedAt != nil {
 			file := s.files.Decorate(media.File{ID: *item.FileID, Kind: item.FileKind.String, MIME: item.FileMime.String, Size: *item.FileSize, Width: item.FileWidth.Int32, Height: item.FileHeight.Int32, ThumbnailWidth: item.ThumbnailWidth.Int32, ThumbnailHeight: item.ThumbnailHeight.Int32, CreatedAt: item.FileCreatedAt.UTC()}, viewer)
 			view.File = &file

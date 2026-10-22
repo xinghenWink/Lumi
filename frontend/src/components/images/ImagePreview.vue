@@ -13,6 +13,7 @@ const props = defineProps<{
   index: number
   prompt: string
   parameters: string
+  allowEdit?: boolean
 }>()
 const emit = defineEmits<{ 'update:open': [boolean]; edit: [ImageFile]; navigate: [number] }>()
 const { t } = useI18n(),
@@ -88,7 +89,7 @@ function edit(file: ImageFile) {
         <button class="button compact" @click="actions.copy(file)">
           <Copy :size="15" />{{ t(actions.copied.value ? 'images.copied' : 'images.copy') }}
         </button>
-        <button class="button compact" @click="edit(file)">
+        <button v-if="allowEdit !== false" class="button compact" @click="edit(file)">
           <Plus :size="15" />{{ t('images.edit') }}
         </button>
       </div>

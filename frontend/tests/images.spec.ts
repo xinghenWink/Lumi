@@ -150,10 +150,21 @@ test('M5 real image generation editing gallery cancellation and administrator pr
     channelID = ''
   let oldPricing: Record<string, unknown> | undefined,
     oldSettings: ReturnType<typeof parseImageConfiguration> | undefined
-  async function api(method: string, path: string, body?: unknown, token = adminToken) {
+  async function api(
+    method: string,
+    path: string,
+    body?: unknown,
+    token = adminToken,
+    idempotencyKey?: string,
+  ) {
     const response = await page.request.fetch('/api/v1' + path, {
       method,
-      headers: { Authorization: 'Bearer ' + token, 'X-Lumi-CSRF': '1', Origin: baseURL ?? '' },
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'X-Lumi-CSRF': '1',
+        Origin: baseURL ?? '',
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      },
       ...(body === undefined ? {} : { data: body }),
     })
     expect(response.ok(), path + ' status ' + response.status()).toBe(true)
@@ -385,6 +396,26 @@ test('M5 real image generation editing gallery cancellation and administrator pr
     const adminView = await api('GET', '/admin/image-tasks/' + firstID)
     expect(adminView.content_visible).toBe(false)
     expect(adminView.prompt).toBe('')
+    await page.goto('/admin/image-tasks')
+    await page.getByLabel('用户 ID', { exact: true }).fill(String(memberUser.id))
+    await page.getByRole('button', { name: '筛选', exact: true }).click()
+    await page
+      .getByRole('row')
+      .filter({ hasText: firstID })
+      .getByRole('button', { name: '任务详情', exact: true })
+      .click()
+    await expect(
+      page.getByRole('dialog').getByText('内容访问未开启', { exact: true }),
+    ).toBeVisible()
+    await expect(page.getByRole('dialog').getByRole('img')).toHaveCount(0)
+    await expect(
+      page.getByRole('dialog').getByRole('button', { name: '删除图片 1', exact: true }),
+    ).toBeVisible()
+    await page.screenshot({
+      path: info.outputPath('image-admin-private.png'),
+      animations: 'disabled',
+    })
+    await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
     await page.goto('/admin/image-settings')
     await page.getByLabel('允许管理员查看提示词、参考图与结果', { exact: true }).check()
     await page.getByRole('button', { name: '保存', exact: true }).click()
@@ -452,6 +483,86 @@ test('M5 real image generation editing gallery cancellation and administrator pr
     expect(avatar.height).toBe(256)
     await member.reload()
     await expect(member.locator('.profile-avatar img')).toBeVisible()
+    // Real generated files exercise cursor pagination and bounded gallery rendering.
+    const galleryEmail = 'image-gallery-' + suffix + '@lumi.test'
+    await api('POST', '/admin/users', {
+      email: galleryEmail,
+      password,
+      nickname: 'Gallery member',
+      role: 'user',
+      initial_credits: 10000,
+    })
+    await memberContext.clearCookies()
+    const galleryToken = await login(member, galleryEmail, password),
+      galleryConversation = randomUUID()
+    await api(
+      'POST',
+      '/image-conversations',
+      { id: galleryConversation, model_id: modelID },
+      galleryToken,
+    )
+    let lastTaskID = ''
+    for (let index = 0; index < 15; index++) {
+      const row = await api(
+        'POST',
+        '/image-tasks',
+        {
+          conversation_id: galleryConversation,
+          model_id: modelID,
+          prompt: 'gallery ' + index,
+          quality: 'medium',
+          size: '1024x1024',
+          ratio: '',
+          n: 4,
+          reference_file_ids: [],
+        },
+        galleryToken,
+        randomUUID(),
+      )
+      lastTaskID = String(row.id)
+    }
+    await expect
+      .poll(
+        async () =>
+          (await api('GET', '/image-tasks/' + lastTaskID, undefined, galleryToken)).status,
+        { timeout: 60_000, intervals: [500] },
+      )
+      .toBe('succeeded')
+    const requested: string[] = []
+    member.on('request', (request) => {
+      if (request.url().includes('/api/v1/files/')) requested.push(request.url())
+    })
+    const firstPageResponse = member.waitForResponse(
+      (r) => r.url().includes('/api/v1/me/images?') && r.status() === 200,
+    )
+    await member.goto('/me/images')
+    const firstPage = record(await (await firstPageResponse).json())
+    expect(Array.isArray(firstPage.items) && firstPage.items.length).toBe(40)
+    const nextPageResponse = member.waitForResponse(
+      (r) =>
+        r.url().includes('/api/v1/me/images?') && r.url().includes('cursor=') && r.status() === 200,
+    )
+    await member.getByRole('button', { name: '加载更多', exact: true }).click()
+    const nextPage = record(await (await nextPageResponse).json())
+    expect(Array.isArray(nextPage.items) && nextPage.items.length).toBe(20)
+    if (!Array.isArray(firstPage.items) || !Array.isArray(nextPage.items))
+      throw new Error('Invalid gallery page')
+    expect(
+      new Set([...firstPage.items, ...nextPage.items].map((item) => record(record(item).file).id))
+        .size,
+    ).toBe(60)
+    const bounded = member.locator('.image-gallery-card')
+    await expect(bounded.first()).toBeVisible()
+    expect(await bounded.count()).toBeLessThan(info.project.name === 'mobile' ? 12 : 30)
+    expect(requested.length).toBeGreaterThan(0)
+    expect(requested.every((url) => url.includes('/thumb?'))).toBe(true)
+    expect(await member.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    )
+    await member.screenshot({
+      path: info.outputPath('image-gallery-virtualized.png'),
+      animations: 'disabled',
+    })
     expect(errors).toEqual([])
   } finally {
     await memberContext.close()

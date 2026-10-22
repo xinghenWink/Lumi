@@ -280,6 +280,7 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 		otherClient := f.client(t)
 		otherLogin := f.login(t, otherClient, other.Email, "Integration-password-1")
 		expectStatus(t, f.call(t, otherClient, "GET", file.URL, otherLogin.AccessToken, nil), 404)
+		expectStatus(t, f.call(t, otherClient, "DELETE", "/api/v1/me/images/"+file.ID.String(), otherLogin.AccessToken, nil), 404)
 		expectStatus(t, f.call(t, client, "GET", file.URL+"tampered", login.AccessToken, nil), 404)
 		if _, err := service.Get(f.ctx, user.Actor{ID: other.ID}, partial.ID, false); creditCode(err) != "IMAGE_TASK_NOT_FOUND" {
 			t.Fatal("task owner escaped")
@@ -505,6 +506,34 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 		}
 		if _, err := f.services.Files.Get(f.ctx, actor.ID, replacement.ID); err != nil {
 			t.Fatal("current avatar was removed", err)
+		}
+	})
+	t.Run("administrator deletion works without content access and never refunds a successful image", func(t *testing.T) {
+		result := execute(submit("delete-check", 1).ID)
+		file := result.Items[0].File
+		if file == nil {
+			t.Fatal("missing deletion fixture")
+		}
+		cfg, err = service.Configuration(f.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg.AdminCanViewContent = false
+		if _, err := service.SaveConfiguration(f.ctx, admin, cfg); err != nil {
+			t.Fatal(err)
+		}
+		before := creditBalance(t, f, actor.ID)
+		if err := service.DeleteFile(f.ctx, admin, file.ID, true); err != nil {
+			t.Fatal(err)
+		}
+		after := creditBalance(t, f, actor.ID)
+		view, err := service.Get(f.ctx, actor, result.ID, false)
+		if err != nil || view.Items[0].File != nil || view.Items[0].FileID != nil || view.RefundedCost != 0 || before.Total != after.Total {
+			t.Fatal("deletion exposed a file or changed settled credits")
+		}
+		var count int
+		if err := f.pool.QueryRow(f.ctx, "SELECT count(*) FROM audit_logs WHERE action='image.delete' AND target_id=$1", file.ID).Scan(&count); err != nil || count != 1 {
+			t.Fatal("administrator deletion was not audited", err)
 		}
 	})
 }

@@ -23,7 +23,7 @@ const { t } = useI18n(),
 const preview = ref(false),
   previewIndex = ref(0),
   details = ref(false),
-  deleting = ref<ImageFile>(),
+  deleting = ref<{ id: string }>(),
   busy = ref(false)
 const error = shallowRef<unknown>(),
   references = shallowRef<ImageFile[]>([])
@@ -178,6 +178,19 @@ function open(file: ImageFile) {
         </div>
       </div>
     </div>
+    <div v-if="admin && !task.content_visible" class="image-task-footer">
+      <template v-for="item in task.items" :key="item.position">
+        <button
+          v-if="item.file_id"
+          class="button compact danger-text"
+          :aria-label="t('images.delete') + ' ' + (item.position + 1)"
+          @click="deleting = { id: item.file_id }"
+        >
+          <Trash2 :size="14" />{{ t('images.result', { index: item.position + 1 }) }} ·
+          {{ t('images.delete') }}
+        </button>
+      </template>
+    </div>
     <ApiNotice v-if="task.error_code" :error="new ApiError(task.error_code)" />
     <ApiNotice :error="actions.error.value || error" />
     <p v-if="actions.copied.value" class="field-hint" role="status">{{ t('images.copied') }}</p>
@@ -198,6 +211,7 @@ function open(file: ImageFile) {
       :index="previewIndex"
       :prompt="task.prompt"
       :parameters="parameters"
+      :allow-edit="!admin"
       @update:open="preview = $event"
       @edit="emit('edit', $event)"
     />
