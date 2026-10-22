@@ -8,10 +8,10 @@ const values = reactive({ state: '', quality: '', from: '', until: '', user: '' 
 function apply() {
   const q = new URLSearchParams({ limit: '40' })
   for (const key of ['state', 'quality'] as const) if (values[key]) q.set(key, values[key])
-  if (values.from) q.set('from', new Date(values.from + 'T00:00:00').toISOString())
+  if (values.from) q.set('from', new Date(values.from + 'T00:00:00Z').toISOString())
   if (values.until) {
-    const date = new Date(values.until + 'T00:00:00')
-    date.setDate(date.getDate() + 1)
+    const date = new Date(values.until + 'T00:00:00Z')
+    date.setUTCDate(date.getUTCDate() + 1)
     q.set('until', date.toISOString())
   }
   if (values.user.trim()) q.set('user_id', values.user.trim())

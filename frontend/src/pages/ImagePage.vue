@@ -8,11 +8,13 @@ import { ApiError } from '../api/transport'
 import { useImageStore } from '../stores/images'
 import { useChatStore } from '../stores/chat'
 import { useModelStore } from '../stores/models'
+import { useAuthStore } from '../stores/auth'
 import ImageComposer from '../components/images/ImageComposer.vue'
 import ImageTaskList from '../components/images/ImageTaskList.vue'
 const store = useImageStore(),
   chat = useChatStore(),
   models = useModelStore(),
+  auth = useAuthStore(),
   route = useRoute(),
   router = useRouter(),
   { t } = useI18n()
@@ -61,10 +63,11 @@ function add(file: ImageFile) {
   store.draft.references = [...store.draft.references, file]
 }
 async function reuse(task: ImageTask) {
-  const owner = store.active
+  const owner = auth.user?.id,
+    conversation = store.active
   models.select('image', task.model_id)
   const refs = await Promise.allSettled(task.reference_file_ids.map((id) => images.file(id)))
-  if (owner !== store.active) return
+  if (!owner || owner !== auth.user?.id || conversation !== store.active) return
   store.draft.prompt = task.prompt
   store.draft.quality = task.quality
   store.draft.size = task.size

@@ -135,7 +135,7 @@ function setTheme(event: Event) {
           <div>
             <input
               ref="avatarInput"
-              class="sr-only"
+              hidden
               type="file"
               accept="image/png,image/jpeg,image/webp"
               tabindex="-1"

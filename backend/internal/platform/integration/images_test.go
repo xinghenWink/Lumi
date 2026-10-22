@@ -348,7 +348,8 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			t.Fatal("cancel not settled")
 		}
 		task = submit("recover", 1)
-		if _, ok, err := service.Claim(f.ctx, task.ID); err != nil || !ok {
+		claimed, ok, err = service.Claim(f.ctx, task.ID)
+		if err != nil || !ok {
 			t.Fatal("recovery claim failed")
 		}
 		if err := service.Recover(f.ctx); err != nil {

@@ -67,7 +67,13 @@ const disabled = computed(
 )
 let quoteController: AbortController | undefined, uploadController: AbortController | undefined
 watch(
-  [() => sizes.value.join(','), () => store.active],
+  [
+    () => sizes.value.join(','),
+    () => store.active,
+    maxN,
+    () => store.draft.n,
+    () => store.draft.size,
+  ],
   () => {
     if (!sizes.value.includes(store.draft.size))
       store.draft.size = sizes.value.includes('1024x1024') ? '1024x1024' : (sizes.value[0] ?? '')
@@ -88,6 +94,7 @@ watch(
     () => store.draft.size,
     () => store.draft.references.length > 0,
     () => auth.user?.id,
+    () => store.active,
   ],
   async () => {
     quoteController?.abort()
@@ -318,7 +325,7 @@ watch(
         <div class="image-upload-actions">
           <input
             ref="picker"
-            class="sr-only"
+            hidden
             type="file"
             accept="image/png,image/jpeg,image/webp"
             multiple

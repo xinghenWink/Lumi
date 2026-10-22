@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, onUnmounted } from 'vue'
+import { ref, shallowRef, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { images, type ImageTask } from '../../api/images'
 import ImageFilters from '../../components/images/ImageFilters.vue'
 import ImageTaskCard from '../../components/images/ImageTaskCard.vue'
 import ModalDialog from '../../components/ModalDialog.vue'
 import ApiNotice from '../../components/ApiNotice.vue'
+import { useAuthStore } from '../../stores/auth'
+const auth = useAuthStore()
 const { t, te } = useI18n(),
   items = shallowRef<ImageTask[]>([]),
   selected = shallowRef<ImageTask>(),
@@ -14,6 +16,8 @@ const { t, te } = useI18n(),
   cursor = ref('')
 let query = new URLSearchParams({ limit: '40' }),
   controller: AbortController | undefined
+let alive = true,
+  detailVersion = 0
 async function load(more = false) {
   controller?.abort()
   const current = new AbortController()
@@ -39,10 +43,13 @@ async function load(more = false) {
 }
 async function detail(row: ImageTask) {
   error.value = null
+  const owner = auth.user?.id,
+    version = ++detailVersion
   try {
-    selected.value = await images.task(row.id, true)
+    const result = await images.task(row.id, true)
+    if (alive && owner === auth.user?.id && version === detailVersion) selected.value = result
   } catch (e) {
-    error.value = e
+    if (alive && owner === auth.user?.id && version === detailVersion) error.value = e
   }
 }
 function apply(q: URLSearchParams) {
@@ -50,7 +57,21 @@ function apply(q: URLSearchParams) {
   void load()
 }
 onMounted(() => void load())
-onUnmounted(() => controller?.abort())
+watch(
+  () => auth.user?.id,
+  () => {
+    detailVersion++
+    controller?.abort()
+    items.value = []
+    selected.value = undefined
+    error.value = null
+  },
+)
+onUnmounted(() => {
+  alive = false
+  detailVersion++
+  controller?.abort()
+})
 </script>
 <template>
   <div class="page-container">
