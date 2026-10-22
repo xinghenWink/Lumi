@@ -245,6 +245,7 @@
   justify-content: flex-end;
 }
 .image-result-actions .icon-button {
+  min-width: 30px;
   width: 30px;
   height: 30px;
 }
