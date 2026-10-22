@@ -48,6 +48,8 @@ test('M2 real gifts redemption retry pricing exports and administrator adjustmen
     fullPage: true,
     animations: 'disabled',
   })
+  await page.getByRole('heading', { name: '价格规则', exact: true }).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: info.outputPath('pricing-rules.png'), animations: 'disabled' })
 
   const email = `credits-${randomUUID().slice(0, 12)}@lumi.test`
   const password = `${randomBytes(18).toString('base64url')}Aa1`
@@ -76,6 +78,8 @@ test('M2 real gifts redemption retry pricing exports and administrator adjustmen
       fullPage: true,
       animations: 'disabled',
     })
+    await member.getByRole('heading', { name: '使用情况', exact: true }).scrollIntoViewIfNeeded()
+    await member.screenshot({ path: info.outputPath('credit-usage.png'), animations: 'disabled' })
 
     const batchName = `验收-${info.project.name}-${randomUUID().slice(0, 8)}`
     await page.goto('/admin/redeem-codes')

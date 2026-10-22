@@ -168,7 +168,7 @@ export default {
       deleteSuccess: 'User deleted',
       statusSuccess: 'Account status updated',
       deleteDescription:
-        'This account will no longer be able to sign in. Audit records are retained.',
+        'This account will no longer be able to sign in. Audit, credit ledger and redemption records are retained.',
       deleteConfirm: 'Enter this user email to confirm deletion',
       deleteAction: 'Confirm deletion',
       selfProtected: 'You cannot change your own role, disable or delete yourself here.',
@@ -309,10 +309,10 @@ export default {
     content:
       'Only submit content you are authorized to use. Administrator access is granted by the server. Ordinary accounts cannot elevate their own permissions.',
     dataTitle: 'Data we process',
-    data: 'Account use involves your email, display name, password hash, sign-in IP, device information and necessary security records. Passwords are not stored in plain text. Only refresh token hashes are stored.',
+    data: 'Account use involves your email, display name, password hash, sign-in IP, device information and necessary security records. Credit use records balance changes, charge settlements, redemption times, code tails and source IPs. Passwords are not stored in plain text. Only refresh token hashes are stored.',
     purposeTitle: 'Why it is used',
     purpose:
-      'This information supports authentication, account management, security and operation history. Administration requires authorization. Sensitive credentials are not returned to the browser.',
+      'This information supports authentication, account management, security and operation history. Credit ledger, charge settlement and redemption records retain a stable user identifier after account cleanup to preserve accounting history. Administration requires authorization. Sensitive credentials are not returned to the browser.',
     contactTitle: 'Contact',
     contact:
       'Use the contact information provided by the site operator for account or data questions.',

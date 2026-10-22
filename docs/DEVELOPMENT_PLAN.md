@@ -1,6 +1,6 @@
 # Lumi 开发分析与里程碑计划
 
-M0 与 M1 的功能验收已通过，用户已授权按 M0 → M1 的顺序合并到 main。M0 已发布 `v0.0.1` 并通过 amd64 / arm64 发布镜像的真实 Compose 运行验证；M1 详细范围与结果见 [M1_PLAN.md](M1_PLAN.md) 和 [M1_ACCEPTANCE.md](M1_ACCEPTANCE.md)。后续业务从 M2 继续，本轮不扩展阶段范围。
+M0 与 M1 已验收并按顺序合并到 main。M0 已发布 `v0.0.1`，M1 主分支 CI 与双架构发布镜像 Compose 运行验证均通过；详细结果见 [M1_ACCEPTANCE.md](M1_ACCEPTANCE.md)。当前按用户授权推进 M2，范围和验收见 [M2_PLAN.md](M2_PLAN.md) 与 [M2_ACCEPTANCE.md](M2_ACCEPTANCE.md)，保持独立分支和 PR。
 
 ## 基线与约束
 
@@ -36,7 +36,7 @@ M0 与 M1 的功能验收已通过，用户已授权按 M0 → M1 的顺序合�
 | M6   | P1 与后台完善                                                          | 断线续传、反滥用、熔断、对账、批量与导出               |
 | M7   | 安全、压测、性能、备份恢复、部署与发布验收                             | 第 18 章逐项验收及干净服务器部署                       |
 
-## 本轮 M0 文件与状态清单
+## M0 文件与状态清单（历史）
 
 - `backend/cmd/lumi`：serve / migrate / healthcheck，信号退出与构建信息。
 - `backend/internal/config`、`platform/{db,redis,logger}`、`http/{handler,middleware,router}`：配置校验、连接、就绪检查、安全头、请求日志与统一错误。
@@ -47,6 +47,6 @@ M0 与 M1 的功能验收已通过，用户已授权按 M0 → M1 的顺序合�
 - `Dockerfile`、`deploy`、`Makefile`、`.github/workflows`：开发依赖、完整本地构建、非 root 镜像、质量检查、多架构发布。
 - 后端单元测试与 PG/Redis 集成测试；前端 Vitest 与 Playwright 基础冒烟。实际执行结果另见 `M0_ACCEPTANCE.md`。
 
-## 本轮边界
+## M0 阶段边界（历史）
 
 M0 只提供公开的工程欢迎页，不模拟登录、聊天、生图、积分或后台。数据库只建立基础设施 schema，不提前建立 M1/M2 业务表。尚无上游实例凭据，M3 的契约探测保持待办。
