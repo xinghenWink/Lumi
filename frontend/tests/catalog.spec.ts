@@ -127,6 +127,7 @@ test('M3 real channel configuration import routing and safe model selection', as
       await dialog.getByRole('checkbox', { name: '默认模型', exact: true }).check()
       if (name === chatName) {
         await expect(dialog.getByLabel('上游模型 ID 1', { exact: true })).toHaveValue(wireChat)
+        await dialog.getByLabel('上游模型 ID 1', { exact: true }).scrollIntoViewIfNeeded()
         await page.screenshot({ path: info.outputPath('model-routes.png'), animations: 'disabled' })
       }
       await dialog.getByRole('button', { name: '保存模型', exact: true }).click()

@@ -62,6 +62,7 @@ onUnmounted(() => models.cancel(props.kind))
           :side-offset="8"
           :collision-padding="12"
           :aria-label="t('catalog.availableModels')"
+          :aria-labelledby="undefined"
         >
           <DropdownMenuItem
             v-for="model in models.items[kind]"
