@@ -15,6 +15,11 @@ export const useSiteStore = defineStore('site', () => {
     pending = (async () => {
       try {
         config.value = await request('/api/v1/public/config', parsePublic)
+        const favicon = config.value.site.favicon_url
+        if (favicon?.startsWith('/') && !favicon.startsWith('//')) {
+          const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+          if (link) link.href = favicon
+        }
       } catch (failure) {
         error.value = failure
       } finally {

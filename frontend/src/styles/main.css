@@ -3,6 +3,7 @@
 @import './catalog.css';
 @import './chat.css';
 @import './images.css';
+@import './operations.css';
 
 @theme {
   --font-sans: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
@@ -545,6 +546,9 @@ input[type='checkbox'] {
 .sidebar-navigation {
   display: grid;
   gap: 4px;
+  overflow-y: auto;
+  flex-shrink: 1;
+  min-height: 0;
 }
 .sidebar-link {
   display: flex;

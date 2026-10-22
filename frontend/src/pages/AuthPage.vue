@@ -6,6 +6,7 @@ import { ArrowUpRight, Eye, EyeOff, MessageSquare, Sparkles } from 'lucide-vue-n
 import BrandMark from '../components/BrandMark.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import ApiNotice from '../components/ApiNotice.vue'
+import TurnstileChallenge from '../components/TurnstileChallenge.vue'
 import { useAuthStore } from '../stores/auth'
 import { useSiteStore } from '../stores/site'
 import { safeRedirect, validEmail, validPassword } from '../features/accounts/utils'
@@ -16,6 +17,11 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const site = useSiteStore()
+const challenge = ref<InstanceType<typeof TurnstileChallenge>>()
+async function challengeToken(action: 'register' | 'send_code') {
+  if (!site.config?.turnstile_enabled) return undefined
+  return challenge.value?.token(action)
+}
 const registering = computed(() => route.name === 'register')
 const email = ref('')
 const password = ref('')
@@ -58,7 +64,12 @@ async function sendCode() {
   }
   sending.value = true
   try {
-    seconds.value = await auth.sendCode(email.value.trim(), locale.value === 'en' ? 'en' : 'zh-CN')
+    const token = await challengeToken('send_code')
+    seconds.value = await auth.sendCode(
+      email.value.trim(),
+      locale.value === 'en' ? 'en' : 'zh-CN',
+      token,
+    )
     notice.value = t('auth.codeSent')
   } catch (failure) {
     if (failure instanceof ApiError && failure.retryAfter) seconds.value = failure.retryAfter
@@ -100,6 +111,7 @@ async function submit() {
   try {
     if (registering.value)
       await auth.register({
+        turnstile_token: (await challengeToken('register')) ?? '',
         email: email.value.trim(),
         password: password.value,
         nickname: nickname.value.trim(),
@@ -181,6 +193,14 @@ async function submit() {
           {{ t('auth.registrationClosed') }}
         </div>
         <form v-else class="stack auth-form" novalidate @submit.prevent="submit">
+          <TurnstileChallenge
+            v-if="registering && site.config?.turnstile_enabled"
+            ref="challenge"
+            :site-key="site.config.turnstile_site_key ?? ''"
+          />
+          <RouterLink v-if="!registering" class="text-button" to="/forgot-password">{{
+            t('ops.forgot')
+          }}</RouterLink>
           <label v-if="registering" class="field" for="auth-nickname"
             >{{ t('auth.nickname')
             }}<input

@@ -34,6 +34,7 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/http/router"
 	"github.com/xinghenWink/Lumi/backend/internal/images"
 	"github.com/xinghenWink/Lumi/backend/internal/media"
+	"github.com/xinghenWink/Lumi/backend/internal/operations"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/password"
@@ -146,6 +147,7 @@ func newAccountFixture(t *testing.T) *fixture {
 	sender := &captureMailer{codes: make(map[string]string)}
 	services := &account.Services{Auth: auth.New(pool, hasher, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: catalog.New(pool, vault, upstream.NetworkPolicy{AllowPrivate: true}, nil)}
 	services.Chat = chat.New(pool, services.Catalog, cache)
+	services.Operations = operations.New(pool)
 	dataDir := t.TempDir()
 	services.Files, err = media.New(pool, dataDir, key)
 	if err != nil {
@@ -157,6 +159,7 @@ func newAccountFixture(t *testing.T) *fixture {
 		}
 	})
 	services.Images = images.New(pool, billing, services.Catalog, services.Files, cache, nil)
+	services.Chat.SetFiles(services.Files)
 	engine, err := router.New(slog.New(slog.NewJSONHandler(io.Discard, nil)), handler.Health{Postgres: pool.Ping, Redis: cache.Ping}, handler.Version{}, fstest.MapFS{}, account.Routes(services, account.Security{Origins: []string{"https://lumi.test"}, CookieSecure: true}, slog.New(slog.NewJSONHandler(io.Discard, nil))))
 	if err != nil {
 		t.Fatal(err)

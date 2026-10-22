@@ -41,7 +41,7 @@ test('M1 real registration, sessions, administration, settings and audit', async
   await login(page, adminEmail, adminPassword)
   await accountMenu(page)
   await page.getByRole('menuitem', { name: '管理后台', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '用户管理', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '数据看板', exact: true })).toBeVisible()
   await page.goto('/admin/settings/registration')
   await page.getByRole('switch', { name: /开放注册/ }).check()
   await page.getByRole('switch', { name: /注册时验证邮箱/ }).uncheck()

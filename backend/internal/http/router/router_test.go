@@ -62,7 +62,7 @@ func TestInfrastructureRoutes(t *testing.T) {
 					t.Errorf("%s missing security headers", route.path)
 				}
 				policy := recorder.Header().Get("Content-Security-Policy")
-				for _, directive := range []string{"script-src 'self';", "script-src-attr 'none';", "style-src-elem 'self';", "style-src-attr 'unsafe-inline';"} {
+				for _, directive := range []string{"script-src 'self' https://challenges.cloudflare.com;", "frame-src https://challenges.cloudflare.com;", "script-src-attr 'none';", "style-src-elem 'self';", "style-src-attr 'unsafe-inline';"} {
 					if !strings.Contains(policy, directive) {
 						t.Errorf("%s CSP failed the script/style boundary", route.path)
 					}

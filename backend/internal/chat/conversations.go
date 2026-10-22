@@ -180,7 +180,7 @@ func checkUser(ctx context.Context, q *query.Queries, actor user.Actor, lock boo
 }
 
 // prepare serializes accepted operations per user, with durable per-conversation ownership.
-func (s *Service) prepare(ctx context.Context, actor user.Actor, id uuid.UUID, input SendInput, config Configuration, modelLimit int32) (*run, error) {
+func (s *Service) prepare(ctx context.Context, actor user.Actor, id uuid.UUID, input SendInput, config Configuration, modelLimit int32, vision bool) (*run, error) {
 	var result run
 	encoded, encodeErr := json.Marshal(input)
 	if encodeErr != nil {
@@ -256,10 +256,33 @@ func (s *Service) prepare(ctx context.Context, actor user.Actor, id uuid.UUID, i
 			if err != nil {
 				return fmt.Errorf("insert user message: %w", err)
 			}
+			if len(input.ReferenceFileIDs) > 0 {
+				if err := q.SetMessageReferences(ctx, query.SetMessageReferencesParams{ID: userRow.ID, ReferenceFileIds: input.ReferenceFileIDs}); err != nil {
+					return fmt.Errorf("save chat references: %w", err)
+				}
+				userRow.ReferenceFileIds = input.ReferenceFileIDs
+			}
 			history = append(history, userRow)
+		}
+		pref, prefErr := q.GetPreferences(ctx, actor.ID)
+		if prefErr != nil && !errors.Is(prefErr, pgx.ErrNoRows) {
+			return fmt.Errorf("read chat preferences: %w", prefErr)
+		}
+		if pref.Instructions != "" {
+			config.SystemPrompt += "\n\n" + pref.Instructions
 		}
 		assembled, err := BuildContext(history, config, modelLimit)
 		if err != nil {
+			return err
+		}
+		if !vision {
+			for _, row := range history {
+				if len(row.ReferenceFileIds) > 0 {
+					return problem.Invalid()
+				}
+			}
+		}
+		if err := s.attachVision(ctx, actor.ID, history, assembled); err != nil {
 			return err
 		}
 		if config.PerMinute > 0 {

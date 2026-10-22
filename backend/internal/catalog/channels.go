@@ -44,7 +44,7 @@ func configError(err error) error {
 	}
 	return err
 }
-func channelView(row query.Upstream) Channel {
+func baseChannelView(row query.Upstream) Channel {
 	return Channel{ID: row.ID, Version: row.Version, Name: row.Name, BaseURL: row.BaseUrl, APIKeyConfigured: row.ApiKeyEnc != "", TimeoutChatS: row.TimeoutChatS, TimeoutImageS: row.TimeoutImageS, ProxyURL: row.ProxyUrl, Enabled: row.Enabled, Priority: row.Priority, Weight: row.Weight, EditFormat: row.EditFormat, Note: row.Note, CreatedAt: row.CreatedAt.UTC(), UpdatedAt: row.UpdatedAt.UTC()}
 }
 func validRank(priority, weight int32) bool {
@@ -219,6 +219,19 @@ func (s *Service) recordCall(ctx context.Context, id uuid.UUID, call upstream.Ca
 	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
+	// User cancellation and content rejection do not indicate provider health failures.
+	if call.ErrorCode == "" {
+		if err := s.queries.RecordCircuitSuccess(ctx, id); err != nil && s.logger != nil {
+			s.logger.ErrorContext(ctx, "reset upstream circuit failed")
+		}
+	} else if call.ErrorCode != "UPSTREAM_CANCELED" && call.ErrorCode != "UPSTREAM_REJECTED" && call.ErrorCode != "UPSTREAM_REQUEST_INVALID" {
+		threshold, duration, cfgErr := s.circuitConfig(ctx)
+		if cfgErr == nil {
+			if err := s.queries.RecordCircuitFailure(ctx, query.RecordCircuitFailureParams{ID: id, LastError: call.ErrorCode, Threshold: threshold, Duration: duration}); err != nil && s.logger != nil {
+				s.logger.ErrorContext(ctx, "record upstream circuit failed")
+			}
+		}
+	}
 	callID, err := validation.NewID()
 	if err == nil {
 		err = s.queries.AppendUpstreamCall(ctx, query.AppendUpstreamCallParams{ID: callID, UpstreamID: id, Model: call.Model, Kind: call.Kind, LatencyMs: call.LatencyMS, Status: int32(status), ErrorSummary: call.ErrorCode, RequestID: middleware.RequestID(ctx)})

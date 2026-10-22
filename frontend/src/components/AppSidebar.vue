@@ -30,6 +30,11 @@ const site = useSiteStore()
 const links = computed(() =>
   props.admin
     ? [
+        { path: '/admin/dashboard', key: 'nav.dashboard', icon: SlidersHorizontal },
+        { path: '/admin/conversations', key: 'nav.adminChats', icon: MessageSquare },
+        { path: '/admin/announcements', key: 'nav.announcements', icon: ClipboardList },
+        { path: '/admin/system', key: 'nav.systemInfo', icon: Server },
+        { path: '/admin/operations-settings', key: 'nav.operations', icon: Settings2 },
         { path: '/admin/users', key: 'nav.users', icon: Users },
         { path: '/admin/upstreams', key: 'nav.upstreams', icon: Server },
         { path: '/admin/models', key: 'nav.models', icon: Boxes },
@@ -43,6 +48,7 @@ const links = computed(() =>
         { path: '/admin/audit', key: 'nav.audit', icon: ClipboardList },
       ]
     : [
+        { path: '/me/security', key: 'nav.security', icon: Settings2 },
         { path: '/chat', key: 'nav.chat', icon: MessageSquare },
         { path: '/me/credits', key: 'nav.credits', icon: Coins },
         { path: '/me/chats', key: 'nav.chatHistory', icon: MessageSquare },
@@ -53,7 +59,13 @@ const links = computed(() =>
 <template>
   <div class="sidebar-content">
     <RouterLink to="/chat" class="sidebar-brand brand-lockup" @click="emit('navigate')"
-      ><BrandMark />
+      ><img
+        v-if="site.config?.site.logo_url"
+        :src="site.config.site.logo_url"
+        alt=""
+        width="32"
+        height="32"
+      /><BrandMark v-else />
       <div>
         <span class="brand-name">{{ site.config?.site.name ?? t('app.name') }}</span
         ><span class="brand-caption">{{ t(admin ? 'nav.administration' : 'nav.workspace') }}</span>

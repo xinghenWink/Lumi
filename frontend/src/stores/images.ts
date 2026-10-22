@@ -13,6 +13,7 @@ import { credits } from '../api/credits'
 import { ApiError } from '../api/transport'
 import { useAuthStore } from './auth'
 import { useModelStore } from './models'
+import { operations, type Preferences } from '../api/operations'
 export interface ImageDraft {
   prompt: string
   quality: ImageInput['quality']
@@ -39,6 +40,7 @@ export const useImageStore = defineStore('images', () => {
     cursor = ref(''),
     older = ref('')
   const drafts = reactive<Record<string, ImageDraft>>({})
+  const preferences = shallowRef<Preferences>()
   const pending = shallowRef<{ input: ImageInput; key: string; create: boolean }>()
   const draft = computed(() => {
     const id = active.value || 'new'
@@ -46,10 +48,12 @@ export const useImageStore = defineStore('images', () => {
       drafts[id] ??
       (drafts[id] = {
         prompt: '',
-        quality: 'medium',
-        size: '1024x1024',
-        ratio: '',
-        n: 1,
+        quality: preferences.value?.image_quality ?? 'medium',
+        size: preferences.value
+          ? (configuration.value?.ratio_sizes[preferences.value.image_ratio] ?? '1024x1024')
+          : '1024x1024',
+        ratio: preferences.value?.image_ratio ?? '',
+        n: preferences.value?.image_count ?? 1,
         references: [],
       })
     )
@@ -67,6 +71,7 @@ export const useImageStore = defineStore('images', () => {
     timers.clear()
   }
   function reset() {
+    preferences.value = undefined
     epoch++
     openVersion++
     listVersion++
@@ -104,6 +109,21 @@ export const useImageStore = defineStore('images', () => {
     try {
       const [config] = await Promise.all([images.options(), refreshBalance()])
       if (generation === epoch) configuration.value = config
+      try {
+        const pref = await operations.preferences()
+        if (generation === epoch) {
+          preferences.value = pref
+          const currentDraft = drafts[active.value || 'new']
+          if (currentDraft && !currentDraft.prompt && !currentDraft.references.length) {
+            currentDraft.quality = pref.image_quality
+            currentDraft.ratio = pref.image_ratio
+            currentDraft.size = config.ratio_sizes[pref.image_ratio] ?? currentDraft.size
+            currentDraft.n = pref.image_count
+          }
+        }
+      } catch {
+        /* Generation remains available with local defaults. */
+      }
     } catch (e) {
       if (generation === epoch) error.value = e
     }

@@ -11,6 +11,8 @@ import (
 )
 
 type Config struct {
+	UpstreamBaseURL      string
+	UpstreamAPIKey       string
 	Environment          string
 	HTTPAddress          string
 	DatabaseURL          string
@@ -33,6 +35,7 @@ type Config struct {
 // Load accepts an environment lookup so tests do not mutate process state.
 func Load(getenv func(string) string) (Config, error) {
 	cfg := Config{
+		UpstreamBaseURL: getenv("UPSTREAM_BASE_URL"), UpstreamAPIKey: getenv("UPSTREAM_API_KEY"),
 		Environment:        value(getenv, "APP_ENV", "development"),
 		HTTPAddress:        value(getenv, "HTTP_ADDR", ":8080"),
 		DatabaseURL:        getenv("DATABASE_URL"),

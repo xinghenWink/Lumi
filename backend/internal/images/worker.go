@@ -276,12 +276,9 @@ func (s *Service) Execute(ctx context.Context, task query.ImageTask) {
 			run := func(position int32, count int) {
 				input := request
 				input.Count = count
-				var results []upstream.ImageResult
-				var callErr error
-				if task.Operation == "edit" {
-					results, callErr = client.EditImages(work, upstream.EditRequest{ImageRequest: input, References: refs})
-				} else {
-					results, callErr = client.GenerateImages(work, input)
+				results, resultClient, callErr := s.catalog.RoutedImages(work, task.ModelID, input, refs)
+				if resultClient != nil {
+					defer resultClient.Close()
 				}
 				errorCode := upstream.FailureCode(callErr)
 				for index := 0; index < count; index++ {
@@ -294,7 +291,7 @@ func (s *Service) Execute(ctx context.Context, task query.ImageTask) {
 							itemCode = "IMAGE_RESULT_MISSING"
 						}
 					}
-					if err := s.saveItem(work, task, position+int32(index), result, client, itemCode); err != nil {
+					if err := s.saveItem(work, task, position+int32(index), result, resultClient, itemCode); err != nil {
 						s.report(work, "save image result failed", err)
 					}
 				}

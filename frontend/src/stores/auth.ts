@@ -95,10 +95,10 @@ export const useAuthStore = defineStore('auth', () => {
       loggingOut = false
     }
   }
-  async function sendCode(email: string, locale: 'zh-CN' | 'en') {
+  async function sendCode(email: string, locale: 'zh-CN' | 'en', turnstile_token?: string) {
     return request('/api/v1/auth/send-code', parseCodeSent, {
       method: 'POST',
-      body: { email, locale },
+      body: { email, locale, ...(turnstile_token ? { turnstile_token } : {}) },
     })
   }
   function updateUser(value: User) {

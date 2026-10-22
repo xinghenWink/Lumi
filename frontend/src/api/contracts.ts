@@ -96,6 +96,8 @@ export function parseAuth(value: unknown): AuthResult {
 export function parseSite(value: unknown): SiteSettings {
   const data = record(value)
   return {
+    ...(typeof data.logo_url === 'string' ? { logo_url: data.logo_url } : {}),
+    ...(typeof data.favicon_url === 'string' ? { favicon_url: data.favicon_url } : {}),
     name: text(data, 'name'),
     description: text(data, 'description'),
     footer: text(data, 'footer'),
@@ -107,6 +109,9 @@ export function parseSite(value: unknown): SiteSettings {
 export function parsePublic(value: unknown): PublicConfig {
   const data = record(value)
   return {
+    maintenance: data.maintenance === true,
+    turnstile_enabled: data.turnstile_enabled === true,
+    turnstile_site_key: typeof data.turnstile_site_key === 'string' ? data.turnstile_site_key : '',
     site: parseSite(data.site),
     registration_enabled: bool(data, 'registration_enabled'),
     email_verification_enabled: bool(data, 'email_verification_enabled'),

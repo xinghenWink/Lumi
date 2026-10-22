@@ -55,6 +55,7 @@ export function parseMessage(value: unknown): Message {
   )
     throw new ApiError('RESPONSE_INVALID')
   const result: Message = {
+    reference_file_ids: Array.isArray(d.reference_file_ids) ? d.reference_file_ids.map(str) : [],
     id: str(d.id),
     request_id: str(d.request_id),
     role,
@@ -116,6 +117,7 @@ export function parseEvent(type: string, value: unknown): ChatEvent {
 export async function consumeChat(
   response: Response,
   onEvent: (e: ChatEvent) => void,
+  onID?: (id: string) => void,
 ): Promise<void> {
   if (!response.headers.get('Content-Type')?.startsWith('text/event-stream') || !response.body)
     throw new ApiError('RESPONSE_INVALID')
@@ -133,9 +135,11 @@ export async function consumeChat(
         const frame = buffer.slice(0, match.index)
         buffer = buffer.slice(match.index + match[0].length)
         let type = 'message'
+        let eventID = ''
         const data: string[] = []
         for (const line of frame.split(/\r?\n/)) {
           if (line.startsWith('event:')) type = line.slice(6).trim()
+          if (line.startsWith('id:')) eventID = line.slice(3).trim()
           if (line.startsWith('data:')) data.push(line.slice(5).replace(/^ /, ''))
         }
         if (data.length) {
@@ -143,6 +147,7 @@ export async function consumeChat(
           if (done) throw new ApiError('RESPONSE_INVALID')
           const event = parseEvent(type, value)
           onEvent(event)
+          if (eventID && /^\d+-\d+$/.test(eventID)) onID?.(eventID)
           if (event.type === 'done') {
             done = true
           }
@@ -191,13 +196,45 @@ export const chats = {
     input: SendInput,
     signal: AbortSignal,
     onEvent: (e: ChatEvent) => void,
+    resumeOnly = false,
   ) => {
-    const response = await authorizedResponse(`${path(id)}/messages`, {
-      method: 'POST',
-      body: input,
-      signal,
-    })
-    await consumeChat(response, onEvent)
+    let last = '',
+      attempt = resumeOnly ? 1 : 0
+    while (true) {
+      try {
+        const response = await authorizedResponse(
+          attempt === 0
+            ? `${path(id)}/messages`
+            : `${path(id)}/events?request_id=${encodeURIComponent(input.request_id)}`,
+          attempt === 0
+            ? { method: 'POST', body: input, signal }
+            : { signal, ...(last ? { lastEventID: last } : {}) },
+        )
+        await consumeChat(response, onEvent, (value) => {
+          last = value
+        })
+        return
+      } catch (error) {
+        if (
+          signal.aborted ||
+          attempt >= 5 ||
+          (error instanceof ApiError && !['NETWORK_ERROR', 'CHAT_INTERRUPTED'].includes(error.code))
+        )
+          throw error
+        attempt++
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(resolve, Math.min(attempt * 500, 2000))
+          signal.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer)
+              reject(new DOMException('Aborted', 'AbortError'))
+            },
+            { once: true },
+          )
+        })
+      }
+    }
   },
   settings: (signal?: AbortSignal) =>
     authorized('/api/v1/admin/chat-settings', parseConfiguration, signal ? { signal } : {}),

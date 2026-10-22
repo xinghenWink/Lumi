@@ -8,6 +8,7 @@ import { useTime } from '../features/accounts/time'
 import ConversationActions from '../components/chat/ConversationActions.vue'
 import ModalDialog from '../components/ModalDialog.vue'
 import ApiNotice from '../components/ApiNotice.vue'
+import { operations } from '../api/operations'
 const { t } = useI18n(),
   chat = useChatStore(),
   time = useTime()
@@ -21,6 +22,17 @@ function apply() {
   chat.query = search.value
   selected.value = []
   void chat.list()
+}
+async function exportChats(format: 'json' | 'markdown') {
+  busy.value = true
+  error.value = null
+  try {
+    await operations.exportChats(format)
+  } catch (e) {
+    error.value = e
+  } finally {
+    busy.value = false
+  }
 }
 async function remove() {
   busy.value = true
@@ -56,7 +68,11 @@ async function remove() {
     </form>
     <ApiNotice :error="chat.listError" />
     <div class="chat-history-tools">
-      <span>{{ t('chat.selected', { count: selected.length }) }}</span
+      <button class="button" :disabled="busy" @click="exportChats('json')">
+        {{ t('ops.exportJSON') }}</button
+      ><button class="button" :disabled="busy" @click="exportChats('markdown')">
+        {{ t('ops.exportMarkdown') }}</button
+      ><ApiNotice :error="error" /> <span>{{ t('chat.selected', { count: selected.length }) }}</span
       ><button class="button" :disabled="!selected.length" @click="modal = 'selected'">
         <Trash2 :size="14" />{{ t('chat.deleteSelected') }}</button
       ><button class="text-button danger-text" @click="modal = 'all'">

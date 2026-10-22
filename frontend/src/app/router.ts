@@ -6,6 +6,16 @@ export const router = createRouter({
   routes: [
     { path: '/', redirect: '/chat' },
     {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: () => import('../pages/ResetPasswordPage.vue'),
+    },
+    {
+      path: '/reset-password',
+      name: 'reset-password',
+      component: () => import('../pages/ResetPasswordPage.vue'),
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('../pages/AuthPage.vue'),
@@ -24,6 +34,26 @@ export const router = createRouter({
       component: () => import('./AppShell.vue'),
       meta: { requiresAuth: true },
       children: [
+        {
+          path: 'me/security',
+          name: 'security',
+          component: () => import('../pages/SecurityPage.vue'),
+          meta: { title: 'nav.security' },
+        },
+        ...(
+          [
+            ['dashboard', 'admin-dashboard', 'nav.dashboard'],
+            ['announcements', 'admin-announcements', 'nav.announcements'],
+            ['system', 'admin-system', 'nav.systemInfo'],
+            ['operations-settings', 'admin-operations', 'nav.operations'],
+            ['conversations', 'admin-chats', 'nav.adminChats'],
+          ] as const
+        ).map(([path, name, title]) => ({
+          path: 'admin/' + path,
+          name,
+          component: () => import('../pages/admin/OperationsPage.vue'),
+          meta: { admin: true, title },
+        })),
         {
           path: 'chat',
           name: 'workspace',
@@ -96,7 +126,7 @@ export const router = createRouter({
           component: () => import('../pages/admin/ModelsPage.vue'),
           meta: { admin: true, title: 'nav.models' },
         },
-        { path: 'admin', redirect: '/admin/users', meta: { admin: true } },
+        { path: 'admin', redirect: '/admin/dashboard', meta: { admin: true } },
         {
           path: 'me/credits',
           name: 'credits',

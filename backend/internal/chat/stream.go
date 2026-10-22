@@ -49,7 +49,7 @@ func (s *Service) relay(ctx context.Context, targets []catalog.ChatTarget, messa
 	for index, target := range targets {
 		code := ""
 		attempt, cancel := context.WithCancel(ctx)
-		client, err := s.catalog.ChatClient(target)
+		client, err := s.catalog.RoutedChatClient(attempt, target)
 		if err != nil {
 			cancel()
 			if index == len(targets)-1 {
@@ -163,7 +163,13 @@ func (s *Service) Stream(ctx context.Context, actor user.Actor, id uuid.UUID, in
 	if err != nil {
 		return err
 	}
-	r, err := s.prepare(ctx, actor, id, input, config, model.Capabilities.MaxContextTokens)
+	if len(input.ReferenceFileIDs) > 4 || (len(input.ReferenceFileIDs) > 0 && !model.Capabilities.Vision) {
+		return problem.Invalid()
+	}
+	if !model.Capabilities.Vision {
+		input.ReferenceFileIDs = nil
+	}
+	r, err := s.prepare(ctx, actor, id, input, config, model.Capabilities.MaxContextTokens, model.Capabilities.Vision)
 	if err != nil {
 		return err
 	}

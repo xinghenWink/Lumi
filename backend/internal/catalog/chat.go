@@ -35,15 +35,13 @@ func (s *Service) ChatTargets(ctx context.Context, modelID uuid.UUID) (PublicMod
 	if !model.Capabilities.Stream {
 		return model, nil, problem.New("CHAT_MODEL_UNAVAILABLE", http.StatusConflict)
 	}
-	rows, err := s.queries.ChatRouteTargets(ctx, modelID)
+	rows, err := s.routeTargets(ctx, modelID)
 	if err != nil {
 		return model, nil, fmt.Errorf("read chat routes: %w", err)
 	}
 	targets := make([]ChatTarget, 0, len(rows))
 	for _, r := range rows {
-		targets = append(targets, ChatTarget{UpstreamID: r.ID, RemoteModel: r.UpstreamModelName, row: query.Upstream{
-			ID: r.ID, BaseUrl: r.BaseUrl, ApiKeyEnc: r.ApiKeyEnc, ProxyUrl: r.ProxyUrl, TimeoutChatS: r.TimeoutChatS, TimeoutImageS: r.TimeoutImageS, EditFormat: r.EditFormat,
-		}})
+		targets = append(targets, ChatTarget{UpstreamID: r.Upstream.ID, RemoteModel: r.UpstreamModelName, row: r.Upstream})
 	}
 	if len(targets) == 0 {
 		return model, nil, problem.New("CHAT_MODEL_UNAVAILABLE", http.StatusConflict)
@@ -52,5 +50,12 @@ func (s *Service) ChatTargets(ctx context.Context, modelID uuid.UUID) (PublicMod
 }
 
 func (s *Service) ChatClient(target ChatTarget) (*upstream.Client, error) {
+	return s.adapter(target.row)
+}
+
+func (s *Service) RoutedChatClient(ctx context.Context, target ChatTarget) (*upstream.Client, error) {
+	if err := s.permit(ctx, target.UpstreamID); err != nil {
+		return nil, err
+	}
 	return s.adapter(target.row)
 }

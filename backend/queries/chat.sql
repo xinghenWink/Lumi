@@ -18,7 +18,7 @@ SELECT * FROM conversations WHERE id=$1 AND user_id=$2 AND type='chat' AND delet
 
 -- name: ListConversations :many
 SELECT * FROM conversations WHERE user_id=sqlc.arg(user_id) AND type='chat' AND deleted_at IS NULL
-AND (sqlc.arg(search)::text='' OR title ILIKE '%'||sqlc.arg(search)::text||'%')
+AND (sqlc.arg(search)::text='' OR title ILIKE '%'||sqlc.arg(search)::text||'%' OR EXISTS(SELECT 1 FROM messages m WHERE m.conversation_id=conversations.id AND m.deleted_at IS NULL AND m.content ILIKE '%'||sqlc.arg(search)::text||'%'))
 AND (sqlc.narg(cursor_time)::timestamptz IS NULL OR (pinned,last_message_at,id) < (sqlc.narg(cursor_pinned)::boolean,sqlc.narg(cursor_time)::timestamptz,sqlc.narg(cursor_id)::uuid))
 ORDER BY pinned DESC,last_message_at DESC,id DESC LIMIT sqlc.arg(page_limit);
 

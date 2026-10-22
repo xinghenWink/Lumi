@@ -73,6 +73,14 @@ export function parseCapabilities(value: unknown): Capabilities {
 export function parseUpstream(value: unknown): Upstream {
   const d = record(value)
   return {
+    ...(d.circuit_state !== undefined
+      ? {
+          circuit_state: choice(d, 'circuit_state', ['closed', 'open', 'half_open'] as const),
+          consecutive_failures: integer(d, 'consecutive_failures'),
+          last_error: text(d, 'last_error'),
+          open_until: d.open_until === null ? null : text(d, 'open_until'),
+        }
+      : {}),
     id: text(d, 'id'),
     version: integer(d, 'version', 1),
     name: text(d, 'name'),

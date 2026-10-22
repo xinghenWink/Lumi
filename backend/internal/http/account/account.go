@@ -24,6 +24,8 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/http/response"
 	"github.com/xinghenWink/Lumi/backend/internal/images"
 	"github.com/xinghenWink/Lumi/backend/internal/media"
+	"github.com/xinghenWink/Lumi/backend/internal/operations"
+	"github.com/xinghenWink/Lumi/backend/internal/platform/mailer"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/problem"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/validation"
 	"github.com/xinghenWink/Lumi/backend/internal/settings"
@@ -31,16 +33,23 @@ import (
 )
 
 type Services struct {
-	Auth     *auth.Service
-	Users    *user.Service
-	Settings *settings.Service
-	Audit    *audit.Service
-	Gate     auth.Gate
-	Credits  *credits.Service
-	Catalog  *catalog.Service
-	Chat     *chat.Service
-	Images   *images.Service
-	Files    *media.Store
+	Metrics       *middleware.Metrics
+	Operations    *operations.Service
+	Mailer        *mailer.Service
+	PublicBaseURL string
+	Version       string
+	Commit        string
+	BuildTime     string
+	Auth          *auth.Service
+	Users         *user.Service
+	Settings      *settings.Service
+	Audit         *audit.Service
+	Gate          auth.Gate
+	Credits       *credits.Service
+	Catalog       *catalog.Service
+	Chat          *chat.Service
+	Images        *images.Service
+	Files         *media.Store
 }
 type Security struct {
 	Origins        []string
@@ -59,6 +68,12 @@ func Routes(services *Services, security Security, logger *slog.Logger) func(*gi
 			return fmt.Errorf("configure application proxies: %w", err)
 		}
 		h := &Handler{services: services, security: security, logger: logger}
+		if services != nil {
+			if services.Metrics == nil {
+				services.Metrics = middleware.NewMetrics()
+			}
+			engine.Use(services.Metrics.Handler())
+		}
 		api := engine.Group("/api/v1", h.available, func(c *gin.Context) { c.Header("Cache-Control", "no-store"); c.Next() })
 		api.GET("/public/config", h.publicConfig)
 		authRoutes := api.Group("/auth", h.csrf)
@@ -67,7 +82,9 @@ func Routes(services *Services, security Security, logger *slog.Logger) func(*gi
 		authRoutes.POST("/send-code", h.sendCode)
 		authRoutes.POST("/refresh", h.refresh)
 		authRoutes.POST("/logout", h.logout)
-		protected := api.Group("", h.authenticate)
+		authRoutes.POST("/forgot-password", h.forgotPassword)
+		authRoutes.POST("/reset-password", h.resetPassword)
+		protected := api.Group("", h.authenticate, h.maintenance)
 		protected.GET("/me", h.me)
 		protected.PATCH("/me", h.csrf, h.updateMe)
 		protected.POST("/me/password", h.csrf, h.changePassword)
@@ -84,6 +101,8 @@ func Routes(services *Services, security Security, logger *slog.Logger) func(*gi
 		h.catalogRoutes(protected, admin)
 		h.chatRoutes(protected, admin)
 		h.imageRoutes(protected, admin)
+		h.m6Routes(protected, admin)
+		engine.GET("/metrics", h.available, h.authenticate, h.adminOnly, h.metrics)
 		return nil
 	}
 }

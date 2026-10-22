@@ -1,5 +1,6 @@
 export default {
   common: {
+    refresh: 'Refresh',
     loading: 'Loading…',
     retry: 'Try again',
     save: 'Save changes',
@@ -327,7 +328,7 @@ export default {
     data: 'Account use involves your email, display name, password hash, sign-in IP, device information and necessary security records. Chat stores conversation titles, messages and generation status, and sends the required context and title requests to the selected upstream. Credit use records balance changes, charge settlements, redemption times, code tails and source IPs. Passwords are not stored in plain text. Only refresh token hashes are stored.',
     purposeTitle: 'Why it is used',
     purpose:
-      'This information supports authentication, account management, chat generation and history recovery, security and operation history. Deleting chat history immediately hides conversations using soft deletion. Chat data is removed after the 30-day deleted-account retention period. Credit ledger, charge settlement and redemption records retain a stable user identifier after account cleanup to preserve accounting history. Administration requires authorization. Sensitive credentials are not returned to the browser.',
+      'This information supports authentication, chat generation, history recovery and security. Chat context may include your uploaded images and custom instructions. Self-deletion signs you out immediately and removes personal data after 7 days; administrator deletion retains it for 30 days. Required financial, redemption and audit records retain a stable user identifier. Administrators see conversation metadata by default. If the operator enables content access, administrators may view chat messages and image prompts; every access is audited. Sensitive credentials are not returned to the browser.',
     contactTitle: 'Contact',
     contact:
       'Use the contact information provided by the site operator for account or data questions.',
