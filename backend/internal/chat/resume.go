@@ -146,6 +146,8 @@ func (s *Service) Buffered(ctx context.Context, owner, id, request uuid.UUID, af
 		if time.Since(idle) > 20*time.Second {
 			return problem.New("CHAT_RESUME_EXPIRED", 410)
 		}
-		if err:=ctx.Err();err!=nil{return err}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 	}
 }

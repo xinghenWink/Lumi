@@ -16,6 +16,7 @@ func (s *Service) SendReset(ctx context.Context, email, link, locale string) err
 		return err
 	}
 	if cfg.Mail.Host == "" {
+		s.logger.ErrorContext(ctx, "password reset mail is not configured")
 		return problem.New("SMTP_UNAVAILABLE", 503)
 	}
 	if locale != "en" {
@@ -35,6 +36,7 @@ func (s *Service) SendReset(ctx context.Context, email, link, locale string) err
 	body := strings.ReplaceAll(catalog.ResetBody, "{link}", link)
 	message := "From: " + cfg.Mail.From + "\r\nTo: " + email + "\r\nSubject: " + mime.QEncoding.Encode("UTF-8", catalog.ResetSubject) + "\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n" + body
 	if err := s.deliver(ctx, cfg.Mail, email, message); err != nil {
+		s.logger.ErrorContext(ctx, "password reset mail delivery failed")
 		return problem.New("SMTP_UNAVAILABLE", 503)
 	}
 	return nil

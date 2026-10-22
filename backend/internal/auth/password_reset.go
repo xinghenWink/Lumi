@@ -74,10 +74,14 @@ func (s *Service) ForgotPassword(ctx context.Context, input CodeInput, client Cl
 	}
 	sender, ok := s.mailer.(ResetMailer)
 	if !ok {
-		return problem.New("SMTP_UNAVAILABLE", 503)
+		return nil
 	}
 	// The URL fragment never reaches HTTP access logs or referrer headers.
-	return sender.SendReset(ctx, email, baseURL+"/reset-password#token="+url.QueryEscape(token), input.Locale)
+	if err := sender.SendReset(ctx, email, baseURL+"/reset-password#token="+url.QueryEscape(token), input.Locale); err != nil {
+		// The public response also stays generic when email delivery fails.
+		return nil
+	}
+	return nil
 }
 func (s *Service) ResetPassword(ctx context.Context, input ResetInput, client Client) error {
 	if len(input.Token) != 43 {

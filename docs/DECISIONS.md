@@ -5,7 +5,7 @@
 - ADR-079：聊天 vision 使用所有者图片的规范化缩略图再缩放为长边 ≤256px PNG，避免把四张 10 MB 原图编码为超大 JSON；总上下文 JSON 内容限制 3 MiB，超限在保存新消息事务内拒绝。原图与生图编辑引用保持既有行为。
 
 - ADR-065：M6 独立分支基于 M5，新增 00008；仅实施全部 P1 与 M6 明确列出的后台补全，不执行 M7 压测、部署演练或发布。无新增项目依赖。
-- ADR-066：密码重置令牌为 256 位随机值，数据库仅存哈希，有效 30 分钟、单次使用并绑定 token_version；重置与吊销全部登录在同一事务。链接令牌放 URL fragment，页面读取后移除，不进入 HTTP 请求或日志。无 SMTP 时明确返回不可用，不在日志打印重置链接。
+- ADR-066：密码重置令牌为 256 位随机值，数据库仅存哈希，有效 30 分钟、单次使用并绑定 token_version；重置与吊销全部登录在同一事务。链接令牌放 URL fragment，页面读取后移除，不进入 HTTP 请求或日志。忘记密码对不存在账号与邮件投递失败均返回统一受理结果，避免故障期间枚举账号；投递失败仅记不含个人资料的服务日志，不打印重置链接。管理员测试邮件仍明确返回 SMTP 状态。
 - ADR-067：Turnstile 使用固定官方 Siteverify 地址，校验 success、hostname 与 action；secret 经 AES-GCM 入库，响应和审计只暴露 configured。CSP 仅为官方 challenges.cloudflare.com 增加 script / frame / connect 来源。参考：[官方验证说明](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)。
 - ADR-068：每 IP 注册上限默认 5，使用 Redis 滑动 24 小时窗口，0 关闭；配额保守地计入通过输入验证后尝试的注册，即便后续邮箱验证码、重复邮箱或事务失败也不返还。Redis 故障拒绝注册，避免绕过配额。沿用独立每分钟限制。
 - ADR-069：个人偏好单独存表。自定义指令不复制到审计，与全局 system prompt 拼接并纳入上下文预算；vision 仅在能力明确启用时可用，只接受已有所有者文件 ID，最多 4 张，作为内联图片发送上游，历史保留引用 ID。每张保守预留 1024 估算 token；上游仍负责实际上下文限制。
