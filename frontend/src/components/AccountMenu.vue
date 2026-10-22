@@ -62,7 +62,7 @@ async function logout() {
           <DropdownMenuItem
             v-if="auth.user?.role === 'admin'"
             class="menu-item"
-            @select="router.push('/admin/users')"
+            @select="router.push('/admin')"
             ><Shield :size="16" />{{ t('nav.admin') }}</DropdownMenuItem
           >
           <DropdownMenuItem class="menu-item" @select="router.push('/me/credits')"
