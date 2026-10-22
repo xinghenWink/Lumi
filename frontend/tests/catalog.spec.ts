@@ -99,6 +99,7 @@ test('M3 real channel configuration import routing and safe model selection', as
     await dialog.getByLabel('备注', { exact: true }).fill('E2E preserved secret')
     await dialog.getByRole('button', { name: '保存渠道', exact: true }).click()
     await expect(dialog).not.toBeVisible()
+    await expect(channelRow.getByRole('status')).not.toBeVisible()
     await channelRow.getByRole('button', { name: '测试连接', exact: true }).click()
     await expect(channelRow.getByRole('status')).toContainText('连接成功')
     await channelRow.getByRole('button', { name: '同步模型', exact: true }).click()

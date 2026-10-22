@@ -32,7 +32,7 @@ const modalError = shallowRef<unknown>(null),
 const selected = shallowRef<Upstream | null>(null),
   deleting = shallowRef<Upstream | null>(null),
   syncing = shallowRef<Upstream | null>(null)
-const tests = shallowRef(new Map<string, ConnectionTest>())
+const tests = shallowRef(new Map<string, ConnectionTest & { version: number }>())
 const form = reactive<UpstreamInput>({
   version: 0,
   name: '',
@@ -137,7 +137,7 @@ async function test(row: Upstream) {
   try {
     const result = await catalog.test(row.id)
     if (data.value?.items.some((item) => item.id === row.id && item.version === row.version))
-      tests.value = new Map(tests.value).set(row.id, result)
+      tests.value = new Map(tests.value).set(row.id, { ...result, version: row.version })
   } catch (failure) {
     actionError.value = failure
   } finally {
@@ -227,7 +227,7 @@ function imported(count: number) {
               <td>
                 <code class="catalog-url">{{ row.base_url }}</code
                 ><span v-if="row.note" class="table-secondary">{{ row.note }}</span>
-                <div v-if="tests.get(row.id)" class="catalog-test-result">
+                <div v-if="tests.get(row.id)?.version === row.version" class="catalog-test-result">
                   <p
                     :class="tests.get(row.id)?.success ? 'success-message' : 'danger-text'"
                     :role="tests.get(row.id)?.success ? 'status' : 'alert'"
