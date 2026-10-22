@@ -2,6 +2,7 @@ package chat
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -35,6 +36,10 @@ func (s *Service) Export(ctx context.Context, owner uuid.UUID, id *uuid.UUID) ([
 			}
 		}
 		for _, row := range page.Items {
+			size += 1024
+			if size > 32<<20 {
+				return nil, problem.New("EXPORT_TOO_LARGE", 413)
+			}
 			data := Export{Conversation: row, Messages: []Message{}}
 			next := ""
 			for {
@@ -43,7 +48,11 @@ func (s *Service) Export(ctx context.Context, owner uuid.UUID, id *uuid.UUID) ([
 					return nil, err
 				}
 				for _, m := range messages.Items {
-					size += len(m.Content) + 1024
+					encoded, err := json.Marshal(m)
+					if err != nil {
+						return nil, fmt.Errorf("measure export record: %w", err)
+					}
+					size += len(encoded) + 2
 				}
 				if size > 32<<20 {
 					return nil, problem.New("EXPORT_TOO_LARGE", 413)

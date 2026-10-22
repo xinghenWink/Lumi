@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"github.com/xinghenWink/Lumi/backend/internal/platform/problem"
 	"time"
 
 	redisclient "github.com/redis/go-redis/v9"
@@ -17,7 +18,7 @@ func (c *Client) ReserveChat(ctx context.Context, key, fingerprint string) (bool
 		return false, fmt.Errorf("reserve chat buffer: %w", err)
 	}
 	if result < 0 {
-		return false, fmt.Errorf("chat fingerprint conflict")
+		return false, problem.New("CHAT_REQUEST_CONFLICT", 409)
 	}
 	return result == 1, nil
 }

@@ -42,7 +42,11 @@ func (s *Service) StartBuffered(ctx context.Context, actor user.Actor, id uuid.U
 	key := bufferKey(actor.ID, id, input.RequestID)
 	reserved, err := s.resume.ReserveChat(ctx, key, hex.EncodeToString(digest[:]))
 	if err != nil {
-		return problem.New("CHAT_REQUEST_CONFLICT", 409)
+		var rejected *problem.Error
+		if errors.As(err, &rejected) {
+			return err
+		}
+		return problem.New("DEPENDENCY_UNAVAILABLE", 503)
 	}
 	if !reserved {
 		return nil

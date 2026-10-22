@@ -487,7 +487,14 @@ func (h *Handler) downloadImages(c *gin.Context) {
 	}
 	var buffer bytes.Buffer
 	writer := zip.NewWriter(&buffer)
+	seen := map[uuid.UUID]bool{}
+	totalBytes := int64(0)
 	for _, id := range input.IDs {
+		if id == uuid.Nil || seen[id] {
+			h.fail(c, problem.Invalid())
+			return
+		}
+		seen[id] = true
 		row, err := h.services.Files.Get(c.Request.Context(), p.User.ID, id)
 		if err != nil {
 			h.fail(c, err)
@@ -495,6 +502,11 @@ func (h *Handler) downloadImages(c *gin.Context) {
 		}
 		if row.Kind != "generated" {
 			h.fail(c, problem.New("FILE_NOT_FOUND", 404))
+			return
+		}
+		totalBytes += row.Size
+		if totalBytes > 100<<20 {
+			h.fail(c, problem.New("EXPORT_TOO_LARGE", 413))
 			return
 		}
 		file, _, err := h.services.Files.Open(c.Request.Context(), row, false)
