@@ -14,7 +14,7 @@
 
 ADR-054：新增仅开发依赖 Lighthouse 13.5.0，验收登录后的桌面冷 HTTP 缓存性能；使用隔离的临时 Chromium profile，不保存认证报告。其 Node 下限为 22.19，工作区同步提高下限。工具链 OpenTelemetry API 固定 1.9.0，满足 SDK 声明的 <1.10 peer 范围。以 60 次顺序 SSE 请求的首文本往返减去 fixture 内部耗时，测量包含认证 / 数据库 / 首文本前回退 / 转发的平台额外延迟；另测流式期间交互事件上界与长任务比例，报告注明 CI 环境及测量边界，不代替生产负载或现场 INP。Shiki 使用 core + JavaScript 正则引擎及显式语法按需加载，避免携带 WASM 与无关语言。
 
-ADR-055：KaTeX 的动态尺寸与 Shiki 双主题高亮需要 style 属性。CSP 仅以 style-src-attr 允许样式属性，style-src-elem / script-src 保持 self，script-src-attr 明确 none。原始 Markdown HTML 禁用，最终生成 HTML 仍经 DOMPurify，KaTeX trust=false 并限制展开 / 尺寸。通过 HTTP 头回归与实际浏览器零 CSP 错误确认；不通过全局 unsafe-inline 放宽脚本或样式标签。依据：[CSP3](https://www.w3.org/TR/CSP3/#directive-style-src-attr)、[MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/style-src-attr)。
+ADR-055：KaTeX 的动态尺寸与 Shiki 双主题高亮需要 style 属性。CSP 仅以 style-src-attr 允许样式属性，style-src-elem / script-src 保持 self，script-src-attr 明确 none。原始 Markdown HTML 禁用，最终生成 HTML 仍经 DOMPurify，KaTeX trust=false 并限制展开 / 尺寸。Vite assetsInlineLimit=0 将小字体输出为同源静态文件，维持 font-src self。通过 HTTP 头回归与实际浏览器零 CSP 错误确认；不通过全局 unsafe-inline 放宽脚本或样式标签。依据：[CSP3](https://www.w3.org/TR/CSP3/#directive-style-src-attr)、[MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/style-src-attr)。
 
 Markdown 安全与按需加载依据：[markdown-it](https://markdown-it.github.io/markdown-it/)、[DOMPurify](https://github.com/cure53/DOMPurify)、[Shiki](https://shiki.style/guide/bundles)、[KaTeX](https://katex.org/docs/options)。
 

@@ -301,6 +301,7 @@ export const useChatStore = defineStore('chat', () => {
         // A generation opened in another tab has no local reader; refresh its durable checkpoint.
         for (let i = 0; i < 5; i++) {
           await new Promise((r) => setTimeout(r, 600))
+          if (owner !== epoch || deleted.has(id)) return
           await open(id)
           if (!current.value?.busy) break
         }
@@ -318,6 +319,7 @@ export const useChatStore = defineStore('chat', () => {
     const owner = epoch
     await chats.delete(ids, all)
     if (owner !== epoch) return
+    if (all) createID = ''
     // A filtered or paginated list does not contain every cached conversation.
     const removed = all
       ? [
