@@ -72,6 +72,13 @@ export function parseUser(value: unknown): User {
     created_at: text(data, 'created_at'),
     last_login_at: nullableText(data, 'last_login_at'),
     last_login_ip: text(data, 'last_login_ip'),
+    ...(data.total_credits !== undefined
+      ? {
+          permanent_balance: number(data, 'permanent_balance'),
+          daily_balance: number(data, 'daily_balance'),
+          total_credits: number(data, 'total_credits'),
+        }
+      : {}),
   }
 }
 export function parseAuth(value: unknown): AuthResult {

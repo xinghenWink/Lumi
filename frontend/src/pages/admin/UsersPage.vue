@@ -22,6 +22,8 @@ const filters = reactive({
   sort: 'created_at',
   from: '',
   until: '',
+  minBalance: '',
+  maxBalance: '',
 })
 const page = shallowRef<UserPage | null>(null)
 const loading = ref(false)
@@ -35,6 +37,7 @@ const modalOpen = ref(false)
 const mode = ref<'create' | 'edit' | 'delete'>('create')
 const selected = shallowRef<User | null>(null)
 const form = reactive({
+  initialCredits: 0,
   email: '',
   nickname: '',
   password: '',
@@ -66,6 +69,8 @@ async function load() {
       cursor: cursors.value.at(-1) ?? '',
     })
     addDateRange(query, filters.from, filters.until)
+    if (filters.minBalance !== '') query.set('min_balance', filters.minBalance)
+    if (filters.maxBalance !== '') query.set('max_balance', filters.maxBalance)
     const result = await accounts.list(query, controller.signal)
     if (current === generation) page.value = result
   } catch (failure) {
@@ -86,6 +91,8 @@ function search() {
 }
 function reset() {
   Object.assign(filters, {
+    minBalance: '',
+    maxBalance: '',
     search: '',
     role: '',
     status: '',
@@ -114,6 +121,7 @@ function open(value: 'create' | 'edit' | 'delete', user: User | null = null) {
   validation.value = ''
   confirmation.value = ''
   Object.assign(form, {
+    initialCredits: 0,
     email: user?.email ?? '',
     nickname: user?.nickname ?? '',
     password: '',
@@ -143,6 +151,7 @@ async function save() {
   try {
     if (mode.value === 'create') {
       await accounts.create({
+        initial_credits: form.initialCredits,
         email: form.email.trim(),
         nickname: form.nickname.trim(),
         password: form.password,
@@ -229,9 +238,18 @@ async function toggle(user: User) {
         <option value="disabled">{{ t('admin.users.disabled') }}</option></select
       ><select v-model="filters.sort" :aria-label="t('admin.users.newest')" @change="search">
         <option value="created_at">{{ t('admin.users.newest') }}</option>
-        <option value="last_login_at">{{ t('admin.users.lastLoginSort') }}</option></select
+        <option value="last_login_at">{{ t('admin.users.lastLoginSort') }}</option>
+        <option value="balance">{{ t('credits.balanceSort') }}</option></select
       ><button class="button" type="submit">{{ t('common.search') }}</button>
       <div class="date-filters">
+        <label
+          >{{ t('credits.minBalance')
+          }}<input v-model="filters.minBalance" type="number" min="0" max="2000000000000" step="1"
+        /></label>
+        <label
+          >{{ t('credits.maxBalance')
+          }}<input v-model="filters.maxBalance" type="number" min="0" max="2000000000000" step="1"
+        /></label>
         <label>{{ t('common.from') }}<input v-model="filters.from" type="date" /></label
         ><label>{{ t('common.until') }}<input v-model="filters.until" type="date" /></label
         ><span class="field-hint">{{ t('common.filterUTC') }}</span
@@ -258,6 +276,7 @@ async function toggle(user: User) {
                 <th>{{ t('admin.users.identity') }}</th>
                 <th>{{ t('admin.users.role') }}</th>
                 <th>{{ t('admin.users.status') }}</th>
+                <th>{{ t('credits.total') }}</th>
                 <th>{{ t('admin.users.registered') }}</th>
                 <th>{{ t('admin.users.lastLogin') }}</th>
                 <th>{{ t('common.actions') }}</th>
@@ -284,6 +303,15 @@ async function toggle(user: User) {
                   <span class="badge" :class="user.status === 'active' ? 'green' : 'red'"
                     ><span class="status-dot" />{{ t(`admin.users.${user.status}`) }}</span
                   >
+                </td>
+                <td class="numeric">
+                  <strong>{{ user.total_credits?.toLocaleString() ?? '—' }}</strong>
+                  <span v-if="user.total_credits !== undefined" class="table-secondary">{{
+                    t('credits.split', {
+                      daily: user.daily_balance,
+                      permanent: user.permanent_balance,
+                    })
+                  }}</span>
                 </td>
                 <td class="nowrap">{{ formatTime(user.created_at) }}</td>
                 <td>
@@ -391,6 +419,18 @@ async function toggle(user: User) {
               :disabled="busy"
           /></label>
           <div class="form-grid">
+            <label v-if="mode === 'create'" class="field"
+              >{{ t('credits.initial')
+              }}<input
+                v-model.number="form.initialCredits"
+                type="number"
+                min="0"
+                max="1000000000000"
+                step="1"
+                required
+                :disabled="busy"
+              /><span class="field-hint">{{ t('credits.initialHint') }}</span></label
+            >
             <label class="field"
               >{{ t('admin.users.role')
               }}<select v-model="form.role" :disabled="busy || self">
