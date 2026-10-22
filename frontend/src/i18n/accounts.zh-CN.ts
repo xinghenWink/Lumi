@@ -242,8 +242,25 @@ export default {
     emptyTitle: '暂无匹配的审计记录',
     emptyDescription: '调整筛选条件，或在完成账号、设置操作后查看记录。',
     otherAction: '其他操作（{action}）',
-    types: { user: '用户', site: '站点信息', registration: '注册与安全', mail: '邮件服务' },
+    types: {
+      user: '用户',
+      site: '站点信息',
+      registration: '注册与安全',
+      mail: '邮件服务',
+      pricing: '价格与赠送',
+      redeem_batch: '兑换码批次',
+      redeem_code: '兑换码',
+      credit_ledger: '积分流水',
+    },
     actions: {
+      credits: { adjust: '调整积分', initialize: '发放初始积分', pricing_update: '修改价格与赠送' },
+      redeem: {
+        batch_create: '生成兑换码批次',
+        codes_update: '修改兑换码状态',
+        codes_delete: '删除未使用兑换码',
+      },
+      credit_ledger: { export: '导出积分流水' },
+      redeem_code: { export: '导出兑换码' },
       user: {
         create: '新增用户',
         update: '修改用户',

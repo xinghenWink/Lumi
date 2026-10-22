@@ -252,8 +252,29 @@ export default {
     emptyTitle: 'No matching audit records',
     emptyDescription: 'Adjust the filters or return after making account or settings changes.',
     otherAction: 'Other action ({action})',
-    types: { user: 'User', site: 'Site', registration: 'Registration', mail: 'Email delivery' },
+    types: {
+      user: 'User',
+      site: 'Site',
+      registration: 'Registration',
+      mail: 'Email delivery',
+      pricing: 'Pricing and gifts',
+      redeem_batch: 'Redeem batch',
+      redeem_code: 'Redeem code',
+      credit_ledger: 'Credit ledger',
+    },
     actions: {
+      credits: {
+        adjust: 'Adjust credits',
+        initialize: 'Grant initial credits',
+        pricing_update: 'Update pricing and gifts',
+      },
+      redeem: {
+        batch_create: 'Generate redeem batch',
+        codes_update: 'Change code status',
+        codes_delete: 'Delete unused codes',
+      },
+      credit_ledger: { export: 'Export credit ledger' },
+      redeem_code: { export: 'Export redeem codes' },
       user: {
         create: 'Create user',
         update: 'Update user',

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -336,7 +337,7 @@ func (h *Handler) redemptions(c *gin.Context, owner *uuid.UUID, admin bool) {
 	c.JSON(http.StatusOK, result)
 }
 func csvCell(value string) string {
-	stripped := strings.TrimLeft(value, " \t\r\n")
+	stripped := strings.TrimLeftFunc(value, func(ch rune) bool { return unicode.IsSpace(ch) || ch == '\ufeff' || ch == '\u200b' })
 	if stripped != "" && strings.ContainsRune("=+-@", rune(stripped[0])) {
 		if _, err := strconv.ParseInt(stripped, 10, 64); err != nil {
 			return "'" + value
@@ -357,11 +358,16 @@ func optionalCredits(value string) (*int64, error) {
 	}
 	return &parsed, nil
 }
-func beginCSV(c *gin.Context, name string) *csv.Writer {
+func beginCSV(c *gin.Context, name string) (*csv.Writer, error) {
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", name))
 	c.Header("X-Content-Type-Options", "nosniff")
-	return csv.NewWriter(c.Writer)
+	if _, err := c.Writer.Write([]byte{0xef, 0xbb, 0xbf}); err != nil {
+		return nil, fmt.Errorf("write CSV encoding marker: %w", err)
+	}
+	writer := csv.NewWriter(c.Writer)
+	writer.UseCRLF = true
+	return writer, nil
 }
 func csvRow(writer *csv.Writer, row []string) error {
 	for i, cell := range row {
@@ -417,7 +423,11 @@ func (h *Handler) exportLedger(c *gin.Context) {
 		h.fail(c, err)
 		return
 	}
-	writer := beginCSV(c, "lumi-credit-ledger.csv")
+	writer, err := beginCSV(c, "lumi-credit-ledger.csv")
+	if err != nil {
+		h.csvFailure(c, err)
+		return
+	}
 	if err := csvRow(writer, catalog.LedgerHeaders); err != nil {
 		h.csvFailure(c, err)
 		return
@@ -476,7 +486,11 @@ func (h *Handler) exportCodes(c *gin.Context) {
 		h.fail(c, err)
 		return
 	}
-	writer := beginCSV(c, "lumi-redeem-codes.csv")
+	writer, err := beginCSV(c, "lumi-redeem-codes.csv")
+	if err != nil {
+		h.csvFailure(c, err)
+		return
+	}
 	if err := csvRow(writer, catalog.CodeHeaders); err != nil {
 		h.csvFailure(c, err)
 		return

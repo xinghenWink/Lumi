@@ -112,6 +112,7 @@ test('M2 real gifts redemption retry pricing exports and administrator adjustmen
     await page.getByRole('button', { name: '搜索', exact: true }).click()
     let codeRow = page.getByRole('row').filter({ hasText: code })
     await expect(codeRow).toBeVisible()
+    await page.bringToFront()
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
     await codeRow.getByRole('button', { name: `复制兑换码 ${code.slice(-4)}`, exact: true }).click()
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(code)

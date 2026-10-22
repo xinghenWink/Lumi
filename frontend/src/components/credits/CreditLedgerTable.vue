@@ -69,7 +69,7 @@ async function exportCSV() {
       /></label>
       <label class="field"
         >{{ t('credits.type')
-        }}<select v-model="filters.type">
+        }}<select v-model="filters.type" :aria-label="t('credits.type')">
           <option value="">{{ t('credits.allTypes') }}</option>
           <option v-for="type in types" :key="type" :value="type">
             {{ t(`credits.types.${type}`) }}

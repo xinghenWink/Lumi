@@ -58,6 +58,8 @@ async function redeem() {
     data.value = { next_cursor: '', account: result.account }
     code.value = ''
     notice.value = t('credits.redeemSuccess', { amount: number(result.credits) })
+    await load()
+    if (!alive) return
     emit('changed')
   } catch (failure) {
     if (alive) actionError.value = failure
@@ -96,6 +98,8 @@ async function adjust() {
     form.note = ''
     form.amount = '0'
     notice.value = t('credits.adjusted')
+    await load()
+    if (!alive) return
     emit('changed')
   } catch (failure) {
     if (alive) actionError.value = failure
@@ -182,14 +186,14 @@ async function adjust() {
       <div class="form-grid">
         <label class="field"
           >{{ t('credits.bucket')
-          }}<select v-model="form.bucket" :disabled="busy">
+          }}<select v-model="form.bucket" :aria-label="t('credits.bucket')" :disabled="busy">
             <option value="permanent">{{ t('credits.permanent') }}</option>
             <option value="daily">{{ t('credits.daily') }}</option>
           </select></label
         >
         <label class="field"
           >{{ t('credits.action')
-          }}<select v-model="form.action" :disabled="busy">
+          }}<select v-model="form.action" :aria-label="t('credits.action')" :disabled="busy">
             <option v-for="action in ['add', 'subtract', 'set']" :key="action" :value="action">
               {{ t(`credits.${action}`) }}
             </option>

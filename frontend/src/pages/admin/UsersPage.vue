@@ -429,6 +429,7 @@ async function toggle(user: User) {
               >{{ t('credits.initial')
               }}<input
                 v-model.number="form.initialCredits"
+                :aria-label="t('credits.initial')"
                 type="number"
                 min="0"
                 max="1000000000000"
