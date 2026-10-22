@@ -25,11 +25,7 @@ export function record(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>
 }
 
-export async function request<T>(
-  path: string,
-  parse: (value: unknown) => T,
-  options: RequestOptions = {},
-): Promise<T> {
+export async function openResponse(path: string, options: RequestOptions = {}): Promise<Response> {
   const headers = new Headers()
   if (options.method && options.method !== 'GET') headers.set('X-Lumi-CSRF', '1')
   if (options.body !== undefined) headers.set('Content-Type', 'application/json')
@@ -65,6 +61,15 @@ export async function request<T>(
       Number(response.headers.get('Retry-After')) || 0,
     )
   }
+  return response
+}
+
+export async function request<T>(
+  path: string,
+  parse: (value: unknown) => T,
+  options: RequestOptions = {},
+): Promise<T> {
+  const response = await openResponse(path, options)
   if (response.status === 204) return parse(undefined)
   if (options.responseType === 'blob') {
     if (!response.headers.get('Content-Type')?.startsWith('text/csv'))
