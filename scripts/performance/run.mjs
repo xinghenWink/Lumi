@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { createServer as createPortProbe } from 'node:net'
 import { spawn, execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, openSync, closeSync, writeFileSync } from 'node:fs'
@@ -16,6 +17,12 @@ if (
     'Use an explicit loopback database ending in _m7_load and a dedicated Redis database',
   )
 if (!process.env.E2E_REDIS_URL) throw new Error('E2E_REDIS_URL required')
+const portProbe = createPortProbe()
+await new Promise((done, reject) => {
+  portProbe.once('error', reject)
+  portProbe.listen(19080, '127.0.0.1', done)
+})
+await new Promise((done, reject) => portProbe.close((error) => (error ? reject(error) : done())))
 const output = resolve(root, '.tools/m7-load')
 mkdirSync(output, { recursive: true })
 const key = randomBytes(32).toString('base64url')

@@ -4,6 +4,38 @@ SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL FOR SHARE;
 -- name: LockCreditAccount :one
 SELECT * FROM credit_accounts WHERE user_id = $1 FOR UPDATE;
 
+-- name: ReadCreditAccount :one
+-- Keep lazy reset and both immutable ledger entries in one atomic statement.
+-- Lock the owner before the account, matching every other financial mutation.
+WITH owner AS MATERIALIZED (
+    SELECT u.id FROM users u WHERE u.id=sqlc.arg(user_id) AND u.deleted_at IS NULL FOR SHARE OF u
+), locked AS MATERIALIZED (
+    SELECT a.* FROM credit_accounts a JOIN owner o ON o.id=a.user_id FOR UPDATE OF a
+), changed AS (
+    UPDATE credit_accounts a SET daily_balance=sqlc.arg(grant_amount)::bigint,
+        daily_reset_on=sqlc.arg(today)::date,
+        version=a.version+1+(CASE WHEN l.daily_balance>0 THEN 1 ELSE 0 END)+(CASE WHEN sqlc.arg(grant_amount)::bigint>0 THEN 1 ELSE 0 END)
+    FROM locked l WHERE a.user_id=l.user_id AND (l.daily_reset_on IS NULL OR l.daily_reset_on<sqlc.arg(today)::date)
+    RETURNING a.*
+), expired AS (
+    INSERT INTO credit_ledger(id,user_id,type,bucket,delta,bucket_balance_after,total_after,idempotency_key)
+    SELECT sqlc.arg(expire_id)::uuid,l.user_id,'daily_expire','daily',-l.daily_balance,0,l.permanent_balance,
+        'daily:'||l.user_id::text||':'||to_char(c.daily_reset_on,'YYYY-MM-DD')||':expire'
+    FROM changed c JOIN locked l ON l.user_id=c.user_id WHERE l.daily_balance>0
+    RETURNING id
+), granted AS (
+    INSERT INTO credit_ledger(id,user_id,type,bucket,delta,bucket_balance_after,total_after,idempotency_key)
+    SELECT sqlc.arg(grant_id)::uuid,c.user_id,'daily_grant','daily',c.daily_balance,c.daily_balance,c.permanent_balance+c.daily_balance,
+        'daily:'||c.user_id::text||':'||to_char(c.daily_reset_on,'YYYY-MM-DD')||':grant'
+    FROM changed c WHERE c.daily_balance>0
+    RETURNING id
+)
+SELECT l.user_id,l.permanent_balance,
+    (CASE WHEN c.user_id IS NULL THEN l.daily_balance ELSE c.daily_balance END)::bigint AS daily_balance,
+    coalesce(c.daily_reset_on,l.daily_reset_on)::date AS daily_reset_on,
+    coalesce(c.version,l.version)::bigint AS version
+FROM locked l LEFT JOIN changed c ON c.user_id=l.user_id;
+
 -- name: LockCreditOwnerForSettlement :one
 SELECT * FROM users WHERE id=$1 FOR SHARE;
 

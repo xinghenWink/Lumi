@@ -189,18 +189,19 @@ func (s *Service) prepare(ctx context.Context, actor user.Actor, id uuid.UUID, i
 	digest := sha256.Sum256(encoded)
 	fingerprint := hex.EncodeToString(digest[:])
 	err := db.Transaction(ctx, s.pool, func(q *query.Queries) error {
-		if err := q.LockChatUser(ctx, actor.ID.String()); err != nil {
-			return fmt.Errorf("lock chat user: %w", err)
-		}
-		if err := checkUser(ctx, q, actor, true); err != nil {
+		prelude, err := q.ReadChatPrelude(ctx, actor.ID, id, input.RequestID)
+		if err != nil {
 			return err
 		}
-		conv, err := q.LockConversation(ctx, query.LockConversationParams{ID: id, UserID: actor.ID})
-		if err != nil {
-			return missing(err)
+		if prelude.Owner.ID == uuid.Nil || prelude.Owner.Status != "active" || prelude.Owner.TokenVersion != actor.TokenVersion {
+			return problem.Unauthorized()
 		}
-		old, err := q.ChatMessageByRequest(ctx, query.ChatMessageByRequestParams{ConversationID: id, RequestID: input.RequestID})
-		if err == nil {
+		conv := prelude.Conversation
+		if conv.ID == uuid.Nil {
+			return missing(pgx.ErrNoRows)
+		}
+		old := prelude.Previous
+		if old.ID != uuid.Nil {
 			if old.DeletedAt != nil || old.RequestHash != fingerprint {
 				return problem.New("CHAT_REQUEST_CONFLICT", 409)
 			}
@@ -210,16 +211,10 @@ func (s *Service) prepare(ctx context.Context, actor user.Actor, id uuid.UUID, i
 			result = run{conversation: conv, assistant: old, replay: true}
 			return nil
 		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("read chat request: %w", err)
-		}
 		if conv.ActiveRunID != nil {
 			return problem.New("CHAT_BUSY", 409)
 		}
-		rows, err := q.ListChatMessages(ctx, query.ListChatMessagesParams{ConversationID: id, PageLimit: 202})
-		if err != nil {
-			return fmt.Errorf("read chat context: %w", err)
-		}
+		rows := prelude.Messages
 		history := make([]query.Message, 0, len(rows)+1)
 		for i := len(rows) - 1; i >= 0; i-- {
 			history = append(history, rows[i])
@@ -264,10 +259,7 @@ func (s *Service) prepare(ctx context.Context, actor user.Actor, id uuid.UUID, i
 			}
 			history = append(history, userRow)
 		}
-		pref, prefErr := q.GetPreferences(ctx, actor.ID)
-		if prefErr != nil && !errors.Is(prefErr, pgx.ErrNoRows) {
-			return fmt.Errorf("read chat preferences: %w", prefErr)
-		}
+		pref := prelude.Preferences
 		if pref.Instructions != "" {
 			config.SystemPrompt += "\n\n" + pref.Instructions
 		}
@@ -294,24 +286,21 @@ func (s *Service) prepare(ctx context.Context, actor user.Actor, id uuid.UUID, i
 				return problem.Retry("CHAT_RATE_LIMITED", retry)
 			}
 		}
-		if _, err := q.UseChatDailyQuota(ctx, query.UseChatDailyQuotaParams{UserID: actor.ID, DailyLimit: config.PerDay}); errors.Is(err, pgx.ErrNoRows) {
-			return problem.Retry("CHAT_DAILY_LIMIT", 60)
-		} else if err != nil {
-			return fmt.Errorf("count daily chat usage: %w", err)
-		}
 		aid, err := validation.NewID()
 		if err != nil {
 			return err
 		}
-		assistant, err := q.InsertChatMessage(ctx, query.InsertChatMessageParams{ID: aid, ConversationID: id, RequestID: input.RequestID, RequestHash: fingerprint, Role: "assistant", Status: "streaming", ModelID: &input.ModelID})
+		assistant, accepted, allowed, err := q.ClaimChatTurn(ctx,
+			query.UseChatDailyQuotaParams{UserID: actor.ID, DailyLimit: config.PerDay},
+			query.InsertChatMessageParams{ID: aid, ConversationID: id, RequestID: input.RequestID, RequestHash: fingerprint, Role: "assistant", Status: "streaming", ModelID: &input.ModelID},
+			query.StartChatRunParams{ID: id, UserID: actor.ID, ActiveRunID: &aid, ModelID: &input.ModelID})
 		if err != nil {
-			return fmt.Errorf("insert assistant message: %w", err)
+			return err
 		}
-		conv, err = q.StartChatRun(ctx, query.StartChatRunParams{ID: id, UserID: actor.ID, ActiveRunID: &aid, ModelID: &input.ModelID})
-		if err != nil {
-			return fmt.Errorf("claim chat run: %w", err)
+		if !allowed {
+			return problem.Retry("CHAT_DAILY_LIMIT", 60)
 		}
-		result = run{conversation: conv, user: userRow, assistant: assistant, messages: assembled, first: first}
+		result = run{conversation: accepted, user: userRow, assistant: assistant, messages: assembled, first: first}
 		return nil
 	})
 	return &result, err

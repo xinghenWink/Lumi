@@ -83,12 +83,21 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 			logger.Error("PostgreSQL connection failed")
 			return fmt.Errorf("open database: %w", err)
 		}
-		defer pool.Close()
-		database = pool
 		if err := migrations.Up(startup, pool); err != nil {
+			pool.Close()
 			logger.Error("database migration failed")
 			return fmt.Errorf("migrate database: %w", err)
 		}
+		if command == "serve" {
+			pool.Close()
+			pool, err = db.OpenPrepared(startup, cfg.DatabaseURL)
+			if err != nil {
+				logger.Error("PostgreSQL preparation failed")
+				return fmt.Errorf("prepare database: %w", err)
+			}
+		}
+		defer pool.Close()
+		database = pool
 		health.Postgres = pool.Ping
 	}
 	if command == "migrate" {

@@ -116,7 +116,7 @@ func (s *Service) Submit(ctx context.Context, actor user.Actor, key string, inpu
 		if err != nil {
 			return err
 		}
-		model, client, _, err := s.catalog.ImageTarget(ctx, input.ModelID)
+		model, client, _, err := s.catalog.ImageTargetTx(ctx, q, input.ModelID)
 		if err != nil {
 			return err
 		}

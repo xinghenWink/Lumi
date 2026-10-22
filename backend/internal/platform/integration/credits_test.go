@@ -211,6 +211,35 @@ func TestM2CreditConsistency(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+	t.Run("lazy read rolls back the reset and both ledger entries together", func(t *testing.T) {
+		creditPricing(t, f, actor, 5)
+		member := creditMember(t, f, actor, 0)
+		stamp := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+		billing := credits.New(f.pool, f.vault, f.cache, func() time.Time { return stamp })
+		before, err := billing.Read(f.ctx, member.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stamp = stamp.Add(24 * time.Hour)
+		if _, err := f.pool.Exec(f.ctx, "CREATE FUNCTION reject_daily_grant() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.type='daily_grant' THEN RAISE EXCEPTION 'injected'; END IF; RETURN NEW; END; $$; CREATE TRIGGER reject_daily_grant BEFORE INSERT ON credit_ledger FOR EACH ROW EXECUTE FUNCTION reject_daily_grant()"); err != nil {
+			t.Fatal(err)
+		}
+		_, readErr := billing.Read(f.ctx, member.ID)
+		if _, err := f.pool.Exec(f.ctx, "DROP TRIGGER reject_daily_grant ON credit_ledger; DROP FUNCTION reject_daily_grant()"); err != nil {
+			t.Fatal(err)
+		}
+		row, err := query.New(f.pool).LockCreditAccount(f.ctx, member.ID)
+		if readErr == nil || err != nil || row.DailyBalance != before.DailyBalance || row.DailyResetOn.Format(time.DateOnly) != before.DailyResetOn || row.Version != before.Version {
+			t.Fatalf("failed grant changed the account: read=%v snapshot=%+v error=%v", readErr, row, err)
+		}
+		var count int
+		if err := f.pool.QueryRow(f.ctx, "SELECT count(*) FROM credit_ledger WHERE user_id=$1", member.ID).Scan(&count); err != nil || count != 1 {
+			t.Fatalf("failed grant left a partial ledger: count=%d error=%v", count, err)
+		}
+		if _, err := billing.Read(f.ctx, member.ID); err != nil {
+			t.Fatal(err)
+		}
+	})
 	t.Run("cross-day reset and refund do not restore an expired daily bucket", func(t *testing.T) {
 		creditPricing(t, f, actor, 5)
 		stamp := time.Date(2026, 10, 22, 15, 59, 59, 0, time.UTC)

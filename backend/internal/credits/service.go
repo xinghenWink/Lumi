@@ -198,23 +198,31 @@ func (s *Service) account(ctx context.Context, q *query.Queries, id uuid.UUID, c
 	return record, nil
 }
 func (s *Service) Read(ctx context.Context, id uuid.UUID) (Account, error) {
-	var result Account
-	err := db.Transaction(ctx, s.pool, func(q *query.Queries) error {
-		if err := lockUser(ctx, q, id, false); err != nil {
-			return err
-		}
-		cfg, err := configuration(ctx, q)
-		if err != nil {
-			return err
-		}
-		record, err := s.account(ctx, q, id, cfg)
-		if err != nil {
-			return err
-		}
-		result, err = accountView(record, cfg, s.now())
-		return err
-	})
-	return result, err
+	cfg, err := configuration(ctx, s.queries)
+	if err != nil {
+		return Account{}, err
+	}
+	now := s.now()
+	today, _, err := calendar(now, cfg.CreditsTimezone)
+	if err != nil {
+		return Account{}, err
+	}
+	expireID, err := validation.NewID()
+	if err != nil {
+		return Account{}, err
+	}
+	grantID, err := validation.NewID()
+	if err != nil {
+		return Account{}, err
+	}
+	row, err := s.queries.ReadCreditAccount(ctx, query.ReadCreditAccountParams{UserID: id, GrantAmount: cfg.DailyFreeCredits, Today: today, ExpireID: expireID, GrantID: grantID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Account{}, problem.New("USER_NOT_FOUND", http.StatusNotFound)
+	}
+	if err != nil {
+		return Account{}, fmt.Errorf("read and reset credit account: %w", err)
+	}
+	return accountView(query.CreditAccount{UserID: row.UserID, PermanentBalance: row.PermanentBalance, DailyBalance: row.DailyBalance, DailyResetOn: &row.DailyResetOn, Version: row.Version}, cfg, now)
 }
 func (s *Service) Summary(ctx context.Context, id uuid.UUID) (int64, int64, error) {
 	result, err := s.Read(ctx, id)

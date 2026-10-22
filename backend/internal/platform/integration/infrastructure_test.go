@@ -70,6 +70,25 @@ func TestInfrastructure(t *testing.T) {
 	if alive, err := query.New(pool).Ping(ctx); err != nil || alive != 1 {
 		t.Fatalf("generated query = %d, error = %v", alive, err)
 	}
+	t.Run("prepared pool describes writes without executing them", func(t *testing.T) {
+		prepared, err := db.OpenPrepared(ctx, "postgres://lumi:integration-only@"+postgresAddress+"/lumi?sslmode=disable")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer prepared.Close()
+		connection, err := prepared.Acquire(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer connection.Release()
+		var descriptions, mutations int
+		if err := connection.QueryRow(ctx, "SELECT count(*) FROM pg_prepared_statements WHERE statement LIKE '-- name:%'").Scan(&descriptions); err != nil || descriptions < 20 {
+			t.Fatalf("hot descriptions=%d error=%v", descriptions, err)
+		}
+		if err := connection.QueryRow(ctx, "SELECT (SELECT count(*) FROM users)+(SELECT count(*) FROM credit_ledger)+(SELECT count(*) FROM messages)").Scan(&mutations); err != nil || mutations != 0 {
+			t.Fatalf("preparation executed business writes: rows=%d error=%v", mutations, err)
+		}
+	})
 
 	cache, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
