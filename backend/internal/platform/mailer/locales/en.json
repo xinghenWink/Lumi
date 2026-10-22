@@ -1,0 +1,4 @@
+{
+  "subject": "Your {site} verification code",
+  "body": "Your registration code is: {code}\n\nThis code expires in 10 minutes. Do not share it with anyone. If you did not request this email, you can ignore it.\n\n{site}"
+}

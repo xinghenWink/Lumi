@@ -3,3 +3,73 @@
 //   sqlc v1.31.1
 
 package query
+
+import (
+	"net/netip"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type AuditLog struct {
+	ID         uuid.UUID
+	ActorID    *uuid.UUID
+	Action     string
+	TargetType string
+	TargetID   *uuid.UUID
+	Before     []byte
+	After      []byte
+	Ip         netip.Addr
+	CreatedAt  time.Time
+}
+
+type Setting struct {
+	Key       string
+	Value     []byte
+	UpdatedBy *uuid.UUID
+	UpdatedAt time.Time
+}
+
+type User struct {
+	ID              uuid.UUID
+	Email           string
+	PasswordHash    string
+	Nickname        string
+	AvatarFileID    *uuid.UUID
+	Role            string
+	Status          string
+	TokenVersion    int64
+	Locale          string
+	Timezone        string
+	LastLoginAt     *time.Time
+	LastLoginIp     *netip.Addr
+	TermsAcceptedAt *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       *time.Time
+}
+
+type UserSession struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	FamilyID    uuid.UUID
+	TokenHash   string
+	Device      string
+	Ip          netip.Addr
+	UserAgent   string
+	CreatedAt   time.Time
+	ExpiresAt   time.Time
+	RevokedAt   *time.Time
+	RotatedFrom *uuid.UUID
+}
+
+type VerificationCode struct {
+	ID        uuid.UUID
+	Target    string
+	Purpose   string
+	CodeHash  []byte
+	Attempts  int32
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+}

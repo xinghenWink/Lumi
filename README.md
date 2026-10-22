@@ -2,13 +2,15 @@
 
 AI 对话与图像创作平台。Go + Gin + PostgreSQL 16 + Redis 7，以及 Vue 3 + TypeScript + Vite。
 
-当前阶段：**M0 基础工程**。已实现健康检查、版本 API、欢迎页、迁移与代码生成基础、Docker 和自动化配置。账号、积分、聊天、生图和后台按 M1～M7 开发，HTML 原型中的模拟逻辑不进入生产代码。
+当前阶段：**M1 账号与后台**。已实现邮箱注册/验证、登录与会话轮换、个人资料、用户管理、站点/注册/SMTP 设置和审计。积分、聊天和生图按 M2～M5 开发，HTML 原型中的模拟逻辑不进入生产代码。
 
 - [需求清单](docs/REQUIREMENTS.md)
 - [开发分析与计划](docs/DEVELOPMENT_PLAN.md)
 - [原型对接说明](docs/Lumi-原型对接文档.md)
 - [技术决策](docs/DECISIONS.md)
 - [M0 验收记录](docs/M0_ACCEPTANCE.md)
+- [M1 开发范围](docs/M1_PLAN.md)
+- [M1 验收记录](docs/M1_ACCEPTANCE.md)
 - [OpenAPI](docs/openapi.yaml)
 
 ## 开发环境
@@ -28,6 +30,10 @@ PowerShell 启动后端：
 ```powershell
 $env:DATABASE_URL = 'postgres://lumi:lumi-dev-only@127.0.0.1:5432/lumi?sslmode=disable'
 $env:REDIS_URL = 'redis://:lumi-dev-only@127.0.0.1:6379/0'
+$env:JWT_SECRET = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+$env:ENCRYPTION_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+$env:ADMIN_EMAIL = 'admin@example.com'
+$env:ADMIN_PASSWORD = Read-Host 'First administrator password (8+ characters with letters and numbers)' -MaskInput
 $env:GIN_MODE = 'release'
 Set-Location backend
 go run ./cmd/lumi serve
@@ -35,7 +41,9 @@ go run ./cmd/lumi serve
 
 另一个终端从仓库根目录运行 `pnpm dev`，打开 [开发页](http://127.0.0.1:5173)。Vite 代理 API 到 8080。也可打开 [Go 托管首页](http://127.0.0.1:8080)，读取最近一次构建产物。
 
-无 Docker 时，可省略两个连接变量，只验证首页。此时 `/healthz` 为 200，`/readyz` 为 503。`APP_ENV=production` 不允许缺失依赖。Go 不自动读取 `.env`；本地请设置环境变量，Compose 通过 `env_file` 加载。
+上述随机密钥须保存在本地安全配置中以便重启复用；更换 JWT 密钥会使旧 access token 和验证码失效，更换加密密钥会使已有 SMTP 密文无法解密。管理员仅在系统尚无管理员时创建，修改环境密码不会重置已有账号。`PUBLIC_BASE_URL` 默认 `http://127.0.0.1:8080`，开发时额外接受 `DEV_ORIGIN=http://127.0.0.1:5173`。注册默认要求邮箱验证；开发环境未设置 SMTP 时，验证码仅输出到后端开发日志；生产环境须在后台邮件设置中配置 SMTP。
+
+无 Docker 时，可省略两个连接变量，只验证访客页面。此时 `/healthz` 为 200，`/readyz` 与账号 API 为 503。`APP_ENV=production` 不允许缺失依赖。Go 不自动读取 `.env`；本地请设置环境变量，Compose 通过 `env_file` 加载。
 
 ## 构建与验证
 
@@ -70,13 +78,13 @@ pnpm --filter @lumi/frontend exec playwright install chromium
 pnpm test:e2e
 ```
 
-集成测试启动临时 PG / Redis 并自动清理；无 Docker 时失败。浏览器测试覆盖桌面、320px 手机、嵌入首页、真实版本接口、失败重试与 SPA 回退。
+集成测试启动临时 PG / Redis 并自动清理；无 Docker 时失败。完整浏览器测试须设置 `E2E_DATABASE_URL` 和 `E2E_REDIS_URL`，指向独立测试数据库/缓存，不要使用生产数据。测试在 18080 端口启动真实应用并创建临时管理员，覆盖桌面、320px 手机、注册、会话恢复、禁用/删除失效、用户详情、设置和审计。无依赖时可用 `pnpm test:e2e --grep '@guest'` 验证访客页、主题、路由守卫与 SPA 回退。
 
 `production` 构建嵌入前端，二进制可脱离仓库运行。必须先 `pnpm build`。Linux 产物为 `bin/lumi`，Windows 示例为 `bin/lumi.exe`。
 
 ## 本地完整容器栈
 
-复制 `deploy/.env.example` 为 `deploy/.env`，填入随机 `POSTGRES_PASSWORD` 与 `REDIS_PASSWORD`。建议用 URL 安全的字母数字密码；连接 URL 中的特殊字符须编码。
+复制 `deploy/.env.example` 为 `deploy/.env`，填入随机 `POSTGRES_PASSWORD`、`REDIS_PASSWORD`、至少 32 字节随机 `JWT_SECRET`、32 字节 base64 `ENCRYPTION_KEY` 及首次管理员 `ADMIN_EMAIL` / `ADMIN_PASSWORD`。建议连接密码用 URL 安全的字母数字；连接 URL 中的特殊字符须编码。
 
 ```sh
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml -f deploy/docker-compose.build.yml up --build -d --wait
@@ -95,16 +103,19 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --wait
 
 ## 运维接口与命令
 
-| 项目               | 行为                                              |
-| ------------------ | ------------------------------------------------- |
-| `GET /healthz`     | 仅检查进程存活                                    |
-| `GET /readyz`      | 两秒内检查 PG / Redis；失败 503                   |
-| `GET /api/version` | 返回 version / commit / build_time                |
-| `lumi serve`       | 默认；连接依赖、执行迁移、启动 HTTP               |
-| `lumi migrate`     | 只执行嵌入的 forward-only 迁移，要求 DATABASE_URL |
-| `lumi healthcheck` | 本地存活检查，供镜像 HEALTHCHECK 使用             |
+| 项目                                        | 行为                                                                             |
+| ------------------------------------------- | -------------------------------------------------------------------------------- |
+| `GET /healthz`                              | 仅检查进程存活                                                                   |
+| `GET /readyz`                               | 两秒内检查 PG / Redis；失败 503                                                  |
+| `GET /api/version`                          | 返回 version / commit / build_time                                               |
+| `lumi serve`                                | 默认；连接依赖、执行迁移、启动 HTTP                                              |
+| `lumi migrate`                              | 只执行嵌入的 forward-only 迁移，要求 DATABASE_URL                                |
+| `lumi healthcheck`                          | 本地存活检查，供镜像 HEALTHCHECK 使用                                            |
+| `lumi admin reset-password --email address` | 使用 `ADMIN_RESET_PASSWORD` 环境变量重置已有管理员密码，撤销其全部会话并记录审计 |
 
-环境变量：`APP_ENV`（development / production / test）、`HTTP_ADDR`（默认 :8080）、`DATABASE_URL`、`REDIS_URL`、`LOG_LEVEL`。完整列表及后续预留项见 `deploy/.env.example`。
+环境变量完整列表见 `deploy/.env.example`。站点、注册与邮件设置遵循环境变量优先于数据库；后台标记受环境管理的字段。数据库缓存 30 秒，保存立即失效；SMTP 密码加密保存且 API 不回传。会话使用内存 access token 与 HttpOnly refresh cookie；跨源写入需匹配配置的 Origin，代理部署须正确设置公开地址。操作恢复命令后清除 `ADMIN_RESET_PASSWORD` 环境变量。
+
+账号软删除后保留 30 天。应用启动后及每小时运行内部维护任务，按每批最多 100 条清理到期账号及其会话，并保留脱敏审计；清理与审计在同一事务，审计失败会回滚删除。维护任务随应用退出停止，不提供额外管理 API。
 
 ## CI 与发布
 

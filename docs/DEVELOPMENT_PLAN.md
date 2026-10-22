@@ -1,5 +1,7 @@
 # Lumi 开发分析与里程碑计划
 
+M0 与 M1 的功能验收已通过，用户已授权按 M0 → M1 的顺序合并到 main。M0 已发布 `v0.0.1` 并通过 amd64 / arm64 发布镜像的真实 Compose 运行验证；M1 详细范围与结果见 [M1_PLAN.md](M1_PLAN.md) 和 [M1_ACCEPTANCE.md](M1_ACCEPTANCE.md)。后续业务从 M2 继续，本轮不扩展阶段范围。
+
 ## 基线与约束
 
 - 需求基线：`REQUIREMENTS.md` v1.0；交互基线：`Lumi-原型.html` 与 `Lumi-原型对接文档.md` v2.2。

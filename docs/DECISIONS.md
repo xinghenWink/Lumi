@@ -1,5 +1,34 @@
 # 技术决策记录
 
+## M1（2026-10-22）
+
+| 编号    | 决策与理由                                                                                                                                                                                                                                 |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ADR-017 | 用户明确要求进入 M1，覆盖先前等待 M0 发布的推进限制；M0 发布仍未验收。M1 独立分支暂以 M0 分支为 base，不自动合并或发 tag。                                                                                                                 |
+| ADR-018 | 新增 golang-jwt/jwt/v5 5.3.1 实现 JWT，固定 HS256、issuer、audience 与到期检查。google/uuid 1.6.0、x/crypto 0.58.0 从已有间接依赖转为直接依赖，分别生成 UUID v7 与 Argon2id。                                                              |
+| ADR-019 | Argon2id 使用 19 MiB、2 次迭代、1 路并行、16 字节随机盐与 32 字节结果，符合 OWASP 最低建议；限制 4 个并行哈希，拒绝异常 PHC 参数以控制内存。密码 8–128 个字符且包含字母与数字。                                                            |
+| ADR-020 | Access JWT 15 分钟，仅保存在前端内存。Refresh 为 256 位随机值，30 天、HttpOnly / Lax cookie，数据库仅存 SHA-256；每次轮换新增记录，旧值重放吊销整个登录 family。JWT 绑定稳定 family ID，正常轮换不使同一设备已有 access token 提前失效。   |
+| ADR-021 | 每次受保护请求用数据库同时检查账号状态、token_version 与有效 family。退出只注销当前 family；禁用、删除、角色/邮箱/密码变更注销该用户全部登录并递增 token_version。后端不使用角色缓存。                                                     |
+| ADR-022 | 邮箱验证码 HMAC-SHA-256 存储，10 分钟有效，最多 5 次失败，验证与注册同事务；错误尝试仍提交计数。Redis 原子滑动窗口分别保护登录、注册和验证码，并提供账号+IP 的 5 次失败/15 分钟锁定及邮箱 60 秒发送冷却。Redis 不可用时拒绝认证写操作。    |
+| ADR-023 | 邮件采用 Go 标准 SMTP 客户端，附 context 取消、20 秒截止、TLS/STARTTLS 及证书校验，不新增邮件库。只有 development 且没有 SMTP 主机时允许将验证码写入开发日志，邮箱遮蔽；test / production 不输出验证码。邮件正文来自 zh-CN / en 翻译文件。 |
+| ADR-024 | SMTP 密码使用 ENCRYPTION_KEY 的 AES-256-GCM 加密，带用途关联数据；API 仅返回 password_configured，省略密码保留原值，空字符串清除。生产拒绝未加密 SMTP，开发明文仅限 loopback。日志及审计不记录密码、令牌、验证码或密文。                   |
+| ADR-025 | 设置缓存 30 秒，保存后立即失效；generation 防止并发旧读取覆盖新缓存。环境变量优先于数据库，后台标出覆盖字段并禁止在表单编辑。M1 支持站点、注册、安全参数与邮件设置，其余设置在后续里程碑追加。                                             |
+| ADR-026 | 管理员写操作在事务内使用 advisory lock 串行化，再次核对操作者角色/版本并锁定目标行。禁止修改自己的角色/停用/删除自己，保留至少一位可登录管理员。业务与脱敏审计同事务；数据库触发器禁止修改/删除审计记录。                                  |
+| ADR-027 | 首位管理员仅首次通过 ADMIN_EMAIL / ADMIN_PASSWORD 创建；后续环境变化不重置账号。生产空库未提供引导凭据时拒绝启动。救援重置密码通过 ADMIN_RESET_PASSWORD 环境输入，避免密码进入命令行参数，重置后注销全部登录并留审计。                     |
+| ADR-028 | Cookie 写接口核验 Origin/Referer 及 X-Lumi-CSRF。COOKIE_SECURE 默认生产开启；本地 HTTP 需显式关闭。PUBLIC_BASE_URL 为可信来源，development 另允许 DEV_ORIGIN。代理 IP 仅信任显式 TRUSTED_PROXIES。                                         |
+| ADR-029 | 前端用单次初始化、refresh 请求合并和浏览器 Web Locks 协调标签页；401/403 清理认证状态，临时网络/503 不主动注销；localStorage 只保存外观偏好。采用 Reka Dialog / DropdownMenu 管理焦点及弹层，账户菜单限制在侧栏宽度。                      |
+| ADR-030 | 列表按时间+UUID 游标分页并绑定筛选条件，无 offset；日期筛选在界面明确使用 UTC，显示按账号时区。用户列表在 M1 只展示已有账号字段，积分、生图统计与相关筛选在 M2/M5 增补，不返回伪造余额。                                                   |
+| ADR-031 | M1 的注册事务保留 M2 接入 credits.Service 的边界，本阶段不宣称 F-AUTH-03 已完成。个人资料支持昵称/语言/时区和修改密码；头像在文件模块完成后接入。协议说明页与同意时间先落地，完整上线合规检查仍属 M7。                                     |
+| ADR-032 | 完整集成测试使用真实临时 PG16/Redis7，浏览器全流程使用 CI 的独立 PG/Redis 服务；本地无 Docker 时只执行明确选择的 guest 浏览器检查，不把完整联调标为通过。CI 容器凭据运行时随机生成。                                                       |
+
+认证参考：[OWASP 密码存储](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)、[JWT 校验选项](https://golang-jwt.github.io/jwt/usage/parse/)、[Reka Dialog](https://reka-ui.com/docs/components/dialog)。
+
+补充：迁移使用独立连接与 PostgreSQL session lock；迁移版本表固定为 `public.goose_db_version`，业务连接固定 `search_path=lumi,public`。M0 首次创建的同名 schema 会改变 PostgreSQL 默认 `$user,public` 查找结果；显式限定可避免并发启动创建第二张版本表，并使业务表位置不受数据库用户名影响。保留并发迁移、重复执行和每条迁移版本仅记录一次的集成检查。
+
+M1 账号删除保留策略：启动后及每小时分批处理已软删除满 30 天的账号。每批至多 100 条，使用行锁与 SKIP LOCKED 允许多实例协作，每轮最多 30 秒；永久删除、会话级联及 user.purge 审计同事务。保留最近删除和历史审计，新增索引迁移 00003。后续积分等业务表必须保留必要账务历史并设计其删除/匿名化策略，再与该维护任务联调。
+
+## M0（2026-10-22）
+
 以下为 M0（2026-10-22）决策。依赖版本锁定在 `backend/go.mod` / `backend/go.sum` 与根目录 `pnpm-lock.yaml`。
 
 M0 发布验收补充：GHCR 推送成功后，以构建返回的 digest 锁定镜像，在 amd64 与 arm64 原生 runner 分别运行完整生产 Compose 栈，检查平台、非 root 用户与版本 commit；全部通过才创建 Release。验证复用现有 Docker actions 与 runner 工具，无新增项目依赖。

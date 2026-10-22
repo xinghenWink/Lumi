@@ -1,0 +1,37 @@
+# M1 验收记录
+
+日期：2026-10-22。分支：`codex/m1-accounts-admin`。[PR #2](https://github.com/xinghenWink/Lumi/pull/2) 随 M0 合并后以 `main` 为目标分支；用户已授权合并两个阶段。
+
+## 实现范围
+
+- [x] 新增账号、会话、验证码、设置、审计迁移与 sqlc 查询。
+- [x] Argon2id、邮箱注册/验证码、登录/退出、JWT 与 refresh 轮换/重放保护、Redis 滑动窗口和登录锁定。
+- [x] 管理员首次引导、运维重置密码、禁用/删除/安全字段变更立即失效。
+- [x] 后端 RBAC 与事务内二次校验、用户 CRUD/详情、游标列表、最后管理员保护、不可修改的脱敏审计。
+- [x] 软删除保留 30 天，启动及每小时分批物理清理；会话级联删除，清理与审计同事务，保留历史审计。
+- [x] 站点、注册、安全参数与 SMTP 设置，环境覆盖、缓存失效、SMTP 凭据加密与不回传。
+- [x] 登录/注册、验证码与协议说明、路由守卫、工作区/后台独立布局、个人资料与密码、深浅色和手机导航。
+- [x] 用户管理、设置与审计均请求真实 API；没有演示身份切换、模拟认证或积分余额。
+- [x] OpenAPI 与前端类型同步；文档、运行配置和 CI 更新。
+
+## 验证记录
+
+- [x] Go 单元测试通过，含密码、JWT、加密、SMTP 本地投递、CSRF、输入与设置缓存。
+- [x] golangci-lint 0 issues（含 integration 编译检查），gofmt 通过。
+- [x] 前端 11 项 Vitest 通过，含所有中英文文案的运行时编译检查；类型检查与 ESLint 通过。
+- [x] Vue 生产构建通过，保持路由拆包，登录首屏 JS gzip 低于 250 KB。
+- [x] 4 项桌面 / 320px 访客浏览器检查通过，截图复核；含服务未就绪状态、路由守卫、主题持久化、SPA 回退。
+- [x] CI 真实 PG/Redis 集成测试，包括验证码耗尽/过期、并发注册、轮换重放、禁用/删除失效、并发管理员操作与审计失败回滚。
+- [x] 桌面 / 320px 完整账号与后台浏览器流程通过（共 6 项 Playwright）。
+- [x] 30 天保留边界、并发/重复清理、会话清理、审计保留及审计失败回滚的真实数据库检查通过。
+- [x] GitHub CI 通过，含 Docker 镜像构建与完整 Compose 栈验证。
+
+同步 M0 发布门禁后的 `27b5c23` 的[完整 CI 记录](https://github.com/xinghenWink/Lumi/actions/runs/39705795803)包含上述真实依赖、清理、浏览器及容器检查，全部通过。验收文档更新后的状态见 [PR 最新 Checks](https://github.com/xinghenWink/Lumi/pull/2/checks)。已下载并复核真实账号的登录/注册、深色资料、用户详情与审计截图；[桌面与手机截图产物](https://github.com/xinghenWink/Lumi/actions/runs/39702303779/artifacts/12393826386)由 CI 保留。
+
+本机 Docker 引擎不可用，真实依赖测试在 CI 执行。并发启动测试发现 M0 创建同名 schema 后会改变默认查找路径，导致出现第二张迁移版本表；已固定 `public.goose_db_version` 与业务连接 `search_path=lumi,public`，并通过并发/重复迁移、每条版本只记录一次及无影子版本表的回归检查。未修改既有 SQL 迁移。
+
+## 阶段边界
+
+F-AUTH-03 的注册积分及 F-ADM-03 的初始积分、余额筛选和积分详情在 M2；模型/聊天/图像能力在 M3～M5。M1 不写入积分流水，也不显示示例余额。头像上传和 P1 账号设备管理、找回密码与 Turnstile 等不在本阶段。
+
+M0 发布验收已完成：[v0.0.1](https://github.com/xinghenWink/Lumi/releases/tag/v0.0.1) 的 amd64 / arm64 镜像均通过完整生产 Compose 验证，详见 `M0_ACCEPTANCE.md`。用户随后要求完成验收并合并 M0 / M1，合并顺序为 PR #1 → PR #2。`v0.0.1` 保留纯 M0 内容，M1 合并后的镜像由 main 的 `edge` / `sha-*` 发布提供。

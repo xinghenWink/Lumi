@@ -58,8 +58,14 @@ func TestInfrastructure(t *testing.T) {
 		t.Fatalf("repeat migration: %v", err)
 	}
 	var count int
-	if err := pool.QueryRow(ctx, "SELECT count(*) FROM goose_db_version WHERE version_id = 1 AND is_applied").Scan(&count); err != nil || count != 1 {
-		t.Fatalf("migration version count = %d, error = %v", count, err)
+	for _, version := range []int64{1, 2, 3} {
+		if err := pool.QueryRow(ctx, "SELECT count(*) FROM public.goose_db_version WHERE version_id = $1 AND is_applied", version).Scan(&count); err != nil || count != 1 {
+			t.Fatalf("migration %d version count = %d, error = %v", version, count, err)
+		}
+	}
+	var stableSchema bool
+	if err := pool.QueryRow(ctx, "SELECT current_schema() = 'lumi' AND to_regclass('lumi.users') IS NOT NULL AND to_regclass('lumi.goose_db_version') IS NULL").Scan(&stableSchema); err != nil || !stableSchema {
+		t.Fatalf("migration schema changed or shadowed its version table: stable=%v error=%v", stableSchema, err)
 	}
 	if alive, err := query.New(pool).Ping(ctx); err != nil || alive != 1 {
 		t.Fatalf("generated query = %d, error = %v", alive, err)

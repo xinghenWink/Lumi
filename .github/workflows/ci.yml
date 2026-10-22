@@ -13,6 +13,22 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lumi
+          POSTGRES_PASSWORD: ci-e2e-only
+          POSTGRES_DB: lumi
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U lumi -d lumi" --health-interval 3s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      E2E_DATABASE_URL: postgres://lumi:ci-e2e-only@127.0.0.1:5432/lumi?sslmode=disable
+      E2E_REDIS_URL: redis://127.0.0.1:6379/0
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-go@v7.0.0
@@ -37,7 +53,7 @@ jobs:
       - run: pnpm --filter @lumi/frontend exec playwright install --with-deps chromium
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v7.0.2
-        if: failure()
+        if: always()
         with:
           name: playwright-results
           path: frontend/test-results
@@ -51,12 +67,23 @@ jobs:
       - uses: actions/checkout@v7.0.1
       - name: Build the application image
         run: docker build --build-arg VERSION=ci --build-arg COMMIT="$GITHUB_SHA" -t lumi:ci .
+      - name: Generate ephemeral container credentials
+        shell: bash
+        run: |
+          lumi_ci_jwt=$(openssl rand -hex 32)
+          lumi_ci_key=$(openssl rand -base64 32)
+          lumi_ci_admin="$(openssl rand -hex 24)Aa1"
+          for lumi_ci_secret in "$lumi_ci_jwt" "$lumi_ci_key" "$lumi_ci_admin"; do
+            printf '::add-mask::%s\n' "$lumi_ci_secret"
+          done
+          printf 'JWT_SECRET=%s\nENCRYPTION_KEY=%s\nADMIN_PASSWORD=%s\n' "$lumi_ci_jwt" "$lumi_ci_key" "$lumi_ci_admin" >> "$GITHUB_ENV"
       - name: Verify the full compose stack
         env:
           LUMI_IMAGE: lumi
           LUMI_VERSION: ci
           POSTGRES_PASSWORD: ci-database-only
           REDIS_PASSWORD: ci-cache-only
+          ADMIN_EMAIL: admin@lumi.test
         run: |
           cp deploy/.env.example deploy/.env
           docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --wait --wait-timeout 120

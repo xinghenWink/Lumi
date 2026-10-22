@@ -1,8 +1,10 @@
 openapi: 3.1.0
 info:
   title: Lumi API
-  version: 0.0.0
-  description: M0 infrastructure endpoints. Business endpoints will be added with their milestones.
+  version: 0.1.0
+  description: >-
+    M1 accounts, administration, settings and audit. Credits and model capabilities are introduced
+    in later milestones. Cookie mutations require a matching Origin/Referer and X-Lumi-CSRF: 1.
 servers:
   - url: /
 paths:
@@ -57,6 +59,684 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Version'
+  /api/v1/public/config:
+    get:
+      operationId: getPublicConfig
+      summary: getPublicConfig
+      parameters: []
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicConfig'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/auth/login:
+    post:
+      operationId: login
+      summary: login
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - '1'
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Referer
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResult'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/auth/register:
+    post:
+      operationId: register
+      summary: register
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - '1'
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Referer
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+      responses:
+        '201':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResult'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/auth/send-code:
+    post:
+      operationId: sendVerificationCode
+      summary: sendVerificationCode
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - '1'
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Referer
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendCodeInput'
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodeSent'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/auth/refresh:
+    post:
+      operationId: refreshSession
+      summary: refreshSession
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - '1'
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Referer
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResult'
+        default:
+          $ref: '#/components/responses/APIError'
+      security:
+        - refreshCookie: []
+  /api/v1/auth/logout:
+    post:
+      operationId: logout
+      summary: logout
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - '1'
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Referer
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/me:
+    get:
+      operationId: getMe
+      summary: getMe
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        default:
+          $ref: '#/components/responses/APIError'
+    patch:
+      operationId: updateMe
+      summary: updateMe
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - '1'
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Referer
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSelfInput'
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/me/password:
+    post:
+      operationId: changePassword
+      summary: changePassword
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - '1'
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Referer
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordInput'
+      responses:
+        '204':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/users:
+    get:
+      operationId: listUsers
+      summary: listUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 2048
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: until
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 254
+        - name: role
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - user
+              - admin
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - active
+              - disabled
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - created_at
+              - last_login_at
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+        default:
+          $ref: '#/components/responses/APIError'
+    post:
+      operationId: createUser
+      summary: createUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - '1'
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Referer
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserInput'
+      responses:
+        '201':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/users/{id}:
+    get:
+      operationId: getUserDetail
+      summary: getUserDetail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+        default:
+          $ref: '#/components/responses/APIError'
+    patch:
+      operationId: updateUser
+      summary: updateUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - '1'
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Referer
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserInput'
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        default:
+          $ref: '#/components/responses/APIError'
+    delete:
+      operationId: deleteUser
+      summary: deleteUser
+      description: Soft-delete the account after email confirmation and immediately revoke its sessions. An internal maintenance task permanently removes accounts after 30 days, cascades their sessions, and preserves audit history in the same transaction.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - '1'
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Referer
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteUserInput'
+      responses:
+        '204':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/settings/{group}:
+    get:
+      operationId: getSettings
+      summary: getSettings
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - site
+              - registration
+              - mail
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsView'
+        default:
+          $ref: '#/components/responses/APIError'
+    put:
+      operationId: saveSettings
+      summary: saveSettings
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - '1'
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Referer
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - site
+              - registration
+              - mail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettingsUpdate'
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsView'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/audit-logs:
+    get:
+      operationId: listAuditLogs
+      summary: listAuditLogs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 2048
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: until
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: actor_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: target_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+        - name: target_type
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 30
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditPage'
+        default:
+          $ref: '#/components/responses/APIError'
 components:
   headers:
     RequestID:
@@ -67,34 +747,46 @@ components:
     Health:
       type: object
       additionalProperties: false
-      required: [status]
+      required:
+        - status
       properties:
         status:
           type: string
-          enum: [ok]
+          enum:
+            - ok
     Readiness:
       type: object
       additionalProperties: false
-      required: [status, checks]
+      required:
+        - status
+        - checks
       properties:
         status:
           type: string
-          enum: [ok]
+          enum:
+            - ok
         checks:
           type: object
           additionalProperties: false
-          required: [postgres, redis]
+          required:
+            - postgres
+            - redis
           properties:
             postgres:
               type: string
-              enum: [ok]
+              enum:
+                - ok
             redis:
               type: string
-              enum: [ok]
+              enum:
+                - ok
     Version:
       type: object
       additionalProperties: false
-      required: [version, commit, build_time]
+      required:
+        - version
+        - commit
+        - build_time
       properties:
         version:
           type: string
@@ -106,7 +798,10 @@ components:
     Error:
       type: object
       additionalProperties: false
-      required: [code, message, request_id]
+      required:
+        - code
+        - message
+        - request_id
       properties:
         code:
           type: string
@@ -115,3 +810,584 @@ components:
           description: Diagnostic fallback; clients translate the error code using i18n
         request_id:
           type: string
+    User:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - email
+        - nickname
+        - role
+        - status
+        - locale
+        - timezone
+        - created_at
+        - last_login_at
+        - last_login_ip
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        nickname:
+          type: string
+          minLength: 1
+          maxLength: 30
+        role:
+          type: string
+          enum:
+            - user
+            - admin
+        status:
+          type: string
+          enum:
+            - active
+            - disabled
+        locale:
+          type: string
+          enum:
+            - zh-CN
+            - en
+        timezone:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_login_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        last_login_ip:
+          type: string
+    AuthResult:
+      type: object
+      additionalProperties: false
+      required:
+        - access_token
+        - token_type
+        - expires_in
+        - user
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          enum:
+            - Bearer
+        expires_in:
+          type: integer
+          minimum: 900
+          maximum: 900
+        user:
+          $ref: '#/components/schemas/User'
+    LoginInput:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          maxLength: 512
+          writeOnly: true
+    RegisterInput:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+        - nickname
+        - accept_terms
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          writeOnly: true
+          description: Must contain a letter and a digit.
+        nickname:
+          type: string
+          minLength: 1
+          maxLength: 30
+        code:
+          type: string
+          maxLength: 6
+        accept_terms:
+          type: boolean
+          enum:
+            - true
+    SendCodeInput:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+        locale:
+          type: string
+          enum:
+            - zh-CN
+            - en
+          default: zh-CN
+    CodeSent:
+      type: object
+      additionalProperties: false
+      required:
+        - retry_after
+      properties:
+        retry_after:
+          type: integer
+          minimum: 60
+          maximum: 60
+    CreateUserInput:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+        - nickname
+        - role
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          writeOnly: true
+          description: Must contain a letter and a digit.
+        nickname:
+          type: string
+          minLength: 1
+          maxLength: 30
+        role:
+          type: string
+          enum:
+            - user
+            - admin
+    UpdateUserInput:
+      type: object
+      additionalProperties: false
+      required: []
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          writeOnly: true
+          description: Must contain a letter and a digit.
+        nickname:
+          type: string
+          minLength: 1
+          maxLength: 30
+        role:
+          type: string
+          enum:
+            - user
+            - admin
+        status:
+          type: string
+          enum:
+            - active
+            - disabled
+      minProperties: 1
+    UpdateSelfInput:
+      type: object
+      additionalProperties: false
+      required: []
+      properties:
+        nickname:
+          type: string
+          minLength: 1
+          maxLength: 30
+        locale:
+          type: string
+          enum:
+            - zh-CN
+            - en
+        timezone:
+          type: string
+          maxLength: 100
+      minProperties: 1
+    PasswordInput:
+      type: object
+      additionalProperties: false
+      required:
+        - current_password
+        - new_password
+      properties:
+        current_password:
+          type: string
+          writeOnly: true
+          maxLength: 512
+        new_password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          writeOnly: true
+          description: Must contain a letter and a digit.
+    UserPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - next_cursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        next_cursor:
+          type: string
+    Session:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - device
+        - ip
+        - user_agent
+        - created_at
+        - expires_at
+        - revoked_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        device:
+          type: string
+        ip:
+          type: string
+        user_agent:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    UserDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - user
+        - sessions
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Session'
+    DeleteUserInput:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          description: Must match the account email. Self deletion is not allowed here.
+    SiteSettings:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - description
+        - footer
+        - contact
+        - terms_url
+        - privacy_url
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        description:
+          type: string
+          maxLength: 200
+        footer:
+          type: string
+          maxLength: 200
+        contact:
+          type: string
+          maxLength: 200
+        terms_url:
+          type: string
+          maxLength: 2048
+        privacy_url:
+          type: string
+          maxLength: 2048
+    RegistrationSettings:
+      type: object
+      additionalProperties: false
+      required:
+        - enabled
+        - email_verification_enabled
+        - domain_allowlist
+        - domain_blocklist
+        - login_failure_limit
+        - login_lock_minutes
+        - login_per_minute
+        - register_per_minute
+        - code_per_minute
+      properties:
+        enabled:
+          type: boolean
+        email_verification_enabled:
+          type: boolean
+        domain_allowlist:
+          type: array
+          items:
+            type: string
+        domain_blocklist:
+          type: array
+          items:
+            type: string
+        login_failure_limit:
+          type: integer
+          minimum: 3
+          maximum: 20
+        login_lock_minutes:
+          type: integer
+          minimum: 1
+          maximum: 120
+        login_per_minute:
+          type: integer
+          minimum: 1
+          maximum: 120
+        register_per_minute:
+          type: integer
+          minimum: 1
+          maximum: 60
+        code_per_minute:
+          type: integer
+          minimum: 1
+          maximum: 20
+    MailSettings:
+      type: object
+      additionalProperties: false
+      required:
+        - host
+        - port
+        - username
+        - from
+        - encryption
+        - password_configured
+      properties:
+        host:
+          type: string
+          maxLength: 253
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        username:
+          type: string
+          maxLength: 254
+        from:
+          type: string
+        encryption:
+          type: string
+          enum:
+            - starttls
+            - tls
+            - none
+        password_configured:
+          type: boolean
+    MailSettingsInput:
+      type: object
+      additionalProperties: false
+      required:
+        - host
+        - port
+        - username
+        - from
+        - encryption
+      properties:
+        host:
+          type: string
+          maxLength: 253
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        username:
+          type: string
+          maxLength: 254
+        from:
+          type: string
+        encryption:
+          type: string
+          enum:
+            - starttls
+            - tls
+            - none
+        password:
+          type: string
+          maxLength: 4096
+          writeOnly: true
+          description: Omit to preserve the stored secret; empty string clears it.
+    SettingsView:
+      type: object
+      additionalProperties: false
+      required:
+        - site
+        - registration
+        - mail
+        - env_overrides
+      properties:
+        site:
+          $ref: '#/components/schemas/SiteSettings'
+        registration:
+          $ref: '#/components/schemas/RegistrationSettings'
+        mail:
+          $ref: '#/components/schemas/MailSettings'
+        env_overrides:
+          type: array
+          items:
+            type: string
+    SettingsUpdate:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - site
+          properties:
+            site:
+              $ref: '#/components/schemas/SiteSettings'
+        - type: object
+          additionalProperties: false
+          required:
+            - registration
+          properties:
+            registration:
+              $ref: '#/components/schemas/RegistrationSettings'
+        - type: object
+          additionalProperties: false
+          required:
+            - mail
+          properties:
+            mail:
+              $ref: '#/components/schemas/MailSettingsInput'
+    PublicConfig:
+      type: object
+      additionalProperties: false
+      required:
+        - site
+        - registration_enabled
+        - email_verification_enabled
+      properties:
+        site:
+          $ref: '#/components/schemas/SiteSettings'
+        registration_enabled:
+          type: boolean
+        email_verification_enabled:
+          type: boolean
+    AuditRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - actor_id
+        - action
+        - target_type
+        - target_id
+        - before
+        - after
+        - ip
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        actor_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        action:
+          type: string
+        target_type:
+          type: string
+        target_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        before:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+        after:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+        ip:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    AuditPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - next_cursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditRecord'
+        next_cursor:
+          type: string
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: lumi_refresh
+  responses:
+    APIError:
+      description: >-
+        Validation, authorization, conflict, rate limit or service failure. Translate code in the
+        client.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestID'
+        Retry-After:
+          schema:
+            type: integer
+            minimum: 1
+          description: Seconds to wait after a rate limit.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
