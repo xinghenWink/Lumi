@@ -48,7 +48,10 @@ test('M2 real gifts redemption retry pricing exports and administrator adjustmen
     fullPage: true,
     animations: 'disabled',
   })
-  await page.getByRole('heading', { name: '价格规则', exact: true }).scrollIntoViewIfNeeded()
+  await page
+    .locator('section')
+    .filter({ has: page.getByRole('heading', { name: '价格规则', exact: true }) })
+    .evaluate((element) => element.scrollIntoView({ block: 'start' }))
   await page.screenshot({ path: info.outputPath('pricing-rules.png'), animations: 'disabled' })
 
   const email = `credits-${randomUUID().slice(0, 12)}@lumi.test`
@@ -78,7 +81,10 @@ test('M2 real gifts redemption retry pricing exports and administrator adjustmen
       fullPage: true,
       animations: 'disabled',
     })
-    await member.getByRole('heading', { name: '使用情况', exact: true }).scrollIntoViewIfNeeded()
+    await member
+      .locator('section.credit-usage')
+      .evaluate((element) => element.scrollIntoView({ block: 'start' }))
+    await expect(member.getByRole('list', { name: '近 30 天每日积分消耗' })).toBeInViewport()
     await member.screenshot({ path: info.outputPath('credit-usage.png'), animations: 'disabled' })
 
     const batchName = `验收-${info.project.name}-${randomUUID().slice(0, 8)}`
