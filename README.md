@@ -2,7 +2,7 @@
 
 AI 对话与图像创作平台。Go + Gin + PostgreSQL 16 + Redis 7，以及 Vue 3 + TypeScript + Vite。
 
-当前阶段：**M4 聊天开发完成，正在收尾验收**。M0 / M1 已合并，M2 / M3 已验收待审查；M4 基于 M3 独立提交，提供持久化会话、SSE、Markdown、上下文与限额、个人聊天历史及后台聊天配置。图像任务按 M5 开发，HTML 原型中的模拟逻辑不进入生产代码。
+当前阶段：**M4 聊天开发验收通过，待 PR 审查**。M0 / M1 已合并，M2 / M3 已验收待审查；M4 基于 M3 独立提交，提供持久化会话、SSE、Markdown、上下文与限额、个人聊天历史及后台聊天配置。图像任务按 M5 开发，HTML 原型中的模拟逻辑不进入生产代码。
 
 - [需求清单](docs/REQUIREMENTS.md)
 - [开发分析与计划](docs/DEVELOPMENT_PLAN.md)

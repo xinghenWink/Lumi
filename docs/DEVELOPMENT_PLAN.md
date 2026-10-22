@@ -1,6 +1,6 @@
 # Lumi 开发分析与里程碑计划
 
-M0 与 M1 已验收并按顺序合并到 main。M0 已发布 `v0.0.1`，M1 主分支 CI 与双架构发布镜像 Compose 运行验证均通过；详细结果见 [M1_ACCEPTANCE.md](M1_ACCEPTANCE.md)。M2 / M3 已开发验收通过，PR #3 / #4 待审查；当前按用户授权推进 M4，范围和验收见 [M4_PLAN.md](M4_PLAN.md) 与 [M4_ACCEPTANCE.md](M4_ACCEPTANCE.md)。M4 独立分支 `codex/m4-chat`、PR #5 基于 M3，未自动合并任何阶段。
+M0 与 M1 已验收并按顺序合并到 main。M0 已发布 `v0.0.1`，M1 主分支 CI 与双架构发布镜像 Compose 运行验证均通过；详细结果见 [M1_ACCEPTANCE.md](M1_ACCEPTANCE.md)。M2 / M3 / M4 已开发验收通过，PR #3 / #4 / #5 待审查；M4 范围和验收见 [M4_PLAN.md](M4_PLAN.md) 与 [M4_ACCEPTANCE.md](M4_ACCEPTANCE.md)。M4 独立分支 `codex/m4-chat`、PR #5 基于 M3，未自动合并任何阶段；M5 尚未开始。
 
 ## 基线与约束
 

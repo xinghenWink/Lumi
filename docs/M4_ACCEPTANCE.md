@@ -2,7 +2,7 @@
 
 验收日期：2026-10-22。基线为已验收的 M3 `a4318df`，分支 `codex/m4-chat`，[PR #5](https://github.com/xinghenWink/Lumi/pull/5) 暂基于尚未合并的 M3 PR #4。未合并前序阶段，未发布新镜像或版本。
 
-当前状态：**功能开发完成，完整浏览器与 Compose 收尾验收中**。以下区分已验证行为、测量方法和保留范围；最终结果以对应 CI 为准。
+当前状态：**M4 开发验收通过，可进入 PR 审查**。功能提交 `d2fe57d` 的 [CI 39779410937](https://github.com/xinghenWink/Lumi/actions/runs/39779410937) 全部通过，包括真实 PG / Redis、全部 12 项浏览器和生产 Compose；最终截图已下载复核。后续归档只更新文档。
 
 ## 功能清单
 
@@ -24,23 +24,31 @@
 
 首非空文本前按优先级稳定回退可重试路由；输出开始后不再次执行请求。空结果、截断、超时、内容拒绝等返回受控错误。检查点每 2 秒刷新内容、账号权限及 45 秒租约；每 15 秒扫描到期租约，不打断其他实例的健康任务。正常停止 / 断开使用独立的短 context 落库，崩溃最多丢失最近一个检查点内的内容。刷新读取落库内容，不承诺恢复原上游连接。
 
-会话 / 消息 API 仅返回平台 ID 与允许的元数据，不透传渠道、真实模型 ID、凭据、输入摘要或供应商错误。管理员配置和审计不记录 system prompt 正文；调用日志不存聊天正文。聊天存储和发送所选上游已在隐私页说明。历史删除立即隐藏，使用软删除，当前无独立会话物理清理周期；账号软删除 30 天后清理聊天数据。
+会话 / 消息 API 仅返回平台 ID 与允许的元数据，不透传渠道、真实模型 ID、凭据、输入摘要或供应商错误。配置变更审计不记录 system prompt 正文；调用日志不存聊天正文。聊天存储和发送所选上游已在隐私页说明。历史删除立即隐藏，使用软删除，当前无独立会话物理清理周期；账号软删除 30 天后清理聊天数据。
 
-高亮与公式依赖动态样式属性。CSP 以 `style-src-attr 'unsafe-inline'` 允许这一属性，`script-src` / `style-src-elem` 仍限制 self，`script-src-attr` 为 none。Markdown 关闭原始 HTML，KaTeX trust=false、限制展开和尺寸，DOMPurify 清洗最终输出。HTTP 头回归和浏览器控制台均纳入验收。
+高亮与公式依赖动态样式属性。CSP 以 `style-src-attr 'unsafe-inline'` 允许这一属性，`script-src` / `style-src-elem` 仍限制 self，`script-src-attr` 为 none。Vite 禁止资源内嵌，小字体输出为同源静态文件，维持 font-src self。Markdown 关闭原始 HTML，KaTeX trust=false、限制展开和尺寸，DOMPurify 清洗最终输出。HTTP 头回归和浏览器控制台均纳入验收。
 
-前端消息使用 shallowRef 不可变更新，rAF 合并增量，缓存完成的 Markdown 块；输入组件隔离。侧栏虚拟化，消息超过 100 条虚拟化；IntersectionObserver 控制底部跟随。新配置 / 删除操作有并发冲突和失败反馈，退出账号取消请求并清除缓存与草稿。
+前端消息使用 shallowRef 不可变更新，rAF 合并增量，缓存完成的 Markdown 块；输入组件隔离。侧栏虚拟化，消息超过 100 条虚拟化；IntersectionObserver 控制底部跟随。新配置 / 删除操作有并发冲突和失败反馈，退出账号取消请求并清除缓存与草稿。清空全部同时处理搜索 / 分页之外的缓存，删除后的流事件不重新写入；切换账号后迟到的重命名 / 删除响应不改变新账号状态。
 
 ## 验证记录
 
-| 检查           | 结果 / 证据                                                                                                                                         |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 前序基线       | M3 最终提交 `a4318df` 的 CI 39753475431 全绿                                                                                                        |
-| 核心后端       | M4 首个功能提交 `32eef7d` 的 [CI 39772628528](https://github.com/xinghenWink/Lumi/actions/runs/39772628528) 真实 PG / Redis 集成与生产 Compose 通过 |
-| 本地质量       | Go 单元、golangci-lint（integration，0 issues）、gofmt，前端 strict 类型、ESLint / Prettier、33 项 Vitest与生产构建通过                             |
-| 生成契约       | CI 重新生成 sqlc / OpenAPI 类型，检查无差异                                                                                                         |
-| 最终完整 CI    | 待记录                                                                                                                                              |
-| 浏览器视觉复核 | 待记录最终 artifact 与结果                                                                                                                          |
-| 性能测量       | 待记录最终 artifact 与数值                                                                                                                          |
+| 检查           | 结果 / 证据                                                                                                                                                                       |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 前序基线       | M3 最终提交 `a4318df` 的 CI 39753475431 全绿                                                                                                                                      |
+| 核心后端       | M4 首个功能提交 `32eef7d` 的 [CI 39772628528](https://github.com/xinghenWink/Lumi/actions/runs/39772628528) 真实 PG / Redis 集成与生产 Compose 通过                               |
+| 本地质量       | Go 单元、golangci-lint（integration，0 issues）、gofmt，前端 strict 类型、ESLint / Prettier、35 项 Vitest 与生产构建通过                                                          |
+| 生成契约       | CI 重新生成 sqlc / OpenAPI 类型，检查无差异                                                                                                                                       |
+| 最终完整 CI    | `d2fe57d` 的 [CI 39779410937](https://github.com/xinghenWink/Lumi/actions/runs/39779410937)：质量、真实 PG / Redis、生成契约、35 项 Vitest、全部 12 项浏览器、生产 Compose 均通过 |
+| 浏览器视觉复核 | 已下载并复核 artifact `12425494954` 的桌面 / 320px 浅深色聊天、公式 / 高亮、历史、设置和虚拟列表；无页面溢出与 CSP / 页面错误                                                     |
+| 桌面首屏       | Lighthouse 100 分；实际首屏 JS gzip `161007` 字节，FCP / LCP `175.004ms`，TBT `0ms`，CLS `0.001687`                                                                               |
+| 流式交互       | 桌面 / 手机约 `2876.6 / 2844.6ms` 窗口，长任务均 `0ms / 0%`，采样交互上界 `24 / 16ms`                                                                                             |
+| 平台额外延迟   | 桌面 / 手机各 60 次 SSE，请求 p95 均 `6ms`；Content-Encoding 为空，X-Accel-Buffering 为 no                                                                                        |
+
+## 收尾清单
+
+- [x] 最终功能提交完整 CI：质量、真实 PG / Redis、全部 12 项浏览器、生产 Compose。
+- [x] 桌面 / 320px 浅深色、公式 / 高亮、历史 / 设置与虚拟列表截图复核。
+- [x] 迁移、OpenAPI / sqlc、依赖锁定、决策、运行与隐私说明、验收证据及 PR 清单齐备。
 
 真实 PG / Redis 集成覆盖：持久化、幂等 / 摘要冲突、会话并发占用、跨用户隔离、普通用户后台拒绝、首文本前 429 回退、流中断不重试、停止保存、空结果拒绝、分钟 / 每日配额与重放不计次、健康租约保留和过期恢复；公开目录排除未启用 stream 的模型。
 
@@ -52,7 +60,7 @@
 - 连续流式回复期间采集 PerformanceObserver 长任务和 Event Timing，检查长任务占比 <5%、采样交互事件上界 <200ms。该实验室采样不等同于生产现场 INP 或所有设备表现。
 - 每种视口执行 60 次顺序 SSE 请求，首文本往返减去 fixture 内部处理时间；保留认证、事务、首文本前回退、HTTP 转发开销，检查 p95 <100ms。无 Content-Encoding，并检查 X-Accel-Buffering。该结果限于 CI 本地链路，不代表生产并发负载。
 
-本地 Docker engine 不可用；真实依赖与 Compose 在 Actions 验证。此前失败运行未计入最终通过，包括正常 SSE 结束时过早取消 reader 导致 CDP 取 body 失败、CSP 阻止生成样式和 ESLint 缺少 DOM 类型全局的问题。
+本地 Docker engine 不可用；真实依赖与 Compose 在 Actions 验证。此前失败运行未计入最终通过，包括正常 SSE 结束时过早取消 reader 导致 CDP 取 body 失败、CSP 阻止生成样式 / 内嵌字体和 ESLint 缺少 DOM 类型全局的问题。
 
 ## 实例验证与阶段范围
 
