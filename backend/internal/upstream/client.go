@@ -332,9 +332,10 @@ func (c *Client) EditImages(ctx context.Context, input EditRequest) (results []I
 				field = "image[]"
 			}
 			extension := ".png"
-			if reference.MIME == "image/jpeg" {
+			switch reference.MIME {
+			case "image/jpeg":
 				extension = ".jpg"
-			} else if reference.MIME == "image/webp" {
+			case "image/webp":
 				extension = ".webp"
 			}
 			header := make(textproto.MIMEHeader)
