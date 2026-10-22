@@ -1,0 +1,31 @@
+export default {
+  app: {
+    title: 'Lumi · 对话与生图',
+    name: 'Lumi',
+    tagline: '对话与生图',
+    skipLink: '跳到主要内容',
+  },
+  welcome: {
+    badge: '创作的起点',
+    title: '让想法，慢慢成形。',
+    description: '从一句灵感，到一幅画面。你的对话与创作空间，正在这里生长。',
+    preparing: '创作空间正在准备中',
+    milestone: 'M0 · 基础工程',
+    scope: '当前版本已搭建基础服务。账号、对话和图像创作将随后续版本逐步开放。',
+    version: '当前版本',
+    commit: '构建提交',
+    buildTime: '构建时间',
+    development: '开发版本',
+    unknown: '暂未提供',
+    loading: '正在读取版本信息…',
+    unavailable: '暂时无法读取版本信息，请确认服务已启动后重试。',
+    refresh: '刷新版本信息',
+    retry: '重新获取',
+    footer: '给灵感一点空间。',
+  },
+  notFound: {
+    title: '这一页还没有内容',
+    description: '链接可能已变更，你可以返回首页继续。',
+    home: '返回首页',
+  },
+}

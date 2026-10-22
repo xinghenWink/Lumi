@@ -1,0 +1,15 @@
+.idea/
+.vscode/
+.env
+.env.*
+!.env.example
+node_modules/
+backend/web/dist/
+bin/
+.tools/
+coverage/
+*.log
+frontend/test-results/
+frontend/playwright-report/
+deploy/data/
+*.tsbuildinfo

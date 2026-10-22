@@ -1,0 +1,16 @@
+.git
+.idea
+.env
+**/.env
+**/.env.*
+!**/.env.example
+node_modules
+**/node_modules
+.tools
+bin
+backend/web/dist
+frontend/test-results
+frontend/playwright-report
+deploy/data
+docs
+*.log

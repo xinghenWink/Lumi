@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7.0.0
+        with:
+          go-version: '1.26.10'
+          cache-dependency-path: backend/go.sum
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: make install
+      - run: make lint test
+      - name: Check generated contracts
+        run: |
+          make sqlc api
+          git diff --exit-code -- backend/internal/platform/db/query frontend/src/api/schema.d.ts
+      - run: make test-integration
+      - run: make build
+      - run: pnpm --filter @lumi/frontend exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v7.0.2
+        if: failure()
+        with:
+          name: playwright-results
+          path: frontend/test-results
+          if-no-files-found: ignore
+
+  container:
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Build the application image
+        run: docker build --build-arg VERSION=ci --build-arg COMMIT="$GITHUB_SHA" -t lumi:ci .
+      - name: Verify the full compose stack
+        env:
+          LUMI_IMAGE: lumi
+          LUMI_VERSION: ci
+          POSTGRES_PASSWORD: ci-database-only
+          REDIS_PASSWORD: ci-cache-only
+        run: |
+          cp deploy/.env.example deploy/.env
+          docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --wait --wait-timeout 120
+          curl --fail --silent http://127.0.0.1:8080/readyz
+          curl --fail --silent http://127.0.0.1:8080/api/version
+          curl --fail --silent http://127.0.0.1:8080/ | grep -q '<div id="app">'
+      - name: Print container diagnostics
+        if: failure()
+        env:
+          POSTGRES_PASSWORD: ci-database-only
+          REDIS_PASSWORD: ci-cache-only
+        run: docker compose --env-file deploy/.env -f deploy/docker-compose.yml logs --no-color
+      - name: Stop containers
+        if: always()
+        env:
+          POSTGRES_PASSWORD: ci-database-only
+          REDIS_PASSWORD: ci-cache-only
+        run: docker compose --env-file deploy/.env -f deploy/docker-compose.yml down --volumes

@@ -1,0 +1,37 @@
+import js from '@eslint/js'
+import vue from 'eslint-plugin-vue'
+import ts from 'typescript-eslint'
+
+export default ts.config(
+  { ignores: ['src/api/schema.d.ts', 'playwright-report/**', 'test-results/**'] },
+  js.configs.recommended,
+  ...ts.configs.strict,
+  ...vue.configs['flat/recommended'],
+  {
+    files: ['**/*.vue'],
+    languageOptions: { parserOptions: { parser: ts.parser } },
+  },
+  {
+    languageOptions: {
+      globals: {
+        document: 'readonly',
+        window: 'readonly',
+        fetch: 'readonly',
+        AbortController: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        Response: 'readonly',
+        process: 'readonly',
+      },
+    },
+    rules: {
+      'vue/multi-word-component-names': 'error',
+      'vue/html-self-closing': ['error', { html: { void: 'always' } }],
+      'vue/max-attributes-per-line': 'off',
+      'vue/html-closing-bracket-newline': 'off',
+      'vue/singleline-html-element-content-newline': 'off',
+      'vue/html-indent': 'off',
+      '@typescript-eslint/no-explicit-any': 'error',
+    },
+  },
+)

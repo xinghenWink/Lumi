@@ -1,0 +1,13 @@
+node_modules
+backend
+.tools
+bin
+coverage
+pnpm-lock.yaml
+frontend/playwright-report
+frontend/test-results
+docs/REQUIREMENTS.md
+docs/Lumi-原型.html
+docs/Lumi-原型对接文档.md
+AGENTS.md
+LICENSE
