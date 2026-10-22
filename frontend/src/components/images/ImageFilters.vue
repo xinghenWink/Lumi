@@ -21,7 +21,11 @@ function apply() {
 <template>
   <form class="image-filters" @submit.prevent="apply">
     <label v-if="admin" class="field"
-      >{{ t('images.user') }}<input v-model="values.user" maxlength="36" pattern="[0-9a-fA-F-]{36}"
+      >{{ t('images.user')
+      }}<input
+        v-model="values.user"
+        maxlength="36"
+        pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
     /></label>
     <label class="field"
       >{{ t('images.quality')
