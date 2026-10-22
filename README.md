@@ -108,6 +108,6 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --wait
 
 ## CI 与发布
 
-`ci.yml` 检查代码、生成结果、集成与完整容器栈。`release.yml` 在 main 或版本 tag 推送时复用 CI，通过后构建 amd64 / arm64 并推 GHCR。main 标签为 edge / sha；版本为 vX.Y.Z、X.Y、latest，并生成 Release。
+`ci.yml` 检查代码、生成结果、集成与完整容器栈。`release.yml` 在 main 或版本 tag 推送时复用 CI，通过后构建 amd64 / arm64 并推 GHCR。随后按发布 digest 在两种原生架构 runner 上拉取镜像，验证 manifest、非 root 用户、完整 Compose 栈和版本 / commit。main 标签为 edge / sha；版本为 vX.Y.Z、X.Y、latest，两种架构验收通过后生成 Release。
 
 仓库需启用 Actions，`GITHUB_TOKEN` 需 Packages 写权限。私有镜像需服务器登录 GHCR。远程验收以实际工作流与镜像结果为准。
