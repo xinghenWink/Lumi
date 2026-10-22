@@ -21,7 +21,7 @@ const props = withDefaults(
   }>(),
   { busy: false },
 )
-const emit = defineEmits<{ 'update:open': [value: boolean] }>()
+const emit = defineEmits<{ 'update:open': [value: boolean]; 'close-auto-focus': [event: Event] }>()
 const { t } = useI18n()
 function change(value: boolean) {
   if (!props.busy) emit('update:open', value)
@@ -40,6 +40,7 @@ function guard(event: Event) {
         :class="{ 'dialog-wide': wide }"
         @escape-key-down="guard"
         @interact-outside="guard"
+        @close-auto-focus="emit('close-auto-focus', $event)"
       >
         <div class="dialog-heading">
           <DialogTitle>{{ title }}</DialogTitle

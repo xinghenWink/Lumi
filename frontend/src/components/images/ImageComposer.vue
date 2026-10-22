@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch, onUnmounted, nextTick } from 'vue'
+import { computed, ref, shallowRef, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ArrowUp, ImagePlus, Images, X } from 'lucide-vue-next'
@@ -223,6 +223,9 @@ watch(
 onUnmounted(() => {
   quoteController?.abort()
   uploadController?.abort()
+})
+onMounted(() => {
+  if (store.draft.references.length) textarea.value?.focus()
 })
 watch(
   () => store.draft.references.length,

@@ -6,6 +6,7 @@ export default {
     saving: '正在保存…',
     saved: '修改已保存',
     cancel: '取消',
+    delete: '删除',
     close: '关闭',
     back: '返回',
     search: '搜索',

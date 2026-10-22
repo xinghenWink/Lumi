@@ -6,6 +6,7 @@ export default {
     saving: 'Saving…',
     saved: 'Changes saved',
     cancel: 'Cancel',
+    delete: 'Delete',
     close: 'Close',
     back: 'Back',
     search: 'Search',

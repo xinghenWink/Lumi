@@ -19,11 +19,13 @@ const emit = defineEmits<{ 'update:open': [boolean]; edit: [ImageFile]; navigate
 const { t } = useI18n(),
   currentIndex = ref(0),
   zoom = ref(100),
+  joining = ref(false),
   actions = useImageActions()
 watch(
   () => [props.index, props.open],
   () => {
     currentIndex.value = props.index
+    if (props.open) joining.value = false
     zoom.value = 100
     actions.copied.value = false
   },
@@ -35,6 +37,7 @@ function move(direction: number) {
   emit('navigate', currentIndex.value)
 }
 function edit(file: ImageFile) {
+  joining.value = true
   emit('edit', file)
   emit('update:open', false)
 }
@@ -46,6 +49,11 @@ function edit(file: ImageFile) {
     :description="parameters"
     wide
     @update:open="emit('update:open', $event)"
+    @close-auto-focus="
+      (event) => {
+        if (joining) event.preventDefault()
+      }
+    "
   >
     <template v-if="file">
       <div class="image-preview-stage">
