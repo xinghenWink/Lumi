@@ -179,7 +179,7 @@ function imported(count: number) {
         <Plus :size="16" />{{ t('catalog.newChannel') }}
       </button>
     </div>
-    <form class="credit-filters" @submit.prevent="search">
+    <form class="filter-panel catalog-filters" @submit.prevent="search">
       <input
         v-model="filters.search"
         type="search"
