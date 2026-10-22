@@ -110,6 +110,89 @@ type CreditOperation struct {
 	CreatedAt   time.Time
 }
 
+type File struct {
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	Kind            string
+	TaskID          *uuid.UUID
+	Path            string
+	ThumbnailPath   string
+	Mime            string
+	Size            int64
+	Width           int32
+	Height          int32
+	ThumbnailWidth  int32
+	ThumbnailHeight int32
+	Sha256          string
+	CreatedAt       time.Time
+	DeletedAt       *time.Time
+	PurgedAt        *time.Time
+}
+
+type ImageSetting struct {
+	Singleton           bool
+	MaxN                int32
+	MaxReferences       int32
+	MaxUploadBytes      int64
+	Sizes               []byte
+	RatioSizes          []byte
+	PerUserConcurrency  int32
+	GlobalConcurrency   int32
+	TimeoutSeconds      int32
+	QueueTimeoutSeconds int32
+	SplitRequests       bool
+	RetentionDays       int32
+	AdminCanViewContent bool
+	Version             int64
+}
+
+type ImageTask struct {
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	ConversationID   uuid.UUID
+	MessageID        uuid.UUID
+	UserMessageID    uuid.UUID
+	Operation        string
+	ModelID          uuid.UUID
+	ModelName        string
+	Prompt           string
+	Params           []byte
+	Quality          string
+	Size             string
+	Ratio            string
+	ImageCount       int32
+	ReferenceFileIds []uuid.UUID
+	ChargeID         uuid.UUID
+	UnitPrice        int64
+	TotalCost        int64
+	RefundedCost     int64
+	SuccessfulImages int32
+	Status           string
+	IdempotencyKey   string
+	RequestHash      string
+	ErrorCode        string
+	ErrorMessage     string
+	SplitRequests    bool
+	TimeoutSeconds   int32
+	QueueDeadline    time.Time
+	RunToken         *uuid.UUID
+	LeaseUntil       *time.Time
+	CancelRequested  bool
+	StartedAt        *time.Time
+	FinishedAt       *time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	Version          int64
+}
+
+type ImageTaskItem struct {
+	TaskID    uuid.UUID
+	Position  int32
+	Status    string
+	FileID    *uuid.UUID
+	ErrorCode string
+}
+
 type Message struct {
 	ID             uuid.UUID
 	ConversationID uuid.UUID

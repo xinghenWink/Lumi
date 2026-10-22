@@ -756,6 +756,353 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/image-options': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * getImageOptions
+     * @description Authenticated image configuration. Admin content visibility is always false in this response.
+     */
+    get: operations['getImageOptions']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/files': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * uploadImageFile
+     * @description One multipart file, magic/decoded dimension checks, PNG re-encoding and WebP thumbnail. Upload <=10MiB and 24 million pixels; avatar <=2MiB.
+     */
+    post: operations['uploadImageFile']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/files/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * getImageBytes
+     * @description Bearer authentication and a viewer-bound expiring signature are both required. No public filesystem paths.
+     */
+    get: operations['getImageBytes']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/files/{id}/thumb': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** getImageThumbnail */
+    get: operations['getImageThumbnail']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/files/{id}/metadata': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** getOwnedImageFile */
+    get: operations['getOwnedImageFile']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/me/files': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listImageReferenceLibrary */
+    get: operations['listImageReferenceLibrary']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/image-conversations': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listImageConversations */
+    get: operations['listImageConversations']
+    put?: never
+    /** createImageConversation */
+    post: operations['createImageConversation']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/image-conversations/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** getImageConversation */
+    get: operations['getImageConversation']
+    put?: never
+    post?: never
+    /**
+     * deleteImageConversation
+     * @description Hide conversation and cancel unfinished work through recovery. Generated images remain in the owner gallery until separately deleted or expired.
+     */
+    delete: operations['deleteImageConversation']
+    options?: never
+    head?: never
+    /** updateImageConversation */
+    patch: operations['updateImageConversation']
+    trace?: never
+  }
+  '/api/v1/image-tasks': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listOwnedImageTasks */
+    get: operations['listOwnedImageTasks']
+    put?: never
+    /**
+     * submitImageTask
+     * @description Charge and task creation are atomic. Identical key/input returns the same task; changed payload returns conflict. No references uses generation, otherwise edit. Estimates are not price locks; task stores actual accepted price.
+     */
+    post: operations['submitImageTask']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/image-tasks/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** getOwnedImageTask */
+    get: operations['getOwnedImageTask']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/image-tasks/{id}/cancel': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * cancelImageTask
+     * @description Queued cancellation settles immediately; running cancellation is acknowledged by worker or lease recovery. Full refund; terminal requests are idempotent.
+     */
+    post: operations['cancelImageTask']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/image-tasks/{id}/events': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * streamImageTask
+     * @description SSE task, done and ping events with ImageTaskEvent payload. Disconnect does not stop task. Poll GET task every 3s if stream is lost.
+     */
+    get: operations['streamImageTask']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/me/images': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listImageGallery */
+    get: operations['listImageGallery']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/me/images/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * deleteOwnedImage
+     * @description Soft delete owned file; refuses a reference used by queued/running tasks. File cleanup removes bytes later, without refunding already successful generation.
+     */
+    delete: operations['deleteOwnedImage']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/image-tasks': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * listAdminImageTasks
+     * @description Admin only. Default excludes prompts/reference IDs/file URLs. Content opt-in records an audit on every view.
+     */
+    get: operations['listAdminImageTasks']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/image-tasks/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * getAdminImageTask
+     * @description Admin only; same content visibility policy as list.
+     */
+    get: operations['getAdminImageTask']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/images/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * deleteAdminImage
+     * @description Admin only, audited.
+     */
+    delete: operations['deleteAdminImage']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/image-settings': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** getAdminImageSettings */
+    get: operations['getAdminImageSettings']
+    /**
+     * saveImageSettings
+     * @description Admin only; version check and audited configuration update. Image quotas/parameters change new tasks; existing task price and parameters are frozen.
+     */
+    put: operations['saveImageSettings']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -1470,6 +1817,178 @@ export interface components {
       content?: string
       code?: string
       message?: string
+    }
+    ImageFile: {
+      /** Format: uuid */
+      id: string
+      /** @enum {string} */
+      kind: 'upload' | 'generated' | 'thumbnail' | 'avatar'
+      /** @constant */
+      mime: 'image/png'
+      /** Format: int64 */
+      size: number
+      /** Format: int64 */
+      width: number
+      /** Format: int64 */
+      height: number
+      /** Format: int64 */
+      thumbnail_width: number
+      /** Format: int64 */
+      thumbnail_height: number
+      url: string
+      thumbnail_url: string
+      /** Format: int64 */
+      expires_at: number
+      /** Format: date-time */
+      created_at: string
+    }
+    ImageConversation: {
+      /** Format: uuid */
+      id: string
+      title: string
+      /** Format: uuid */
+      model_id: string | null
+      pinned: boolean
+      /** Format: int64 */
+      version: number
+      /** Format: date-time */
+      last_message_at: string
+      /** Format: date-time */
+      created_at: string
+    }
+    ImageConfiguration: {
+      /** Format: int64 */
+      max_n: number
+      /** Format: int64 */
+      max_references: number
+      /** Format: int64 */
+      max_upload_bytes: number
+      sizes: string[]
+      ratio_sizes: {
+        [key: string]: string
+      }
+      /** Format: int64 */
+      per_user_concurrency: number
+      /** Format: int64 */
+      global_concurrency: number
+      /** Format: int64 */
+      timeout_seconds: number
+      /** Format: int64 */
+      queue_timeout_seconds: number
+      split_requests: boolean
+      /** Format: int64 */
+      retention_days: number
+      admin_can_view_content: boolean
+      /** Format: int64 */
+      version: number
+    }
+    ImageTaskInput: {
+      /** Format: uuid */
+      conversation_id: string
+      /** Format: uuid */
+      model_id: string
+      prompt: string
+      /** @enum {string} */
+      quality: 'low' | 'medium' | 'high'
+      size: string
+      ratio?: string
+      /** Format: int64 */
+      n: number
+      reference_file_ids: string[]
+    }
+    ImageTaskItem: {
+      /** Format: int64 */
+      position: number
+      /** @enum {string} */
+      status: 'pending' | 'succeeded' | 'failed'
+      /** Format: uuid */
+      file_id: string | null
+      file: components['schemas']['ImageFile'] | null
+      error_code: string
+    }
+    ImageTask: {
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      user_id: string
+      /** Format: uuid */
+      conversation_id: string
+      /** Format: uuid */
+      model_id: string
+      model_name: string
+      /** @enum {string} */
+      operation: 'generate' | 'edit'
+      prompt: string
+      /** @enum {string} */
+      quality: 'low' | 'medium' | 'high'
+      size: string
+      ratio: string
+      /** Format: int64 */
+      n: number
+      reference_file_ids: string[]
+      /** Format: int64 */
+      unit_price: number
+      /** Format: int64 */
+      total_cost: number
+      /** Format: int64 */
+      refunded_cost: number
+      /** Format: int64 */
+      actual_cost: number
+      /** @enum {string} */
+      status: 'queued' | 'running' | 'succeeded' | 'partial' | 'failed' | 'canceled'
+      /** Format: int64 */
+      successful_images: number
+      /** Format: int64 */
+      queue_position: number
+      cancel_requested: boolean
+      error_code: string
+      /** Format: date-time */
+      started_at: string | null
+      /** Format: date-time */
+      finished_at: string | null
+      /** Format: date-time */
+      created_at: string
+      /** Format: int64 */
+      version: number
+      items: components['schemas']['ImageTaskItem'][]
+      content_visible: boolean
+    }
+    ImageGalleryItem: {
+      file: components['schemas']['ImageFile']
+      /** Format: uuid */
+      task_id: string
+      /** Format: uuid */
+      conversation_id: string
+      /** Format: uuid */
+      model_id: string
+      model_name: string
+      prompt: string
+      /** @enum {string} */
+      quality: 'low' | 'medium' | 'high'
+      size: string
+      ratio: string
+      status: string
+      /** Format: int64 */
+      unit_price: number
+    }
+    ImageTaskPage: {
+      items: components['schemas']['ImageTask'][]
+      next_cursor: string
+    }
+    ImageConversationPage: {
+      items: components['schemas']['ImageConversation'][]
+      next_cursor: string
+    }
+    ImageGalleryPage: {
+      items: components['schemas']['ImageGalleryItem'][]
+      next_cursor: string
+    }
+    ImageLibraryPage: {
+      items: components['schemas']['ImageFile'][]
+      next_cursor: string
+    }
+    ImageTaskEvent: {
+      task?: components['schemas']['ImageTask']
     }
   }
   responses: {
@@ -3141,6 +3660,606 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ChatConfiguration']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getImageOptions: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageConfiguration']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  uploadImageFile: {
+    parameters: {
+      query?: {
+        kind?: 'upload' | 'avatar'
+      }
+      header: {
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': {
+          /** Format: binary */
+          file: string
+        }
+      }
+    }
+    responses: {
+      /** @description Success */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageFile']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getImageBytes: {
+    parameters: {
+      query: {
+        expires: number
+        sig: string
+      }
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'image/png': string
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getImageThumbnail: {
+    parameters: {
+      query: {
+        expires: number
+        sig: string
+      }
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'image/webp': string
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getOwnedImageFile: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageFile']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listImageReferenceLibrary: {
+    parameters: {
+      query?: {
+        cursor?: string
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageLibraryPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listImageConversations: {
+    parameters: {
+      query?: {
+        cursor?: string
+        limit?: number
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageConversationPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  createImageConversation: {
+    parameters: {
+      query?: never
+      header: {
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          /** Format: uuid */
+          id: string
+          /** Format: uuid */
+          model_id: string
+        }
+      }
+    }
+    responses: {
+      /** @description Success */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageConversation']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getImageConversation: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageConversation']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  deleteImageConversation: {
+    parameters: {
+      query?: never
+      header: {
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  updateImageConversation: {
+    parameters: {
+      query?: never
+      header: {
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          title: string
+          pinned: boolean
+          /** Format: int64 */
+          version: number
+        }
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageConversation']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listOwnedImageTasks: {
+    parameters: {
+      query?: {
+        cursor?: string
+        limit?: number
+        state?: string
+        quality?: string
+        from?: string
+        until?: string
+        conversation_id?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageTaskPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  submitImageTask: {
+    parameters: {
+      query?: never
+      header: {
+        'Idempotency-Key': string
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ImageTaskInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageTask']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getOwnedImageTask: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageTask']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  cancelImageTask: {
+    parameters: {
+      query?: never
+      header: {
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageTask']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  streamImageTask: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'text/event-stream': components['schemas']['ImageTaskEvent']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listImageGallery: {
+    parameters: {
+      query?: {
+        cursor?: string
+        limit?: number
+        state?: string
+        quality?: string
+        from?: string
+        until?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageGalleryPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  deleteOwnedImage: {
+    parameters: {
+      query?: never
+      header: {
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listAdminImageTasks: {
+    parameters: {
+      query?: {
+        cursor?: string
+        limit?: number
+        state?: string
+        quality?: string
+        from?: string
+        until?: string
+        user_id?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageTaskPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getAdminImageTask: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageTask']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  deleteAdminImage: {
+    parameters: {
+      query?: never
+      header: {
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getAdminImageSettings: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageConfiguration']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  saveImageSettings: {
+    parameters: {
+      query?: never
+      header: {
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ImageConfiguration']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImageConfiguration']
         }
       }
       default: components['responses']['APIError']

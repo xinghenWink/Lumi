@@ -1,5 +1,15 @@
 # 技术决策记录
 
+## M5（2026-10-22）
+
+- ADR-056：独立 M5 分支基于已验收的 M4，新增 00007，不改既有迁移；生图使用 image-conversations API 与共用的 image 类型会话表，保持聊天契约稳定。
+- ADR-057：复用积分算法，增加 ChargeTx / SettleTx，把扣费与建单、结算与终态分别放入同一事务。账号物理清理跳过未结算扣费，防止启动或并发维护丢失退款依据。
+- ADR-058：PG 为任务事实源，Redis 有序队列调度并定期补偿；数据库锁负责跨实例并发，30 秒租约 / 2 秒续期 / 15 秒恢复。图像写请求不自动重试到其他路由，以免生成重复结果。拆分开关按 n 个 n=1 请求并发，上限按任务数配置。
+- ADR-059：新增锁定 github.com/HugoSmits86/nativewebp 1.3.0（纯 Go WebP 无损编码，保持 CGO_ENABLED=0 与双架构）和 golang.org/x/image 0.47.0（WebP 解码和缩放）；版本与校验锁定在 go.mod / go.sum。依据：[nativewebp](https://github.com/HugoSmits86/nativewebp)、[Go image](https://pkg.go.dev/golang.org/x/image)。
+- ADR-060：文件统一 PNG 重编码并生成 ≤512px WebP，魔数 / 像素 / 字节及并行解码限制共同约束资源。路径随机并经 os.Root 防逃逸；读取同时要求登录、所有权与限时签名，前端授权 fetch 转 Blob，列表只取缩略图。
+- ADR-061：后台默认不返回提示词、参考图或图片内容；开启 admin_can_view_content 后每次内容查看写审计。后台删除图片另记审计，普通用户跨所有者返回 404。
+- ADR-062：默认 DATA_DIR 开发为 backend/data、生产 /data。CI / 双架构发布验收为宿主挂载目录设置 uid 10001 权限，运行时保留非 root；路径与部署说明同步。
+
 ## M4（2026-10-22）
 
 | 编号    | 决策与理由                                                                                                                                                                                                                           |

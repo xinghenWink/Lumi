@@ -501,6 +501,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 
 const listUsersForPurge = `-- name: ListUsersForPurge :many
 SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at FROM users WHERE deleted_at < now() - interval '30 days'
+AND NOT EXISTS(SELECT 1 FROM credit_charges c WHERE c.user_id=users.id AND NOT c.settled)
 ORDER BY deleted_at, id LIMIT $1 FOR UPDATE SKIP LOCKED
 `
 
@@ -560,7 +561,8 @@ func (q *Queries) LockRegistration(ctx context.Context, dollar_1 string) error {
 }
 
 const purgeDeletedUser = `-- name: PurgeDeletedUser :exec
-DELETE FROM users WHERE id = $1 AND deleted_at < now() - interval '30 days'
+DELETE FROM users WHERE users.id = $1 AND users.deleted_at < now() - interval '30 days'
+AND NOT EXISTS(SELECT 1 FROM credit_charges c WHERE c.user_id=users.id AND NOT c.settled)
 `
 
 func (q *Queries) PurgeDeletedUser(ctx context.Context, id uuid.UUID) error {

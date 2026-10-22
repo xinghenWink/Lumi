@@ -1,11 +1,11 @@
 openapi: 3.1.0
 info:
   title: Lumi API
-  version: 0.4.0
+  version: 0.5.0
   description: >-
     Accounts, credits, upstream configuration and owner-isolated chat. Mutations require Origin and
     X-Lumi-CSRF: 1. Chat POST streams use meta, delta, error, done and ping SSE events. Reuse request_id
-    only with identical input; a live duplicate returns CHAT_BUSY. No image task execution yet.
+    only with identical input; a live duplicate returns CHAT_BUSY. Image tasks charge and settle atomically, run independently of HTTP, and expose only owner-scoped signed files.
 servers:
   - url: /
 paths:
@@ -2154,6 +2154,822 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ChatConfiguration'
+  /api/v1/image-options:
+    get:
+      operationId: getImageOptions
+      summary: getImageOptions
+      description: Authenticated image configuration. Admin content visibility is always false in this response.
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageConfiguration'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/files:
+    post:
+      operationId: uploadImageFile
+      summary: uploadImageFile
+      description: >-
+        One multipart file, magic/decoded dimension checks, PNG re-encoding and WebP thumbnail. Upload
+        <=10MiB and 24 million pixels; avatar <=2MiB.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - upload
+              - avatar
+            default: upload
+        - name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageFile'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+                - file
+  /api/v1/files/{id}:
+    get:
+      operationId: getImageBytes
+      summary: getImageBytes
+      description: >-
+        Bearer authentication and a viewer-bound expiring signature are both required. No public
+        filesystem paths.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: expires
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+        - name: sig
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/files/{id}/thumb:
+    get:
+      operationId: getImageThumbnail
+      summary: getImageThumbnail
+      description: ''
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: expires
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+        - name: sig
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/files/{id}/metadata:
+    get:
+      operationId: getOwnedImageFile
+      summary: getOwnedImageFile
+      description: ''
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageFile'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/me/files:
+    get:
+      operationId: listImageReferenceLibrary
+      summary: listImageReferenceLibrary
+      description: ''
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageLibraryPage'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/image-conversations:
+    get:
+      operationId: listImageConversations
+      summary: listImageConversations
+      description: ''
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageConversationPage'
+        default:
+          $ref: '#/components/responses/APIError'
+    post:
+      operationId: createImageConversation
+      summary: createImageConversation
+      description: ''
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageConversation'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                model_id:
+                  type: string
+                  format: uuid
+              required:
+                - id
+                - model_id
+  /api/v1/image-conversations/{id}:
+    get:
+      operationId: getImageConversation
+      summary: getImageConversation
+      description: ''
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageConversation'
+        default:
+          $ref: '#/components/responses/APIError'
+    patch:
+      operationId: updateImageConversation
+      summary: updateImageConversation
+      description: ''
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageConversation'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                title:
+                  type: string
+                pinned:
+                  type: boolean
+                version:
+                  type: integer
+                  format: int64
+                  minimum: 0
+              required:
+                - title
+                - pinned
+                - version
+    delete:
+      operationId: deleteImageConversation
+      summary: deleteImageConversation
+      description: >-
+        Hide conversation and cancel unfinished work through recovery. Generated images remain in the
+        owner gallery until separately deleted or expired.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Success
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/image-tasks:
+    get:
+      operationId: listOwnedImageTasks
+      summary: listOwnedImageTasks
+      description: ''
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: quality
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: until
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: conversation_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageTaskPage'
+        default:
+          $ref: '#/components/responses/APIError'
+    post:
+      operationId: submitImageTask
+      summary: submitImageTask
+      description: >-
+        Charge and task creation are atomic. Identical key/input returns the same task; changed
+        payload returns conflict. No references uses generation, otherwise edit. Estimates are not
+        price locks; task stores actual accepted price.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 128
+        - name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '202':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageTask'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageTaskInput'
+  /api/v1/image-tasks/{id}:
+    get:
+      operationId: getOwnedImageTask
+      summary: getOwnedImageTask
+      description: ''
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageTask'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/image-tasks/{id}/cancel:
+    post:
+      operationId: cancelImageTask
+      summary: cancelImageTask
+      description: >-
+        Queued cancellation settles immediately; running cancellation is acknowledged by worker or
+        lease recovery. Full refund; terminal requests are idempotent.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageTask'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/image-tasks/{id}/events:
+    get:
+      operationId: streamImageTask
+      summary: streamImageTask
+      description: >-
+        SSE task, done and ping events with ImageTaskEvent payload. Disconnect does not stop task.
+        Poll GET task every 3s if stream is lost.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Success
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/ImageTaskEvent'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/me/images:
+    get:
+      operationId: listImageGallery
+      summary: listImageGallery
+      description: ''
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: quality
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: until
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageGalleryPage'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/me/images/{id}:
+    delete:
+      operationId: deleteOwnedImage
+      summary: deleteOwnedImage
+      description: >-
+        Soft delete owned file; refuses a reference used by queued/running tasks. File cleanup removes
+        bytes later, without refunding already successful generation.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Success
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/image-tasks:
+    get:
+      operationId: listAdminImageTasks
+      summary: listAdminImageTasks
+      description: >-
+        Admin only. Default excludes prompts/reference IDs/file URLs. Content opt-in records an audit
+        on every view.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: quality
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: until
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: user_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageTaskPage'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/image-tasks/{id}:
+    get:
+      operationId: getAdminImageTask
+      summary: getAdminImageTask
+      description: Admin only; same content visibility policy as list.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageTask'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/images/{id}:
+    delete:
+      operationId: deleteAdminImage
+      summary: deleteAdminImage
+      description: Admin only, audited.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Success
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/image-settings:
+    get:
+      operationId: getAdminImageSettings
+      summary: getAdminImageSettings
+      description: ''
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageConfiguration'
+        default:
+          $ref: '#/components/responses/APIError'
+    put:
+      operationId: saveImageSettings
+      summary: saveImageSettings
+      description: >-
+        Admin only; version check and audited configuration update. Image quotas/parameters change new
+        tasks; existing task price and parameters are frozen.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageConfiguration'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageConfiguration'
 components:
   headers:
     RequestID:
@@ -4222,6 +5038,487 @@ components:
           type: string
         message:
           type: string
+      required: []
+    ImageFile:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+            - upload
+            - generated
+            - thumbnail
+            - avatar
+        mime:
+          type: string
+          const: image/png
+        size:
+          type: integer
+          format: int64
+          minimum: 0
+        width:
+          type: integer
+          format: int64
+          minimum: 0
+        height:
+          type: integer
+          format: int64
+          minimum: 0
+        thumbnail_width:
+          type: integer
+          format: int64
+          minimum: 0
+        thumbnail_height:
+          type: integer
+          format: int64
+          minimum: 0
+        url:
+          type: string
+        thumbnail_url:
+          type: string
+        expires_at:
+          type: integer
+          format: int64
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - kind
+        - mime
+        - size
+        - width
+        - height
+        - thumbnail_width
+        - thumbnail_height
+        - url
+        - thumbnail_url
+        - expires_at
+        - created_at
+    ImageConversation:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        model_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        pinned:
+          type: boolean
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        last_message_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - model_id
+        - pinned
+        - version
+        - last_message_at
+        - created_at
+    ImageConfiguration:
+      type: object
+      additionalProperties: false
+      properties:
+        max_n:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 4
+        max_references:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 4
+        max_upload_bytes:
+          type: integer
+          format: int64
+          minimum: 1024
+          maximum: 10485760
+        sizes:
+          type: array
+          items:
+            type: string
+        ratio_sizes:
+          type: object
+          additionalProperties:
+            type: string
+        per_user_concurrency:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 20
+        global_concurrency:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 20
+        timeout_seconds:
+          type: integer
+          format: int64
+          minimum: 5
+          maximum: 600
+        queue_timeout_seconds:
+          type: integer
+          format: int64
+          minimum: 60
+          maximum: 86400
+        split_requests:
+          type: boolean
+        retention_days:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 3650
+        admin_can_view_content:
+          type: boolean
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+        - max_n
+        - max_references
+        - max_upload_bytes
+        - sizes
+        - ratio_sizes
+        - per_user_concurrency
+        - global_concurrency
+        - timeout_seconds
+        - queue_timeout_seconds
+        - split_requests
+        - retention_days
+        - admin_can_view_content
+        - version
+    ImageTaskInput:
+      type: object
+      additionalProperties: false
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        model_id:
+          type: string
+          format: uuid
+        prompt:
+          type: string
+          minLength: 1
+          maxLength: 64000
+        quality:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+        size:
+          type: string
+        ratio:
+          type: string
+        'n':
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 4
+        reference_file_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 4
+      required:
+        - conversation_id
+        - model_id
+        - prompt
+        - quality
+        - size
+        - 'n'
+        - reference_file_ids
+    ImageTaskItem:
+      type: object
+      additionalProperties: false
+      properties:
+        position:
+          type: integer
+          format: int64
+          minimum: 0
+        status:
+          type: string
+          enum:
+            - pending
+            - succeeded
+            - failed
+        file_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        file:
+          anyOf:
+            - $ref: '#/components/schemas/ImageFile'
+            - type: 'null'
+        error_code:
+          type: string
+      required:
+        - position
+        - status
+        - file_id
+        - file
+        - error_code
+    ImageTask:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+        model_id:
+          type: string
+          format: uuid
+        model_name:
+          type: string
+        operation:
+          type: string
+          enum:
+            - generate
+            - edit
+        prompt:
+          type: string
+        quality:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+        size:
+          type: string
+        ratio:
+          type: string
+        'n':
+          type: integer
+          format: int64
+          minimum: 0
+        reference_file_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        unit_price:
+          type: integer
+          format: int64
+          minimum: 0
+        total_cost:
+          type: integer
+          format: int64
+          minimum: 0
+        refunded_cost:
+          type: integer
+          format: int64
+          minimum: 0
+        actual_cost:
+          type: integer
+          format: int64
+          minimum: 0
+        status:
+          type: string
+          enum:
+            - queued
+            - running
+            - succeeded
+            - partial
+            - failed
+            - canceled
+        successful_images:
+          type: integer
+          format: int64
+          minimum: 0
+        queue_position:
+          type: integer
+          format: int64
+          minimum: 0
+        cancel_requested:
+          type: boolean
+        error_code:
+          type: string
+        started_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        finished_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageTaskItem'
+        content_visible:
+          type: boolean
+      required:
+        - id
+        - user_id
+        - conversation_id
+        - model_id
+        - model_name
+        - operation
+        - prompt
+        - quality
+        - size
+        - ratio
+        - 'n'
+        - reference_file_ids
+        - unit_price
+        - total_cost
+        - refunded_cost
+        - actual_cost
+        - status
+        - successful_images
+        - queue_position
+        - cancel_requested
+        - error_code
+        - started_at
+        - finished_at
+        - created_at
+        - version
+        - items
+        - content_visible
+    ImageGalleryItem:
+      type: object
+      additionalProperties: false
+      properties:
+        file:
+          $ref: '#/components/schemas/ImageFile'
+        task_id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+        model_id:
+          type: string
+          format: uuid
+        model_name:
+          type: string
+        prompt:
+          type: string
+        quality:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+        size:
+          type: string
+        ratio:
+          type: string
+        status:
+          type: string
+        unit_price:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+        - file
+        - task_id
+        - conversation_id
+        - model_id
+        - model_name
+        - prompt
+        - quality
+        - size
+        - ratio
+        - status
+        - unit_price
+    ImageTaskPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageTask'
+        next_cursor:
+          type: string
+      required:
+        - items
+        - next_cursor
+    ImageConversationPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageConversation'
+        next_cursor:
+          type: string
+      required:
+        - items
+        - next_cursor
+    ImageGalleryPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageGalleryItem'
+        next_cursor:
+          type: string
+      required:
+        - items
+        - next_cursor
+    ImageLibraryPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageFile'
+        next_cursor:
+          type: string
+      required:
+        - items
+        - next_cursor
+    ImageTaskEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        task:
+          $ref: '#/components/schemas/ImageTask'
       required: []
   securitySchemes:
     bearerAuth:
