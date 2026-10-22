@@ -70,9 +70,13 @@ jobs:
       - name: Generate ephemeral container credentials
         shell: bash
         run: |
-          printf 'JWT_SECRET=%s\n' "$(openssl rand -hex 32)" >> "$GITHUB_ENV"
-          printf 'ENCRYPTION_KEY=%s\n' "$(openssl rand -base64 32)" >> "$GITHUB_ENV"
-          printf 'ADMIN_PASSWORD=%sAa1\n' "$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          lumi_ci_jwt=$(openssl rand -hex 32)
+          lumi_ci_key=$(openssl rand -base64 32)
+          lumi_ci_admin="$(openssl rand -hex 24)Aa1"
+          for lumi_ci_secret in "$lumi_ci_jwt" "$lumi_ci_key" "$lumi_ci_admin"; do
+            printf '::add-mask::%s\n' "$lumi_ci_secret"
+          done
+          printf 'JWT_SECRET=%s\nENCRYPTION_KEY=%s\nADMIN_PASSWORD=%s\n' "$lumi_ci_jwt" "$lumi_ci_key" "$lumi_ci_admin" >> "$GITHUB_ENV"
       - name: Verify the full compose stack
         env:
           LUMI_IMAGE: lumi

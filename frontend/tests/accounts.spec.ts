@@ -134,9 +134,14 @@ test('M1 real registration, sessions, administration, settings and audit', async
     await page.goto('/admin/audit')
     await page.getByRole('textbox', { name: '对象 ID', exact: true }).fill(id)
     await page.getByRole('button', { name: '搜索', exact: true }).click()
-    await expect(page.getByText('修改用户', { exact: true }).first()).toBeVisible()
-    await page.getByText('查看变更', { exact: true }).first().click()
-    expect((await page.locator('pre').allTextContents()).join('')).not.toContain(email)
+    const auditRecord = page
+      .getByRole('article')
+      .filter({ hasText: id })
+      .filter({ hasText: '修改用户' })
+      .first()
+    await expect(auditRecord.getByText('修改用户', { exact: true })).toBeVisible()
+    await auditRecord.getByText('查看变更', { exact: true }).click()
+    expect((await auditRecord.locator('pre').allTextContents()).join('')).not.toContain(email)
     await page.screenshot({
       path: info.outputPath('audit.png'),
       fullPage: true,
