@@ -1,6 +1,6 @@
 # M6 后台完善与 P1 验收
 
-日期：2026-10-23。分支 `codex/m6-operations`，基于 M5 `codex/m5-images`。未进入 M7，未合并前序 PR、未发版本标签。
+日期：2026-10-23。分支 `codex/m6-operations`，PR [#7](https://github.com/xinghenWink/Lumi/pull/7)，基于 M5 `codex/m5-images`。未进入 M7，未合并前序 PR、未发版本标签。
 
 ## DoD 对照
 
@@ -24,12 +24,13 @@
 
 ## 检查记录
 
-- 本地 Go 单元、golangci-lint（errcheck / govet / staticcheck / gosec，包含 integration 标签）、前端 ESLint、strict 类型与 Prettier 检查正在最终复核。
+- 本地 Go 单元、golangci-lint（errcheck / govet / staticcheck / gosec，包含 integration 标签）、前端 ESLint、strict 类型、Prettier 与生产构建通过。
 - 前端 45 项 Vitest 通过，覆盖 M6 DTO / 翻译完整性与 SSE 事件 ID；已有回归测试保留。
-- 新增真实 PG / Redis 集成用例覆盖密码重置、设备、偏好、批量积分、账号清除、公告、看板、对账、续传、vision、熔断与手动退款。未把只编译集成测试标为执行通过。
-- 本机 `make lint test` 因没有 GNU make 未启动；Docker Linux 引擎未运行。CI 将执行原始 `make lint test`、真实 PG / Redis 集成、生成一致性、构建、桌面 / 手机浏览器与 Compose 栈。最终状态待 PR CI 完成后更新。
+- CI 已执行并通过原始 `make lint test`、真实 PG / Redis 集成测试、生成一致性与生产构建。集成用例覆盖密码重置、设备、偏好、批量积分、账号清除、IP 配额、密钥脱敏、公告、看板、对账、续传、vision、熔断与手动退款。最终提交全部检查以 [PR 检查结果](https://github.com/xinghenWink/Lumi/pull/7/checks) 为准，保留每轮修复记录。
+- 新增 M6 桌面 / 320px 浏览器用例验证看板、公告横幅、偏好保存与刷新、JSON 导出、安全设置、系统信息及指标；两种视口的 M6 用例通过，截图已目视核对，无横向溢出。本地另有 4 项游客浏览器检查通过。完整回归沿用 M1～M5 用例与性能阈值，SSE 性能解析器已适配事件 ID，仍要求 60 个样本及 p95 <100ms。
+- 本机没有 GNU make，Docker Linux 引擎未运行；真实依赖、完整浏览器回归及 Compose 栈由上述 Ubuntu CI 执行，不把本机仅编译集成测试当作通过。
 - 新增 00008；00001～00007 未修改；OpenAPI 与生成类型同步。无新增依赖、无参考项目源码、无提交密钥。
 
 ## 运行边界
 
-Turnstile、SMTP 需运营者提供配置。vision 与边界行为由可控 HTTP 上游验证，本轮不新增收费真实生图 / 改图探测。导出、批量数量、故障回退和存储配置限制详见 ADR-065～078。M7 的负载测试、部署演练及正式发布不属于本次验收。
+Turnstile、SMTP 需运营者提供配置。vision 与边界行为由可控 HTTP 上游验证，本轮不新增收费真实生图 / 改图探测。导出、批量数量、故障回退和存储配置限制详见 ADR-065～079。M7 的负载测试、部署演练及正式发布不属于本次验收。
