@@ -213,6 +213,38 @@ func TestChatPersistenceIsolationRetryStopAndLimits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	config.PerMinute = 1
+	config, err = service.SaveConfiguration(f.ctx, actor, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	memberRecord, err := query.New(f.pool).GetUserByEmail(f.ctx, member.Email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	memberActor := user.Actor{ID: member.ID, TokenVersion: memberRecord.TokenVersion, IP: actor.IP}
+	limitedID := uuid.New()
+	if _, err := service.Create(f.ctx, member.ID, limitedID, model.ID); err != nil {
+		t.Fatal(err)
+	}
+	limited := chat.SendInput{RequestID: uuid.New(), ModelID: model.ID, Action: "send", Content: "minute"}
+	discard := func(chat.Event) error { return nil }
+	if err := service.Stream(f.ctx, memberActor, limitedID, limited, discard, nil); err != nil {
+		t.Fatal(err)
+	}
+	before = good.Load()
+	if err := service.Stream(f.ctx, memberActor, limitedID, limited, discard, nil); err != nil || good.Load() != before {
+		t.Fatalf("limited replay called provider or consumed quota: %v", err)
+	}
+	limited.RequestID = uuid.New()
+	if err := service.Stream(f.ctx, memberActor, limitedID, limited, discard, nil); creditCode(err) != "CHAT_RATE_LIMITED" || good.Load() != before {
+		t.Fatalf("minute limit did not reject before provider call: %v", err)
+	}
+	var dailyCount int
+	if err := f.pool.QueryRow(f.ctx, "SELECT count FROM chat_daily_usage WHERE user_id=$1 AND day=(now() AT TIME ZONE 'UTC')::date", member.ID).Scan(&dailyCount); err != nil || dailyCount != 1 {
+		t.Fatalf("rejected or replayed request changed daily count: count=%d error=%v", dailyCount, err)
+	}
+	config.PerMinute = 0
 	config.PerDay = 1
 	if _, err := service.SaveConfiguration(f.ctx, actor, config); err != nil {
 		t.Fatal(err)
