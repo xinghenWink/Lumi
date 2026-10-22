@@ -44,6 +44,7 @@ test('M4 real streaming history stop editing isolation and bounded rendering', a
   const markdown =
     '## 灯塔与海风\n\n先把问题拆成两步，再观察光线。\n\n| 项目 | 结果 |\n| --- | --- |\n| 风向 | 东南 |\n\n```go\nfmt.Println("lumi")\n```\n\n公式 $E=mc^2$。\n\n$$\n\\frac{a_1}{b}\n$$\n\n<script>window.untrusted=true</script>\n'
   const server = createServer(async (request, response) => {
+    const receivedAt = Date.now()
     if (request.headers.authorization !== `Bearer ${key}`) {
       response.writeHead(401)
       response.end('private-credential-error')
@@ -108,15 +109,8 @@ test('M4 real streaming history stop editing isolation and bounded rendering', a
       return
     }
     if (prompt === 'latency') {
-      let count = 0
-      const timer = setInterval(() => {
-        delta('@' + Date.now() + '|')
-        if (++count === 60) {
-          clearInterval(timer)
-          done()
-        }
-      }, 15)
-      response.on('close', () => clearInterval(timer))
+      delta('@' + Date.now() + ',' + receivedAt + '|')
+      done()
       return
     }
     const output =
@@ -419,11 +413,13 @@ test('M4 real streaming history stop editing isolation and bounded rendering', a
     await older.click()
     await expect(member.locator('.chat-virtual-row').first()).toBeVisible()
     expect(await member.locator('.chat-message').count()).toBeLessThan(60)
-    if (info.project.name === 'mobile')
-      await member.getByRole('button', { name: '打开导航菜单', exact: true }).click()
+    await member.keyboard.press('Control+k')
     const sidebar = member.locator(
       info.project.name === 'mobile' ? '.mobile-sidebar' : '.desktop-sidebar',
     )
+    await expect(
+      sidebar.getByRole('searchbox', { name: '搜索对话标题', exact: true }),
+    ).toBeFocused()
     expect(await sidebar.locator('.chat-sidebar-row').count()).toBeLessThan(30)
     await member.screenshot({
       path: info.outputPath('chat-virtualized.png'),

@@ -62,6 +62,10 @@ func (s *Service) relay(ctx context.Context, targets []catalog.ChatTarget, messa
 			code = upstream.FailureCode(err)
 		} else {
 			for event := range events {
+				if event.FinishReason == "content_filter" {
+					code = "UPSTREAM_REJECTED"
+					break
+				}
 				if event.ErrorCode != "" {
 					code = event.ErrorCode
 					break
@@ -78,6 +82,9 @@ func (s *Service) relay(ctx context.Context, targets []catalog.ChatTarget, messa
 		}
 		cancel()
 		client.Close()
+		if code == "" && !started {
+			code = "UPSTREAM_RESPONSE_INVALID"
+		}
 		if code == "" {
 			send(packet{done: true, target: target})
 			return

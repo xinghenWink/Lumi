@@ -73,63 +73,69 @@ export async function streamPerformance(page: Page, token: string, info: TestInf
   if (!id) throw new Error('No performance conversation')
   const latency = await page.evaluate(
     async ({ id, token }) => {
-      const response = await fetch('/api/v1/conversations/' + id + '/messages', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Lumi-CSRF': '1',
-          Authorization: 'Bearer ' + token,
-        },
-        body: JSON.stringify({
-          request_id: crypto.randomUUID(),
-          model_id: (
-            (await (
-              await fetch('/api/v1/conversations/' + id, {
-                headers: { Authorization: 'Bearer ' + token },
-              })
-            ).json()) as { model_id: string | null }
-          ).model_id,
-          action: 'send',
-          content: 'latency',
-        }),
-      })
-      if (!response.ok || !response.body) throw new Error('Latency stream rejected')
-      const reader = response.body.getReader(),
-        decoder = new TextDecoder(),
-        samples: number[] = []
-      let buffer = ''
-      try {
-        while (true) {
-          const chunk = await reader.read()
-          buffer += decoder.decode(chunk.value, { stream: !chunk.done })
-          let end = buffer.indexOf('\n\n')
-          while (end >= 0) {
-            const frame = buffer.slice(0, end)
-            buffer = buffer.slice(end + 2)
-            if (frame.startsWith('event: delta\n')) {
-              const value: unknown = JSON.parse(frame.slice(frame.indexOf('data: ') + 6))
-              if (
-                typeof value === 'object' &&
-                value !== null &&
-                'content' in value &&
-                typeof value.content === 'string'
-              )
-                for (const match of value.content.matchAll(/@(\d+)\|/g))
-                  samples.push(Math.max(0, Date.now() - Number(match[1])))
+      const model = (await (
+        await fetch('/api/v1/conversations/' + id, {
+          headers: { Authorization: 'Bearer ' + token },
+        })
+      ).json()) as { model_id: string | null }
+      const samples: number[] = []
+      let encoding: string | null = null
+      for (let attempt = 0; attempt < 60; attempt++) {
+        const started = Date.now()
+        const response = await fetch('/api/v1/conversations/' + id + '/messages', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Lumi-CSRF': '1',
+            Authorization: 'Bearer ' + token,
+          },
+          body: JSON.stringify({
+            request_id: crypto.randomUUID(),
+            model_id: model.model_id,
+            action: 'send',
+            content: 'latency',
+          }),
+        })
+        if (!response.ok || !response.body) throw new Error('Latency stream rejected')
+        const reader = response.body.getReader(),
+          decoder = new TextDecoder()
+        let buffer = ''
+        try {
+          while (true) {
+            const chunk = await reader.read()
+            buffer += decoder.decode(chunk.value, { stream: !chunk.done })
+            let end = buffer.indexOf('\n\n')
+            while (end >= 0) {
+              const frame = buffer.slice(0, end)
+              buffer = buffer.slice(end + 2)
+              if (frame.startsWith('event: delta\n')) {
+                const value: unknown = JSON.parse(frame.slice(frame.indexOf('data: ') + 6))
+                if (
+                  typeof value === 'object' &&
+                  value !== null &&
+                  'content' in value &&
+                  typeof value.content === 'string'
+                )
+                  for (const match of value.content.matchAll(/@(\d+),(\d+)\|/g))
+                    samples.push(
+                      Math.max(0, Date.now() - started - (Number(match[1]) - Number(match[2]))),
+                    )
+              }
+              end = buffer.indexOf('\n\n')
             }
-            end = buffer.indexOf('\n\n')
+            if (chunk.done) break
           }
-          if (chunk.done) break
+        } finally {
+          reader.releaseLock()
         }
-      } finally {
-        reader.releaseLock()
+        encoding = response.headers.get('Content-Encoding')
       }
       samples.sort((a, b) => a - b)
       return {
         samples: samples.length,
         p95MS: samples[Math.max(0, Math.ceil(samples.length * 0.95) - 1)] ?? -1,
-        encoding: response.headers.get('Content-Encoding'),
+        encoding,
       }
     },
     { id, token },

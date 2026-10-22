@@ -100,7 +100,7 @@ export default {
     url: 'Image URL',
     routes: 'Route bindings',
     routesHint:
-      'Only enabled models with available upstream bindings appear in the public catalog.',
+      'Enabled models need an available upstream binding to appear publicly. Chat models also require streaming.',
     addRoute: 'Add route',
     removeRoute: 'Remove this route',
     channel: 'Upstream',

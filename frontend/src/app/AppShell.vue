@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, nextTick, ref, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -31,7 +31,30 @@ watch(
 )
 onMounted(() => {
   if (!site.config) void site.load()
+  window.addEventListener('keydown', searchShortcut)
 })
+onUnmounted(() => window.removeEventListener('keydown', searchShortcut))
+function searchShortcut(event: KeyboardEvent) {
+  if (
+    admin.value ||
+    route.path.startsWith('/create') ||
+    !(event.ctrlKey || event.metaKey) ||
+    event.key.toLowerCase() !== 'k'
+  )
+    return
+  event.preventDefault()
+  if (window.matchMedia('(max-width: 900px)').matches) menuOpen.value = true
+  void nextTick(() =>
+    requestAnimationFrame(() => {
+      const inputs = document.querySelectorAll<HTMLInputElement>('.chat-sidebar-search input')
+      for (const input of inputs)
+        if (input.getClientRects().length) {
+          input.focus()
+          break
+        }
+    }),
+  )
+}
 </script>
 <template>
   <div class="app-layout" :class="{ 'admin-layout': admin }">

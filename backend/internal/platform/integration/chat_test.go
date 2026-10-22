@@ -51,6 +51,12 @@ func TestChatPersistenceIsolationRetryStopAndLimits(t *testing.T) {
 			value = "真实聊天"
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
+		if prompt == "empty" {
+			if _, err := fmt.Fprint(w, "data: [DONE]\n\n"); err != nil {
+				return
+			}
+			return
+		}
 		if _, err := fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":%q}}]}\n\n", value); err != nil {
 			return
 		}
@@ -191,6 +197,17 @@ func TestChatPersistenceIsolationRetryStopAndLimits(t *testing.T) {
 	recovered, err := service.Messages(f.ctx, actor.ID, slowID, "", 100)
 	if err != nil || recovered.Items[0].Content != "Hello" || recovered.Items[0].Meta.ErrorCode != "CHAT_STOPPED" {
 		t.Fatal("stopped partial answer not retained")
+	}
+	emptyID := uuid.New()
+	if _, err := service.Create(f.ctx, actor.ID, emptyID, model.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Stream(f.ctx, actor, emptyID, chat.SendInput{RequestID: uuid.New(), ModelID: model.ID, Action: "send", Content: "empty"}, emit, nil); err != nil {
+		t.Fatal(err)
+	}
+	emptyMessages, err := service.Messages(f.ctx, actor.ID, emptyID, "", 100)
+	if err != nil || emptyMessages.Items[0].Status != "error" || emptyMessages.Items[0].Meta.ErrorCode != "UPSTREAM_RESPONSE_INVALID" {
+		t.Fatal("empty upstream answer accepted")
 	}
 	config, err = service.Configuration(f.ctx)
 	if err != nil {

@@ -2,10 +2,12 @@ package catalog
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/problem"
 	"github.com/xinghenWink/Lumi/backend/internal/upstream"
@@ -20,7 +22,10 @@ type ChatTarget struct {
 
 func (s *Service) ChatTargets(ctx context.Context, modelID uuid.UUID) (PublicModel, []ChatTarget, error) {
 	row, err := s.queries.GetPlatformModel(ctx, modelID)
-	if err != nil || row.Type != "chat" || !row.Enabled {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return PublicModel{}, nil, fmt.Errorf("read chat model: %w", err)
+	}
+	if errors.Is(err, pgx.ErrNoRows) || row.Type != "chat" || !row.Enabled {
 		return PublicModel{}, nil, problem.New("CHAT_MODEL_UNAVAILABLE", http.StatusConflict)
 	}
 	model, err := publicView(row)
