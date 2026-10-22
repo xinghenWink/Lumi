@@ -2,7 +2,7 @@
 
 AI 对话与图像创作平台。Go + Gin + PostgreSQL 16 + Redis 7，以及 Vue 3 + TypeScript + Vite。
 
-当前阶段：**M2 积分与兑换码开发验收通过，待 PR 审查**。M0 / M1 已合并；已实现账号与后台、双桶积分、注册/每日赠送、价格规则、兑换码、积分流水和使用统计。聊天、模型接入和生图任务按 M3～M5 开发，HTML 原型中的模拟逻辑不进入生产代码。
+当前阶段：**M3 上游与模型开发验收通过，待 PR 审查**。M0 / M1 已合并，M2 已验收待审查；M3 基于 M2 独立提交，提供契约探测、上游适配器、渠道与平台模型管理和分模式模型选择器。实际聊天与生图任务按 M4 / M5 开发，HTML 原型中的模拟逻辑不进入生产代码。
 
 - [需求清单](docs/REQUIREMENTS.md)
 - [开发分析与计划](docs/DEVELOPMENT_PLAN.md)
@@ -13,6 +13,9 @@ AI 对话与图像创作平台。Go + Gin + PostgreSQL 16 + Redis 7，以及 Vue
 - [M1 验收记录](docs/M1_ACCEPTANCE.md)
 - [M2 开发范围](docs/M2_PLAN.md)
 - [M2 验收记录](docs/M2_ACCEPTANCE.md)
+- [M3 开发范围](docs/M3_PLAN.md)
+- [M3 验收记录](docs/M3_ACCEPTANCE.md)
+- [上游实例契约](docs/UPSTREAM_CONTRACT.md)
 - [OpenAPI](docs/openapi.yaml)
 
 ## 开发环境
@@ -43,7 +46,7 @@ go run ./cmd/lumi serve
 
 另一个终端从仓库根目录运行 `pnpm dev`，打开 [开发页](http://127.0.0.1:5173)。Vite 代理 API 到 8080。也可打开 [Go 托管首页](http://127.0.0.1:8080)，读取最近一次构建产物。
 
-上述随机密钥须保存在本地安全配置中以便重启复用；更换 JWT 密钥会使旧 access token 和验证码失效，更换加密密钥会使已有 SMTP 密文无法解密。管理员仅在系统尚无管理员时创建，修改环境密码不会重置已有账号。`PUBLIC_BASE_URL` 默认 `http://127.0.0.1:8080`，开发时额外接受 `DEV_ORIGIN=http://127.0.0.1:5173`。注册默认要求邮箱验证；开发环境未设置 SMTP 时，验证码仅输出到后端开发日志；生产环境须在后台邮件设置中配置 SMTP。
+上述随机密钥须保存在本地安全配置中以便重启复用；更换 JWT 密钥会使旧 access token 和验证码失效，更换加密密钥会使已有 SMTP、兑换码和上游渠道密文无法解密。管理员仅在系统尚无管理员时创建，修改环境密码不会重置已有账号。`PUBLIC_BASE_URL` 默认 `http://127.0.0.1:8080`，开发时额外接受 `DEV_ORIGIN=http://127.0.0.1:5173`。注册默认要求邮箱验证；开发环境未设置 SMTP 时，验证码仅输出到后端开发日志；生产环境须在后台邮件设置中配置 SMTP。
 
 无 Docker 时，可省略两个连接变量，只验证访客页面。此时 `/healthz` 为 200，`/readyz` 与账号 API 为 503。`APP_ENV=production` 不允许缺失依赖。Go 不自动读取 `.env`；本地请设置环境变量，Compose 通过 `env_file` 加载。
 
@@ -95,6 +98,25 @@ pnpm test:e2e
 `ENCRYPTION_KEY` 同时保护 SMTP 配置和兑换码密文，须随数据库安全备份并保持稳定。积分流水、扣费和兑换记录在账号保留期清理后继续保留稳定 UUID，避免财务历史断裂。
 
 M2 提供服务内部的 `Charge` / `Settle` 及只读报价 API；浏览器没有直接扣费或退款入口。生图任务创建、调度、上游执行和重启恢复属于 M5，届时接入扣费快照与结算。当前没有任务时图表与图片计数为真实的零。
+
+## 上游与平台模型
+
+管理员在 `/admin/upstreams` 创建渠道，填写带版本路径的 Base URL（例如 `https://upstream.example/v1`）、密钥、文本 / 生图超时和可选 HTTP 代理，测试连接后同步模型。读取渠道只返回密钥是否配置；编辑时密钥留空保留原值。`ENCRYPTION_KEY` 必须稳定保存。调用不隐式读取系统代理环境变量，不跟随重定向；内网实例或私有代理需显式设置 `UPSTREAM_ALLOW_PRIVATE_NETWORKS=true`，默认关闭。
+
+同步模型时填写平台展示名称和类型，新导入模型保持停用。在 `/admin/models` 核对能力及“平台模型 → 渠道 → 真实模型 ID”路由后启用；可配置多个路由、排序和每种类型的唯一默认模型。渠道停用 / 删除或没有可用路由的模型不会出现在普通用户目录。`/chat` 与 `/create` 分别加载聊天 / 图片模型，菜单在输入区底部向上展开；聊天发送与图像任务入口随 M4 / M5 开放。
+
+`00005_upstreams_models.sql` 为新增迁移。配置变更与脱敏审计在同一事务，版本冲突要求刷新后重试。上游调用记录保留 30 天，仅存模型、调用类型、状态、耗时、受控错误码和请求 ID；启动及每小时分批清理，不保留请求正文、图片或供应商原始错误。
+
+独立探测工具读取 `UPSTREAM_BASE_URL` / `UPSTREAM_API_KEY`，默认只读模型列表，不写入数据库。凭据请在进程环境中设置：
+
+```sh
+cd backend
+go run ./cmd/probe -output ../.tools/upstream-observed.json
+```
+
+文本 SSE 需显式传 `-chat-model`；生图需 `-images -image-model`；改图需 `-edit -image-model -reference-file`。这些选项会真实调用上游并可能计费。可选 `-proxy`、`-allow-private`、`-image-output`，完整参数见 `go run ./cmd/probe -help`。报告不记录密钥或正文，本地图像和报告置于 Git 忽略的 `.tools`。
+
+已授权的实例测试确认模型列表、文本 SSE、单张 low / 1024×1024 生图及 multipart 单图编辑；实际返回为 1254×1254。vision、其他质量 / 尺寸 / 张数上限及 JSON 编辑仍未实测，新模型的未确认能力默认关闭。详见上游契约文档。首次启动环境变量自动创建渠道、熔断及按权重自动切换属于 P1。
 
 ## 本地完整容器栈
 
