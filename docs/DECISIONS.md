@@ -23,7 +23,9 @@
 
 认证参考：[OWASP 密码存储](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)、[JWT 校验选项](https://golang-jwt.github.io/jwt/usage/parse/)、[Reka Dialog](https://reka-ui.com/docs/components/dialog)。
 
-补充：迁移使用独立连接与 PostgreSQL session lock；迁移版本表固定为 `public.goose_db_version`，业务连接固定 `search_path=lumi,public`。M0 首次创建的同名 schema 会改变 PostgreSQL 默认 `$user,public` 查找结果；显式限定可避免并发启动创建第二张版本表，并使业务表位置不受数据库用户名影响。保留并发迁移、重复执行和两条版本记录各一次的集成检查。
+补充：迁移使用独立连接与 PostgreSQL session lock；迁移版本表固定为 `public.goose_db_version`，业务连接固定 `search_path=lumi,public`。M0 首次创建的同名 schema 会改变 PostgreSQL 默认 `$user,public` 查找结果；显式限定可避免并发启动创建第二张版本表，并使业务表位置不受数据库用户名影响。保留并发迁移、重复执行和每条迁移版本仅记录一次的集成检查。
+
+M1 账号删除保留策略：启动后及每小时分批处理已软删除满 30 天的账号。每批至多 100 条，使用行锁与 SKIP LOCKED 允许多实例协作，每轮最多 30 秒；永久删除、会话级联及 user.purge 审计同事务。保留最近删除和历史审计，新增索引迁移 00003。后续积分等业务表必须保留必要账务历史并设计其删除/匿名化策略，再与该维护任务联调。
 
 ## M0（2026-10-22）
 

@@ -115,6 +115,8 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --wait
 
 环境变量完整列表见 `deploy/.env.example`。站点、注册与邮件设置遵循环境变量优先于数据库；后台标记受环境管理的字段。数据库缓存 30 秒，保存立即失效；SMTP 密码加密保存且 API 不回传。会话使用内存 access token 与 HttpOnly refresh cookie；跨源写入需匹配配置的 Origin，代理部署须正确设置公开地址。操作恢复命令后清除 `ADMIN_RESET_PASSWORD` 环境变量。
 
+账号软删除后保留 30 天。应用启动后及每小时运行内部维护任务，按每批最多 100 条清理到期账号及其会话，并保留脱敏审计；清理与审计在同一事务，审计失败会回滚删除。维护任务随应用退出停止，不提供额外管理 API。
+
 ## CI 与发布
 
 `ci.yml` 检查代码、生成结果、集成与完整容器栈。`release.yml` 在 main 或版本 tag 推送时复用 CI，通过后构建 amd64 / arm64 并推 GHCR。main 标签为 edge / sha；版本为 vX.Y.Z、X.Y、latest，并生成 Release。

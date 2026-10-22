@@ -221,7 +221,10 @@ export interface paths {
     get: operations['getUserDetail']
     put?: never
     post?: never
-    /** deleteUser */
+    /**
+     * deleteUser
+     * @description Soft-delete the account after email confirmation and immediately revoke its sessions. An internal maintenance task permanently removes accounts after 30 days, cascades their sessions, and preserves audit history in the same transaction.
+     */
     delete: operations['deleteUser']
     options?: never
     head?: never

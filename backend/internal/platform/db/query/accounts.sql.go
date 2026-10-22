@@ -499,6 +499,48 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 	return items, nil
 }
 
+const listUsersForPurge = `-- name: ListUsersForPurge :many
+SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at FROM users WHERE deleted_at < now() - interval '30 days'
+ORDER BY deleted_at, id LIMIT $1 FOR UPDATE SKIP LOCKED
+`
+
+func (q *Queries) ListUsersForPurge(ctx context.Context, limit int32) ([]User, error) {
+	rows, err := q.db.Query(ctx, listUsersForPurge, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []User{}
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.PasswordHash,
+			&i.Nickname,
+			&i.AvatarFileID,
+			&i.Role,
+			&i.Status,
+			&i.TokenVersion,
+			&i.Locale,
+			&i.Timezone,
+			&i.LastLoginAt,
+			&i.LastLoginIp,
+			&i.TermsAcceptedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockAdminChanges = `-- name: LockAdminChanges :exec
 SELECT pg_advisory_xact_lock(6218401001)
 `
@@ -514,6 +556,15 @@ SELECT pg_advisory_xact_lock(hashtextextended($1::text, 6218401002))
 
 func (q *Queries) LockRegistration(ctx context.Context, dollar_1 string) error {
 	_, err := q.db.Exec(ctx, lockRegistration, dollar_1)
+	return err
+}
+
+const purgeDeletedUser = `-- name: PurgeDeletedUser :exec
+DELETE FROM users WHERE id = $1 AND deleted_at < now() - interval '30 days'
+`
+
+func (q *Queries) PurgeDeletedUser(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, purgeDeletedUser, id)
 	return err
 }
 

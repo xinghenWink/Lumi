@@ -17,6 +17,8 @@
 - `frontend`：登录/注册、邮箱验证码、条款/隐私说明、路由守卫、工作区布局、个人资料、独立管理侧栏、用户 CRUD/详情、站点/注册/邮件设置、审计筛选、深浅色与手机适配。
 - `docs/openapi.yaml`、生成类型、测试、环境示例与运行文档同步更新。
 
+删除保留策略由启动时及每小时运行的内部维护任务执行：30 天内保留软删除账号，期满分批物理清理账号及会话；审计保留，业务删除与清理审计同事务。`00003_user_retention.sql` 为过期扫描新增部分索引，不修改旧迁移。
+
 ## 本阶段接口
 
 `/api/v1/public/config`；`/auth/register`、`/auth/send-code`、`/auth/login`、`/auth/refresh`、`/auth/logout`；`GET/PATCH /me`、`POST /me/password`；`GET/POST /admin/users`、`GET/PATCH/DELETE /admin/users/{id}`；`GET/PUT /admin/settings/{group}`；`GET /admin/audit-logs`。

@@ -478,6 +478,70 @@ func TestM1Accounts(t *testing.T) {
 		expectStatus(t, f.call(t, adminClient, "GET", "/api/v1/admin/users?limit=2&role=admin&cursor="+first.NextCursor, admin.AccessToken, nil), 400)
 		expectStatus(t, f.call(t, adminClient, "GET", "/api/v1/admin/audit-logs?limit=2", admin.AccessToken, nil), 200)
 	})
+	t.Run("retention cleanup preserves recent deletions and audit history", func(t *testing.T) {
+		actor := adminPrincipal.Actor
+		for _, expired := range []bool{true, false} {
+			targetEmail := strings.ToLower(rand.Text()) + "@lumi.test"
+			targetPassword := rand.Text() + "Aa1"
+			target, err := f.services.Users.Create(f.ctx, actor, user.CreateInput{Email: targetEmail, Password: targetPassword, Nickname: "Retention", Role: "user"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.login(t, f.client(t), targetEmail, targetPassword)
+			if err := f.services.Users.Delete(f.ctx, actor, target.ID, targetEmail); err != nil {
+				t.Fatal(err)
+			}
+			days := 29
+			if expired {
+				days = 31
+			}
+			if _, err := f.pool.Exec(f.ctx, "UPDATE users SET deleted_at=now() - make_interval(days => $2) WHERE id=$1", target.ID, days); err != nil {
+				t.Fatal(err)
+			}
+			count := 0
+			if expired {
+				var group sync.WaitGroup
+				type purgeResult struct {
+					count int
+					err   error
+				}
+				results := make(chan purgeResult, 2)
+				for range 2 {
+					group.Go(func() {
+						n, err := f.services.Users.PurgeDeleted(f.ctx, 100)
+						results <- purgeResult{n, err}
+					})
+				}
+				group.Wait()
+				close(results)
+				for result := range results {
+					if result.err != nil {
+						t.Fatal(result.err)
+					}
+					count += result.count
+				}
+			} else {
+				count, err = f.services.Users.PurgeDeleted(f.ctx, 100)
+			}
+			want := 0
+			if expired {
+				want = 1
+			}
+			if err != nil || count != want {
+				t.Fatalf("retention count=%d want=%d error=%v", count, want, err)
+			}
+			var accountCount, sessionCount, auditCount, purgeCount int
+			if err := f.pool.QueryRow(f.ctx, "SELECT (SELECT count(*) FROM users WHERE id=$1), (SELECT count(*) FROM user_sessions WHERE user_id=$1), (SELECT count(*) FROM audit_logs WHERE target_id=$1), (SELECT count(*) FROM audit_logs WHERE target_id=$1 AND action='user.purge')", target.ID).Scan(&accountCount, &sessionCount, &auditCount, &purgeCount); err != nil {
+				t.Fatal(err)
+			}
+			if auditCount == 0 || purgeCount != want || (expired && (accountCount != 0 || sessionCount != 0)) || (!expired && (accountCount != 1 || sessionCount != 1)) {
+				t.Fatal("retention removed recent data or failed to preserve audit history")
+			}
+		}
+		if count, err := f.services.Users.PurgeDeleted(f.ctx, 100); err != nil || count != 0 {
+			t.Fatalf("repeated retention cleanup was not idempotent: %d %v", count, err)
+		}
+	})
 	t.Run("five failed logins lock the account and IP pair", func(t *testing.T) {
 		client := auth.Client{IP: netip.MustParseAddr("192.0.2.99")}
 		for attempt := 1; attempt <= 5; attempt++ {
@@ -582,6 +646,17 @@ func TestM1AuditFailureRollsBackBusinessChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	actor := user.Actor{ID: record.ID, TokenVersion: record.TokenVersion, IP: netip.MustParseAddr("127.0.0.1")}
+	target, err := f.services.Users.Create(f.ctx, actor, user.CreateInput{Email: "retention-rollback@lumi.test", Password: rand.Text() + "Aa1", Nickname: "Retention rollback", Role: "user"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.services.Users.Delete(f.ctx, actor, target.ID, target.Email); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(f.ctx, "UPDATE users SET deleted_at=now() - interval '31 days' WHERE id=$1", target.ID); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := f.pool.Exec(f.ctx, `CREATE FUNCTION lumi.test_reject_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test audit failure'; END; $$; CREATE TRIGGER test_reject_audit BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION lumi.test_reject_audit();`); err != nil {
 		t.Fatal(err)
 	}
@@ -591,5 +666,12 @@ func TestM1AuditFailureRollsBackBusinessChange(t *testing.T) {
 	}
 	if _, err := query.New(f.pool).GetUserByEmail(f.ctx, "rollback@lumi.test"); !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("business change survived failed audit: %v", err)
+	}
+	if _, err := f.services.Users.PurgeDeleted(f.ctx, 100); err == nil {
+		t.Fatal("retention ignored an audit failure")
+	}
+	var retained bool
+	if err := f.pool.QueryRow(f.ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE id=$1)", target.ID).Scan(&retained); err != nil || !retained {
+		t.Fatalf("retention deleted data despite an audit failure: retained=%v error=%v", retained, err)
 	}
 }

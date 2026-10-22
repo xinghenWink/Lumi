@@ -216,6 +216,35 @@ func (s *Service) Delete(ctx context.Context, actor Actor, id uuid.UUID, confirm
 	})
 }
 
+// PurgeDeleted removes expired accounts and their cascading sessions atomically
+// with an audit entry. SKIP LOCKED lets multiple application instances cooperate.
+func (s *Service) PurgeDeleted(ctx context.Context, limit int32) (int, error) {
+	if limit < 1 || limit > 100 {
+		return 0, problem.Invalid()
+	}
+	count := 0
+	err := db.Transaction(ctx, s.pool, func(q *query.Queries) error {
+		records, err := q.ListUsersForPurge(ctx, limit)
+		if err != nil {
+			return fmt.Errorf("list expired accounts: %w", err)
+		}
+		for _, record := range records {
+			if err := q.PurgeDeletedUser(ctx, record.ID); err != nil {
+				return fmt.Errorf("purge expired account: %w", err)
+			}
+			if err := audit.Write(ctx, q, audit.Entry{Action: "user.purge", TargetType: "user", TargetID: &record.ID, Before: audit.UserSnapshot(record), After: map[string]bool{"purged": true}, IP: netip.MustParseAddr("127.0.0.1")}); err != nil {
+				return err
+			}
+		}
+		count = len(records)
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func (s *Service) UpdateSelf(ctx context.Context, actor Actor, input SelfInput) (Profile, error) {
 	if input.Nickname == nil && input.Locale == nil && input.Timezone == nil {
 		return Profile{}, problem.Invalid()

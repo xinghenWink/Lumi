@@ -244,7 +244,12 @@ export default {
     otherAction: '其他操作（{action}）',
     types: { user: '用户', site: '站点信息', registration: '注册与安全', mail: '邮件服务' },
     actions: {
-      user: { create: '新增用户', update: '修改用户', delete: '删除用户' },
+      user: {
+        create: '新增用户',
+        update: '修改用户',
+        delete: '删除用户',
+        purge: '清理过期删除账号',
+      },
       settings: { update: '修改系统设置' },
       auth: {
         register: '用户注册',

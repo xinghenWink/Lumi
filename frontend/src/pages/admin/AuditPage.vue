@@ -22,6 +22,7 @@ const actions = [
   'user.create',
   'user.update',
   'user.delete',
+  'user.purge',
   'settings.update',
   'auth.register',
   'auth.login',

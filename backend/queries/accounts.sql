@@ -31,6 +31,13 @@ WHERE id = $1 AND deleted_at IS NULL RETURNING *;
 UPDATE users SET deleted_at = now(), updated_at = now(), token_version = token_version + 1
 WHERE id = $1 AND deleted_at IS NULL;
 
+-- name: ListUsersForPurge :many
+SELECT * FROM users WHERE deleted_at < now() - interval '30 days'
+ORDER BY deleted_at, id LIMIT $1 FOR UPDATE SKIP LOCKED;
+
+-- name: PurgeDeletedUser :exec
+DELETE FROM users WHERE id = $1 AND deleted_at < now() - interval '30 days';
+
 -- name: CountActiveAdmins :one
 SELECT count(*) FROM users WHERE role = 'admin' AND status = 'active' AND deleted_at IS NULL;
 

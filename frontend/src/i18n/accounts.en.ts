@@ -254,7 +254,12 @@ export default {
     otherAction: 'Other action ({action})',
     types: { user: 'User', site: 'Site', registration: 'Registration', mail: 'Email delivery' },
     actions: {
-      user: { create: 'Create user', update: 'Update user', delete: 'Delete user' },
+      user: {
+        create: 'Create user',
+        update: 'Update user',
+        delete: 'Delete user',
+        purge: 'Purge expired deleted account',
+      },
       settings: { update: 'Update settings' },
       auth: {
         register: 'Register account',
