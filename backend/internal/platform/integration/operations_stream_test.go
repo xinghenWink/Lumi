@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
 	"github.com/xinghenWink/Lumi/backend/internal/chat"
+	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	platformredis "github.com/xinghenWink/Lumi/backend/internal/platform/redis"
 	"github.com/xinghenWink/Lumi/backend/internal/upstream"
 	"github.com/xinghenWink/Lumi/backend/internal/user"
@@ -233,4 +234,23 @@ func TestM6CircuitSkipsOpenRoutesAndAllowsOneHalfOpenProbe(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	t.Run("healthy calls avoid the channel write lock", func(t *testing.T) {
+		transaction, err := f.pool.Begin(f.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := transaction.Rollback(f.ctx); err != nil {
+				t.Error(err)
+			}
+		}()
+		if _, err := transaction.Exec(f.ctx, "SELECT id FROM upstreams WHERE id=$1 FOR UPDATE", channel.ID); err != nil {
+			t.Fatal(err)
+		}
+		bounded, cancel := context.WithTimeout(f.ctx, time.Second)
+		defer cancel()
+		if err := query.New(f.pool).RecordCircuitSuccess(bounded, channel.ID); err != nil {
+			t.Fatalf("healthy success waited for an unrelated row writer: %v", err)
+		}
+	})
 }

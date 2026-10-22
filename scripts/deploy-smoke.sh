@@ -35,6 +35,37 @@ bash "$root/deploy/docker-deploy.sh" "$workspace/live"
 [[ $(sha256sum .env) == "$before" ]] || { echo 'Installer replaced credentials.' >&2; exit 1; }
 docker compose up -d --wait --wait-timeout 180
 curl --fail --silent "$base/readyz" >/dev/null
+password=$(sed -n 's/^ADMIN_PASSWORD=//p' .env)
+login() {
+  # Installer-generated smoke passwords are hexadecimal plus Aa1, so JSON quoting is unambiguous.
+  printf '{"email":"smoke@lumi.test","password":"%s"}' "$password" | curl --fail --silent --show-error \
+    -H 'Content-Type: application/json' -H 'Origin: http://127.0.0.1:8080' -H 'X-Lumi-CSRF: 1' \
+    --data-binary @- "$base/api/v1/auth/login" > "$workspace/login.json"
+  token=$(sed -nE 's/.*"access_token":"([^"]+)".*/\1/p' "$workspace/login.json")
+  [[ -n $token ]] || { echo 'Administrator login failed.' >&2; exit 1; }
+}
+login
+owner=$(sed -nE 's/.*"id":"([^"]+)".*/\1/p' "$workspace/login.json")
+curl --fail --silent --show-error -H "Authorization: Bearer $token" \
+  -H 'Content-Type: application/json' -H 'Origin: http://127.0.0.1:8080' -H 'X-Lumi-CSRF: 1' \
+  -H "Idempotency-Key: smoke-$(openssl rand -hex 16)" \
+  --data '{"action":"add","bucket":"permanent","amount":37,"note":"M7 deployment persistence"}' \
+  "$base/api/v1/admin/users/$owner/credits" > "$workspace/credits.json"
+printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGMIiDoBAAJwAXNTgWk3AAAAAElFTkSuQmCC' | base64 -d > "$workspace/input.png"
+curl --fail --silent --show-error -H "Authorization: Bearer $token" \
+  -H 'Origin: http://127.0.0.1:8080' -H 'X-Lumi-CSRF: 1' -F "file=@$workspace/input.png" \
+  "$base/api/v1/files" > "$workspace/file.json"
+file_id=$(sed -nE 's/.*"id":"([^"]+)".*/\1/p' "$workspace/file.json")
+[[ -n $file_id ]] || { echo 'File upload failed.' >&2; exit 1; }
+download_file() {
+  curl --fail --silent --show-error -H "Authorization: Bearer $token" \
+    "$base/api/v1/files/$file_id/metadata" > "$workspace/metadata.json"
+  file_url=$(sed 's/\\u0026/\&/g' "$workspace/metadata.json" | sed -nE 's/.*"url":"([^"]+)".*/\1/p')
+  [[ $file_url == /api/v1/files/* ]] || { echo 'Signed file URL missing.' >&2; exit 1; }
+  curl --fail --silent --show-error -H "Authorization: Bearer $token" "$base$file_url" > "$workspace/download.png"
+}
+download_file
+file_hash=$(sha256sum "$workspace/download.png" | cut -d ' ' -f 1)
 printf 'persisted-image-data\n' > data/app/smoke-sentinel
 docker compose exec -T postgres sh -c 'exec psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
 CREATE TABLE public.m7_smoke (value text PRIMARY KEY);
@@ -44,6 +75,11 @@ verify_data() {
   [[ $(cat data/app/smoke-sentinel) == persisted-image-data ]]
   docker compose exec -T postgres sh -c 'exec psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT value FROM public.m7_smoke"' | grep -qx persisted-database-data
   curl --fail --silent "$base/readyz" >/dev/null
+  login
+  curl --fail --silent --show-error -H "Authorization: Bearer $token" "$base/api/v1/me/credits" > "$workspace/credits.json"
+  grep -q '"permanent_balance":37' "$workspace/credits.json"
+  download_file
+  [[ $(sha256sum "$workspace/download.png" | cut -d ' ' -f 1) == "$file_hash" ]]
 }
 docker compose restart app postgres redis
 docker compose up -d --wait --wait-timeout 180
@@ -64,4 +100,4 @@ docker compose down --volumes
 bash "$workspace/live/restore.sh" "$archive" "$workspace/restored"
 cd -- "$workspace/restored"
 verify_data
-echo 'PASS: empty-directory deployment, idempotent setup, persistent restart, M6→M7 upgrade, M7→M6 rollback, coordinated backup and fresh restore.'
+echo 'PASS: empty-directory deployment, idempotent setup, persistent restart, M6→M7 upgrade, M7→M6 rollback, coordinated backup and fresh restore; administrator login, credits and signed file bytes persist.'

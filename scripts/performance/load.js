@@ -84,6 +84,7 @@ export function read(data) {
 }
 export function chat(data) {
   const actor = current(data)
+  const started = Date.now()
   const response = http.post(
     base + '/api/v1/conversations/' + actor.chatID + '/messages',
     JSON.stringify({
@@ -102,8 +103,21 @@ export function chat(data) {
   })
   const match = response.body.match(/platform-timing:(\d+):(\d+)/)
   check(match, { 'upstream timing marker exists': (value) => value !== null })
-  if (match)
-    overhead.add(Math.max(0, response.timings.duration - (Number(match[2]) - Number(match[1]))))
+  if (match) {
+    const extra = Math.max(0, response.timings.duration - (Number(match[2]) - Number(match[1])))
+    overhead.add(extra)
+    if (__ENV.LUMI_DIAGNOSTICS === '1' && extra > 100)
+      console.log(
+        JSON.stringify({
+          turn: execution.vu.iterationInScenario,
+          extra,
+          total: response.timings.duration,
+          upstream: Number(match[2]) - Number(match[1]),
+          before: Number(match[1]) - started,
+          after: Date.now() - Number(match[2]),
+        }),
+      )
+  }
   if (ok) streams.add(1)
   sleep(4)
 }

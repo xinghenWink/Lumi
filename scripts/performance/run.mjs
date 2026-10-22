@@ -129,11 +129,17 @@ try {
   await api('PUT', '/admin/pricing', pricing)
   const chat = (await api('GET', '/models?type=chat')).items[0]
   const image = (await api('GET', '/models?type=image')).items[0]
-  execFileSync('go', ['run', '-tags=integration', './internal/testsupport/loadseed'], {
-    cwd: resolve(root, 'backend'),
-    env,
-    stdio: 'inherit',
-  })
+  execFileSync(
+    process.env.LUMI_LOAD_SEED_BIN ?? 'go',
+    process.env.LUMI_LOAD_SEED_BIN
+      ? []
+      : ['run', '-tags=integration', './internal/testsupport/loadseed'],
+    {
+      cwd: resolve(root, 'backend'),
+      env,
+      stdio: 'inherit',
+    },
+  )
   const k6env = {
     ...process.env,
     LUMI_BASE_URL: base,

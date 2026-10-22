@@ -55,7 +55,9 @@ DELETE FROM announcements WHERE id=$1;
 -- name: AcquireCircuitProbe :execrows
 UPDATE upstreams SET probe_until=now()+interval '10 minutes' WHERE id=$1 AND open_until<=now() AND (probe_until IS NULL OR probe_until<=now());
 -- name: RecordCircuitSuccess :exec
-UPDATE upstreams SET consecutive_failures=0,open_until=NULL,probe_until=NULL,last_error='' WHERE id=$1;
+-- Healthy calls must not serialize behind redundant updates of the same channel row.
+UPDATE upstreams SET consecutive_failures=0,open_until=NULL,probe_until=NULL,last_error='' WHERE id=$1
+AND (consecutive_failures<>0 OR open_until IS NOT NULL OR probe_until IS NOT NULL OR last_error<>'');
 -- name: RecordCircuitFailure :exec
 UPDATE upstreams SET consecutive_failures=least(consecutive_failures+1,1000000),last_error=$2,
 open_until=CASE WHEN consecutive_failures+1>=sqlc.arg(threshold)::integer OR open_until IS NOT NULL THEN now()+make_interval(secs=>sqlc.arg(duration)::integer) ELSE open_until END,probe_until=NULL WHERE id=$1;

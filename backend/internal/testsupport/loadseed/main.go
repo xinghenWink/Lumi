@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"time"
+	_ "time/tzdata" // The optional standalone fixture binary also needs IANA zones.
 
 	"github.com/google/uuid"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"

@@ -1,6 +1,7 @@
 package probe
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,6 +11,25 @@ import (
 
 	"github.com/xinghenWink/Lumi/backend/internal/upstream"
 )
+
+func TestProbeObservesDimensionsWithoutRetainingImageBytes(t *testing.T) {
+	raw, err := referenceImage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(base64.StdEncoding.EncodeToString(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := imageDimensions(encoded); got != "256x256" {
+		t.Fatalf("dimensions = %s", got)
+	}
+	for _, value := range []string{`null`, `"not-base64"`, `"bm90LWFuLWltYWdl"`} {
+		if got := imageDimensions(json.RawMessage(value)); got != "unavailable" {
+			t.Fatalf("invalid image dimensions = %s", got)
+		}
+	}
+}
 
 func TestProbeObservesShapesWithoutSavingSecretsOrImages(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

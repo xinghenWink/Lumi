@@ -59,6 +59,7 @@ jobs:
       - name: Install pinned k6
         run: |
           curl --fail --location --silent --show-error https://github.com/grafana/k6/releases/download/v1.3.0/k6-v1.3.0-linux-amd64.tar.gz -o "$RUNNER_TEMP/k6.tar.gz"
+          printf '84d26fc1f7bc03e02f2e016b3b1b20c032e05dfe461fca82de4e3a6ebe72ddbd  %s\n' "$RUNNER_TEMP/k6.tar.gz" | sha256sum --check
           tar -xzf "$RUNNER_TEMP/k6.tar.gz" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/k6-v1.3.0-linux-amd64" >> "$GITHUB_PATH"
       - name: Measure 100 distinct users with a local upstream
