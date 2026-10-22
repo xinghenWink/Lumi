@@ -20,6 +20,7 @@ func (s *Service) attachVision(ctx context.Context, owner uuid.UUID, history []q
 		offset = 1
 	}
 	count := len(messages) - offset
+	bytesUsed := 0
 	for i, row := range history[len(history)-count:] {
 		if len(row.ReferenceFileIds) == 0 {
 			continue
@@ -29,7 +30,7 @@ func (s *Service) attachVision(ctx context.Context, owner uuid.UUID, history []q
 		}
 		parts := []map[string]any{{"type": "text", "text": row.Content}}
 		for _, id := range row.ReferenceFileIds {
-			data, err := s.files.Reference(ctx, owner, id)
+			data, err := s.files.VisionReference(ctx, owner, id)
 			if err != nil {
 				return err
 			}
@@ -40,6 +41,12 @@ func (s *Service) attachVision(ctx context.Context, owner uuid.UUID, history []q
 			return fmt.Errorf("encode vision context: %w", err)
 		}
 		messages[offset+i].Content = raw
+	}
+	for _, message := range messages {
+		bytesUsed += len(message.Content)
+	}
+	if bytesUsed > 3<<20 {
+		return problem.New("CHAT_CONTEXT_TOO_LARGE", 400)
 	}
 	return nil
 }

@@ -2,6 +2,8 @@
 
 ## M6（2026-10-23）
 
+- ADR-079：聊天 vision 使用所有者图片的规范化缩略图再缩放为长边 ≤256px PNG，避免把四张 10 MB 原图编码为超大 JSON；总上下文 JSON 内容限制 3 MiB，超限在保存新消息事务内拒绝。原图与生图编辑引用保持既有行为。
+
 - ADR-065：M6 独立分支基于 M5，新增 00008；仅实施全部 P1 与 M6 明确列出的后台补全，不执行 M7 压测、部署演练或发布。无新增项目依赖。
 - ADR-066：密码重置令牌为 256 位随机值，数据库仅存哈希，有效 30 分钟、单次使用并绑定 token_version；重置与吊销全部登录在同一事务。链接令牌放 URL fragment，页面读取后移除，不进入 HTTP 请求或日志。无 SMTP 时明确返回不可用，不在日志打印重置链接。
 - ADR-067：Turnstile 使用固定官方 Siteverify 地址，校验 success、hostname 与 action；secret 经 AES-GCM 入库，响应和审计只暴露 configured。CSP 仅为官方 challenges.cloudflare.com 增加 script / frame / connect 来源。参考：[官方验证说明](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)。
