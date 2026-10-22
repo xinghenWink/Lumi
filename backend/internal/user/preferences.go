@@ -12,6 +12,7 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
+	"github.com/xinghenWink/Lumi/backend/internal/platform/pagination"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/problem"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/validation"
 )
@@ -71,6 +72,39 @@ func (s *Service) Devices(ctx context.Context, id uuid.UUID) ([]Session, error) 
 	result := make([]Session, 0, len(rows))
 	for _, r := range rows {
 		result = append(result, Session{ID: r.FamilyID, Device: r.Device, IP: r.Ip.String(), UserAgent: r.UserAgent, CreatedAt: r.CreatedAt, ExpiresAt: r.ExpiresAt})
+	}
+	return result, nil
+}
+
+type DevicePage struct {
+	Items      []Session `json:"items"`
+	NextCursor string    `json:"next_cursor"`
+}
+
+func (s *Service) DevicePage(ctx context.Context, id uuid.UUID, cursor string, limit int32) (DevicePage, error) {
+	result := DevicePage{Items: []Session{}}
+	if limit < 1 || limit > 100 {
+		return result, problem.Invalid()
+	}
+	key := pagination.Fingerprint("devices", id.String())
+	point, err := pagination.Decode(cursor, key)
+	if err != nil {
+		return result, err
+	}
+	rows, err := s.queries.ActiveDevicePage(ctx, query.ActiveDevicePageParams{UserID: id, CursorTime: point.Time, CursorID: point.ID, PageLimit: limit + 1})
+	if err != nil {
+		return result, fmt.Errorf("list device page: %w", err)
+	}
+	if len(rows) > int(limit) {
+		rows = rows[:limit]
+		last := rows[len(rows)-1]
+		result.NextCursor, err = pagination.Encode(last.CreatedAt, last.FamilyID, key)
+		if err != nil {
+			return result, err
+		}
+	}
+	for _, r := range rows {
+		result.Items = append(result.Items, Session{ID: r.FamilyID, Device: r.Device, IP: r.Ip.String(), UserAgent: r.UserAgent, CreatedAt: r.CreatedAt, ExpiresAt: r.ExpiresAt})
 	}
 	return result, nil
 }

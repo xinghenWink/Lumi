@@ -3288,7 +3288,17 @@ paths:
       operationId: m6_get__api_v1_me_sessions
       security:
         - bearerAuth: []
-      parameters: []
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
       responses:
         '200':
           description: Success
@@ -5373,9 +5383,12 @@ components:
         current_id:
           type: string
           format: uuid
+        next_cursor:
+          type: string
       required:
         - items
         - current_id
+        - next_cursor
     Device:
       type: object
       additionalProperties: false

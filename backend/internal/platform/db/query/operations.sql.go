@@ -25,6 +25,64 @@ func (q *Queries) AcquireCircuitProbe(ctx context.Context, id uuid.UUID) (int64,
 	return result.RowsAffected(), nil
 }
 
+const activeDevicePage = `-- name: ActiveDevicePage :many
+WITH devices AS (
+ SELECT DISTINCT ON (family_id) family_id,device,ip,user_agent,created_at,expires_at
+ FROM user_sessions WHERE user_id=$4 AND revoked_at IS NULL AND expires_at>now()
+ ORDER BY family_id,created_at DESC
+)
+SELECT family_id, device, ip, user_agent, created_at, expires_at FROM devices WHERE $1::timestamptz IS NULL OR (created_at,family_id)<($1,$2::uuid)
+ORDER BY created_at DESC,family_id DESC LIMIT $3
+`
+
+type ActiveDevicePageParams struct {
+	CursorTime *time.Time
+	CursorID   uuid.UUID
+	PageLimit  int32
+	UserID     uuid.UUID
+}
+
+type ActiveDevicePageRow struct {
+	FamilyID  uuid.UUID
+	Device    string
+	Ip        netip.Addr
+	UserAgent string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+}
+
+func (q *Queries) ActiveDevicePage(ctx context.Context, arg ActiveDevicePageParams) ([]ActiveDevicePageRow, error) {
+	rows, err := q.db.Query(ctx, activeDevicePage,
+		arg.CursorTime,
+		arg.CursorID,
+		arg.PageLimit,
+		arg.UserID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ActiveDevicePageRow{}
+	for rows.Next() {
+		var i ActiveDevicePageRow
+		if err := rows.Scan(
+			&i.FamilyID,
+			&i.Device,
+			&i.Ip,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.ExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const activeDevices = `-- name: ActiveDevices :many
 SELECT DISTINCT ON (family_id) family_id,device,ip,user_agent,created_at,expires_at
 FROM user_sessions WHERE user_id=$1 AND revoked_at IS NULL AND expires_at>now()

@@ -14,6 +14,7 @@ const { t } = useI18n(),
 const preferences = ref<Preferences>(),
   devices = shallowRef<Device[]>([]),
   current = ref(''),
+  deviceCursor = ref(''),
   busy = ref(false),
   loading = ref(true),
   error = shallowRef<unknown>(),
@@ -37,6 +38,7 @@ async function load() {
       preferences.value = p
       devices.value = d.items
       current.value = d.current_id
+      deviceCursor.value = d.next_cursor
     }
   } catch (e) {
     if (alive) error.value = e
@@ -55,6 +57,16 @@ async function action(fn: () => Promise<void>) {
   } finally {
     if (alive) busy.value = false
   }
+}
+async function moreDevices() {
+  await action(async () => {
+    const page = await operations.devices(deviceCursor.value)
+    if (alive) {
+      const seen = new Set(devices.value.map((d) => d.id))
+      devices.value = [...devices.value, ...page.items.filter((d) => !seen.has(d.id))]
+      deviceCursor.value = page.next_cursor
+    }
+  })
 }
 async function save() {
   if (!preferences.value) return
@@ -164,6 +176,9 @@ async function exportChats(format: 'json' | 'markdown') {
         </button>
       </article>
     </section>
+    <button v-if="deviceCursor" class="button" :disabled="busy" @click="moreDevices">
+      {{ t('images.more') }}
+    </button>
     <section class="panel ops-section">
       <h2>{{ t('ops.export') }}</h2>
       <p class="muted">{{ t('ops.exportHint') }}</p>

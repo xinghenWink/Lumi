@@ -159,6 +159,17 @@ func TestM6PreferencesDevicesBatchGrantsAndSelfDeletion(t *testing.T) {
 	if err != nil || len(devices) != 2 {
 		t.Fatalf("devices=%+v error=%v", devices, err)
 	}
+	firstPage, err := f.services.Users.DevicePage(f.ctx, member.ID, "", 1)
+	if err != nil || len(firstPage.Items) != 1 || firstPage.NextCursor == "" {
+		t.Fatalf("device page=%+v error=%v", firstPage, err)
+	}
+	secondPage, err := f.services.Users.DevicePage(f.ctx, member.ID, firstPage.NextCursor, 1)
+	if err != nil || len(secondPage.Items) != 1 || secondPage.Items[0].ID == firstPage.Items[0].ID || secondPage.NextCursor != "" {
+		t.Fatalf("device cursor repeated rows: %v", err)
+	}
+	if _, err := f.services.Users.DevicePage(f.ctx, second.ID, firstPage.NextCursor, 1); creditCode(err) != "INVALID_INPUT" {
+		t.Fatalf("device cursor crossed owner: %v", err)
+	}
 	if err := f.services.Users.RevokeDevices(f.ctx, actor, member.ID, &devices[0].ID, false); err != nil {
 		t.Fatal(err)
 	}

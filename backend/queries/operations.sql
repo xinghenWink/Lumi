@@ -10,6 +10,14 @@ UPDATE password_resets SET used_at=now() WHERE user_id=$1 AND used_at IS NULL;
 SELECT DISTINCT ON (family_id) family_id,device,ip,user_agent,created_at,expires_at
 FROM user_sessions WHERE user_id=$1 AND revoked_at IS NULL AND expires_at>now()
 ORDER BY family_id,created_at DESC;
+-- name: ActiveDevicePage :many
+WITH devices AS (
+ SELECT DISTINCT ON (family_id) family_id,device,ip,user_agent,created_at,expires_at
+ FROM user_sessions WHERE user_id=sqlc.arg(user_id) AND revoked_at IS NULL AND expires_at>now()
+ ORDER BY family_id,created_at DESC
+)
+SELECT * FROM devices WHERE sqlc.narg(cursor_time)::timestamptz IS NULL OR (created_at,family_id)<(sqlc.narg(cursor_time),sqlc.arg(cursor_id)::uuid)
+ORDER BY created_at DESC,family_id DESC LIMIT sqlc.arg(page_limit);
 -- name: RevokeOwnedDevice :execrows
 UPDATE user_sessions SET revoked_at=now() WHERE user_id=$1 AND family_id=$2 AND revoked_at IS NULL;
 -- name: GetPreferences :one

@@ -197,11 +197,12 @@ export const operations = {
   preferences: () => authorized('/api/v1/me/preferences', parsePreferences),
   savePreferences: (body: Preferences) =>
     authorized('/api/v1/me/preferences', parsePreferences, { method: 'PUT', body }),
-  devices: () =>
-    authorized('/api/v1/me/sessions', (v) => {
+  devices: (cursor = '') =>
+    authorized('/api/v1/me/sessions?limit=50&cursor=' + encodeURIComponent(cursor), (v) => {
       const d = record(v)
       return {
         current_id: text(d.current_id),
+        next_cursor: text(d.next_cursor),
         items: array(d.items, (v) => {
           const r = record(v)
           return {

@@ -1685,6 +1685,7 @@ export interface components {
       items: components['schemas']['Device'][]
       /** Format: uuid */
       current_id: string
+      next_cursor: string
     }
     Device: {
       /** Format: uuid */
@@ -5320,7 +5321,10 @@ export interface operations {
   }
   m6_get__api_v1_me_sessions: {
     parameters: {
-      query?: never
+      query?: {
+        cursor?: string
+        limit?: number
+      }
       header?: never
       path?: never
       cookie?: never

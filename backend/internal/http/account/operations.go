@@ -119,8 +119,13 @@ func (h *Handler) devices(c *gin.Context) {
 	if !ok {
 		return
 	}
-	v, err := h.services.Users.Devices(c.Request.Context(), p.User.ID)
-	h.imageReply(c, gin.H{"items": v, "current_id": p.FamilyID}, err, 200)
+	_, _, limit, err := pageArguments(c)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	v, err := h.services.Users.DevicePage(c.Request.Context(), p.User.ID, c.Query("cursor"), limit)
+	h.imageReply(c, gin.H{"items": v.Items, "current_id": p.FamilyID, "next_cursor": v.NextCursor}, err, 200)
 }
 func (h *Handler) revokeDevice(c *gin.Context) {
 	p, ok := principal(c)
