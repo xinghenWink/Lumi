@@ -9,6 +9,7 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"
 	"github.com/xinghenWink/Lumi/backend/internal/config"
+	"github.com/xinghenWink/Lumi/backend/internal/credits"
 	"github.com/xinghenWink/Lumi/backend/internal/http/account"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/mailer"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/password"
@@ -41,10 +42,11 @@ func configureAccounts(ctx context.Context, cfg config.Config, pool *pgxpool.Poo
 	if _, err := configuration.Read(ctx); err != nil {
 		return nil, fmt.Errorf("load initial account settings: %w", err)
 	}
-	users := user.New(pool, passwords)
+	billing := credits.New(pool, vault, cache, nil)
+	users := user.New(pool, passwords, billing)
 	if err := users.Bootstrap(ctx, cfg.AdminEmail, cfg.AdminPassword, cfg.Environment == "production"); err != nil {
 		return nil, fmt.Errorf("bootstrap administrator: %w", err)
 	}
 	sender := mailer.New(configuration, cfg.Environment, logger)
-	return &account.Services{Auth: auth.New(pool, passwords, tokens, configuration, cache, sender), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache}, nil
+	return &account.Services{Auth: auth.New(pool, passwords, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing}, nil
 }

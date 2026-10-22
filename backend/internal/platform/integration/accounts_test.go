@@ -26,6 +26,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"
+	"github.com/xinghenWink/Lumi/backend/internal/credits"
 	"github.com/xinghenWink/Lumi/backend/internal/http/account"
 	"github.com/xinghenWink/Lumi/backend/internal/http/handler"
 	"github.com/xinghenWink/Lumi/backend/internal/http/router"
@@ -57,6 +58,7 @@ func (m *captureMailer) code(email string) string {
 }
 
 type fixture struct {
+	vault                     *secrets.Vault
 	ctx                       context.Context
 	pool                      *pgxpool.Pool
 	cache                     *platformredis.Client
@@ -128,21 +130,22 @@ func newAccountFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	configuration := settings.New(pool, vault, "test", nil)
-	users := user.New(pool, hasher)
+	billing := credits.New(pool, vault, cache, nil)
+	users := user.New(pool, hasher, billing)
 	email := "admin@lumi.test"
 	value := rand.Text() + "Aa1"
 	if err := users.Bootstrap(ctx, email, value, true); err != nil {
 		t.Fatal(err)
 	}
 	sender := &captureMailer{codes: make(map[string]string)}
-	services := &account.Services{Auth: auth.New(pool, hasher, tokens, configuration, cache, sender), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache}
+	services := &account.Services{Auth: auth.New(pool, hasher, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing}
 	engine, err := router.New(slog.New(slog.NewJSONHandler(io.Discard, nil)), handler.Health{Postgres: pool.Ping, Redis: cache.Ping}, handler.Version{}, fstest.MapFS{}, account.Routes(services, account.Security{Origins: []string{"https://lumi.test"}, CookieSecure: true}, slog.New(slog.NewJSONHandler(io.Discard, nil))))
 	if err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewTLSServer(engine)
 	t.Cleanup(server.Close)
-	return &fixture{ctx: ctx, pool: pool, cache: cache, services: services, sender: sender, server: server, adminEmail: email, adminPassword: value}
+	return &fixture{ctx: ctx, pool: pool, cache: cache, services: services, sender: sender, server: server, adminEmail: email, adminPassword: value, vault: vault}
 }
 
 func (f *fixture) client(t *testing.T) *http.Client {
@@ -156,7 +159,7 @@ func (f *fixture) client(t *testing.T) *http.Client {
 	client.Timeout = 15 * time.Second
 	return &client
 }
-func (f *fixture) call(t *testing.T, client *http.Client, method, path, token string, body any) reply {
+func (f *fixture) call(t *testing.T, client *http.Client, method, path, token string, body any, keys ...string) reply {
 	t.Helper()
 	encoded, err := json.Marshal(body)
 	if err != nil {
@@ -170,6 +173,9 @@ func (f *fixture) call(t *testing.T, client *http.Client, method, path, token st
 	request.Header.Set("Origin", "https://lumi.test")
 	request.Header.Set("X-Lumi-CSRF", "1")
 	request.Header.Set("User-Agent", "Lumi integration test")
+	if len(keys) > 0 {
+		request.Header.Set("Idempotency-Key", keys[0])
+	}
 	if token != "" {
 		request.Header.Set("Authorization", "Bearer "+token)
 	}

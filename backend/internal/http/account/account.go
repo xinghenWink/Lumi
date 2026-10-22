@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"
+	"github.com/xinghenWink/Lumi/backend/internal/credits"
 	"github.com/xinghenWink/Lumi/backend/internal/http/middleware"
 	"github.com/xinghenWink/Lumi/backend/internal/http/response"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/problem"
@@ -31,6 +32,7 @@ type Services struct {
 	Settings *settings.Service
 	Audit    *audit.Service
 	Gate     auth.Gate
+	Credits  *credits.Service
 }
 type Security struct {
 	Origins        []string
@@ -70,6 +72,7 @@ func Routes(services *Services, security Security, logger *slog.Logger) func(*gi
 		admin.GET("/settings/:group", h.getSettings)
 		admin.PUT("/settings/:group", h.csrf, h.adminLimit, h.saveSettings)
 		admin.GET("/audit-logs", h.listAudit)
+		h.creditRoutes(protected, admin)
 		return nil
 	}
 }
@@ -305,7 +308,17 @@ func (h *Handler) listUsers(c *gin.Context) {
 		return
 	}
 	sort := c.DefaultQuery("sort", "created_at")
-	result, err := h.services.Users.List(c.Request.Context(), user.Filter{Search: strings.TrimSpace(c.Query("search")), Role: c.Query("role"), Status: c.Query("status"), Sort: sort, Cursor: c.Query("cursor"), From: from, Until: until, Limit: limit})
+	minimum, err := optionalCredits(c.Query("min_balance"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	maximum, err := optionalCredits(c.Query("max_balance"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	result, err := h.services.Users.List(c.Request.Context(), user.Filter{Search: strings.TrimSpace(c.Query("search")), Role: c.Query("role"), Status: c.Query("status"), Sort: sort, Cursor: c.Query("cursor"), From: from, Until: until, Limit: limit, MinBalance: minimum, MaxBalance: maximum})
 	if err != nil {
 		h.fail(c, err)
 		return
