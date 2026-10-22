@@ -40,6 +40,13 @@ const actions = [
   'redeem.codes_delete',
   'credit_ledger.export',
   'redeem_code.export',
+  'upstream.save',
+  'upstream.delete',
+  'upstream.test',
+  'upstream.discover',
+  'model.save',
+  'model.delete',
+  'model.import',
 ]
 const page = shallowRef<AuditPage | null>(null)
 const loading = ref(false)
@@ -147,6 +154,8 @@ function previous() {
             'redeem_batch',
             'redeem_code',
             'credit_ledger',
+            'upstream',
+            'model',
           ]"
           :key="type"
           :value="type"

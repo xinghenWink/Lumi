@@ -261,6 +261,8 @@ export default {
       redeem_batch: 'Redeem batch',
       redeem_code: 'Redeem code',
       credit_ledger: 'Credit ledger',
+      upstream: 'Upstream channel',
+      model: 'Platform model',
     },
     actions: {
       credits: {
@@ -275,6 +277,17 @@ export default {
       },
       credit_ledger: { export: 'Export credit ledger' },
       redeem_code: { export: 'Export redeem codes' },
+      upstream: {
+        save: 'Save upstream channel',
+        delete: 'Delete upstream channel',
+        test: 'Test upstream connection',
+        discover: 'Discover upstream models',
+      },
+      model: {
+        save: 'Save platform model',
+        delete: 'Delete platform model',
+        import: 'Import upstream models',
+      },
       user: {
         create: 'Create user',
         update: 'Update user',

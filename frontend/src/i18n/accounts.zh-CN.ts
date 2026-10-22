@@ -251,6 +251,8 @@ export default {
       redeem_batch: '兑换码批次',
       redeem_code: '兑换码',
       credit_ledger: '积分流水',
+      upstream: '上游渠道',
+      model: '平台模型',
     },
     actions: {
       credits: { adjust: '调整积分', initialize: '发放初始积分', pricing_update: '修改价格与赠送' },
@@ -261,6 +263,13 @@ export default {
       },
       credit_ledger: { export: '导出积分流水' },
       redeem_code: { export: '导出兑换码' },
+      upstream: {
+        save: '保存上游渠道',
+        delete: '删除上游渠道',
+        test: '测试上游连接',
+        discover: '读取上游模型',
+      },
+      model: { save: '保存平台模型', delete: '删除平台模型', import: '导入上游模型' },
       user: {
         create: '新增用户',
         update: '修改用户',

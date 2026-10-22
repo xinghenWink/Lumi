@@ -25,6 +25,7 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       APP_ENV: 'test',
+      UPSTREAM_ALLOW_PRIVATE_NETWORKS: 'true',
       HTTP_ADDR: `127.0.0.1:${new URL(baseURL).port || '18080'}`,
       PUBLIC_BASE_URL: baseURL,
       DATABASE_URL: process.env.E2E_DATABASE_URL ?? '',
