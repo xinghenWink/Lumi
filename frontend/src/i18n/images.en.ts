@@ -1,6 +1,8 @@
 export default {
   nav: { gallery: 'My images', imageTasks: 'Image tasks', imageSettings: 'Image settings' },
   images: {
+    avatar: 'Change avatar',
+    avatarHint: 'PNG, JPEG or WebP, up to 2 MB; cropped to 256 × 256.',
     title: 'Bring an idea into focus',
     description: 'Describe a scene, or add a reference to start creating.',
     new: 'New image conversation',
@@ -95,6 +97,9 @@ export default {
     hidden: 'Content access is disabled',
     duration: '{seconds} seconds',
     settingsTitle: 'Image settings',
+    cost: 'Charged / refunded',
+    elapsed: 'Duration (seconds)',
+    error: 'Error',
     settingsHint: 'Configure parameters, scheduling and storage. Changes apply to new tasks.',
     max_n: 'Maximum images',
     max_references: 'Maximum references',

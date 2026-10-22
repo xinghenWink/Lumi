@@ -77,7 +77,7 @@ function edit(file: ImageFile) {
       <div class="image-preview-actions">
         <label
           >{{ t('images.zoom') }}
-          <select v-model="zoom">
+          <select v-model="zoom" :aria-label="t('images.zoom')">
             <option v-for="n in [50, 100, 150, 200]" :key="n" :value="n">{{ n }}%</option>
           </select></label
         >

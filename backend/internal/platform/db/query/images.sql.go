@@ -211,7 +211,8 @@ const expireImageFiles = `-- name: ExpireImageFiles :execrows
 UPDATE files f SET deleted_at=now() WHERE f.deleted_at IS NULL
 AND (NOT EXISTS(SELECT 1 FROM users u WHERE u.id=f.user_id)
  OR (f.kind='generated' AND $1::integer>0 AND f.created_at<now()-make_interval(days=>$1::integer))
- OR (f.kind='upload' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE f.id=ANY(t.reference_file_ids))))
+ OR (f.kind='upload' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE f.id=ANY(t.reference_file_ids)))
+ OR (f.kind='avatar' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM users u WHERE u.avatar_file_id=f.id)))
 AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE t.status IN ('queued','running') AND f.id=ANY(t.reference_file_ids))
 `
 
@@ -769,6 +770,17 @@ func (q *Queries) ImageRunningCounts(ctx context.Context, userID uuid.UUID) (Ima
 	var i ImageRunningCountsRow
 	err := row.Scan(&i.GlobalRunning, &i.UserRunning)
 	return i, err
+}
+
+const imageStoragePathExists = `-- name: ImageStoragePathExists :one
+SELECT EXISTS(SELECT 1 FROM files WHERE path=$1 OR thumbnail_path=$1)
+`
+
+func (q *Queries) ImageStoragePathExists(ctx context.Context, path string) (bool, error) {
+	row := q.db.QueryRow(ctx, imageStoragePathExists, path)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const imageTaskByKey = `-- name: ImageTaskByKey :one
@@ -1488,6 +1500,20 @@ func (q *Queries) SaveImageTaskItem(ctx context.Context, arg SaveImageTaskItemPa
 		arg.FileID,
 		arg.ErrorCode,
 	)
+	return err
+}
+
+const setUserAvatar = `-- name: SetUserAvatar :exec
+UPDATE users SET avatar_file_id=$2,updated_at=now() WHERE id=$1 AND deleted_at IS NULL
+`
+
+type SetUserAvatarParams struct {
+	ID           uuid.UUID
+	AvatarFileID *uuid.UUID
+}
+
+func (q *Queries) SetUserAvatar(ctx context.Context, arg SetUserAvatarParams) error {
+	_, err := q.db.Exec(ctx, setUserAvatar, arg.ID, arg.AvatarFileID)
 	return err
 }
 

@@ -14,6 +14,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -108,8 +110,8 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			w.WriteHeader(400)
 			return
 		}
-		calls.Add(1)
-		if input.Prompt == "reject" {
+		callIndex := calls.Add(1)
+		if input.Prompt == "reject" || (input.Prompt == "split-partial" && callIndex%2 == 0) {
 			w.WriteHeader(400)
 			if _, err := fmt.Fprint(w, `{"error":{"code":"content_policy_violation","message":"private-wire-error"}}`); err != nil {
 				return
@@ -368,6 +370,38 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 		if err != nil || result.Status != "failed" || result.RefundedCost != result.TotalCost {
 			t.Fatal("expired task not refunded")
 		}
+		previous := calls.Load()
+		service.Execute(f.ctx, claimed)
+		if calls.Load() != previous {
+			t.Fatal("delayed recovered executor called upstream")
+		}
+	})
+	t.Run("split requests settle partial success and timeouts refund all", func(t *testing.T) {
+		cfg, err = service.Configuration(f.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg.SplitRequests = true
+		if _, err := service.SaveConfiguration(f.ctx, admin, cfg); err != nil {
+			t.Fatal(err)
+		}
+		previous := calls.Load()
+		result := execute(submit("split-partial", 4).ID)
+		if calls.Load()-previous != 4 || result.Status != "partial" || result.SuccessfulImages != 2 || result.RefundedCost != result.UnitPrice*2 {
+			t.Fatal("split task was not settled by independent image outcomes")
+		}
+		result = execute(submit("slow", 1).ID)
+		if result.Status != "failed" || result.RefundedCost != result.TotalCost || result.ErrorCode != "UPSTREAM_TIMEOUT" {
+			t.Fatal("execution timeout was not refunded")
+		}
+		cfg, err = service.Configuration(f.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg.SplitRequests = false
+		if _, err := service.SaveConfiguration(f.ctx, admin, cfg); err != nil {
+			t.Fatal(err)
+		}
 	})
 	t.Run("admin content opt-in and public DTO boundary", func(t *testing.T) {
 		view, err := service.Get(f.ctx, admin, partial.ID, true)
@@ -423,6 +457,53 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			case <-deadline:
 				t.Fatal("durable task lost after Redis delivery")
 			}
+		}
+	})
+	t.Run("avatars attach atomically and maintenance removes old orphan files", func(t *testing.T) {
+		avatar, err := f.services.Files.Upload(f.ctx, actor, "avatar", bitmap.Bytes(), 2<<20)
+		if err != nil || avatar.Width != 256 || avatar.Height != 256 {
+			t.Fatal("avatar crop failed", err)
+		}
+		old, err := query.New(f.pool).GetImageFile(f.ctx, avatar.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		replacement, err := f.services.Files.Upload(f.ctx, actor, "avatar", bitmap.Bytes(), 2<<20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		owner, err := query.New(f.pool).GetUser(f.ctx, actor.ID)
+		if err != nil || owner.AvatarFileID == nil || *owner.AvatarFileID != replacement.ID {
+			t.Fatal("avatar was not attached")
+		}
+		if _, err := f.services.Files.Get(f.ctx, actor.ID, avatar.ID); err == nil {
+			t.Fatal("replaced avatar remained accessible")
+		}
+		directory := filepath.Join(f.dataDir, "images", actor.ID.String())
+		stale := filepath.Join(directory, "orphan.png.tmp")
+		recent := filepath.Join(directory, "recent.png.tmp")
+		for _, path := range []string{stale, recent} {
+			if err := os.WriteFile(path, []byte("staging"), 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		earlier := time.Now().Add(-25 * time.Hour)
+		if err := os.Chtimes(stale, earlier, earlier); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.services.Files.Cleanup(f.ctx, 0); err != nil {
+			t.Fatal(err)
+		}
+		for _, path := range []string{stale, filepath.Join(f.dataDir, "images", filepath.FromSlash(old.Path))} {
+			if _, err := os.Stat(path); !os.IsNotExist(err) {
+				t.Fatal("old image object remained on disk", err)
+			}
+		}
+		if _, err := os.Stat(recent); err != nil {
+			t.Fatal("recent staging object was removed", err)
+		}
+		if _, err := f.services.Files.Get(f.ctx, actor.ID, replacement.ID); err != nil {
+			t.Fatal("current avatar was removed", err)
 		}
 	})
 }

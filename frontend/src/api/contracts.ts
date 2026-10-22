@@ -65,6 +65,9 @@ export function parseUser(value: unknown): User {
     id: text(data, 'id'),
     email: text(data, 'email'),
     nickname: text(data, 'nickname'),
+    ...(data.avatar_file_id !== undefined
+      ? { avatar_file_id: nullableText(data, 'avatar_file_id') }
+      : {}),
     role: choice(data, 'role', ['user', 'admin']),
     status: choice(data, 'status', ['active', 'disabled']),
     locale: choice(data, 'locale', ['zh-CN', 'en']),

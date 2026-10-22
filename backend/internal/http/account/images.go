@@ -301,7 +301,7 @@ func (h *Handler) imageUpload(c *gin.Context) {
 	kind := c.DefaultQuery("kind", "upload")
 	limit := cfg.MaxUploadBytes
 	if kind == "avatar" {
-		limit = min(limit, 2<<20)
+		limit = 2 << 20
 	} else if kind != "upload" {
 		h.fail(c, problem.Invalid())
 		return

@@ -1142,6 +1142,11 @@ export interface components {
       /** Format: email */
       email: string
       nickname: string
+      /**
+       * Format: uuid
+       * @description Private avatar file identifier; fetch metadata and bytes with the owner's session.
+       */
+      avatar_file_id?: string | null
       /** @enum {string} */
       role: 'user' | 'admin'
       /** @enum {string} */

@@ -13,9 +13,11 @@ import (
 	_ "image/jpeg"
 	"image/png"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/HugoSmits86/nativewebp"
@@ -67,6 +69,18 @@ func New(pool *pgxpool.Pool, directory string, key []byte) (*Store, error) {
 	root, err := os.OpenRoot(path)
 	if err != nil {
 		return nil, fmt.Errorf("open image directory: %w", err)
+	}
+	probeID, err := validation.NewID()
+	if err != nil {
+		return nil, errors.Join(err, root.Close())
+	}
+	probe := ".probe-" + probeID.String()
+	file, err := root.OpenFile(probe, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return nil, errors.Join(fmt.Errorf("image directory is not writable: %w", err), root.Close())
+	}
+	if err := errors.Join(file.Close(), root.Remove(probe)); err != nil {
+		return nil, errors.Join(fmt.Errorf("verify image storage: %w", err), root.Close())
 	}
 	return &Store{pool: pool, q: query.New(pool), root: root, key: append([]byte(nil), key...), decodeSlots: make(chan struct{}, 2)}, nil
 }
@@ -257,6 +271,16 @@ func (s *Store) Upload(ctx context.Context, actor user.Actor, kind string, data 
 		if err != nil {
 			return fmt.Errorf("save upload metadata: %w", err)
 		}
+		if kind == "avatar" {
+			if err := q.SetUserAvatar(ctx, query.SetUserAvatarParams{ID: actor.ID, AvatarFileID: &row.ID}); err != nil {
+				return fmt.Errorf("attach user avatar: %w", err)
+			}
+			if owner.AvatarFileID != nil {
+				if _, err := q.DeleteImageFile(ctx, query.DeleteImageFileParams{ID: *owner.AvatarFileID, UserID: actor.ID}); err != nil {
+					return fmt.Errorf("replace user avatar: %w", err)
+				}
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -318,6 +342,46 @@ func (s *Store) Cleanup(ctx context.Context, days int32) error {
 	}
 	if err := s.q.RedactPurgedImageOwners(ctx); err != nil {
 		return fmt.Errorf("redact purged image owners: %w", err)
+	}
+	return s.cleanupOrphans(ctx)
+}
+func (s *Store) cleanupOrphans(ctx context.Context) error {
+	cutoff := time.Now().Add(-24 * time.Hour)
+	removed := 0
+	err := fs.WalkDir(s.root.FS(), ".", func(path string, entry fs.DirEntry, walkErr error) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || !entry.Type().IsRegular() || (!strings.HasSuffix(path, ".png") && !strings.HasSuffix(path, ".webp") && !strings.HasSuffix(path, ".tmp")) {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.ModTime().Before(cutoff) {
+			return nil
+		}
+		known, err := s.q.ImageStoragePathExists(ctx, path)
+		if err != nil {
+			return fmt.Errorf("check orphan image metadata: %w", err)
+		}
+		if !known {
+			if err := s.remove(path); err != nil {
+				return err
+			}
+			removed++
+			if removed >= 100 {
+				return fs.SkipAll
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("remove orphan image objects: %w", err)
 	}
 	return nil
 }

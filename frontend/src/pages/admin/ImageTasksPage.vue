@@ -6,7 +6,7 @@ import ImageFilters from '../../components/images/ImageFilters.vue'
 import ImageTaskCard from '../../components/images/ImageTaskCard.vue'
 import ModalDialog from '../../components/ModalDialog.vue'
 import ApiNotice from '../../components/ApiNotice.vue'
-const { t } = useI18n(),
+const { t, te } = useI18n(),
   items = shallowRef<ImageTask[]>([]),
   selected = shallowRef<ImageTask>(),
   error = shallowRef<unknown>(),
@@ -71,6 +71,10 @@ onUnmounted(() => controller?.abort())
             <th>{{ t('images.model') }}</th>
             <th>{{ t('images.status') }}</th>
             <th>{{ t('images.count') }}</th>
+            <th>{{ t('images.quality') }}</th>
+            <th>{{ t('images.cost') }}</th>
+            <th>{{ t('images.elapsed') }}</th>
+            <th>{{ t('images.error') }}</th>
             <th>{{ t('images.created') }}</th>
             <th>{{ t('images.details') }}</th>
           </tr>
@@ -82,6 +86,29 @@ onUnmounted(() => controller?.abort())
             <td>{{ task.model_name }}</td>
             <td>{{ t('images.' + task.status) }}</td>
             <td>{{ task.successful_images }} / {{ task.n }}</td>
+            <td>{{ t('images.' + task.quality) }}</td>
+            <td>{{ task.actual_cost }} / {{ task.refunded_cost }}</td>
+            <td>
+              {{
+                task.started_at && task.finished_at
+                  ? Math.max(
+                      0,
+                      (Date.parse(task.finished_at) - Date.parse(task.started_at)) / 1000,
+                    ).toFixed(1)
+                  : '—'
+              }}
+            </td>
+            <td>
+              {{
+                task.error_code
+                  ? t(
+                      te('errors.' + task.error_code)
+                        ? 'errors.' + task.error_code
+                        : 'errors.UNKNOWN_ERROR',
+                    )
+                  : '—'
+              }}
+            </td>
             <td>{{ new Date(task.created_at).toLocaleString() }}</td>
             <td>
               <button class="text-button" @click="detail(task)">{{ t('images.details') }}</button>

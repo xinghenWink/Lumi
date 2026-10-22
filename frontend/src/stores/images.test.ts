@@ -25,6 +25,28 @@ afterEach(() => {
   vi.useRealTimers()
 })
 describe('image request replay and account isolation', () => {
+  it('leaves a newly selected conversation in place when an earlier submission finishes', async () => {
+    let resolve: ((value: ImageTask) => void) | undefined
+    vi.spyOn(images, 'submit').mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done
+        }),
+    )
+    vi.spyOn(images, 'conversations').mockResolvedValue({ items: [conversation], next_cursor: '' })
+    const store = useImageStore()
+    store.active = conversation.id
+    useModelStore().selected.image = 'model'
+    store.draft.prompt = 'earlier prompt'
+    const pending = store.submit()
+    await store.open('')
+    store.draft.prompt = 'new private draft'
+    resolve?.(task)
+    expect(await pending).toBeUndefined()
+    expect(store.active).toBe('')
+    expect(store.draft.prompt).toBe('new private draft')
+    expect(store.tasks).toEqual([])
+  })
   it('keeps the exact submission key and payload after an unknown response', async () => {
     vi.spyOn(images, 'create').mockResolvedValue(conversation)
     vi.spyOn(images, 'conversation').mockResolvedValue(conversation)

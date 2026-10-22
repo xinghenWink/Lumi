@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef } from 'vue'
+import { ref, shallowRef } from 'vue'
 import {
   DropdownMenuRoot,
   DropdownMenuTrigger,
@@ -14,13 +14,13 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useThemeStore } from '../stores/theme'
 import ApiNotice from './ApiNotice.vue'
+import UserAvatar from './UserAvatar.vue'
 const { t } = useI18n()
 const auth = useAuthStore()
 const theme = useThemeStore()
 const router = useRouter()
 const busy = ref(false)
 const error = shallowRef<unknown>(null)
-const initial = computed(() => Array.from(auth.user?.nickname ?? 'L')[0])
 async function logout() {
   busy.value = true
   error.value = null
@@ -39,8 +39,7 @@ async function logout() {
     <ApiNotice :error="error" />
     <DropdownMenuRoot>
       <DropdownMenuTrigger class="account-trigger" :aria-label="t('nav.userMenu')"
-        ><span class="avatar">{{ initial }}</span
-        ><span class="account-label"
+        ><UserAvatar /><span class="account-label"
           ><strong>{{ auth.user?.nickname }}</strong
           ><span>{{
             t(auth.user?.role === 'admin' ? 'admin.users.admin' : 'admin.users.user')

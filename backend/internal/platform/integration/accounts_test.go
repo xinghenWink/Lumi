@@ -71,6 +71,7 @@ type fixture struct {
 	sender                    *captureMailer
 	server                    *httptest.Server
 	adminEmail, adminPassword string
+	dataDir                   string
 }
 type reply struct {
 	status  int
@@ -145,7 +146,8 @@ func newAccountFixture(t *testing.T) *fixture {
 	sender := &captureMailer{codes: make(map[string]string)}
 	services := &account.Services{Auth: auth.New(pool, hasher, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: catalog.New(pool, vault, upstream.NetworkPolicy{AllowPrivate: true}, nil)}
 	services.Chat = chat.New(pool, services.Catalog, cache)
-	services.Files, err = media.New(pool, t.TempDir(), key)
+	dataDir := t.TempDir()
+	services.Files, err = media.New(pool, dataDir, key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +163,7 @@ func newAccountFixture(t *testing.T) *fixture {
 	}
 	server := httptest.NewTLSServer(engine)
 	t.Cleanup(server.Close)
-	return &fixture{ctx: ctx, pool: pool, cache: cache, services: services, sender: sender, server: server, adminEmail: email, adminPassword: value, vault: vault}
+	return &fixture{ctx: ctx, pool: pool, cache: cache, services: services, sender: sender, server: server, adminEmail: email, adminPassword: value, vault: vault, dataDir: dataDir}
 }
 
 func (f *fixture) client(t *testing.T) *http.Client {

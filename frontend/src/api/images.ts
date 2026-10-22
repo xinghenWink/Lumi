@@ -233,10 +233,10 @@ export const images = {
   cancel: (id: string) => authorized(task(id) + '/cancel', parseTask, { method: 'POST' }),
   events: async (id: string, signal: AbortSignal, onTask: (task: ImageTask) => void) =>
     consumeImageEvents(await authorizedResponse(task(id) + '/events', { signal }), onTask),
-  upload: (file: File, signal?: AbortSignal) => {
+  upload: (file: File, signal?: AbortSignal, avatar = false) => {
     const form = new FormData()
     form.append('file', file)
-    return authorized(root + '/files', parseFile, {
+    return authorized(root + '/files' + (avatar ? '?kind=avatar' : ''), parseFile, {
       method: 'POST',
       form,
       ...signalOptions(signal),

@@ -251,6 +251,7 @@ export const useImageStore = defineStore('images', () => {
   async function submit(): Promise<string | undefined> {
     if (sending.value) return
     const generation = epoch
+    const view = openVersion
     sending.value = true
     error.value = null
     try {
@@ -283,6 +284,11 @@ export const useImageStore = defineStore('images', () => {
       const result = await images.submit(submission.input, submission.key)
       if (generation !== epoch) return
       pending.value = undefined
+      if (view !== openVersion) {
+        void refreshBalance()
+        void list()
+        return
+      }
       const oldKey = active.value || 'new'
       if (oldKey === 'new' || active.value === result.conversation_id) {
         drafts[result.conversation_id] = { ...draft.value, prompt: '', references: [] }

@@ -30,11 +30,16 @@ UPDATE files SET deleted_at=coalesce(deleted_at,now()) WHERE id=$1 AND user_id=$
 SELECT * FROM files WHERE deleted_at IS NOT NULL AND purged_at IS NULL ORDER BY deleted_at,id LIMIT 100;
 -- name: MarkImageFilePurged :exec
 UPDATE files SET purged_at=now() WHERE id=$1 AND deleted_at IS NOT NULL;
+-- name: ImageStoragePathExists :one
+SELECT EXISTS(SELECT 1 FROM files WHERE path=$1 OR thumbnail_path=$1);
+-- name: SetUserAvatar :exec
+UPDATE users SET avatar_file_id=$2,updated_at=now() WHERE id=$1 AND deleted_at IS NULL;
 -- name: ExpireImageFiles :execrows
 UPDATE files f SET deleted_at=now() WHERE f.deleted_at IS NULL
 AND (NOT EXISTS(SELECT 1 FROM users u WHERE u.id=f.user_id)
  OR (f.kind='generated' AND sqlc.arg(retention_days)::integer>0 AND f.created_at<now()-make_interval(days=>sqlc.arg(retention_days)::integer))
- OR (f.kind='upload' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE f.id=ANY(t.reference_file_ids))))
+ OR (f.kind='upload' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE f.id=ANY(t.reference_file_ids)))
+ OR (f.kind='avatar' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM users u WHERE u.avatar_file_id=f.id)))
 AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE t.status IN ('queued','running') AND f.id=ANY(t.reference_file_ids));
 -- name: RedactPurgedImageOwners :exec
 UPDATE image_tasks SET prompt='',reference_file_ids='{}',error_message='' WHERE (prompt<>'' OR cardinality(reference_file_ids)>0) AND NOT EXISTS(SELECT 1 FROM users WHERE users.id=image_tasks.user_id);

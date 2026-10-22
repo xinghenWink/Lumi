@@ -1,6 +1,8 @@
 export default {
   nav: { gallery: '我的图库', imageTasks: '图片任务', imageSettings: '生图设置' },
   images: {
+    avatar: '更换头像',
+    avatarHint: 'PNG、JPEG 或 WebP，最大 2 MB；自动裁剪为 256 × 256。',
     title: '让想象成为画面',
     description: '描述你的想法，或添加参考图开始创作。',
     new: '新建生图会话',
@@ -92,6 +94,9 @@ export default {
     hidden: '内容访问未开启',
     duration: '耗时 {seconds} 秒',
     settingsTitle: '生图设置',
+    cost: '实际费用 / 退款',
+    elapsed: '耗时（秒）',
+    error: '错误',
     settingsHint: '调整参数范围、任务调度与存储策略。保存后对新任务生效。',
     max_n: '最大生成张数',
     max_references: '最大参考图数',

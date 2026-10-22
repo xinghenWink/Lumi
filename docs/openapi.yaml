@@ -3068,6 +3068,10 @@ components:
           type: string
           minLength: 1
           maxLength: 30
+        avatar_file_id:
+          type: [string, 'null']
+          format: uuid
+          description: Private avatar file identifier; fetch metadata and bytes with the owner's session.
         role:
           type: string
           enum:

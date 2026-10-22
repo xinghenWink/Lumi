@@ -25,7 +25,7 @@ function apply() {
     /></label>
     <label class="field"
       >{{ t('images.quality')
-      }}<select v-model="values.quality">
+      }}<select v-model="values.quality" :aria-label="t('images.quality')">
         <option value="">{{ t('images.all') }}</option>
         <option v-for="quality in ['low', 'medium', 'high']" :key="quality" :value="quality">
           {{ t('images.' + quality) }}
@@ -34,7 +34,7 @@ function apply() {
     >
     <label class="field"
       >{{ t('images.status')
-      }}<select v-model="values.state">
+      }}<select v-model="values.state" :aria-label="t('images.status')">
         <option value="">{{ t('images.all') }}</option>
         <option
           v-for="status in ['queued', 'running', 'succeeded', 'partial', 'failed', 'canceled']"

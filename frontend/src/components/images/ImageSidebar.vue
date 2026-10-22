@@ -94,7 +94,11 @@ async function saveTitle() {
               ><DropdownMenuTrigger class="icon-button" :aria-label="t('images.details')"
                 ><MoreHorizontal :size="16" /></DropdownMenuTrigger
               ><DropdownMenuPortal
-                ><DropdownMenuContent class="dropdown-content" side="right" :collision-padding="12">
+                ><DropdownMenuContent
+                  class="chat-conversation-menu"
+                  side="right"
+                  :collision-padding="12"
+                >
                   <DropdownMenuItem
                     class="menu-item"
                     @select="rename(store.conversations[item.index]!)"

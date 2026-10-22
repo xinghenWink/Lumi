@@ -262,7 +262,11 @@ watch(
       <div class="image-parameters">
         <label
           >{{ t('images.quality')
-          }}<select v-model="store.draft.quality" :disabled="pricing || !!store.pending">
+          }}<select
+            v-model="store.draft.quality"
+            :aria-label="t('images.quality')"
+            :disabled="pricing || !!store.pending"
+          >
             <option v-for="quality in qualities" :key="quality" :value="quality">
               {{ t('images.' + quality) }}
             </option>
@@ -270,7 +274,11 @@ watch(
         >
         <label
           >{{ t('images.size')
-          }}<select v-model="store.draft.size" :disabled="!!store.pending">
+          }}<select
+            v-model="store.draft.size"
+            :aria-label="t('images.size')"
+            :disabled="!!store.pending"
+          >
             <option v-for="size in sizes" :key="size" :value="size">
               {{ size === 'auto' ? t('images.auto') : size }}
             </option>
@@ -278,14 +286,23 @@ watch(
         >
         <label
           >{{ t('images.ratio')
-          }}<select v-model="store.draft.ratio" :disabled="!!store.pending" @change="ratioChanged">
+          }}<select
+            v-model="store.draft.ratio"
+            :aria-label="t('images.ratio')"
+            :disabled="!!store.pending"
+            @change="ratioChanged"
+          >
             <option value="">{{ t('images.custom') }}</option>
             <option v-for="[ratio] in ratios" :key="ratio" :value="ratio">{{ ratio }}</option>
           </select></label
         >
         <label
           >{{ t('images.count')
-          }}<select v-model="store.draft.n" :disabled="!!store.pending">
+          }}<select
+            v-model="store.draft.n"
+            :aria-label="t('images.count')"
+            :disabled="!!store.pending"
+          >
             <option v-for="n in maxN" :key="n" :value="n">{{ n }}</option>
           </select></label
         >

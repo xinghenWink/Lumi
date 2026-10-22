@@ -212,6 +212,11 @@ func (s *Service) DeleteFile(ctx context.Context, actor user.Actor, id uuid.UUID
 		if err != nil {
 			return fmt.Errorf("read deleted file: %w", err)
 		}
+		if admin && row.UserID != actor.ID {
+			if _, err := q.GetUserForUpdate(ctx, row.UserID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("lock image owner before deletion: %w", err)
+			}
+		}
 		busy, err := q.ImageFileInUse(ctx, id)
 		if err != nil {
 			return fmt.Errorf("check reference use: %w", err)

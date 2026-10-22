@@ -435,6 +435,23 @@ test('M5 real image generation editing gallery cancellation and administrator pr
     await expect(member.locator('.image-references img')).toHaveCount(1)
     const account = await api('GET', '/me/credits', undefined, memberToken)
     expect(Number(account.total)).toBeGreaterThanOrEqual(9970)
+    await member.goto('/me')
+    await member
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: png })
+    await expect(member.locator('.profile-avatar img')).toBeVisible()
+    const profile = await api('GET', '/me', undefined, memberToken)
+    expect(typeof profile.avatar_file_id).toBe('string')
+    const avatar = await api(
+      'GET',
+      '/files/' + String(profile.avatar_file_id) + '/metadata',
+      undefined,
+      memberToken,
+    )
+    expect(avatar.width).toBe(256)
+    expect(avatar.height).toBe(256)
+    await member.reload()
+    await expect(member.locator('.profile-avatar img')).toBeVisible()
     expect(errors).toEqual([])
   } finally {
     await memberContext.close()
