@@ -37,6 +37,7 @@ export default ts.config(
         Element: 'readonly',
         HTMLDivElement: 'readonly',
         HTMLButtonElement: 'readonly',
+        HTMLInputElement: 'readonly',
         IntersectionObserver: 'readonly',
         ResizeObserver: 'readonly',
         requestAnimationFrame: 'readonly',

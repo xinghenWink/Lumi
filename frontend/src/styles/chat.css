@@ -337,7 +337,7 @@
   gap: 12px;
   margin: 18px 5px 12px;
 }
-.chat-new {
+.chat-sidebar .chat-new {
   justify-content: flex-start;
   font-size: 12px;
   padding: 10px 12px;
@@ -351,7 +351,7 @@
   top: 11px;
   color: var(--muted);
 }
-.chat-sidebar-search input {
+.chat-sidebar .chat-sidebar-search input {
   font-size: 11px;
   padding: 9px 8px 9px 32px;
   background: var(--panel);

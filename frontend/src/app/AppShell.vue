@@ -43,7 +43,7 @@ function searchShortcut(event: KeyboardEvent) {
   )
     return
   event.preventDefault()
-  if (window.matchMedia('(max-width: 900px)').matches) menuOpen.value = true
+  if (window.matchMedia('(max-width: 800px)').matches) menuOpen.value = true
   void nextTick(() =>
     requestAnimationFrame(() => {
       const inputs = document.querySelectorAll<HTMLInputElement>('.chat-sidebar-search input')
