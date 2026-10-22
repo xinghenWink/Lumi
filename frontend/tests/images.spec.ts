@@ -322,6 +322,20 @@ test('M5 real image generation editing gallery cancellation and administrator pr
     })
     expect(denied.status()).toBe(404)
     await expect(task.locator('img').first()).toBeVisible()
+    for (const region of [
+      member.locator('.image-composer'),
+      task.locator('.image-result-actions').first(),
+    ]) {
+      expect(
+        await region.evaluate((element) => {
+          const bounds = element.getBoundingClientRect()
+          return Array.from(element.querySelectorAll('button')).every((button) => {
+            const box = button.getBoundingClientRect()
+            return box.left >= bounds.left - 1 && box.right <= bounds.right + 1
+          })
+        }),
+      ).toBe(true)
+    }
     expect(await member.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     )

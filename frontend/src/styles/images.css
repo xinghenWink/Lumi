@@ -73,7 +73,7 @@
   min-width: 0;
 }
 .image-send-actions .catalog-model-trigger {
-  max-width: 220px;
+  max-width: min(220px, 100%);
   font-size: 12px;
 }
 .image-send-actions .catalog-model-trigger > span {
@@ -82,9 +82,20 @@
   white-space: nowrap;
 }
 .image-send {
+  flex-shrink: 0;
   white-space: nowrap;
   padding: 8px 12px;
   font-size: 12px;
+}
+.image-upload-actions {
+  flex: 0 0 auto;
+}
+.image-send-actions {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+.image-send-actions .catalog-model-picker {
+  min-width: 0;
 }
 .image-composer-caption {
   display: flex;
@@ -496,7 +507,12 @@
     display: none;
   }
   .image-send-actions .catalog-model-trigger {
-    max-width: 160px;
+    max-width: min(160px, 100%);
+  }
+  .image-result-actions {
+    gap: 0;
+    padding: 4px 2px;
+    justify-content: space-evenly;
   }
   .image-parameters {
     gap: 6px;
