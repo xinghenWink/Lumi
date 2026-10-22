@@ -22,6 +22,8 @@ curl --fail http://127.0.0.1:8080/api/version
 
 `.env` 必填管理员邮箱；脚本自动生成管理员密码、JWT / 加密密钥、PG / Redis 密码，权限 0600，绝不打印秘密。再次运行保留所有既有文件和密钥。应用目录属 uid 10001，数据库和 Redis 仅在内部网络提供服务，应用只绑定宿主 127.0.0.1。首位管理员只在无管理员时创建；环境密码改变不重置已有管理员。
 
+不能向服务器提供最小权限 GHCR 凭据时，可在已授权的工作站从该 Release 下载 `lumi-linux-amd64.tar.gz` 和同名 JSON，安全传到 amd64 服务器后执行 `docker load -i lumi-linux-amd64.tar.gz`。用 `docker image inspect ghcr.io/xinghenwink/lumi:v1.0.0 --format '{{.Id}}'` 对照 JSON 的 `image_id`，再按相同 `.env` 执行 `docker compose up -d --wait`；不执行需要远端鉴权的 pull。该归档来自已按 GHCR digest 拉取、原生启动验收的正式镜像，不是另行构建版本。多架构 manifest digest 与导入后的 image ID 含义不同，不混用；JSON 同时记录版本、提交和来源 digest。避免把工作站的广泛仓库凭据传给服务器。arm64 仍使用 GHCR 最小权限拉取路径。
+
 公开部署先安装本目录的 Caddy 或 Nginx 示例、替换域名并提供证书，再设 `PUBLIC_BASE_URL=https://实际域名`、`COOKIE_SECURE=true`。仅本机 HTTP 演练可用 `http://127.0.0.1:8080` / false。配置更改后 `docker compose up -d`。反代不压缩、缓存或缓冲 SSE；HSTS 在反代设置。Caddy 不额外开启全站压缩。代理示例覆盖客户端传入的 X-Forwarded-For，避免伪造来源。
 
 `TRUSTED_PROXIES` 仅填写应用实际看到的代理地址 /32（或 IPv6 /128）。Docker 转发时通常是网桥 gateway，先用 `docker network inspect lumi_default` 确认，再在测试环境验证不同客户端 IP 的注册 / 登录限流；不要填写 `0.0.0.0/0` 或整个私网。多层代理需逐层建立可信边界。默认不信任转发头，因此不配置会把经同一代理的用户视为同一 IP。

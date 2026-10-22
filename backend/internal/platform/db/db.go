@@ -25,8 +25,8 @@ func open(ctx context.Context, connectionURL string, prepare func(context.Contex
 		// pgx parse errors can contain the original URL; do not expose them.
 		return nil, fmt.Errorf("invalid PostgreSQL connection configuration")
 	}
-	cfg.MaxConns = 8
-	cfg.MinConns = 8
+	cfg.MaxConns = 16
+	cfg.MinConns = 16
 	cfg.MaxConnLifetime = 30 * time.Minute
 	cfg.MaxConnLifetimeJitter = 5 * time.Minute
 	cfg.ConnConfig.ConnectTimeout = 5 * time.Second

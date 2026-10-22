@@ -116,7 +116,12 @@ func (s *Store) Verify(id, viewer uuid.UUID, thumb bool, expires int64, sig stri
 	return expected != "" && hmac.Equal([]byte(expected), []byte(sig))
 }
 func (s *Store) Get(ctx context.Context, owner, id uuid.UUID) (query.File, error) {
-	row, err := s.q.GetImageFile(ctx, id)
+	return s.GetTx(ctx, s.q, owner, id)
+}
+
+// GetTx reuses a caller's connection while preserving the ownership boundary.
+func (s *Store) GetTx(ctx context.Context, q *query.Queries, owner, id uuid.UUID) (query.File, error) {
+	row, err := q.GetImageFile(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.UserID != owner) {
 		return query.File{}, problem.New("FILE_NOT_FOUND", 404)
 	}

@@ -107,6 +107,21 @@ func TestM2CreditConsistency(t *testing.T) {
 			}
 		}
 	})
+	t.Run("pricing changes invalidate cached daily settings immediately", func(t *testing.T) {
+		creditPricing(t, f, actor, 0)
+		old := creditMember(t, f, actor, 0)
+		if balance := creditBalance(t, f, old.ID); balance.DailyBalance != 0 {
+			t.Fatal("disabled gift was granted")
+		}
+		creditPricing(t, f, actor, 5)
+		fresh := creditMember(t, f, actor, 0)
+		if balance := creditBalance(t, f, fresh.ID); balance.DailyBalance != 5 {
+			t.Fatal("cached configuration hid the enabled gift")
+		}
+		if balance := creditBalance(t, f, old.ID); balance.DailyBalance != 0 {
+			t.Fatal("configuration change granted the same day's gift twice")
+		}
+	})
 	t.Run("concurrent charges cannot overdraw", func(t *testing.T) {
 		creditPricing(t, f, actor, 0)
 		member := creditMember(t, f, actor, 100)

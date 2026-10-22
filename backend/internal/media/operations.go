@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/problem"
 	"golang.org/x/image/draw"
 	"image"
@@ -42,7 +43,12 @@ func (s *Store) Usage(ctx context.Context) (int64, error) {
 
 // VisionReference bounds wire and memory usage independently of the uploaded original.
 func (s *Store) VisionReference(ctx context.Context, owner, id uuid.UUID) ([]byte, error) {
-	row, err := s.Get(ctx, owner, id)
+	return s.VisionReferenceTx(ctx, s.q, owner, id)
+}
+
+// VisionReferenceTx never acquires a second connection inside chat preparation.
+func (s *Store) VisionReferenceTx(ctx context.Context, q *query.Queries, owner, id uuid.UUID) ([]byte, error) {
+	row, err := s.GetTx(ctx, q, owner, id)
 	if err != nil {
 		return nil, err
 	}

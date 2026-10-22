@@ -35,6 +35,23 @@ func configuration(ctx context.Context, q *query.Queries) (Configuration, error)
 	}
 	return value, nil
 }
+
+// Read-only balance traffic shares the bounded settings cache. Financial writes
+// still load configuration inside their transaction, and SavePricing invalidates it.
+func (s *Service) readConfiguration(ctx context.Context) (Configuration, error) {
+	s.configMu.Lock()
+	defer s.configMu.Unlock()
+	if time.Now().Before(s.readConfigUntil) {
+		return s.readConfig, nil
+	}
+	value, err := configuration(ctx, s.queries)
+	if err != nil {
+		return Configuration{}, err
+	}
+	s.readConfig = value
+	s.readConfigUntil = time.Now().Add(30 * time.Second)
+	return value, nil
+}
 func validateConfiguration(value Configuration) error {
 	if value.SignupBonusCredits < 0 || value.SignupBonusCredits > 1_000_000_000 || value.DailyFreeCredits < 0 || value.DailyFreeCredits > 1_000_000_000 {
 		return problem.Invalid()
@@ -178,6 +195,11 @@ func (s *Service) SavePricing(ctx context.Context, actor user.Actor, value Prici
 		}
 		return audit.Write(ctx, q, audit.Entry{ActorID: &actor.ID, Action: "credits.pricing_update", TargetType: "pricing", Before: before, After: value, IP: actor.IP})
 	})
+	if err == nil {
+		s.configMu.Lock()
+		s.readConfigUntil = time.Time{}
+		s.configMu.Unlock()
+	}
 	return value, err
 }
 func price(ctx context.Context, q *query.Queries, cfg Configuration, input QuoteInput) (Quote, error) {

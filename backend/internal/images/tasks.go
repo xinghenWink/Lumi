@@ -61,6 +61,14 @@ func shortTitle(text string) string {
 	return string(runes[:min(20, len(runes))])
 }
 func (s *Service) Submit(ctx context.Context, actor user.Actor, key string, input Input) (Task, error) {
+	// Long submission transactions must leave pool capacity for authentication and chat.
+	// This bounds preparation only; accepted tasks retain the configured worker concurrency.
+	select {
+	case s.submissions <- struct{}{}:
+		defer func() { <-s.submissions }()
+	case <-ctx.Done():
+		return Task{}, fmt.Errorf("wait for image submission capacity: %w", ctx.Err())
+	}
 	settings, settingsErr := s.q.ListSettings(ctx)
 	if settingsErr != nil {
 		return Task{}, fmt.Errorf("read content settings: %w", settingsErr)

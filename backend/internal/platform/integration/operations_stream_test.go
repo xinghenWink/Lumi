@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
 	"github.com/xinghenWink/Lumi/backend/internal/chat"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
@@ -103,9 +104,29 @@ func TestM6BufferedChatResumesWithoutSecondProviderCallAndSupportsVision(t *test
 	}
 	input := chat.SendInput{RequestID: uuid.New(), ModelID: model.ID, Action: "send", Content: "Describe this image", ReferenceFileIDs: []uuid.UUID{file.ID}}
 	request, cancelRequest := context.WithCancel(f.ctx)
-	if err := s.StartBuffered(request, actor, id, input, nil); err != nil {
+	// Vision metadata must not request another connection while holding its transaction.
+	var held []*pgxpool.Conn
+	defer func() {
+		for _, connection := range held {
+			connection.Release()
+		}
+	}()
+	for range f.pool.Config().MaxConns - 1 {
+		connection, err := f.pool.Acquire(f.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		held = append(held, connection)
+	}
+	accept, cancelAccept := context.WithTimeout(request, 5*time.Second)
+	defer cancelAccept()
+	if err := s.StartBuffered(accept, actor, id, input, nil); err != nil {
 		t.Fatal(err)
 	}
+	for _, connection := range held {
+		connection.Release()
+	}
+	held = nil
 	select {
 	case <-started:
 	case <-time.After(5 * time.Second):
@@ -251,6 +272,9 @@ func TestM6CircuitSkipsOpenRoutesAndAllowsOneHalfOpenProbe(t *testing.T) {
 		defer cancel()
 		if err := query.New(f.pool).RecordCircuitSuccess(bounded, channel.ID); err != nil {
 			t.Fatalf("healthy success waited for an unrelated row writer: %v", err)
+		}
+		if err := query.New(f.pool).RecordSuccessfulUpstreamCall(bounded, query.AppendUpstreamCallParams{ID: uuid.New(), UpstreamID: channel.ID, Model: "healthy", Kind: "chat", Status: 200}); err != nil {
+			t.Fatalf("successful call batch waited for an unrelated row writer: %v", err)
 		}
 	})
 }

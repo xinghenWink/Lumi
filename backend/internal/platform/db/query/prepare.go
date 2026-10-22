@@ -17,7 +17,7 @@ func PrepareLatencyQueries(ctx context.Context, conn *pgx.Conn) error {
 		lockChatUser, getUserForUpdate, lockConversation, chatMessageByRequest,
 		listChatMessages, insertChatMessage, getPreferences, useChatDailyQuota, startChatRun,
 		getUpstream, recordCircuitSuccess, appendUpstreamCall,
-		heartbeatChatRun, checkpointChatMessage, finishChatRun, autoTitleConversation,
+		heartbeatChatRun, checkpointChatMessage, finishChatRun, persistChatRun, autoTitleConversation,
 		getImageSettings, listSettings,
 	} {
 		if _, err := conn.Prepare(ctx, statement, statement); err != nil {

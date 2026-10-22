@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,11 +32,14 @@ type Gate interface {
 	LoginSucceeded(context.Context, string) error
 }
 type Service struct {
-	pool    *pgxpool.Pool
-	queries *query.Queries
-	vault   *secrets.Vault
-	gate    Gate
-	now     func() time.Time
+	pool            *pgxpool.Pool
+	queries         *query.Queries
+	vault           *secrets.Vault
+	gate            Gate
+	now             func() time.Time
+	configMu        sync.Mutex
+	readConfig      Configuration
+	readConfigUntil time.Time
 }
 
 func New(pool *pgxpool.Pool, vault *secrets.Vault, gate Gate, clock func() time.Time) *Service {
@@ -198,7 +202,7 @@ func (s *Service) account(ctx context.Context, q *query.Queries, id uuid.UUID, c
 	return record, nil
 }
 func (s *Service) Read(ctx context.Context, id uuid.UUID) (Account, error) {
-	cfg, err := configuration(ctx, s.queries)
+	cfg, err := s.readConfiguration(ctx)
 	if err != nil {
 		return Account{}, err
 	}

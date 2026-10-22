@@ -514,6 +514,65 @@ func (q *Queries) LockConversation(ctx context.Context, arg LockConversationPara
 	return i, err
 }
 
+const persistChatRun = `-- name: PersistChatRun :one
+WITH owner AS MATERIALIZED (
+    SELECT c.id,c.cancel_requested,c.deleted_at FROM conversations c
+    WHERE c.id=$1 AND c.active_run_id=$2::uuid FOR UPDATE
+), saved AS (
+    UPDATE messages m SET content=$3,status=$4,
+        upstream_id=$5::uuid,meta=$6::jsonb
+    WHERE m.id=$2::uuid AND m.status='streaming'
+        AND EXISTS(SELECT 1 FROM owner o WHERE $7::boolean OR (NOT o.cancel_requested AND o.deleted_at IS NULL))
+    RETURNING m.id
+), renewed AS (
+    UPDATE conversations c SET
+        active_run_id=CASE WHEN $7::boolean THEN NULL ELSE c.active_run_id END,
+        lease_until=CASE WHEN $7::boolean THEN NULL ELSE now()+interval '45 seconds' END,
+        cancel_requested=CASE WHEN $7::boolean THEN false ELSE c.cancel_requested END
+    WHERE c.id=$1 AND EXISTS(SELECT 1 FROM saved)
+    RETURNING c.id
+)
+SELECT o.cancel_requested,o.deleted_at,EXISTS(SELECT 1 FROM saved) AS saved,EXISTS(SELECT 1 FROM renewed) AS renewed FROM owner o
+`
+
+type PersistChatRunParams struct {
+	ConversationID uuid.UUID
+	RunID          uuid.UUID
+	Content        string
+	Status         string
+	UpstreamID     *uuid.UUID
+	Meta           []byte
+	Final          bool
+}
+
+type PersistChatRunRow struct {
+	CancelRequested bool
+	DeletedAt       *time.Time
+	Saved           bool
+	Renewed         bool
+}
+
+// Lock the lease first, then checkpoint and release it atomically in one round trip.
+func (q *Queries) PersistChatRun(ctx context.Context, arg PersistChatRunParams) (PersistChatRunRow, error) {
+	row := q.db.QueryRow(ctx, persistChatRun,
+		arg.ConversationID,
+		arg.RunID,
+		arg.Content,
+		arg.Status,
+		arg.UpstreamID,
+		arg.Meta,
+		arg.Final,
+	)
+	var i PersistChatRunRow
+	err := row.Scan(
+		&i.CancelRequested,
+		&i.DeletedAt,
+		&i.Saved,
+		&i.Renewed,
+	)
+	return i, err
+}
+
 const pruneChatDailyUsage = `-- name: PruneChatDailyUsage :exec
 DELETE FROM chat_daily_usage WHERE day<(now() AT TIME ZONE 'UTC')::date-35
 `

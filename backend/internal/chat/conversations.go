@@ -274,7 +274,7 @@ func (s *Service) prepare(ctx context.Context, actor user.Actor, id uuid.UUID, i
 				}
 			}
 		}
-		if err := s.attachVision(ctx, actor.ID, history, assembled); err != nil {
+		if err := s.attachVision(ctx, q, actor.ID, history, assembled); err != nil {
 			return err
 		}
 		if config.PerMinute > 0 {

@@ -18,14 +18,17 @@ type Gate interface {
 	Allow(context.Context, string, string, int, time.Duration) (bool, int, error)
 }
 type Service struct {
-	files    *media.Store
-	resume   *platformredis.Client
-	lifetime context.Context
-	workers  sync.WaitGroup
-	pool     *pgxpool.Pool
-	q        *query.Queries
-	catalog  *catalog.Service
-	gate     Gate
+	files       *media.Store
+	resume      *platformredis.Client
+	lifetime    context.Context
+	workers     sync.WaitGroup
+	pool        *pgxpool.Pool
+	q           *query.Queries
+	catalog     *catalog.Service
+	gate        Gate
+	configMu    sync.Mutex
+	config      Configuration
+	configUntil time.Time
 }
 
 func New(pool *pgxpool.Pool, catalog *catalog.Service, gate Gate) *Service {

@@ -12,7 +12,7 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     services:
       postgres:
         image: postgres:16-alpine
@@ -54,7 +54,13 @@ jobs:
           git diff --exit-code -- backend/internal/platform/db/query frontend/src/api/schema.d.ts
       - run: make test-integration
       - run: make build
-      - run: pnpm --filter @lumi/frontend exec playwright install --with-deps chromium
+      - name: Install Chromium and its system dependencies
+        run: |
+          # Keep signed Ubuntu packages while avoiding the slow HTTP Azure mirror.
+          if test -f /etc/apt/apt-mirrors.txt; then
+            printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
+          fi
+          pnpm --filter @lumi/frontend exec playwright install --with-deps chromium
       - run: pnpm test:e2e
       - name: Install pinned k6
         run: |

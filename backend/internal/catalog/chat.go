@@ -21,7 +21,12 @@ type ChatTarget struct {
 }
 
 func (s *Service) ChatTargets(ctx context.Context, modelID uuid.UUID) (PublicModel, []ChatTarget, error) {
-	row, err := s.queries.GetPlatformModel(ctx, modelID)
+	return s.ChatTargetsTx(ctx, s.queries, modelID)
+}
+
+// ChatTargetsTx avoids nested pool acquisition during transactional validation.
+func (s *Service) ChatTargetsTx(ctx context.Context, q *query.Queries, modelID uuid.UUID) (PublicModel, []ChatTarget, error) {
+	row, rows, err := q.ReadChatRouting(ctx, modelID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return PublicModel{}, nil, fmt.Errorf("read chat model: %w", err)
 	}
@@ -35,7 +40,7 @@ func (s *Service) ChatTargets(ctx context.Context, modelID uuid.UUID) (PublicMod
 	if !model.Capabilities.Stream {
 		return model, nil, problem.New("CHAT_MODEL_UNAVAILABLE", http.StatusConflict)
 	}
-	rows, err := s.routeTargets(ctx, modelID)
+	rows, err = WeightedOrder(rows)
 	if err != nil {
 		return model, nil, fmt.Errorf("read chat routes: %w", err)
 	}

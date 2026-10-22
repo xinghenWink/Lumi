@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
-	"github.com/xinghenWink/Lumi/backend/internal/platform/db"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/problem"
 	"github.com/xinghenWink/Lumi/backend/internal/upstream"
@@ -122,32 +121,20 @@ func (s *Service) persist(ctx context.Context, r *run, content, status string, t
 	if target.UpstreamID != uuid.Nil {
 		uid = &target.UpstreamID
 	}
-	return db.Transaction(ctx, s.pool, func(q *query.Queries) error {
-		// Taking the run row lock first prevents recovery from racing a checkpoint.
-		heartbeat, err := q.HeartbeatChatRun(ctx, query.HeartbeatChatRunParams{ID: r.conversation.ID, ActiveRunID: &r.assistant.ID})
-		if errors.Is(err, pgx.ErrNoRows) {
-			return problem.New("CHAT_INTERRUPTED", 409)
-		}
-		if err != nil {
-			return fmt.Errorf("renew chat lease: %w", err)
-		}
-		if !final && (heartbeat.CancelRequested || heartbeat.DeletedAt != nil) {
-			return problem.New("CHAT_STOPPED", 409)
-		}
-		count, err := q.CheckpointChatMessage(ctx, query.CheckpointChatMessageParams{ID: r.assistant.ID, Content: content, Status: status, UpstreamID: uid, Meta: encoded})
-		if err != nil {
-			return fmt.Errorf("checkpoint chat: %w", err)
-		}
-		if count != 1 {
-			return problem.New("CHAT_INTERRUPTED", 409)
-		}
-		if final {
-			if err := q.FinishChatRun(ctx, query.FinishChatRunParams{ID: r.conversation.ID, ActiveRunID: &r.assistant.ID}); err != nil {
-				return fmt.Errorf("release chat run: %w", err)
-			}
-		}
-		return nil
-	})
+	row, err := s.q.PersistChatRun(ctx, query.PersistChatRunParams{ConversationID: r.conversation.ID, RunID: r.assistant.ID, Content: content, Status: status, UpstreamID: uid, Meta: encoded, Final: final})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return problem.New("CHAT_INTERRUPTED", 409)
+	}
+	if err != nil {
+		return fmt.Errorf("persist chat run: %w", err)
+	}
+	if !final && (row.CancelRequested || row.DeletedAt != nil) {
+		return problem.New("CHAT_STOPPED", 409)
+	}
+	if !row.Saved || !row.Renewed {
+		return problem.New("CHAT_INTERRUPTED", 409)
+	}
+	return nil
 }
 
 // Stream persists accepted turns before emitting meta. Only controlled events leave this boundary.
