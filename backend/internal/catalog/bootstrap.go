@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
@@ -16,6 +17,9 @@ import (
 func (s *Service) Bootstrap(ctx context.Context, baseURL, key string) error {
 	if baseURL == "" && key == "" {
 		return nil
+	}
+	if baseURL == "" || strings.TrimSpace(key) == "" {
+		return fmt.Errorf("upstream bootstrap requires both URL and API key")
 	}
 	input := ChannelInput{Name: "Default", BaseURL: baseURL, APIKey: &key, Enabled: true, Weight: 1, TimeoutChatS: 120, TimeoutImageS: 180, EditFormat: "multipart"}
 	if err := channelInput(&input); err != nil {
