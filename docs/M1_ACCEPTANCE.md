@@ -23,8 +23,10 @@
 - [x] 4 项桌面 / 320px 访客浏览器检查通过，截图复核；含服务未就绪状态、路由守卫、主题持久化、SPA 回退。
 - [x] CI 真实 PG/Redis 集成测试，包括验证码耗尽/过期、并发注册、轮换重放、禁用/删除失效、并发管理员操作与审计失败回滚。
 - [x] 桌面 / 320px 完整账号与后台浏览器流程通过（共 6 项 Playwright）。
-- [ ] 30 天保留边界、重复清理、会话清理、审计保留及审计失败回滚的真实数据库检查。
-- [ ] 最新代码 GitHub CI 与完整 Compose 验证。
+- [x] 30 天保留边界、并发/重复清理、会话清理、审计保留及审计失败回滚的真实数据库检查通过。
+- [x] GitHub CI 通过，含 Docker 镜像构建与完整 Compose 栈验证。
+
+业务实现 `da83817` 的[完整 CI 记录](https://github.com/xinghenWink/Lumi/actions/runs/39702932364)包含上述真实依赖、清理、浏览器及容器检查。后续文档与本地默认配置的状态见 [PR 最新 Checks](https://github.com/xinghenWink/Lumi/pull/2/checks)。已下载并复核真实账号的登录/注册、深色资料、用户详情与审计截图；[桌面与手机截图产物](https://github.com/xinghenWink/Lumi/actions/runs/39702303779/artifacts/12393826386)由 CI 保留。
 
 本机 Docker 引擎不可用，真实依赖测试在 CI 执行。并发启动测试发现 M0 创建同名 schema 后会改变默认查找路径，导致出现第二张迁移版本表；已固定 `public.goose_db_version` 与业务连接 `search_path=lumi,public`，并通过并发/重复迁移、每条版本只记录一次及无影子版本表的回归检查。未修改既有 SQL 迁移。
 
