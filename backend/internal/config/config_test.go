@@ -83,3 +83,28 @@ func TestAccountSecurityConfiguration(t *testing.T) {
 		}
 	}
 }
+
+func TestProductionCookieBoundary(t *testing.T) {
+	for _, test := range []struct {
+		origin string
+		secure bool
+		valid  bool
+	}{
+		{"https://lumi.test", true, true},
+		{"https://lumi.test", false, false},
+		{"http://lumi.test", false, false},
+		{"http://127.0.0.1:8080", false, true},
+		{"http://[::1]:8080", false, true},
+		{"http://localhost:8080", false, true},
+		{"http://localhost.evil.test", false, false},
+		{"http://10.0.0.1", false, false},
+	} {
+		t.Run(test.origin, func(t *testing.T) {
+			cfg := Config{Environment: "production", PublicBaseURL: test.origin, CookieSecure: test.secure,
+				JWTSecret: strings.Repeat("x", 32), EncryptionKey: make([]byte, 32)}
+			if err := cfg.ValidateAccounts(); (err == nil) != test.valid {
+				t.Fatalf("secure=%v valid=%v error=%v", test.secure, test.valid, err)
+			}
+		})
+	}
+}

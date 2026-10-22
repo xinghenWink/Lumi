@@ -6,6 +6,7 @@ info:
     Accounts, credits, upstream configuration and owner-isolated chat. Mutations require Origin and
     X-Lumi-CSRF: 1. Chat POST streams use meta, delta, error, done and ping SSE events. Reuse request_id
     only with identical input; live duplicates replay the owner-scoped Redis stream (five-minute TTL). Image tasks charge and settle atomically, run independently of HTTP, and expose only owner-scoped signed files.
+    Public production deployments require HTTPS and Secure refresh cookies; HTTP is allowed only for loopback deployment checks.
 servers:
   - url: /
 paths:

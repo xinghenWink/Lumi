@@ -129,10 +129,25 @@ func (c Config) ValidateAccounts() error {
 	if c.CookieSecure && !strings.HasPrefix(c.PublicBaseURL, "https://") {
 		return fmt.Errorf("COOKIE_SECURE requires an HTTPS PUBLIC_BASE_URL")
 	}
+	// Plain HTTP is restricted to local deployment checks, never a public production origin.
+	if c.Environment == "production" && !c.CookieSecure {
+		origin, err := url.Parse(c.PublicBaseURL)
+		if err != nil || origin.Scheme != "http" || !loopbackHost(origin.Hostname()) {
+			return fmt.Errorf("production requires HTTPS and COOKIE_SECURE, except on loopback HTTP")
+		}
+	}
 	if (c.AdminEmail == "") != (c.AdminPassword == "") {
 		return fmt.Errorf("ADMIN_EMAIL and ADMIN_PASSWORD must be configured together")
 	}
 	return nil
+}
+
+func loopbackHost(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	address := net.ParseIP(host)
+	return address != nil && address.IsLoopback()
 }
 
 func (c Config) AllowedOrigins() []string {

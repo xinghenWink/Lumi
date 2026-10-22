@@ -149,6 +149,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Package deployment tools
+        run: tar -C deploy -czf "$RUNNER_TEMP/lumi-deploy.tar.gz" docker-compose.yml .env.example docker-deploy.sh backup.sh restore.sh Caddyfile.example nginx.conf.example
       - name: Create release notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -158,3 +161,4 @@ jobs:
           if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
             gh release create "$RELEASE_TAG" --generate-notes --verify-tag
           fi
+          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/lumi-deploy.tar.gz" --clobber

@@ -38,7 +38,7 @@ func (c *Client) ReadChat(ctx context.Context, key, after string) ([]ChatFrame, 
 	if after == "" {
 		after = "0-0"
 	}
-	streams, err := c.client.XRead(ctx, &redisclient.XReadArgs{Streams: []string{"lumi:chat:events:" + key, after}, Count: 100, Block: 200 * time.Millisecond}).Result()
+	streams, err := c.chatReads.XRead(ctx, &redisclient.XReadArgs{Streams: []string{"lumi:chat:events:" + key, after}, Count: 100, Block: 200 * time.Millisecond}).Result()
 	if err == redisclient.Nil {
 		return []ChatFrame{}, nil
 	}

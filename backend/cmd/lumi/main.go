@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	_ "time/tzdata" // Standalone binaries must resolve credit reset zones without a host Go installation.
 
 	"github.com/jackc/pgx/v5/pgxpool"
 

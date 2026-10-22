@@ -12,5 +12,6 @@ coverage/
 frontend/test-results/
 frontend/playwright-report/
 deploy/data/
+deploy/backups/
 backend/data/
 *.tsbuildinfo

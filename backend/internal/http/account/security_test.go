@@ -7,8 +7,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/xinghenWink/Lumi/backend/internal/auth"
 	"github.com/xinghenWink/Lumi/backend/internal/http/middleware"
 )
 
@@ -29,6 +31,30 @@ func TestCSRFProtection(t *testing.T) {
 		engine.ServeHTTP(recorder, request)
 		if recorder.Code != test.want {
 			t.Errorf("origin=%q referer=%q status=%d", test.origin, test.referer, recorder.Code)
+		}
+	}
+}
+
+func TestRefreshCookieSecurity(t *testing.T) {
+	h := Handler{security: Security{CookieSecure: true}}
+	engine := gin.New()
+	engine.POST("/issue", func(c *gin.Context) {
+		h.setCookie(c, auth.Result{RefreshToken: "private-refresh", RefreshExpires: time.Now().Add(30 * 24 * time.Hour)})
+	})
+	engine.POST("/clear", h.clearCookie)
+	for _, path := range []string{"/issue", "/clear"} {
+		recorder := httptest.NewRecorder()
+		engine.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, path, nil))
+		cookies := recorder.Result().Cookies()
+		if len(cookies) != 1 {
+			t.Fatalf("%s cookie count = %d", path, len(cookies))
+		}
+		cookie := cookies[0]
+		if !cookie.HttpOnly || !cookie.Secure || cookie.SameSite != http.SameSiteLaxMode || cookie.Domain != "" || cookie.Path != "/api/v1/auth" {
+			t.Fatalf("%s lost cookie security attributes", path)
+		}
+		if path == "/clear" && (cookie.Value != "" || cookie.MaxAge != -1) {
+			t.Fatal("logout did not expire the cookie")
 		}
 	}
 }

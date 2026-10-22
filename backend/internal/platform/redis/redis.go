@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,7 +10,8 @@ import (
 )
 
 type Client struct {
-	client *redisclient.Client
+	client    *redisclient.Client
+	chatReads *redisclient.Client
 }
 
 func Open(ctx context.Context, connectionURL string) (*Client, error) {
@@ -28,7 +30,11 @@ func Open(ctx context.Context, connectionURL string) (*Client, error) {
 		}
 		return nil, fmt.Errorf("ping Redis: %w", err)
 	}
-	return &Client{client: client}, nil
+	// Blocking XREAD must not occupy the pool needed by XADD, authentication and rate limits.
+	readOptions := *options
+	readOptions.PoolSize = 32
+	chatReads := redisclient.NewClient(&readOptions)
+	return &Client{client: client, chatReads: chatReads}, nil
 }
 
 func (c *Client) Ping(ctx context.Context) error {
@@ -39,7 +45,7 @@ func (c *Client) Ping(ctx context.Context) error {
 }
 
 func (c *Client) Close() error {
-	if err := c.client.Close(); err != nil {
+	if err := errors.Join(c.chatReads.Close(), c.client.Close()); err != nil {
 		return fmt.Errorf("close Redis: %w", err)
 	}
 	return nil
