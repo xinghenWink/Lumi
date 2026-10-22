@@ -2,6 +2,8 @@
 
 日期：2026-10-22；分支：`codex/m0-foundation`。
 
+当前结论：M0 DoD 全部通过。用户于 2026-10-22 要求补齐验收后合并 M0 / M1；以下记录实际发布结果，M1 另见 `M1_ACCEPTANCE.md`。
+
 ## 已实现
 
 - [x] Go / Vue monorepo、Makefile、锁文件、代码风格与忽略规则。
@@ -35,13 +37,21 @@ Windows 未安装 Make，本机执行了其等价命令。未把无法运行的�
 
 ## 远程验收与 M0 DoD
 
-代码版本 `1080a1f` 的 [GitHub CI](https://github.com/xinghenWink/Lumi/actions/runs/39653373637) 已全部通过，包含 quality 与 container 两个任务。改动由 [M0 草稿 PR #1](https://github.com/xinghenWink/Lumi/pull/1) 承载。
+代码版本 `9300a95` 的 [GitHub CI](https://github.com/xinghenWink/Lumi/actions/runs/39705739906) 已全部通过，包含 quality 与 container 两个任务。改动由 [M0 PR #1](https://github.com/xinghenWink/Lumi/pull/1) 承载。
 
 - [x] 完整 Compose 栈首页、`/readyz` 与版本接口实测（GitHub Ubuntu runner）。
 - [x] 真实 PG / Redis 集成测试通过，包括并发启动迁移、重复迁移与 Redis 中断。
 - [x] 远程 GitHub Actions 全绿，`make lint test`、代码生成、构建与浏览器冒烟全部通过。
-- [ ] 实际发布 `v0.0.1` 并验证 GHCR amd64 / arm64 镜像。
+- [x] 实际发布 `v0.0.1` 并验证 GHCR amd64 / arm64 镜像。
+
+## 版本发布验收
+
+- [Release v0.0.1](https://github.com/xinghenWink/Lumi/releases/tag/v0.0.1) 已发布；tag 固定在纯 M0 代码 `9300a95f73a4fe40031f2a136fcc4992c82bd1c1`，不包含 M1 业务。
+- [完整发布工作流](https://github.com/xinghenWink/Lumi/actions/runs/39705752935) 的质量、集成、浏览器、容器、镜像推送、两种架构运行验证与 Release 创建任务全部成功。
+- 镜像：`ghcr.io/xinghenwink/lumi:v0.0.1`；多架构 digest：`sha256:43479c2deec1243b314f610c5c232d60d6013195e0158375fac6f84d1dc51854`。
+- amd64（Ubuntu）与 arm64（Ubuntu ARM）原生 runner 分别从 GHCR 按上述 digest 拉取，确认 manifest 平台与容器用户 `10001:10001`，启动生产 Compose 中真实 PostgreSQL 16 / Redis 7 / 应用，检查 `/readyz`、首页、`/api/version` 的版本与完整 commit 均通过。
+- 发布门禁已保留在 `release.yml`，后续 main / tag 发布继续执行；两种架构均通过后才创建正式 Release。
 
 本机 Docker CLI 存在，但 `dockerDesktopLinuxEngine` 管道不可用。启动 Docker Desktop 的操作被自动审批以 `blocked by policy` 拒绝。集成测试返回无法创建 Docker provider；没有跳过测试或用模拟依赖替代。
 
-本机环境限制已通过远程真实容器验证补齐。M0 工程与容器检查通过，剩余版本发布验收尚未完成，因此暂不进入 M1。账号、积分和真实模型能力均未实现，原型的演示入口与本地业务数据没有移植。
+本机环境限制已通过远程真实容器验证补齐。M0 工程、容器与版本发布验收全部通过，已具备合并条件。M0 发布物仅包含基础工程；账号由 M1 提供，积分与真实模型能力由后续阶段实现，原型的演示入口与本地业务数据没有移植。
