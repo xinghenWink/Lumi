@@ -107,4 +107,72 @@ describe('chat state isolation and streaming', () => {
     expect(store.conversations).toEqual([])
     expect(store.drafts.new).toBeUndefined()
   })
+  it('clears filtered-out history and ignores stream events arriving after deletion', async () => {
+    const get = vi.spyOn(chats, 'get').mockResolvedValue(row)
+    vi.spyOn(chats, 'messages').mockResolvedValue({ items: [user], next_cursor: '' })
+    vi.spyOn(chats, 'list').mockResolvedValue({ items: [], next_cursor: '' })
+    vi.spyOn(chats, 'delete').mockResolvedValue(undefined)
+    let finish: (() => void) | undefined
+    vi.spyOn(chats, 'send').mockImplementation(
+      async (_id, _input, _signal, event) =>
+        new Promise<void>((resolve) => {
+          finish = () => {
+            event({ type: 'delta', content: 'late content' })
+            event({ type: 'done', assistant, conversation: row })
+            resolve()
+          }
+        }),
+    )
+    const store = useChatStore()
+    await store.open('c')
+    store.drafts.c = 'conversation draft'
+    store.drafts.new = 'new draft'
+    store.drafts['image-draft'] = 'image draft'
+    store.conversations = []
+    const pending = store.send('c', {
+      request_id: 'r',
+      model_id: 'm',
+      content: 'question',
+      action: 'send',
+    })
+    await store.remove([], true)
+    finish?.()
+    await pending
+    expect(store.messages).toEqual([])
+    expect(store.conversations).toEqual([])
+    expect(store.lastOpened).toBe('')
+    expect(store.drafts.c).toBeUndefined()
+    expect(store.drafts.new).toBe('new draft')
+    expect(store.drafts['image-draft']).toBe('image draft')
+    expect(store.running.c).toBeUndefined()
+    expect(store.errors.c).toBeUndefined()
+    expect(get).toHaveBeenCalledTimes(1)
+  })
+  it('ignores history mutations completed after the account session changes', async () => {
+    let renamed: ((value: Conversation) => void) | undefined
+    let removed: (() => void) | undefined
+    vi.spyOn(chats, 'update').mockImplementation(
+      async () =>
+        new Promise<Conversation>((resolve) => {
+          renamed = resolve
+        }),
+    )
+    vi.spyOn(chats, 'delete').mockImplementation(
+      async () =>
+        new Promise<void>((resolve) => {
+          removed = resolve
+        }),
+    )
+    const list = vi.spyOn(chats, 'list')
+    const store = useChatStore()
+    const changes = Promise.all([store.update(row, 'renamed'), store.remove([], true)])
+    store.reset()
+    store.drafts.new = 'next account draft'
+    renamed?.({ ...row, title: 'renamed' })
+    removed?.()
+    await changes
+    expect(store.conversations).toEqual([])
+    expect(store.drafts.new).toBe('next account draft')
+    expect(list).not.toHaveBeenCalled()
+  })
 })

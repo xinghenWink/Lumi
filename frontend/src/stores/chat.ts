@@ -18,6 +18,7 @@ export const useChatStore = defineStore('chat', () => {
   const pending = shallowReactive(new Map<string, SendInput>())
   let createID = ''
   const controllers = new Map<string, AbortController>()
+  const deleted = new Set<string>()
   const loading = ref(false),
     listError = shallowRef<unknown>(null),
     messageLoading = ref(false)
@@ -36,6 +37,7 @@ export const useChatStore = defineStore('chat', () => {
     messageGeneration++
     for (const c of controllers.values()) c.abort()
     controllers.clear()
+    deleted.clear()
     pending.clear()
     createID = ''
     listController?.abort()
@@ -55,6 +57,7 @@ export const useChatStore = defineStore('chat', () => {
   }
   watch(() => auth.user?.id, reset, { flush: 'sync' })
   function put(id: string, items: Message[]) {
+    if (deleted.has(id)) return
     const copy = { ...cache.value, [id]: items }
     const keys = Object.keys(copy)
     if (keys.length > 12) {
@@ -64,6 +67,7 @@ export const useChatStore = defineStore('chat', () => {
     cache.value = copy
   }
   function upsert(row: Conversation) {
+    if (deleted.has(row.id)) return
     const rows = conversations.value.filter((c) => c.id !== row.id)
     conversations.value = [row, ...rows].sort(
       (a, b) =>
@@ -78,6 +82,7 @@ export const useChatStore = defineStore('chat', () => {
     put(id, index < 0 ? [...rows, row] : rows.map((r, i) => (i === index ? row : r)))
   }
   function failure(id: string, error: unknown) {
+    if (deleted.has(id)) return
     errors.value = { ...errors.value, [id]: error }
   }
   async function list(more = false) {
@@ -135,7 +140,7 @@ export const useChatStore = defineStore('chat', () => {
         chats.get(id, historyController.signal),
         chats.messages(id, '', historyController.signal),
       ])
-      if (owner !== epoch || generation !== messageGeneration) return
+      if (owner !== epoch || generation !== messageGeneration || deleted.has(id)) return
       upsert(row)
       if (!running[id]) put(id, [...page.items].reverse())
       older[id] = page.next_cursor
@@ -158,7 +163,7 @@ export const useChatStore = defineStore('chat', () => {
     messageLoading.value = true
     try {
       const page = await chats.messages(id, next)
-      if (owner !== epoch) return
+      if (owner !== epoch || deleted.has(id)) return
       const existing = cache.value[id] ?? []
       put(
         id,
@@ -187,7 +192,7 @@ export const useChatStore = defineStore('chat', () => {
     return id
   }
   async function send(id: string, input: SendInput) {
-    if (running[id]) return
+    if (running[id] || deleted.has(id)) return
     const owner = epoch,
       controller = new AbortController()
     controllers.set(id, controller)
@@ -198,7 +203,7 @@ export const useChatStore = defineStore('chat', () => {
       frame: number | undefined,
       assistant: Message | undefined
     const flush = () => {
-      if (owner !== epoch || !assistant || !delta) return
+      if (owner !== epoch || deleted.has(id) || !assistant || !delta) return
       assistant = { ...assistant, content: assistant.content + delta }
       delta = ''
       message(id, assistant)
@@ -212,7 +217,7 @@ export const useChatStore = defineStore('chat', () => {
     }
     try {
       await chats.send(id, input, controller.signal, (e) => {
-        if (owner !== epoch) return
+        if (owner !== epoch || deleted.has(id)) return
         if (e.type === 'meta') {
           if (e.conversation) upsert(e.conversation)
           if (input.action === 'edit') {
@@ -264,13 +269,13 @@ export const useChatStore = defineStore('chat', () => {
     } finally {
       if (frame !== undefined) cancelAnimationFrame(frame)
       flush()
-      if (owner === epoch) {
+      if (owner === epoch && !deleted.has(id)) {
         running[id] = false
         controllers.delete(id)
         // Reconcile saved status after disconnect, stop or a response lost after commit.
         try {
           const [row, page] = await Promise.all([chats.get(id), chats.messages(id)])
-          if (owner === epoch) {
+          if (owner === epoch && !deleted.has(id)) {
             upsert(row)
             put(id, [...page.items].reverse())
             older[id] = page.next_cursor
@@ -286,10 +291,12 @@ export const useChatStore = defineStore('chat', () => {
     if (input) await send(active.value, input)
   }
   async function stop() {
-    const id = active.value
+    const id = active.value,
+      owner = epoch
     if (!id) return
     try {
       await chats.stop(id)
+      if (owner !== epoch || deleted.has(id)) return
       if (!running[id]) {
         // A generation opened in another tab has no local reader; refresh its durable checkpoint.
         for (let i = 0; i < 5; i++) {
@@ -303,14 +310,33 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
   async function update(row: Conversation, title: string, pinned = row.pinned) {
+    const owner = epoch
     const result = await chats.update(row, title, pinned)
-    upsert(result)
+    if (owner === epoch) upsert(result)
   }
   async function remove(ids: string[], all = false) {
+    const owner = epoch
     await chats.delete(ids, all)
-    const removed = all ? conversations.value.map((c) => c.id) : ids
+    if (owner !== epoch) return
+    // A filtered or paginated list does not contain every cached conversation.
+    const removed = all
+      ? [
+          ...new Set([
+            ...conversations.value.map((c) => c.id),
+            ...Object.keys(cache.value),
+            ...Object.keys(running),
+            ...pending.keys(),
+            ...Object.keys(drafts).filter((key) => key !== 'new' && key !== 'image-draft'),
+            active.value,
+            lastOpened.value,
+          ]),
+        ].filter(Boolean)
+      : ids
     for (const id of removed) {
+      deleted.add(id)
       controllers.get(id)?.abort()
+      controllers.delete(id)
+      Reflect.deleteProperty(running, id)
       Reflect.deleteProperty(drafts, id)
       Reflect.deleteProperty(older, id)
       pending.delete(id)
@@ -319,6 +345,9 @@ export const useChatStore = defineStore('chat', () => {
     const copy = { ...cache.value }
     for (const id of removed) Reflect.deleteProperty(copy, id)
     cache.value = copy
+    errors.value = Object.fromEntries(
+      Object.entries(errors.value).filter(([id]) => !removed.includes(id)),
+    )
     if (removed.includes(lastOpened.value)) lastOpened.value = ''
     if (removed.includes(active.value)) active.value = ''
     await list()
