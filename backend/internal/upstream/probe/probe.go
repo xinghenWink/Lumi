@@ -5,22 +5,29 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/xinghenWink/Lumi/backend/internal/upstream"
 )
 
 type Options struct {
+	ReferencePath                          string
+	ProxyURL                               string
+	Prompt, ImageOutput                    string
 	BaseURL, APIKey, ChatModel, ImageModel string
 	Quality, Size, EditFormat              string
 	Count                                  int
@@ -29,6 +36,9 @@ type Options struct {
 }
 
 type Observation struct {
+	RequestSent  bool     `json:"request_sent"`
+	Connected    bool     `json:"connected"`
+	SavedImage   string   `json:"saved_image,omitempty"`
 	Operation    string   `json:"operation"`
 	Path         string   `json:"path"`
 	Status       int      `json:"status"`
@@ -68,7 +78,7 @@ func Run(ctx context.Context, options Options) (Report, error) {
 	if options.Vision && options.ChatModel == "" {
 		return Report{}, fmt.Errorf("vision probing requires an explicit chat model")
 	}
-	client, err := upstream.NewHTTPClient("", 180*time.Second, options.Policy)
+	client, err := upstream.NewHTTPClient(options.ProxyURL, 180*time.Second, options.Policy)
 	if err != nil {
 		return Report{}, err
 	}
@@ -87,7 +97,11 @@ func Run(ctx context.Context, options Options) (Report, error) {
 		request("chat_system_stream", http.MethodPost, "/chat/completions", "application/json", payload, true)
 	}
 	if options.Images {
-		payload, err := json.Marshal(map[string]any{"model": options.ImageModel, "prompt": "A simple blue circle on a white background, no text.", "quality": options.Quality, "size": options.Size, "n": options.Count, "response_format": "b64_json"})
+		prompt := options.Prompt
+		if prompt == "" {
+			prompt = "A simple blue circle on a white background, no text."
+		}
+		payload, err := json.Marshal(map[string]any{"model": options.ImageModel, "prompt": prompt, "quality": options.Quality, "size": options.Size, "n": options.Count, "response_format": "b64_json"})
 		if err != nil {
 			return report, fmt.Errorf("encode image probe: %w", err)
 		}
@@ -95,6 +109,9 @@ func Run(ctx context.Context, options Options) (Report, error) {
 	}
 	if options.Edit || options.Vision {
 		fixture, err := referenceImage()
+		if options.ReferencePath != "" {
+			fixture, err = readReference(options.ReferencePath)
+		}
 		if err != nil {
 			return report, err
 		}
@@ -132,6 +149,15 @@ func observe(ctx context.Context, client *http.Client, options Options, base *ur
 		return result
 	}
 	request.Header.Set("Authorization", "Bearer "+options.APIKey)
+	var sent, connected atomic.Bool
+	request = request.WithContext(httptrace.WithClientTrace(request.Context(), &httptrace.ClientTrace{
+		GotConn: func(httptrace.GotConnInfo) { connected.Store(true) },
+		WroteRequest: func(info httptrace.WroteRequestInfo) {
+			if info.Err == nil {
+				sent.Store(true)
+			}
+		},
+	}))
 	request.Header.Set("Accept", "application/json")
 	if stream {
 		request.Header.Set("Accept", "text/event-stream")
@@ -140,9 +166,18 @@ func observe(ctx context.Context, client *http.Client, options Options, base *ur
 		request.Header.Set("Content-Type", contentType)
 	}
 	response, err := client.Do(request)
+	result.RequestSent = sent.Load()
+	result.Connected = connected.Load()
 	result.Milliseconds = time.Since(start).Milliseconds()
 	if err != nil {
-		result.Error = "NETWORK_OR_TIMEOUT"
+		result.Error = "NETWORK_UNAVAILABLE"
+		var network net.Error
+		if errors.As(err, &network) && network.Timeout() {
+			result.Error = "NETWORK_TIMEOUT"
+		}
+		if errors.Is(err, context.Canceled) {
+			result.Error = "REQUEST_CANCELED"
+		}
 		return result
 	}
 	defer func() {
@@ -212,6 +247,9 @@ func observe(ctx context.Context, client *http.Client, options Options, base *ur
 			}
 		} else {
 			result.Results = len(body.Data)
+			if (kind == "image_generate" || strings.HasPrefix(kind, "image_edit_")) && options.ImageOutput != "" && len(body.Data) > 0 {
+				result.SavedImage, result.Error = saveImage(options.ImageOutput, body.Data[0]["b64_json"])
+			}
 			for _, item := range body.Data {
 				for _, format := range []string{"b64_json", "url"} {
 					if _, exists := item[format]; exists && !slices.Contains(result.Formats, format) {
@@ -245,9 +283,13 @@ func referenceImage() ([]byte, error) {
 }
 
 func editRequest(options Options, fixture []byte) ([]byte, string, error) {
+	prompt := options.Prompt
+	if prompt == "" {
+		prompt = "Change the blue square to a red square."
+	}
 	if options.EditFormat == "json" {
 		payload, err := json.Marshal(map[string]any{
-			"model": options.ImageModel, "prompt": "Change the blue square to a red square.",
+			"model": options.ImageModel, "prompt": prompt,
 			"quality": options.Quality, "size": options.Size, "n": options.Count,
 			"images": []map[string]string{{"image_url": dataURL(fixture)}}, "response_format": "b64_json",
 		})
@@ -258,7 +300,7 @@ func editRequest(options Options, fixture []byte) ([]byte, string, error) {
 	}
 	var payload bytes.Buffer
 	writer := multipart.NewWriter(&payload)
-	for name, value := range map[string]string{"model": options.ImageModel, "prompt": "Change the blue square to a red square.", "quality": options.Quality, "size": options.Size, "n": fmt.Sprint(options.Count), "response_format": "b64_json"} {
+	for name, value := range map[string]string{"model": options.ImageModel, "prompt": prompt, "quality": options.Quality, "size": options.Size, "n": fmt.Sprint(options.Count), "response_format": "b64_json"} {
 		if err := writer.WriteField(name, value); err != nil {
 			return nil, "", fmt.Errorf("encode multipart probe field: %w", err)
 		}

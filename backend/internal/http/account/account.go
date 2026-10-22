@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"
+	"github.com/xinghenWink/Lumi/backend/internal/catalog"
 	"github.com/xinghenWink/Lumi/backend/internal/credits"
 	"github.com/xinghenWink/Lumi/backend/internal/http/middleware"
 	"github.com/xinghenWink/Lumi/backend/internal/http/response"
@@ -33,6 +34,7 @@ type Services struct {
 	Audit    *audit.Service
 	Gate     auth.Gate
 	Credits  *credits.Service
+	Catalog  *catalog.Service
 }
 type Security struct {
 	Origins        []string
@@ -73,6 +75,7 @@ func Routes(services *Services, security Security, logger *slog.Logger) func(*gi
 		admin.PUT("/settings/:group", h.csrf, h.adminLimit, h.saveSettings)
 		admin.GET("/audit-logs", h.listAudit)
 		h.creditRoutes(protected, admin)
+		h.catalogRoutes(protected, admin)
 		return nil
 	}
 }

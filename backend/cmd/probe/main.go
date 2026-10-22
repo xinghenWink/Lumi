@@ -24,6 +24,10 @@ func run() error {
 	options := probe.Options{BaseURL: os.Getenv("UPSTREAM_BASE_URL"), APIKey: os.Getenv("UPSTREAM_API_KEY")}
 	flag.StringVar(&options.ChatModel, "chat-model", "", "Explicit text model for one streaming request")
 	flag.StringVar(&options.ImageModel, "image-model", "", "Explicit image model")
+	flag.StringVar(&options.ProxyURL, "proxy", "", "Explicit HTTP proxy for the probe")
+	flag.StringVar(&options.Prompt, "prompt", "", "Image generation test prompt")
+	flag.StringVar(&options.ImageOutput, "image-output", "", "Private image path prefix; the detected extension is appended")
+	flag.StringVar(&options.ReferencePath, "reference-file", "", "Explicit PNG reference for edit or vision probing")
 	flag.StringVar(&options.Quality, "quality", "low", "One quality value to observe")
 	flag.StringVar(&options.Size, "size", "1024x1024", "One size value to observe")
 	flag.StringVar(&options.EditFormat, "edit-format", "multipart", "Edit encoding: multipart or json")

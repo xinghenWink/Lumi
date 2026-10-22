@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Lumi API
-  version: 0.2.0
+  version: 0.3.0
   description: >-
     M2 accounts, dual-bucket credits, pricing, redemption and administration. Financial mutations
     are transactional and idempotent. Mutations require a matching Origin/Referer and X-Lumi-CSRF:
@@ -1496,6 +1496,380 @@ paths:
                 format: binary
         default:
           $ref: '#/components/responses/APIError'
+  /api/v1/models:
+    get:
+      operationId: listAvailableModels
+      summary: listAvailableModels
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - chat
+              - image
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicModelCatalog'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/upstreams:
+    get:
+      operationId: listUpstreams
+      summary: listUpstreams
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - enabled
+              - disabled
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamPage'
+        default:
+          $ref: '#/components/responses/APIError'
+    post:
+      operationId: createUpstream
+      summary: createUpstream
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Upstream'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpstreamInput'
+  /api/v1/admin/upstreams/{id}:
+    put:
+      operationId: updateUpstream
+      summary: updateUpstream
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Upstream'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpstreamInput'
+    delete:
+      operationId: deleteUpstream
+      summary: deleteUpstream
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Success
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/upstreams/{id}/test:
+    post:
+      operationId: testUpstreamModels
+      summary: testUpstreamModels
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamConnectionTest'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/upstreams/{id}/discover:
+    post:
+      operationId: discoverUpstreamModels
+      summary: discoverUpstreamModels
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamDiscovery'
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/upstreams/{id}/import:
+    post:
+      operationId: importUpstreamModels
+      summary: importUpstreamModels
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamImportResult'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpstreamImportInput'
+  /api/v1/admin/models:
+    get:
+      operationId: listPlatformModels
+      summary: listPlatformModels
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - enabled
+              - disabled
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - chat
+              - image
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformModelPage'
+        default:
+          $ref: '#/components/responses/APIError'
+    post:
+      operationId: createPlatformModel
+      summary: createPlatformModel
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformModel'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformModelInput'
+  /api/v1/admin/models/{id}:
+    put:
+      operationId: updatePlatformModel
+      summary: updatePlatformModel
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformModel'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformModelInput'
+    delete:
+      operationId: deletePlatformModel
+      summary: deletePlatformModel
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Success
+        default:
+          $ref: '#/components/responses/APIError'
 components:
   headers:
     RequestID:
@@ -2771,6 +3145,527 @@ components:
           minItems: 1
           maxItems: 1000
           uniqueItems: true
+    UpstreamInput:
+      type: object
+      additionalProperties: false
+      properties:
+        version:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        base_url:
+          type: string
+          format: uri
+          description: HTTP or HTTPS base URL, including /v1 when required; no credentials, query or fragment.
+        api_key:
+          type:
+            - string
+            - 'null'
+          maxLength: 4096
+          description: >-
+            Required for creation. Omitted or null preserves the saved key. Empty clears it only on
+            a disabled channel. Never returned.
+        timeout_chat_s:
+          type: integer
+          minimum: 1
+          maximum: 600
+        timeout_image_s:
+          type: integer
+          minimum: 1
+          maximum: 600
+        proxy_url:
+          type: string
+        enabled:
+          type: boolean
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        weight:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        edit_format:
+          type: string
+          enum:
+            - multipart
+            - json
+        note:
+          type: string
+          maxLength: 500
+      required:
+        - version
+        - name
+        - base_url
+        - timeout_chat_s
+        - timeout_image_s
+        - proxy_url
+        - enabled
+        - priority
+        - weight
+        - edit_format
+        - note
+    Upstream:
+      type: object
+      additionalProperties: false
+      properties:
+        version:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        base_url:
+          type: string
+          format: uri
+          description: HTTP or HTTPS base URL, including /v1 when required; no credentials, query or fragment.
+        timeout_chat_s:
+          type: integer
+          minimum: 1
+          maximum: 600
+        timeout_image_s:
+          type: integer
+          minimum: 1
+          maximum: 600
+        proxy_url:
+          type: string
+        enabled:
+          type: boolean
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        weight:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        edit_format:
+          type: string
+          enum:
+            - multipart
+            - json
+        note:
+          type: string
+          maxLength: 500
+        id:
+          type: string
+          format: uuid
+        api_key_configured:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - version
+        - name
+        - base_url
+        - timeout_chat_s
+        - timeout_image_s
+        - proxy_url
+        - enabled
+        - priority
+        - weight
+        - edit_format
+        - note
+        - id
+        - api_key_configured
+        - created_at
+        - updated_at
+    UpstreamPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Upstream'
+        next_cursor:
+          type: string
+      required:
+        - items
+        - next_cursor
+    ModelCapabilities:
+      type: object
+      additionalProperties: false
+      properties:
+        vision:
+          type: boolean
+        stream:
+          type: boolean
+        max_context_tokens:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        qualities:
+          type: array
+          items:
+            type: string
+            enum:
+              - low
+              - medium
+              - high
+        sizes:
+          type: array
+          items:
+            type: string
+        max_n:
+          type: integer
+          minimum: 0
+          maximum: 10
+        supports_edit:
+          type: boolean
+        max_reference_images:
+          type: integer
+          minimum: 0
+          maximum: 4
+        response_format:
+          type: string
+          enum:
+            - ''
+            - b64_json
+            - url
+      required:
+        - vision
+        - stream
+        - max_context_tokens
+        - qualities
+        - sizes
+        - max_n
+        - supports_edit
+        - max_reference_images
+        - response_format
+    ModelRouteInput:
+      type: object
+      additionalProperties: false
+      properties:
+        upstream_id:
+          type: string
+          format: uuid
+        upstream_model_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        weight:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        enabled:
+          type: boolean
+      required:
+        - upstream_id
+        - upstream_model_name
+        - priority
+        - weight
+        - enabled
+    ModelRoute:
+      type: object
+      additionalProperties: false
+      properties:
+        upstream_id:
+          type: string
+          format: uuid
+        upstream_model_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        weight:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        enabled:
+          type: boolean
+        id:
+          type: string
+          format: uuid
+        upstream_name:
+          type: string
+        upstream_enabled:
+          type: boolean
+      required:
+        - upstream_id
+        - upstream_model_name
+        - priority
+        - weight
+        - enabled
+        - id
+        - upstream_name
+        - upstream_enabled
+    PublicModel:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        type:
+          type: string
+          enum:
+            - chat
+            - image
+        description:
+          type: string
+        icon:
+          type: string
+        sort_order:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        is_default:
+          type: boolean
+        capabilities:
+          $ref: '#/components/schemas/ModelCapabilities'
+      required:
+        - id
+        - display_name
+        - type
+        - description
+        - icon
+        - sort_order
+        - is_default
+        - capabilities
+    PlatformModel:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        type:
+          type: string
+          enum:
+            - chat
+            - image
+        description:
+          type: string
+        icon:
+          type: string
+        sort_order:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        is_default:
+          type: boolean
+        capabilities:
+          $ref: '#/components/schemas/ModelCapabilities'
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        enabled:
+          type: boolean
+        routes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelRoute'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - display_name
+        - type
+        - description
+        - icon
+        - sort_order
+        - is_default
+        - capabilities
+        - version
+        - enabled
+        - routes
+        - created_at
+        - updated_at
+    PlatformModelInput:
+      type: object
+      additionalProperties: false
+      properties:
+        version:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        type:
+          type: string
+          enum:
+            - chat
+            - image
+        description:
+          type: string
+          maxLength: 500
+        icon:
+          type: string
+          maxLength: 40
+        sort_order:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        enabled:
+          type: boolean
+        is_default:
+          type: boolean
+        capabilities:
+          $ref: '#/components/schemas/ModelCapabilities'
+        routes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelRouteInput'
+          maxItems: 20
+      required:
+        - version
+        - display_name
+        - type
+        - description
+        - icon
+        - sort_order
+        - enabled
+        - is_default
+        - capabilities
+        - routes
+    PlatformModelPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlatformModel'
+        next_cursor:
+          type: string
+      required:
+        - items
+        - next_cursor
+    PublicModelCatalog:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicModel'
+      required:
+        - items
+    UpstreamDiscovery:
+      type: object
+      additionalProperties: false
+      properties:
+        upstream_id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        models:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: string
+            required:
+              - id
+      required:
+        - upstream_id
+        - version
+        - models
+    UpstreamConnectionTest:
+      type: object
+      additionalProperties: false
+      properties:
+        success:
+          type: boolean
+        latency_ms:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        status:
+          type: integer
+          minimum: 0
+          maximum: 999
+        error_code:
+          type: string
+        model_count:
+          type: integer
+          minimum: 0
+          maximum: 1000
+      required:
+        - success
+        - latency_ms
+        - status
+        - error_code
+        - model_count
+    UpstreamImportInput:
+      type: object
+      additionalProperties: false
+      properties:
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        models:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              remote_id:
+                type: string
+              display_name:
+                type: string
+              type:
+                type: string
+                enum:
+                  - chat
+                  - image
+              capabilities:
+                $ref: '#/components/schemas/ModelCapabilities'
+            required:
+              - remote_id
+              - display_name
+              - type
+              - capabilities
+      required:
+        - version
+        - models
+    UpstreamImportResult:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlatformModel'
+      required:
+        - items
   securitySchemes:
     bearerAuth:
       type: http

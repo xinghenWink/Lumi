@@ -11,21 +11,22 @@ import (
 )
 
 type Config struct {
-	Environment        string
-	HTTPAddress        string
-	DatabaseURL        string
-	RedisURL           string
-	LogLevel           slog.Level
-	JWTSecret          string
-	EncryptionKey      []byte
-	AdminEmail         string
-	AdminPassword      string
-	AdminResetPassword string
-	PublicBaseURL      string
-	CookieSecure       bool
-	TrustedProxies     []string
-	DevOrigin          string
-	SettingsOverrides  map[string]string
+	Environment          string
+	HTTPAddress          string
+	DatabaseURL          string
+	RedisURL             string
+	LogLevel             slog.Level
+	JWTSecret            string
+	EncryptionKey        []byte
+	AdminEmail           string
+	AdminPassword        string
+	AdminResetPassword   string
+	PublicBaseURL        string
+	CookieSecure         bool
+	TrustedProxies       []string
+	DevOrigin            string
+	SettingsOverrides    map[string]string
+	UpstreamAllowPrivate bool
 }
 
 // Load accepts an environment lookup so tests do not mutate process state.
@@ -69,6 +70,13 @@ func Load(getenv func(string) string) (Config, error) {
 		}
 	}
 	cfg.CookieSecure = cfg.Environment == "production"
+	if raw := getenv("UPSTREAM_ALLOW_PRIVATE_NETWORKS"); raw != "" {
+		parsed, err := strconv.ParseBool(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("parse UPSTREAM_ALLOW_PRIVATE_NETWORKS: %w", err)
+		}
+		cfg.UpstreamAllowPrivate = parsed
+	}
 	if raw := getenv("COOKIE_SECURE"); raw != "" {
 		parsed, err := strconv.ParseBool(raw)
 		if err != nil {

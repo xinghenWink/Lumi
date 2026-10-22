@@ -26,6 +26,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"
+	"github.com/xinghenWink/Lumi/backend/internal/catalog"
 	"github.com/xinghenWink/Lumi/backend/internal/credits"
 	"github.com/xinghenWink/Lumi/backend/internal/http/account"
 	"github.com/xinghenWink/Lumi/backend/internal/http/handler"
@@ -36,6 +37,7 @@ import (
 	platformredis "github.com/xinghenWink/Lumi/backend/internal/platform/redis"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/secrets"
 	"github.com/xinghenWink/Lumi/backend/internal/settings"
+	"github.com/xinghenWink/Lumi/backend/internal/upstream"
 	"github.com/xinghenWink/Lumi/backend/internal/user"
 	"github.com/xinghenWink/Lumi/backend/migrations"
 )
@@ -138,7 +140,7 @@ func newAccountFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	sender := &captureMailer{codes: make(map[string]string)}
-	services := &account.Services{Auth: auth.New(pool, hasher, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing}
+	services := &account.Services{Auth: auth.New(pool, hasher, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: catalog.New(pool, vault, upstream.NetworkPolicy{AllowPrivate: true}, nil)}
 	engine, err := router.New(slog.New(slog.NewJSONHandler(io.Discard, nil)), handler.Health{Postgres: pool.Ping, Redis: cache.Ping}, handler.Version{}, fstest.MapFS{}, account.Routes(services, account.Security{Origins: []string{"https://lumi.test"}, CookieSecure: true}, slog.New(slog.NewJSONHandler(io.Discard, nil))))
 	if err != nil {
 		t.Fatal(err)
