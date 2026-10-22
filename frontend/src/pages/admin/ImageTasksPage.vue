@@ -1,0 +1,106 @@
+<script setup lang="ts">
+import { ref, shallowRef, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { images, type ImageTask } from '../../api/images'
+import ImageFilters from '../../components/images/ImageFilters.vue'
+import ImageTaskCard from '../../components/images/ImageTaskCard.vue'
+import ModalDialog from '../../components/ModalDialog.vue'
+import ApiNotice from '../../components/ApiNotice.vue'
+const { t } = useI18n(),
+  items = shallowRef<ImageTask[]>([]),
+  selected = shallowRef<ImageTask>(),
+  error = shallowRef<unknown>(),
+  loading = ref(false),
+  cursor = ref('')
+let query = new URLSearchParams({ limit: '40' }),
+  controller: AbortController | undefined
+async function load(more = false) {
+  controller?.abort()
+  const current = new AbortController()
+  controller = current
+  error.value = null
+  loading.value = true
+  if (!more) {
+    items.value = []
+    cursor.value = ''
+  }
+  try {
+    const q = new URLSearchParams(query)
+    if (more) q.set('cursor', cursor.value)
+    const page = await images.tasks(q, true, current.signal)
+    if (current.signal.aborted) return
+    items.value = more ? [...items.value, ...page.items] : page.items
+    cursor.value = page.next_cursor
+  } catch (e) {
+    if (!current.signal.aborted) error.value = e
+  } finally {
+    if (!current.signal.aborted) loading.value = false
+  }
+}
+async function detail(row: ImageTask) {
+  error.value = null
+  try {
+    selected.value = await images.task(row.id, true)
+  } catch (e) {
+    error.value = e
+  }
+}
+function apply(q: URLSearchParams) {
+  query = q
+  void load()
+}
+onMounted(() => void load())
+onUnmounted(() => controller?.abort())
+</script>
+<template>
+  <div class="page-container">
+    <div class="page-heading">
+      <div>
+        <h1>{{ t('images.adminTitle') }}</h1>
+        <p>{{ t('images.adminHint') }}</p>
+      </div>
+      <button class="button" :disabled="loading" @click="load()">{{ t('images.refresh') }}</button>
+    </div>
+    <ImageFilters admin @apply="apply" /><ApiNotice :error="error" />
+    <div class="table-scroll panel">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ t('images.task') }}</th>
+            <th>{{ t('images.user') }}</th>
+            <th>{{ t('images.model') }}</th>
+            <th>{{ t('images.status') }}</th>
+            <th>{{ t('images.count') }}</th>
+            <th>{{ t('images.created') }}</th>
+            <th>{{ t('images.details') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="task in items" :key="task.id">
+            <td class="mono">{{ task.id }}</td>
+            <td class="mono">{{ task.user_id }}</td>
+            <td>{{ task.model_name }}</td>
+            <td>{{ t('images.' + task.status) }}</td>
+            <td>{{ task.successful_images }} / {{ task.n }}</td>
+            <td>{{ new Date(task.created_at).toLocaleString() }}</td>
+            <td>
+              <button class="text-button" @click="detail(task)">{{ t('images.details') }}</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p v-if="loading" class="loading-state" role="status">{{ t('images.loading') }}</p>
+    <button v-if="cursor" class="button" :disabled="loading" @click="load(true)">
+      {{ t('images.more') }}
+    </button>
+    <ModalDialog
+      :open="!!selected"
+      :title="t('images.details')"
+      :description="t('images.adminHint')"
+      wide
+      @update:open="selected = undefined"
+      ><ImageTaskCard v-if="selected" :task="selected" admin @changed="detail(selected!)"
+    /></ModalDialog>
+  </div>
+</template>

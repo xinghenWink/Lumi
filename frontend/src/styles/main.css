@@ -2,6 +2,7 @@
 @import './credits.css';
 @import './catalog.css';
 @import './chat.css';
+@import './images.css';
 
 @theme {
   --font-sans: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;

@@ -840,7 +840,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** getOwnedImageFile */
+    /**
+     * getOwnedImageFile
+     * @description Owner metadata, or an administrator with content access enabled. Cross-owner administrator access is audited.
+     */
     get: operations['getOwnedImageFile']
     put?: never
     post?: never

@@ -214,6 +214,19 @@ func (s *Service) finalize(ctx context.Context, task query.ImageTask, status, co
 	})
 }
 func (s *Service) Execute(ctx context.Context, task query.ImageTask) {
+	// Fence delayed executors before any provider write after recovery or cancellation.
+	current, err := s.q.GetImageTask(ctx, task.ID)
+	if err != nil || current.Status != "running" || current.RunToken == nil || task.RunToken == nil || *current.RunToken != *task.RunToken {
+		return
+	}
+	if current.CancelRequested {
+		save, stop := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer stop()
+		if err := s.finalize(save, task, "canceled", "IMAGE_TASK_CANCELED"); err != nil {
+			s.report(save, "settle canceled image task failed", err)
+		}
+		return
+	}
 	work, cancel := context.WithTimeout(ctx, time.Duration(task.TimeoutSeconds)*time.Second)
 	defer cancel()
 	heartbeatDone := make(chan struct{})
@@ -418,7 +431,14 @@ func (s *Service) Run(ctx context.Context) {
 	defer recovery.Stop()
 	cleanup := time.NewTicker(time.Hour)
 	defer cleanup.Stop()
-	for _, job := range []func(context.Context) error{s.Recover, s.reconcile} {
+	clean := func(ctx context.Context) error {
+		cfg, err := s.Configuration(ctx)
+		if err != nil {
+			return err
+		}
+		return s.files.Cleanup(ctx, cfg.RetentionDays)
+	}
+	for _, job := range []func(context.Context) error{s.Recover, s.reconcile, clean} {
 		if err := job(work); err != nil {
 			s.report(work, "initialize image workers failed", err)
 		}

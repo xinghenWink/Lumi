@@ -352,10 +352,20 @@ func (h *Handler) imageFileMetadata(c *gin.Context) {
 		h.fail(c, err)
 		return
 	}
-	row, err := h.services.Files.Get(c.Request.Context(), p.User.ID, id)
+	row, err := h.services.Files.GetForAdmin(c.Request.Context(), id)
 	if err != nil {
 		h.fail(c, err)
 		return
+	}
+	if row.UserID != p.User.ID {
+		if p.User.Role != "admin" {
+			h.fail(c, problem.New("FILE_NOT_FOUND", 404))
+			return
+		}
+		if err := h.services.Images.AllowFileView(c.Request.Context(), p.Actor, id); err != nil {
+			h.fail(c, err)
+			return
+		}
 	}
 	c.JSON(200, h.services.Files.View(row, p.User.ID))
 }

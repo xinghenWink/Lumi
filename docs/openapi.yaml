@@ -2301,7 +2301,7 @@ paths:
     get:
       operationId: getOwnedImageFile
       summary: getOwnedImageFile
-      description: ''
+      description: Owner metadata, or an administrator with content access enabled. Cross-owner administrator access is audited.
       security:
         - bearerAuth: []
       parameters:

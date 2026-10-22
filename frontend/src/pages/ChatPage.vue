@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { Sparkles } from 'lucide-vue-next'
 import { useChatStore } from '../stores/chat'
 import { useModelStore } from '../stores/models'
+import { useImageStore } from '../stores/images'
 import type { Message } from '../api/chat'
 import { lastMessage } from '../features/chat/messages'
 import ChatComposer from '../components/chat/ChatComposer.vue'
@@ -17,6 +18,7 @@ const route = useRoute(),
   { t } = useI18n(),
   chat = useChatStore(),
   models = useModelStore()
+const images = useImageStore()
 const image = computed(() => route.path.startsWith('/create'))
 const editing = ref<Message | null>(null),
   edited = ref('')
@@ -82,7 +84,9 @@ watch(
         <RouterLink :to="chat.lastOpened ? '/chat/' + chat.lastOpened : '/chat'">{{
           t('chat.chatMode')
         }}</RouterLink
-        ><RouterLink to="/create">{{ t('chat.imageMode') }}</RouterLink>
+        ><RouterLink :to="images.lastOpened ? '/create/' + images.lastOpened : '/create'">{{
+          t('chat.imageMode')
+        }}</RouterLink>
       </nav>
       <div v-if="!image && chat.current" class="chat-current-title">
         <span>{{ chat.current.title || t('chat.untitled') }}</span

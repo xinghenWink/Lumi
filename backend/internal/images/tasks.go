@@ -147,8 +147,10 @@ func (s *Service) Submit(ctx context.Context, actor user.Actor, key string, inpu
 			return err
 		}
 		params, err := json.Marshal(struct {
-			Quality, Size, Ratio string
-			N                    int32
+			Quality string `json:"quality"`
+			Size    string `json:"size"`
+			Ratio   string `json:"ratio"`
+			N       int32  `json:"n"`
 		}{input.Quality, input.Size, input.Ratio, input.Count})
 		if err != nil {
 			return fmt.Errorf("encode image parameters: %w", err)
