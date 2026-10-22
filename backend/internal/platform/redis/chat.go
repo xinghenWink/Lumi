@@ -35,14 +35,14 @@ func (c *Client) AppendChat(ctx context.Context, key, kind, data string) error {
 	return nil
 }
 func (c *Client) ReadChat(ctx context.Context, key, after string) ([]ChatFrame, error) {
-	start := "-"
-	if after != "" {
-		start = "(" + after
-	}
-	rows, err := c.client.XRangeN(ctx, "lumi:chat:events:"+key, start, "+", 100).Result()
+	if after==""{after="0-0"}
+	streams, err := c.client.XRead(ctx,&redisclient.XReadArgs{Streams:[]string{"lumi:chat:events:"+key,after},Count:100,Block:200*time.Millisecond}).Result()
+	if err==redisclient.Nil{return []ChatFrame{},nil}
 	if err != nil {
 		return nil, fmt.Errorf("read chat buffer: %w", err)
 	}
+	rows:=[]redisclient.XMessage{}
+	for _,stream:=range streams{rows=append(rows,stream.Messages...)}
 	frames := make([]ChatFrame, 0, len(rows))
 	for _, row := range rows {
 		kind, ok := row.Values["type"].(string)

@@ -115,8 +115,6 @@ func (s *Service) Buffered(ctx context.Context, owner, id, request uuid.UUID, af
 	if _, err := s.Conversation(ctx, owner, id); err != nil {
 		return err
 	}
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
 	checked := time.Time{}
 	idle := time.Now()
 	for {
@@ -148,10 +146,6 @@ func (s *Service) Buffered(ctx context.Context, owner, id, request uuid.UUID, af
 		if time.Since(idle) > 20*time.Second {
 			return problem.New("CHAT_RESUME_EXPIRED", 410)
 		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-		}
+		if err:=ctx.Err();err!=nil{return err}
 	}
 }
