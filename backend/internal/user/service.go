@@ -27,10 +27,17 @@ type Service struct {
 	pool      *pgxpool.Pool
 	queries   *query.Queries
 	passwords *password.Hasher
+	credits   AccountCredits
 }
 
-func New(pool *pgxpool.Pool, passwords *password.Hasher) *Service {
-	return &Service{pool: pool, queries: query.New(pool), passwords: passwords}
+type AccountCredits interface {
+	Initialize(context.Context, *query.Queries, uuid.UUID, uuid.UUID, int64, netip.Addr) error
+	Summary(context.Context, uuid.UUID) (int64, int64, error)
+	Day(context.Context) (string, int64, error)
+}
+
+func New(pool *pgxpool.Pool, passwords *password.Hasher, credits AccountCredits) *Service {
+	return &Service{pool: pool, queries: query.New(pool), passwords: passwords, credits: credits}
 }
 
 // LockAdmin serializes privilege changes and rechecks the actor inside the transaction.
@@ -52,10 +59,11 @@ func LockAdmin(ctx context.Context, q *query.Queries, actor Actor) error {
 }
 
 type CreateInput struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Nickname string `json:"nickname"`
-	Role     string `json:"role"`
+	Email          string `json:"email"`
+	Password       string `json:"password"`
+	Nickname       string `json:"nickname"`
+	Role           string `json:"role"`
+	InitialCredits int64  `json:"initial_credits"`
 }
 type UpdateInput struct {
 	Email    *string `json:"email"`
@@ -103,6 +111,9 @@ func (s *Service) Create(ctx context.Context, actor Actor, input CreateInput) (P
 		record, err = q.CreateUser(ctx, query.CreateUserParams{ID: id, Email: email, PasswordHash: hash, Nickname: input.Nickname, Role: input.Role, Status: "active"})
 		if err != nil {
 			return DatabaseError("create user", err)
+		}
+		if err := s.credits.Initialize(ctx, q, id, actor.ID, input.InitialCredits, actor.IP); err != nil {
+			return err
 		}
 		return audit.Write(ctx, q, audit.Entry{ActorID: &actor.ID, Action: "user.create", TargetType: "user", TargetID: &record.ID, After: audit.UserSnapshot(record), IP: actor.IP})
 	})
@@ -328,6 +339,7 @@ func (s *Service) ChangePassword(ctx context.Context, actor Actor, input Passwor
 }
 
 type Filter struct {
+	MinBalance, MaxBalance             *int64
 	Search, Role, Status, Sort, Cursor string
 	From, Until                        *time.Time
 	Limit                              int32
@@ -338,19 +350,36 @@ type Page struct {
 }
 
 func (s *Service) List(ctx context.Context, filter Filter) (Page, error) {
-	if filter.Limit < 1 || filter.Limit > 100 || len(filter.Search) > 254 || (filter.Role != "" && filter.Role != "admin" && filter.Role != "user") || (filter.Status != "" && filter.Status != "active" && filter.Status != "disabled") || (filter.Sort != "created_at" && filter.Sort != "last_login_at") {
+	if filter.Limit < 1 || filter.Limit > 100 || len(filter.Search) > 254 || (filter.Role != "" && filter.Role != "admin" && filter.Role != "user") || (filter.Status != "" && filter.Status != "active" && filter.Status != "disabled") || (filter.Sort != "created_at" && filter.Sort != "last_login_at" && filter.Sort != "balance") {
 		return Page{}, problem.Invalid()
 	}
-	encoded, err := json.Marshal([]any{filter.Search, filter.Role, filter.Status, filter.Sort, filter.From, filter.Until})
+	if (filter.MinBalance != nil && (*filter.MinBalance < 0 || *filter.MinBalance > 2_000_000_000_000)) || (filter.MaxBalance != nil && (*filter.MaxBalance < 0 || *filter.MaxBalance > 2_000_000_000_000)) || (filter.MinBalance != nil && filter.MaxBalance != nil && *filter.MinBalance > *filter.MaxBalance) {
+		return Page{}, problem.Invalid()
+	}
+	today, grant, err := s.credits.Day(ctx)
+	if err != nil {
+		return Page{}, err
+	}
+	date, err := time.Parse(time.DateOnly, today)
+	if err != nil {
+		return Page{}, fmt.Errorf("parse credit calendar: %w", err)
+	}
+	encoded, err := json.Marshal([]any{filter.Search, filter.Role, filter.Status, filter.Sort, filter.From, filter.Until, filter.MinBalance, filter.MaxBalance, today, grant})
 	if err != nil {
 		return Page{}, fmt.Errorf("encode user filters: %w", err)
 	}
 	fingerprint := pagination.Fingerprint(string(encoded))
-	cursor, err := pagination.Decode(filter.Cursor, fingerprint)
+	var cursor pagination.Cursor
+	var number *int64
+	if filter.Sort == "balance" {
+		number, cursor.ID, err = pagination.DecodeNumber(filter.Cursor, fingerprint)
+	} else {
+		cursor, err = pagination.Decode(filter.Cursor, fingerprint)
+	}
 	if err != nil {
 		return Page{}, err
 	}
-	records, err := s.queries.ListUsers(ctx, query.ListUsersParams{Search: filter.Search, RoleFilter: filter.Role, StatusFilter: filter.Status, SortBy: filter.Sort, CreatedFrom: filter.From, CreatedUntil: filter.Until, CursorTime: cursor.Time, CursorID: cursor.ID, PageLimit: filter.Limit + 1})
+	records, err := s.queries.ListUsersWithCredits(ctx, query.ListUsersWithCreditsParams{Search: filter.Search, RoleFilter: filter.Role, StatusFilter: filter.Status, SortBy: filter.Sort, CreatedFrom: filter.From, CreatedUntil: filter.Until, CursorTime: cursor.Time, CursorID: cursor.ID, PageLimit: filter.Limit + 1, Today: date, DailyGrant: grant, MinBalance: filter.MinBalance, MaxBalance: filter.MaxBalance, CursorNumber: number})
 	if err != nil {
 		return Page{}, fmt.Errorf("list users: %w", err)
 	}
@@ -358,20 +387,28 @@ func (s *Service) List(ctx context.Context, filter Filter) (Page, error) {
 	if len(records) > int(filter.Limit) {
 		records = records[:filter.Limit]
 		last := records[len(records)-1]
-		at := last.CreatedAt
+		at := last.User.CreatedAt
 		if filter.Sort == "last_login_at" {
 			at = time.Unix(0, 0)
-			if last.LastLoginAt != nil {
-				at = *last.LastLoginAt
+			if last.User.LastLoginAt != nil {
+				at = *last.User.LastLoginAt
 			}
 		}
-		page.NextCursor, err = pagination.Encode(at, last.ID, fingerprint)
+		if filter.Sort == "balance" {
+			page.NextCursor, err = pagination.EncodeNumber(last.CreditTotal, last.User.ID, fingerprint)
+		} else {
+			page.NextCursor, err = pagination.Encode(at, last.User.ID, fingerprint)
+		}
 		if err != nil {
 			return Page{}, err
 		}
 	}
 	for _, record := range records {
-		page.Items = append(page.Items, View(record))
+		profile := View(record.User)
+		if err := s.addBalance(ctx, &profile); err != nil {
+			return Page{}, err
+		}
+		page.Items = append(page.Items, profile)
 	}
 	return page, nil
 }
@@ -400,6 +437,9 @@ func (s *Service) Detail(ctx context.Context, id uuid.UUID) (Detail, error) {
 		return Detail{}, fmt.Errorf("list user sessions: %w", err)
 	}
 	result := Detail{User: View(record), Sessions: make([]Session, 0, len(sessions))}
+	if err := s.addBalance(ctx, &result.User); err != nil {
+		return Detail{}, err
+	}
 	for _, session := range sessions {
 		result.Sessions = append(result.Sessions, Session{ID: session.ID, Device: session.Device, IP: session.Ip.String(), UserAgent: session.UserAgent, CreatedAt: session.CreatedAt.UTC(), ExpiresAt: session.ExpiresAt.UTC(), RevokedAt: UTCTime(session.RevokedAt)})
 	}

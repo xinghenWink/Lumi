@@ -122,7 +122,7 @@ test('M1 real registration, sessions, administration, settings and audit', async
     await edit.getByLabel('昵称', { exact: true }).fill('管理已改名')
     await edit.getByRole('button', { name: '保存修改', exact: true }).click()
     await expect(edit).not.toBeVisible()
-    await row.getByRole('link').click()
+    await row.locator('a.identity-link').click()
     await expect(page.getByRole('heading', { name: '管理已改名', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: '最近会话', exact: true })).toBeVisible()
     await page.screenshot({

@@ -1,0 +1,7 @@
+{
+  "ledger_headers": ["流水编号", "用户编号", "类型", "积分桶", "变动积分", "该桶变动后余额", "变动后总余额", "关联类型", "关联编号", "操作人编号", "备注", "时间（UTC）"],
+  "code_headers": ["兑换码编号", "批次编号", "兑换码", "每码积分", "可用次数", "已用次数", "状态", "过期时间（UTC）", "创建时间（UTC）"],
+  "types": {"signup_bonus":"注册赠送","daily_grant":"每日赠送","daily_expire":"每日到期","redeem":"兑换入账","admin_adjust":"管理员调整","image_charge":"生图扣费","image_refund":"生图退款"},
+  "buckets": {"daily":"每日赠送","permanent":"永久积分"},
+  "states": {"unused":"可兑换","used":"次数已用完","disabled":"已停用","expired":"已过期"}
+}

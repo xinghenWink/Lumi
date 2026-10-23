@@ -38,6 +38,30 @@ export const router = createRouter({
         },
         { path: 'admin', redirect: '/admin/users', meta: { admin: true } },
         {
+          path: 'me/credits',
+          name: 'credits',
+          component: () => import('../pages/CreditsPage.vue'),
+          meta: { title: 'nav.credits' },
+        },
+        {
+          path: 'admin/pricing',
+          name: 'pricing',
+          component: () => import('../pages/admin/PricingPage.vue'),
+          meta: { admin: true, title: 'nav.pricing' },
+        },
+        {
+          path: 'admin/redeem-codes',
+          name: 'redeem-codes',
+          component: () => import('../pages/admin/RedeemCodesPage.vue'),
+          meta: { admin: true, title: 'nav.redeemCodes' },
+        },
+        {
+          path: 'admin/credit-ledger',
+          name: 'credit-ledger',
+          component: () => import('../pages/admin/CreditLedgerPage.vue'),
+          meta: { admin: true, title: 'nav.creditLedger' },
+        },
+        {
           path: 'admin/users',
           name: 'users',
           component: () => import('../pages/admin/UsersPage.vue'),

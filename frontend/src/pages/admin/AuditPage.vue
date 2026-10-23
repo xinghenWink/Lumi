@@ -32,6 +32,14 @@ const actions = [
   'profile.password_change',
   'admin.bootstrap',
   'admin.password_reset_cli',
+  'credits.adjust',
+  'credits.initialize',
+  'credits.pricing_update',
+  'redeem.batch_create',
+  'redeem.codes_update',
+  'redeem.codes_delete',
+  'credit_ledger.export',
+  'redeem_code.export',
 ]
 const page = shallowRef<AuditPage | null>(null)
 const loading = ref(false)
@@ -129,7 +137,20 @@ function previous() {
         maxlength="36"
       /><select v-model="filters.targetType" :aria-label="t('audit.targetType')">
         <option value="">{{ t('audit.allTargets') }}</option>
-        <option v-for="type in ['user', 'site', 'registration', 'mail']" :key="type" :value="type">
+        <option
+          v-for="type in [
+            'user',
+            'site',
+            'registration',
+            'mail',
+            'pricing',
+            'redeem_batch',
+            'redeem_code',
+            'credit_ledger',
+          ]"
+          :key="type"
+          :value="type"
+        >
           {{ t(`audit.types.${type}`) }}
         </option></select
       ><input

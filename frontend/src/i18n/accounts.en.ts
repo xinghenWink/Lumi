@@ -168,7 +168,7 @@ export default {
       deleteSuccess: 'User deleted',
       statusSuccess: 'Account status updated',
       deleteDescription:
-        'This account will no longer be able to sign in. Audit records are retained.',
+        'This account will no longer be able to sign in. Audit, credit ledger and redemption records are retained.',
       deleteConfirm: 'Enter this user email to confirm deletion',
       deleteAction: 'Confirm deletion',
       selfProtected: 'You cannot change your own role, disable or delete yourself here.',
@@ -252,8 +252,29 @@ export default {
     emptyTitle: 'No matching audit records',
     emptyDescription: 'Adjust the filters or return after making account or settings changes.',
     otherAction: 'Other action ({action})',
-    types: { user: 'User', site: 'Site', registration: 'Registration', mail: 'Email delivery' },
+    types: {
+      user: 'User',
+      site: 'Site',
+      registration: 'Registration',
+      mail: 'Email delivery',
+      pricing: 'Pricing and gifts',
+      redeem_batch: 'Redeem batch',
+      redeem_code: 'Redeem code',
+      credit_ledger: 'Credit ledger',
+    },
     actions: {
+      credits: {
+        adjust: 'Adjust credits',
+        initialize: 'Grant initial credits',
+        pricing_update: 'Update pricing and gifts',
+      },
+      redeem: {
+        batch_create: 'Generate redeem batch',
+        codes_update: 'Change code status',
+        codes_delete: 'Delete unused codes',
+      },
+      credit_ledger: { export: 'Export credit ledger' },
+      redeem_code: { export: 'Export redeem codes' },
       user: {
         create: 'Create user',
         update: 'Update user',
@@ -288,10 +309,10 @@ export default {
     content:
       'Only submit content you are authorized to use. Administrator access is granted by the server. Ordinary accounts cannot elevate their own permissions.',
     dataTitle: 'Data we process',
-    data: 'Account use involves your email, display name, password hash, sign-in IP, device information and necessary security records. Passwords are not stored in plain text. Only refresh token hashes are stored.',
+    data: 'Account use involves your email, display name, password hash, sign-in IP, device information and necessary security records. Credit use records balance changes, charge settlements, redemption times, code tails and source IPs. Passwords are not stored in plain text. Only refresh token hashes are stored.',
     purposeTitle: 'Why it is used',
     purpose:
-      'This information supports authentication, account management, security and operation history. Administration requires authorization. Sensitive credentials are not returned to the browser.',
+      'This information supports authentication, account management, security and operation history. Credit ledger, charge settlement and redemption records retain a stable user identifier after account cleanup to preserve accounting history. Administration requires authorization. Sensitive credentials are not returned to the browser.',
     contactTitle: 'Contact',
     contact:
       'Use the contact information provided by the site operator for account or data questions.',

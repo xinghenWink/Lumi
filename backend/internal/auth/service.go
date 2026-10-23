@@ -52,10 +52,15 @@ type Service struct {
 	settings  Settings
 	gate      Gate
 	mailer    Mailer
+	credits   SignupCredits
 }
 
-func New(pool *pgxpool.Pool, passwords *password.Hasher, tokens *Tokens, settings Settings, gate Gate, mailer Mailer) *Service {
-	return &Service{pool: pool, queries: query.New(pool), passwords: passwords, tokens: tokens, settings: settings, gate: gate, mailer: mailer}
+type SignupCredits interface {
+	Signup(context.Context, *query.Queries, uuid.UUID) error
+}
+
+func New(pool *pgxpool.Pool, passwords *password.Hasher, tokens *Tokens, settings Settings, gate Gate, mailer Mailer, credits SignupCredits) *Service {
+	return &Service{pool: pool, queries: query.New(pool), passwords: passwords, tokens: tokens, settings: settings, gate: gate, mailer: mailer, credits: credits}
 }
 
 type Result struct {
@@ -251,6 +256,9 @@ func (s *Service) Register(ctx context.Context, input RegisterInput, client Clie
 		record, err := q.CreateUser(ctx, query.CreateUserParams{ID: id, Email: email, PasswordHash: hash, Nickname: input.Nickname, Role: "user", Status: "active", TermsAcceptedAt: &now})
 		if err != nil {
 			return user.DatabaseError("register user", err)
+		}
+		if err := s.credits.Signup(ctx, q, id); err != nil {
+			return err
 		}
 		if err := q.UpdateLogin(ctx, query.UpdateLoginParams{ID: id, LastLoginIp: &client.IP}); err != nil {
 			return fmt.Errorf("record registration login: %w", err)

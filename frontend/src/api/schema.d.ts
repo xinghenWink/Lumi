@@ -267,6 +267,249 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/me/credits': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Read balances and atomically apply the daily lazy reset */
+    get: operations['getMyCredits']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/me/credits/ledger': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listMyCreditLedger */
+    get: operations['listMyCreditLedger']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/me/credits/stats': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** 30 calendar days and current month in the configured credits timezone; image counts include settled successes only */
+    get: operations['getMyCreditUsage']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/me/credits/quote': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** quoteCredits */
+    post: operations['quoteCredits']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/me/redeem': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Redeem once per person; at most five attempts per minute and a one-hour cooldown after ten consecutive failures */
+    post: operations['redeemCredits']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/me/redeem-records': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listMyRedemptions */
+    get: operations['listMyRedemptions']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/users/{id}/credits': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** getUserCredits */
+    get: operations['getUserCredits']
+    put?: never
+    /** adjustUserCredits */
+    post: operations['adjustUserCredits']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/pricing': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** getCreditPricing */
+    get: operations['getCreditPricing']
+    /** Atomically replace global/model rules and gift configuration; requires all six global operation/quality rules */
+    put: operations['saveCreditPricing']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/credit-ledger': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listCreditLedger */
+    get: operations['listCreditLedger']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/redeem-batches': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listRedeemBatches */
+    get: operations['listRedeemBatches']
+    put?: never
+    /** createRedeemBatch */
+    post: operations['createRedeemBatch']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/redeem-codes': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listRedeemCodes */
+    get: operations['listRedeemCodes']
+    put?: never
+    post?: never
+    /** Only unused codes can be deleted; the whole selection is rolled back if any code has been used */
+    delete: operations['deleteUnusedRedeemCodes']
+    options?: never
+    head?: never
+    /** setRedeemCodesEnabled */
+    patch: operations['setRedeemCodesEnabled']
+    trace?: never
+  }
+  '/api/v1/admin/redeem-records': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listRedemptions */
+    get: operations['listRedemptions']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/credit-ledger/export': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** exportCreditLedger */
+    get: operations['exportCreditLedger']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/redeem-codes/export': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** exportRedeemCodes */
+    get: operations['exportRedeemCodes']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -315,6 +558,12 @@ export interface components {
       /** Format: date-time */
       last_login_at: string | null
       last_login_ip: string
+      /** Format: int64 */
+      permanent_balance?: number
+      /** Format: int64 */
+      daily_balance?: number
+      /** Format: int64 */
+      total_credits?: number
     }
     AuthResult: {
       access_token: string
@@ -358,6 +607,11 @@ export interface components {
       nickname: string
       /** @enum {string} */
       role: 'user' | 'admin'
+      /**
+       * Format: int64
+       * @default 0
+       */
+      initial_credits: number
     }
     UpdateUserInput: {
       /** Format: email */
@@ -490,6 +744,233 @@ export interface components {
     AuditPage: {
       items: components['schemas']['AuditRecord'][]
       next_cursor: string
+    }
+    CreditConfiguration: {
+      /** Format: int64 */
+      signup_bonus_credits: number
+      /** Format: int64 */
+      daily_free_credits: number
+      /** @description IANA timezone; default Asia/Shanghai. */
+      credits_timezone: string
+      /** @description Exact decimal multiplier from 0 to 100; never a binary floating-point amount. */
+      edit_multiplier: string
+      size_multipliers: {
+        [key: string]: string
+      }
+    }
+    CreditAccount: {
+      /** Format: uuid */
+      user_id: string
+      /** Format: int64 */
+      permanent_balance: number
+      /** Format: int64 */
+      daily_balance: number
+      /** Format: int64 */
+      total: number
+      /** Format: date */
+      daily_reset_on: string
+      /** Format: date-time */
+      next_reset_at: string
+      timezone: string
+      /** Format: int64 */
+      version: number
+    }
+    CreditPricingRule: {
+      /** Format: uuid */
+      model_id: string | null
+      /** @enum {string} */
+      operation: 'generate' | 'edit'
+      /** @enum {string} */
+      quality: 'low' | 'medium' | 'high'
+      /** Format: int64 */
+      credits_per_image: number
+      enabled: boolean
+    }
+    CreditPricing: {
+      rules: components['schemas']['CreditPricingRule'][]
+      configuration: components['schemas']['CreditConfiguration']
+    }
+    CreditQuoteInput: {
+      /** Format: uuid */
+      model_id?: string | null
+      /** @enum {string} */
+      operation: 'generate' | 'edit'
+      /** @enum {string} */
+      quality: 'low' | 'medium' | 'high'
+      size: string
+      /** Format: int64 */
+      count: number
+    }
+    CreditQuote: {
+      /** Format: int64 */
+      unit_price: number
+      /** Format: int64 */
+      total_cost: number
+      /** Format: int64 */
+      count: number
+    }
+    CreditAdjustInput: {
+      /**
+       * @default permanent
+       * @enum {string}
+       */
+      bucket: 'daily' | 'permanent'
+      /** @enum {string} */
+      action: 'add' | 'subtract' | 'set'
+      /** Format: int64 */
+      amount: number
+      note: string
+    }
+    CreditLedgerRecord: {
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      user_id: string
+      /** @enum {string} */
+      type:
+        | 'signup_bonus'
+        | 'daily_grant'
+        | 'daily_expire'
+        | 'redeem'
+        | 'admin_adjust'
+        | 'image_charge'
+        | 'image_refund'
+      /** @enum {string} */
+      bucket: 'daily' | 'permanent'
+      /** Format: int64 */
+      delta: number
+      /** Format: int64 */
+      bucket_balance_after: number
+      /** Format: int64 */
+      total_after: number
+      ref_type: string
+      /** Format: uuid */
+      ref_id: string | null
+      /** Format: uuid */
+      operator_id: string | null
+      note: string
+      /** Format: date-time */
+      created_at: string
+    }
+    CreditLedgerPage: {
+      items: components['schemas']['CreditLedgerRecord'][]
+      next_cursor: string
+    }
+    CreditUsageDay: {
+      /** Format: date */
+      date: string
+      /** Format: int64 */
+      consumed: number
+    }
+    CreditUsage: {
+      days: components['schemas']['CreditUsageDay'][]
+      /** Format: int64 */
+      month_consumed: number
+      images_by_quality: {
+        /** Format: int64 */
+        low: number
+        /** Format: int64 */
+        medium: number
+        /** Format: int64 */
+        high: number
+      }
+      timezone: string
+    }
+    RedeemInput: {
+      code: string
+    }
+    RedeemRecord: {
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      code_id: string
+      /** Format: uuid */
+      user_id: string
+      code_tail: string
+      /** Format: int64 */
+      credits: number
+      ip?: string
+      /** Format: date-time */
+      created_at: string
+    }
+    RedeemRecordPage: {
+      items: components['schemas']['RedeemRecord'][]
+      next_cursor: string
+    }
+    RedeemResult: {
+      /** Format: int64 */
+      credits: number
+      account: components['schemas']['CreditAccount']
+      record: components['schemas']['RedeemRecord']
+    }
+    RedeemBatchInput: {
+      name: string
+      note?: string
+      prefix?: string
+      /** Format: int64 */
+      quantity: number
+      /** Format: int64 */
+      credits: number
+      /**
+       * Format: int64
+       * @default 1
+       */
+      max_uses: number
+      /** Format: date-time */
+      expires_at?: string | null
+    }
+    RedeemBatch: {
+      /** Format: uuid */
+      id: string
+      name: string
+      note: string
+      prefix: string
+      /** Format: int64 */
+      quantity: number
+      /** Format: int64 */
+      credits: number
+      /** Format: int64 */
+      max_uses: number
+      /** Format: date-time */
+      expires_at: string | null
+      /** Format: date-time */
+      created_at: string
+    }
+    RedeemBatchPage: {
+      items: components['schemas']['RedeemBatch'][]
+      next_cursor: string
+    }
+    RedeemCode: {
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      batch_id: string
+      code: string
+      tail: string
+      /** Format: int64 */
+      credits: number
+      /** Format: int64 */
+      max_uses: number
+      /** Format: int64 */
+      used_count: number
+      enabled: boolean
+      /** @enum {string} */
+      status: 'unused' | 'used' | 'disabled' | 'expired'
+      /** Format: date-time */
+      expires_at: string | null
+      /** Format: date-time */
+      created_at: string
+    }
+    RedeemCodePage: {
+      items: components['schemas']['RedeemCode'][]
+      next_cursor: string
+    }
+    RedeemCodeEnableInput: {
+      ids: string[]
+      enabled: boolean
+    }
+    RedeemCodeDeleteInput: {
+      ids: string[]
     }
   }
   responses: {
@@ -841,7 +1322,9 @@ export interface operations {
         search?: string
         role?: 'user' | 'admin'
         status?: 'active' | 'disabled'
-        sort?: 'created_at' | 'last_login_at'
+        sort?: 'created_at' | 'last_login_at' | 'balance'
+        min_balance?: number
+        max_balance?: number
       }
       header?: never
       path?: never
@@ -1060,6 +1543,532 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['AuditPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getMyCredits: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CreditAccount']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listMyCreditLedger: {
+    parameters: {
+      query?: {
+        type?:
+          | 'signup_bonus'
+          | 'daily_grant'
+          | 'daily_expire'
+          | 'redeem'
+          | 'admin_adjust'
+          | 'image_charge'
+          | 'image_refund'
+        from?: string
+        until?: string
+        cursor?: string
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CreditLedgerPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getMyCreditUsage: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CreditUsage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  quoteCredits: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreditQuoteInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CreditQuote']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  redeemCredits: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        'Idempotency-Key': string
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RedeemInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RedeemResult']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listMyRedemptions: {
+    parameters: {
+      query?: {
+        code_id?: string
+        cursor?: string
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RedeemRecordPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getUserCredits: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CreditAccount']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  adjustUserCredits: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        'Idempotency-Key': string
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreditAdjustInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CreditAccount']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getCreditPricing: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CreditPricing']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  saveCreditPricing: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreditPricing']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CreditPricing']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listCreditLedger: {
+    parameters: {
+      query?: {
+        user_id?: string
+        type?:
+          | 'signup_bonus'
+          | 'daily_grant'
+          | 'daily_expire'
+          | 'redeem'
+          | 'admin_adjust'
+          | 'image_charge'
+          | 'image_refund'
+        from?: string
+        until?: string
+        cursor?: string
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CreditLedgerPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listRedeemBatches: {
+    parameters: {
+      query?: {
+        cursor?: string
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RedeemBatchPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  createRedeemBatch: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        'Idempotency-Key': string
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RedeemBatchInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      201: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RedeemBatch']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listRedeemCodes: {
+    parameters: {
+      query?: {
+        batch_id?: string
+        status?: 'unused' | 'used' | 'expired' | 'disabled'
+        search?: string
+        cursor?: string
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RedeemCodePage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  deleteUnusedRedeemCodes: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RedeemCodeDeleteInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      204: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  setRedeemCodesEnabled: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RedeemCodeEnableInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      204: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listRedemptions: {
+    parameters: {
+      query?: {
+        user_id?: string
+        code_id?: string
+        cursor?: string
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RedeemRecordPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  exportCreditLedger: {
+    parameters: {
+      query?: {
+        user_id?: string
+        type?:
+          | 'signup_bonus'
+          | 'daily_grant'
+          | 'daily_expire'
+          | 'redeem'
+          | 'admin_adjust'
+          | 'image_charge'
+          | 'image_refund'
+        from?: string
+        until?: string
+        cursor?: string
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Audited UTF-8 CSV download; untrusted cells are escaped against spreadsheet formula injection. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'text/csv': string
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  exportRedeemCodes: {
+    parameters: {
+      query?: {
+        batch_id?: string
+        status?: 'unused' | 'used' | 'expired' | 'disabled'
+        search?: string
+        cursor?: string
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Audited UTF-8 CSV download; untrusted cells are escaped against spreadsheet formula injection. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'text/csv': string
         }
       }
       default: components['responses']['APIError']

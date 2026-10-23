@@ -23,6 +23,105 @@ type AuditLog struct {
 	CreatedAt  time.Time
 }
 
+type CreditAccount struct {
+	UserID           uuid.UUID
+	PermanentBalance int64
+	DailyBalance     int64
+	DailyResetOn     *time.Time
+	Version          int64
+}
+
+type CreditCharge struct {
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	ReferenceID      uuid.UUID
+	ModelID          *uuid.UUID
+	Operation        string
+	Quality          string
+	Size             string
+	ImageCount       int64
+	UnitPrice        int64
+	TotalCost        int64
+	DailyCharged     int64
+	PermanentCharged int64
+	DailyResetOn     time.Time
+	FailedImages     int64
+	Settled          bool
+	CreatedAt        time.Time
+}
+
+type CreditLedger struct {
+	ID                 uuid.UUID
+	UserID             uuid.UUID
+	Type               string
+	Bucket             string
+	Delta              int64
+	BucketBalanceAfter int64
+	TotalAfter         int64
+	RefType            string
+	RefID              *uuid.UUID
+	IdempotencyKey     string
+	OperatorID         *uuid.UUID
+	Note               string
+	CreatedAt          time.Time
+}
+
+type CreditOperation struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	Key         string
+	Kind        string
+	RequestHash string
+	Response    []byte
+	CreatedAt   time.Time
+}
+
+type PricingRule struct {
+	ID              uuid.UUID
+	ModelID         *uuid.UUID
+	Operation       string
+	Quality         string
+	CreditsPerImage int64
+	Enabled         bool
+}
+
+type RedeemBatch struct {
+	ID        uuid.UUID
+	Name      string
+	Note      string
+	Prefix    string
+	Quantity  int32
+	Credits   int64
+	MaxUses   int32
+	ExpiresAt *time.Time
+	CreatedBy uuid.UUID
+	CreatedAt time.Time
+}
+
+type RedeemCode struct {
+	ID            uuid.UUID
+	BatchID       uuid.UUID
+	CodeHash      string
+	CodeEncrypted string
+	Tail          string
+	Credits       int64
+	MaxUses       int32
+	UsedCount     int32
+	Enabled       bool
+	ExpiresAt     *time.Time
+	CreatedAt     time.Time
+}
+
+type RedeemRecord struct {
+	ID        uuid.UUID
+	CodeID    uuid.UUID
+	UserID    uuid.UUID
+	CodeTail  string
+	Credits   int64
+	Ip        netip.Addr
+	CreatedAt time.Time
+}
+
 type Setting struct {
 	Key       string
 	Value     []byte

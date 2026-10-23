@@ -9,16 +9,19 @@ import (
 )
 
 type Profile struct {
-	ID          uuid.UUID  `json:"id"`
-	Email       string     `json:"email"`
-	Nickname    string     `json:"nickname"`
-	Role        string     `json:"role"`
-	Status      string     `json:"status"`
-	Locale      string     `json:"locale"`
-	Timezone    string     `json:"timezone"`
-	CreatedAt   time.Time  `json:"created_at"`
-	LastLoginAt *time.Time `json:"last_login_at"`
-	LastLoginIP string     `json:"last_login_ip"`
+	PermanentBalance *int64     `json:"permanent_balance,omitempty"`
+	DailyBalance     *int64     `json:"daily_balance,omitempty"`
+	TotalCredits     *int64     `json:"total_credits,omitempty"`
+	ID               uuid.UUID  `json:"id"`
+	Email            string     `json:"email"`
+	Nickname         string     `json:"nickname"`
+	Role             string     `json:"role"`
+	Status           string     `json:"status"`
+	Locale           string     `json:"locale"`
+	Timezone         string     `json:"timezone"`
+	CreatedAt        time.Time  `json:"created_at"`
+	LastLoginAt      *time.Time `json:"last_login_at"`
+	LastLoginIP      string     `json:"last_login_ip"`
 }
 
 type Actor struct {

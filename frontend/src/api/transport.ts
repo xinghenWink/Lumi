@@ -11,6 +11,8 @@ export class ApiError extends Error {
 }
 
 export interface RequestOptions {
+  idempotencyKey?: string
+  responseType?: 'blob'
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   body?: unknown
   signal?: AbortSignal
@@ -32,6 +34,7 @@ export async function request<T>(
   if (options.method && options.method !== 'GET') headers.set('X-Lumi-CSRF', '1')
   if (options.body !== undefined) headers.set('Content-Type', 'application/json')
   if (options.token) headers.set('Authorization', `Bearer ${options.token}`)
+  if (options.idempotencyKey) headers.set('Idempotency-Key', options.idempotencyKey)
   let response: Response
   try {
     response = await fetch(path, {
@@ -63,6 +66,11 @@ export async function request<T>(
     )
   }
   if (response.status === 204) return parse(undefined)
+  if (options.responseType === 'blob') {
+    if (!response.headers.get('Content-Type')?.startsWith('text/csv'))
+      throw new ApiError('RESPONSE_INVALID')
+    return parse(await response.blob())
+  }
   let value: unknown
   try {
     value = await response.json()

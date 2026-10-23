@@ -99,7 +99,7 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 		if err != nil {
 			return err
 		}
-		if err := user.New(database, passwords).ResetAdminPassword(startup, resetEmail, cfg.AdminResetPassword); err != nil {
+		if err := user.New(database, passwords, nil).ResetAdminPassword(startup, resetEmail, cfg.AdminResetPassword); err != nil {
 			return fmt.Errorf("reset administrator password: %w", err)
 		}
 		logger.Info("administrator password reset completed")
