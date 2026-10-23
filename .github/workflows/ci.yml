@@ -70,6 +70,7 @@ jobs:
           echo "$RUNNER_TEMP/k6-v1.3.0-linux-amd64" >> "$GITHUB_PATH"
       - name: Measure 100 distinct users with a local upstream
         env:
+          GOMAXPROCS: '2'
           E2E_DATABASE_URL: postgres://lumi:ci-e2e-only@127.0.0.1:5432/lumi_m7_load?sslmode=disable
           E2E_REDIS_URL: redis://127.0.0.1:6379/1
         run: |

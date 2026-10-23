@@ -179,6 +179,7 @@ try {
         chatStreams: 20,
         imageSubmitters: 5,
         duration: process.env.LUMI_DURATION ?? '60s',
+        goMaxProcs: process.env.GOMAXPROCS ?? 'runtime default',
         upstream: 'local deterministic SSE / PNG fixture; excludes real upstream latency',
         exitCode: code,
       },

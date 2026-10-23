@@ -82,7 +82,7 @@ make sqlc api test-integration build
 pnpm test:e2e
 # 单独创建空数据库 lumi_m7_load 和 Redis DB 1，然后设置两条测试连接 URL。
 # 每轮须全新数据库；runner 不删除已有数据库，也不导出令牌。
-E2E_DATABASE_URL=postgres://.../lumi_m7_load E2E_REDIS_URL=redis://.../1 make load-test
+GOMAXPROCS=2 E2E_DATABASE_URL=postgres://.../lumi_m7_load E2E_REDIS_URL=redis://.../1 make load-test
 sudo env LUMI_CURRENT_IMAGE=lumi:m7 LUMI_PREVIOUS_IMAGE=lumi:m6 make deploy-smoke
 ```
 
