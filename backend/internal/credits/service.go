@@ -211,6 +211,14 @@ func (s *Service) Read(ctx context.Context, id uuid.UUID) (Account, error) {
 	if err != nil {
 		return Account{}, err
 	}
+	// Only an expired or uninitialized daily bucket needs serialized financial writes.
+	current, err := s.queries.ReadCurrentCreditAccount(ctx, query.ReadCurrentCreditAccountParams{UserID: id, Today: today})
+	if err == nil {
+		return accountView(current, cfg, now)
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return Account{}, fmt.Errorf("read current credit account: %w", err)
+	}
 	expireID, err := validation.NewID()
 	if err != nil {
 		return Account{}, err

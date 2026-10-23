@@ -13,7 +13,7 @@ func PrepareLatencyQueries(ctx context.Context, conn *pgx.Conn) error {
 	for _, statement := range []string{
 		getAuthenticatedUser, getChatSettings, getPlatformModel, availableModelRoutes,
 		getConversation, listConversations, listPublicModels, listImageGallery,
-		getCreditConfiguration, readCreditAccount,
+		getCreditConfiguration, readCurrentCreditAccount, readCreditAccount,
 		lockChatUser, getUserForUpdate, lockConversation, chatMessageByRequest,
 		listChatMessages, insertChatMessage, getPreferences, useChatDailyQuota, startChatRun,
 		getUpstream, recordCircuitSuccess, appendUpstreamCall,

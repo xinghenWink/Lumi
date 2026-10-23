@@ -551,6 +551,31 @@ func (q *Queries) ReadCreditConfigurationLock(ctx context.Context) error {
 	return err
 }
 
+const readCurrentCreditAccount = `-- name: ReadCurrentCreditAccount :one
+SELECT a.user_id, a.permanent_balance, a.daily_balance, a.daily_reset_on, a.version FROM credit_accounts a JOIN users u ON u.id=a.user_id
+WHERE a.user_id=$1 AND u.deleted_at IS NULL
+  AND a.daily_reset_on>=$2::date
+`
+
+type ReadCurrentCreditAccountParams struct {
+	UserID uuid.UUID
+	Today  time.Time
+}
+
+// Current-day balance views use a committed snapshot without taking financial write locks.
+func (q *Queries) ReadCurrentCreditAccount(ctx context.Context, arg ReadCurrentCreditAccountParams) (CreditAccount, error) {
+	row := q.db.QueryRow(ctx, readCurrentCreditAccount, arg.UserID, arg.Today)
+	var i CreditAccount
+	err := row.Scan(
+		&i.UserID,
+		&i.PermanentBalance,
+		&i.DailyBalance,
+		&i.DailyResetOn,
+		&i.Version,
+	)
+	return i, err
+}
+
 const saveCreditAccount = `-- name: SaveCreditAccount :exec
 UPDATE credit_accounts SET permanent_balance=$2, daily_balance=$3, daily_reset_on=$4, version=version+1 WHERE user_id=$1
 `

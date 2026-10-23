@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"
 	"github.com/xinghenWink/Lumi/backend/internal/credits"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
@@ -68,6 +70,42 @@ func creditBalance(t *testing.T, f *fixture, id uuid.UUID) credits.Account {
 	}
 	return value
 }
+func TestM7CurrentBalanceReadDoesNotWaitForFinancialWrites(t *testing.T) {
+	f := newAccountFixture(t)
+	actor := creditActor(t, f)
+	creditPricing(t, f, actor, 5)
+	member := creditMember(t, f, actor, 10)
+	before := creditBalance(t, f, member.ID)
+	tx, err := f.pool.Begin(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := tx.Rollback(f.ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			t.Error(err)
+		}
+	}()
+	if _, err := tx.Exec(f.ctx, "UPDATE credit_accounts SET permanent_balance=permanent_balance+7 WHERE user_id=$1", member.ID); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(f.ctx, 500*time.Millisecond)
+	defer cancel()
+	current, err := f.services.Credits.Read(ctx, member.ID)
+	if err != nil {
+		t.Fatalf("current balance waited for an unrelated uncommitted write: %v", err)
+	}
+	if current.PermanentBalance != before.PermanentBalance || current.DailyBalance != 5 || current.Version != before.Version {
+		t.Fatalf("balance did not retain the committed snapshot: before=%+v current=%+v", before, current)
+	}
+	if err := tx.Rollback(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	after := creditBalance(t, f, member.ID)
+	if after.PermanentBalance != before.PermanentBalance || after.Version != before.Version {
+		t.Fatal("read-only balance access changed the financial account")
+	}
+}
+
 func TestM2CreditConsistency(t *testing.T) {
 	f := newAccountFixture(t)
 	actor := creditActor(t, f)

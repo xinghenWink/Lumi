@@ -4,6 +4,12 @@ SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL FOR SHARE;
 -- name: LockCreditAccount :one
 SELECT * FROM credit_accounts WHERE user_id = $1 FOR UPDATE;
 
+-- name: ReadCurrentCreditAccount :one
+-- Current-day balance views use a committed snapshot without taking financial write locks.
+SELECT a.* FROM credit_accounts a JOIN users u ON u.id=a.user_id
+WHERE a.user_id=sqlc.arg(user_id) AND u.deleted_at IS NULL
+  AND a.daily_reset_on>=sqlc.arg(today)::date;
+
 -- name: ReadCreditAccount :one
 -- Keep lazy reset and both immutable ledger entries in one atomic statement.
 -- Lock the owner before the account, matching every other financial mutation.
