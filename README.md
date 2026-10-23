@@ -76,4 +76,4 @@ access token 仅放前端内存；refresh 为 HttpOnly / SameSite=Lax Cookie。�
 
 CI 检查 lint / 类型 / 单测 / 真实集成 / 生成一致性 / 构建 / 全流程 E2E / Lighthouse / 100 VU / 容器部署恢复及生产依赖漏洞。所有报告保留为受限 CI artifact，测试令牌文件不上传。
 
-main 生成 edge / sha 镜像；已验收版本 tag 生成版本 / X.Y / latest 的 amd64 + arm64 GHCR 镜像。两种原生架构按 digest 验证通过才创建 Release 并附部署包。私有镜像服务器需只读 Packages PAT。M7 未通过项完成前不创建 v1.0.0 标签。
+main 生成 edge / sha 镜像；已验收版本 tag 生成版本 / X.Y / latest 的 amd64 + arm64 GHCR 镜像。两种原生架构按 digest 验证后生成带部署包及官方 amd64 归档的 Release 草稿；整个工作流全绿且正式镜像在目标服务器验收后，授权发布者才发布草稿。私有镜像可使用只读 Packages PAT 或官方离线归档。M7 未通过项完成前不创建 v1.0.0 标签。
