@@ -34,4 +34,6 @@
 
 F-AUTH-03 的注册积分及 F-ADM-03 的初始积分、余额筛选和积分详情在 M2；模型/聊天/图像能力在 M3～M5。M1 不写入积分流水，也不显示示例余额。头像上传和 P1 账号设备管理、找回密码与 Turnstile 等不在本阶段。
 
+M5 后续补充：文件模块已接入 F-ME-01 的头像上传、256px 裁剪与持久化替换，验收记录见 [M5_ACCEPTANCE.md](M5_ACCEPTANCE.md)。
+
 M0 发布验收已完成：[v0.0.1](https://github.com/xinghenWink/Lumi/releases/tag/v0.0.1) 的 amd64 / arm64 镜像均通过完整生产 Compose 验证，详见 `M0_ACCEPTANCE.md`。用户随后要求完成验收并合并 M0 / M1，合并顺序为 PR #1 → PR #2。`v0.0.1` 保留纯 M0 内容，M1 合并后的镜像由 main 的 `edge` / `sha-*` 发布提供。

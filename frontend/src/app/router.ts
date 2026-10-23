@@ -39,8 +39,32 @@ export const router = createRouter({
         {
           path: 'create',
           name: 'image-workspace',
-          component: () => import('../pages/ChatPage.vue'),
+          component: () => import('../pages/ImagePage.vue'),
           meta: { title: 'nav.create' },
+        },
+        {
+          path: 'create/:id',
+          name: 'image-conversation',
+          component: () => import('../pages/ImagePage.vue'),
+          meta: { title: 'nav.create' },
+        },
+        {
+          path: 'me/images',
+          name: 'image-gallery',
+          component: () => import('../pages/ImageGalleryPage.vue'),
+          meta: { title: 'nav.gallery' },
+        },
+        {
+          path: 'admin/image-tasks',
+          name: 'image-tasks',
+          component: () => import('../pages/admin/ImageTasksPage.vue'),
+          meta: { admin: true, title: 'nav.imageTasks' },
+        },
+        {
+          path: 'admin/image-settings',
+          name: 'image-settings',
+          component: () => import('../pages/admin/ImageSettingsPage.vue'),
+          meta: { admin: true, title: 'nav.imageSettings' },
         },
         {
           path: 'chat/:id',

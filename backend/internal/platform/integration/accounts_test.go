@@ -32,6 +32,8 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/http/account"
 	"github.com/xinghenWink/Lumi/backend/internal/http/handler"
 	"github.com/xinghenWink/Lumi/backend/internal/http/router"
+	"github.com/xinghenWink/Lumi/backend/internal/images"
+	"github.com/xinghenWink/Lumi/backend/internal/media"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/password"
@@ -69,6 +71,7 @@ type fixture struct {
 	sender                    *captureMailer
 	server                    *httptest.Server
 	adminEmail, adminPassword string
+	dataDir                   string
 }
 type reply struct {
 	status  int
@@ -143,13 +146,24 @@ func newAccountFixture(t *testing.T) *fixture {
 	sender := &captureMailer{codes: make(map[string]string)}
 	services := &account.Services{Auth: auth.New(pool, hasher, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: catalog.New(pool, vault, upstream.NetworkPolicy{AllowPrivate: true}, nil)}
 	services.Chat = chat.New(pool, services.Catalog, cache)
+	dataDir := t.TempDir()
+	services.Files, err = media.New(pool, dataDir, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := services.Files.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	services.Images = images.New(pool, billing, services.Catalog, services.Files, cache, nil)
 	engine, err := router.New(slog.New(slog.NewJSONHandler(io.Discard, nil)), handler.Health{Postgres: pool.Ping, Redis: cache.Ping}, handler.Version{}, fstest.MapFS{}, account.Routes(services, account.Security{Origins: []string{"https://lumi.test"}, CookieSecure: true}, slog.New(slog.NewJSONHandler(io.Discard, nil))))
 	if err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewTLSServer(engine)
 	t.Cleanup(server.Close)
-	return &fixture{ctx: ctx, pool: pool, cache: cache, services: services, sender: sender, server: server, adminEmail: email, adminPassword: value, vault: vault}
+	return &fixture{ctx: ctx, pool: pool, cache: cache, services: services, sender: sender, server: server, adminEmail: email, adminPassword: value, vault: vault, dataDir: dataDir}
 }
 
 func (f *fixture) client(t *testing.T) *http.Client {

@@ -9,6 +9,8 @@ import catalogZH from './catalog.zh-CN'
 import catalogEN from './catalog.en'
 import chatZH from './chat.zh-CN'
 import chatEN from './chat.en'
+import imagesZH from './images.zh-CN'
+import imagesEN from './images.en'
 
 export const i18n = createI18n({
   legacy: false,
@@ -21,8 +23,21 @@ export const i18n = createI18n({
       ...creditsZH,
       ...catalogZH,
       ...chatZH,
-      nav: { ...accountsZH.nav, ...creditsZH.nav, ...catalogZH.nav, ...chatZH.nav },
-      errors: { ...accountsZH.errors, ...creditsZH.errors, ...catalogZH.errors, ...chatZH.errors },
+      ...imagesZH,
+      nav: {
+        ...accountsZH.nav,
+        ...creditsZH.nav,
+        ...catalogZH.nav,
+        ...chatZH.nav,
+        ...imagesZH.nav,
+      },
+      errors: {
+        ...accountsZH.errors,
+        ...creditsZH.errors,
+        ...catalogZH.errors,
+        ...chatZH.errors,
+        ...imagesZH.errors,
+      },
     },
     en: {
       ...en,
@@ -30,8 +45,21 @@ export const i18n = createI18n({
       ...creditsEN,
       ...catalogEN,
       ...chatEN,
-      nav: { ...accountsEN.nav, ...creditsEN.nav, ...catalogEN.nav, ...chatEN.nav },
-      errors: { ...accountsEN.errors, ...creditsEN.errors, ...catalogEN.errors, ...chatEN.errors },
+      ...imagesEN,
+      nav: {
+        ...accountsEN.nav,
+        ...creditsEN.nav,
+        ...catalogEN.nav,
+        ...chatEN.nav,
+        ...imagesEN.nav,
+      },
+      errors: {
+        ...accountsEN.errors,
+        ...creditsEN.errors,
+        ...catalogEN.errors,
+        ...chatEN.errors,
+        ...imagesEN.errors,
+      },
     },
   },
 })

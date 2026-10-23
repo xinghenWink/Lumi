@@ -15,6 +15,7 @@ export interface RequestOptions {
   responseType?: 'blob'
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   body?: unknown
+  form?: FormData
   signal?: AbortSignal
   token?: string | null
 }
@@ -26,6 +27,7 @@ export function record(value: unknown): Record<string, unknown> {
 }
 
 export async function openResponse(path: string, options: RequestOptions = {}): Promise<Response> {
+  if (options.body !== undefined && options.form) throw new ApiError('INVALID_INPUT')
   const headers = new Headers()
   if (options.method && options.method !== 'GET') headers.set('X-Lumi-CSRF', '1')
   if (options.body !== undefined) headers.set('Content-Type', 'application/json')
@@ -38,6 +40,7 @@ export async function openResponse(path: string, options: RequestOptions = {}): 
       headers,
       credentials: 'same-origin',
       ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+      ...(options.form ? { body: options.form } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
     })
   } catch (error) {

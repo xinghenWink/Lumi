@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, defineAsyncComponent } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   ArrowLeft,
@@ -19,6 +19,10 @@ import BrandMark from './BrandMark.vue'
 import AccountMenu from './AccountMenu.vue'
 import ChatSidebar from './chat/ChatSidebar.vue'
 import { useSiteStore } from '../stores/site'
+import { useImageStore } from '../stores/images'
+const ImageSidebar = defineAsyncComponent(() => import('./images/ImageSidebar.vue'))
+const route = useRoute(),
+  images = useImageStore()
 const props = defineProps<{ admin: boolean }>()
 const emit = defineEmits<{ navigate: [] }>()
 const { t } = useI18n()
@@ -30,6 +34,8 @@ const links = computed(() =>
         { path: '/admin/upstreams', key: 'nav.upstreams', icon: Server },
         { path: '/admin/models', key: 'nav.models', icon: Boxes },
         { path: '/admin/chat-settings', key: 'nav.chatSettings', icon: MessageSquare },
+        { path: '/admin/image-tasks', key: 'nav.imageTasks', icon: Image },
+        { path: '/admin/image-settings', key: 'nav.imageSettings', icon: Settings2 },
         { path: '/admin/pricing', key: 'nav.pricing', icon: SlidersHorizontal },
         { path: '/admin/redeem-codes', key: 'nav.redeemCodes', icon: Ticket },
         { path: '/admin/credit-ledger', key: 'nav.creditLedger', icon: Coins },
@@ -40,6 +46,7 @@ const links = computed(() =>
         { path: '/chat', key: 'nav.chat', icon: MessageSquare },
         { path: '/me/credits', key: 'nav.credits', icon: Coins },
         { path: '/me/chats', key: 'nav.chatHistory', icon: MessageSquare },
+        { path: '/me/images', key: 'nav.gallery', icon: Image },
       ],
 )
 </script>
@@ -61,12 +68,17 @@ const links = computed(() =>
         @click="emit('navigate')"
         ><component :is="link.icon" :size="18" />{{ t(link.key) }}</RouterLink
       >
-      <RouterLink v-if="!admin" to="/create" class="sidebar-link" @click="emit('navigate')">
-        <Image :size="18" />{{ t('nav.image')
-        }}<span class="soon-badge">{{ t('nav.comingSoon') }}</span>
+      <RouterLink
+        v-if="!admin"
+        :to="images.lastOpened ? '/create/' + images.lastOpened : '/create'"
+        class="sidebar-link"
+        @click="emit('navigate')"
+      >
+        <Image :size="18" />{{ t('nav.image') }}
       </RouterLink>
     </nav>
-    <ChatSidebar v-if="!admin" @navigate="emit('navigate')" />
+    <ImageSidebar v-if="!admin && route.path.startsWith('/create')" @navigate="emit('navigate')" />
+    <ChatSidebar v-else-if="!admin" @navigate="emit('navigate')" />
     <div v-else class="sidebar-spacer" />
     <RouterLink
       v-if="admin"

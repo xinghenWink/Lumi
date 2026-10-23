@@ -73,6 +73,9 @@ func multiplier(value string) (*big.Rat, error) {
 	return amount, nil
 }
 func validSize(value string) bool {
+	if value == "auto" {
+		return true
+	}
 	width, height, ok := strings.Cut(value, "x")
 	if !ok {
 		return false

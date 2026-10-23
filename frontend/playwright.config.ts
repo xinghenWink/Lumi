@@ -37,6 +37,7 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       APP_ENV: 'test',
+      DATA_DIR: '../.tools/e2e-data',
       UPSTREAM_ALLOW_PRIVATE_NETWORKS: 'true',
       // Viewport projects represent separate clients while retaining real IP rate limits.
       TRUSTED_PROXIES: '127.0.0.1',

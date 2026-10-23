@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, shallowRef } from 'vue'
+import { onMounted, onUnmounted, reactive, ref, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { accounts } from '../api/accounts'
@@ -7,6 +7,9 @@ import { useAuthStore } from '../stores/auth'
 import { useThemeStore, type Theme } from '../stores/theme'
 import { validPassword } from '../features/accounts/utils'
 import ApiNotice from '../components/ApiNotice.vue'
+import UserAvatar from '../components/UserAvatar.vue'
+import { images } from '../api/images'
+import { ApiError } from '../api/transport'
 const { t, locale } = useI18n()
 const auth = useAuthStore()
 const theme = useThemeStore()
@@ -24,6 +27,31 @@ const passwordError = shallowRef<unknown>(null)
 const validation = ref('')
 const passwordValidation = ref('')
 const notice = ref('')
+const avatarBusy = ref(false),
+  avatarInput = ref<HTMLInputElement>(),
+  avatarError = shallowRef<unknown>()
+const avatarController = new AbortController()
+onUnmounted(() => avatarController.abort())
+async function uploadAvatar(event: Event) {
+  const input = event.target
+  if (!(input instanceof HTMLInputElement)) return
+  const file = input.files?.[0],
+    owner = auth.user?.id
+  input.value = ''
+  if (!file || !owner) return
+  avatarBusy.value = true
+  avatarError.value = null
+  try {
+    if (file.size > 2_097_152) throw new ApiError('FILE_TOO_LARGE')
+    const result = await images.upload(file, avatarController.signal, true)
+    if (!avatarController.signal.aborted && auth.user?.id === owner)
+      auth.updateUser({ ...auth.user, avatar_file_id: result.id })
+  } catch (e) {
+    if (!avatarController.signal.aborted && auth.user?.id === owner) avatarError.value = e
+  } finally {
+    if (!avatarController.signal.aborted) avatarBusy.value = false
+  }
+}
 onMounted(() => {
   if (auth.user) {
     form.nickname = auth.user.nickname
@@ -102,6 +130,28 @@ function setTheme(event: Event) {
         <h2>{{ t('profile.basics') }}</h2>
       </div>
       <form class="panel-body stack" @submit.prevent="save">
+        <div class="profile-avatar">
+          <UserAvatar />
+          <div>
+            <input
+              ref="avatarInput"
+              hidden
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              tabindex="-1"
+              @change="uploadAvatar"
+            /><button
+              type="button"
+              class="button compact"
+              :disabled="avatarBusy"
+              @click="avatarInput?.click()"
+            >
+              {{ t('images.avatar') }}
+            </button>
+            <p class="field-hint">{{ t('images.avatarHint') }}</p>
+          </div>
+        </div>
+        <ApiNotice :error="avatarError" />
         <label class="field"
           >{{ t('auth.nickname')
           }}<input

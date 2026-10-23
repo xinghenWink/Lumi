@@ -22,6 +22,8 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/credits"
 	"github.com/xinghenWink/Lumi/backend/internal/http/middleware"
 	"github.com/xinghenWink/Lumi/backend/internal/http/response"
+	"github.com/xinghenWink/Lumi/backend/internal/images"
+	"github.com/xinghenWink/Lumi/backend/internal/media"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/problem"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/validation"
 	"github.com/xinghenWink/Lumi/backend/internal/settings"
@@ -37,6 +39,8 @@ type Services struct {
 	Credits  *credits.Service
 	Catalog  *catalog.Service
 	Chat     *chat.Service
+	Images   *images.Service
+	Files    *media.Store
 }
 type Security struct {
 	Origins        []string
@@ -79,6 +83,7 @@ func Routes(services *Services, security Security, logger *slog.Logger) func(*gi
 		h.creditRoutes(protected, admin)
 		h.catalogRoutes(protected, admin)
 		h.chatRoutes(protected, admin)
+		h.imageRoutes(protected, admin)
 		return nil
 	}
 }

@@ -58,7 +58,7 @@ func TestInfrastructure(t *testing.T) {
 		t.Fatalf("repeat migration: %v", err)
 	}
 	var count int
-	for _, version := range []int64{1, 2, 3, 4, 5, 6} {
+	for _, version := range []int64{1, 2, 3, 4, 5, 6, 7} {
 		if err := pool.QueryRow(ctx, "SELECT count(*) FROM public.goose_db_version WHERE version_id = $1 AND is_applied", version).Scan(&count); err != nil || count != 1 {
 			t.Fatalf("migration %d version count = %d, error = %v", version, count, err)
 		}

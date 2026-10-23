@@ -299,6 +299,37 @@ func (c *Client) GenerateImages(ctx context.Context, input ImageRequest) (result
 	defer closeBody(response, &result)
 	return c.imageResults(response, input.Count)
 }
+
+// FetchImage accepts only the configured origin and never forwards credentials or redirects.
+func (c *Client) FetchImage(ctx context.Context, raw string) (data []byte, result error) {
+	target, err := url.Parse(raw)
+	if err != nil || target.User != nil || target.Fragment != "" || !strings.EqualFold(target.Scheme, c.base.Scheme) || !strings.EqualFold(target.Host, c.base.Host) {
+		return nil, &Failure{Code: "UPSTREAM_IMAGE_ORIGIN"}
+	}
+	if err := c.policy.ValidateDestination(ctx, target); err != nil {
+		return nil, &Failure{Code: "UPSTREAM_NETWORK_BLOCKED"}
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("create image download request: %w", err)
+	}
+	response, err := c.image.Do(request)
+	if err != nil {
+		return nil, &Failure{Code: FailureCode(err)}
+	}
+	defer closeBody(response, &result)
+	if response.StatusCode != http.StatusOK {
+		return nil, &Failure{Code: "UPSTREAM_RESPONSE_INVALID", Status: response.StatusCode}
+	}
+	data, err = io.ReadAll(io.LimitReader(response.Body, 20<<20+1))
+	if err != nil {
+		return nil, &Failure{Code: "UPSTREAM_RESPONSE_INVALID"}
+	}
+	if len(data) == 0 || len(data) > 20<<20 {
+		return nil, &Failure{Code: "UPSTREAM_RESPONSE_INVALID"}
+	}
+	return data, nil
+}
 func (c *Client) EditImages(ctx context.Context, input EditRequest) (results []ImageResult, result error) {
 	if !validImage(input.ImageRequest) || len(input.References) < 1 || len(input.References) > 4 {
 		return nil, &Failure{Code: "UPSTREAM_REQUEST_INVALID"}

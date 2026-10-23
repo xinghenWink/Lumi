@@ -15,6 +15,7 @@ type Profile struct {
 	ID               uuid.UUID  `json:"id"`
 	Email            string     `json:"email"`
 	Nickname         string     `json:"nickname"`
+	AvatarFileID     *uuid.UUID `json:"avatar_file_id"`
 	Role             string     `json:"role"`
 	Status           string     `json:"status"`
 	Locale           string     `json:"locale"`
@@ -35,7 +36,7 @@ func View(record query.User) Profile {
 	if record.LastLoginIp != nil {
 		ip = record.LastLoginIp.String()
 	}
-	return Profile{ID: record.ID, Email: record.Email, Nickname: record.Nickname,
+	return Profile{ID: record.ID, Email: record.Email, Nickname: record.Nickname, AvatarFileID: record.AvatarFileID,
 		Role: record.Role, Status: record.Status, Locale: record.Locale, Timezone: record.Timezone,
 		CreatedAt: record.CreatedAt.UTC(), LastLoginAt: UTCTime(record.LastLoginAt), LastLoginIP: ip}
 }

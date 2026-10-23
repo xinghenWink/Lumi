@@ -123,6 +123,17 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 		logger.Error("account service initialization failed")
 		return fmt.Errorf("initialize accounts: %w", err)
 	}
+	if accounts != nil {
+		defer func() {
+			if err := accounts.Files.Close(); err != nil {
+				logger.Error("close image storage failed")
+			}
+		}()
+		// Settle expired work before account retention can remove its owner.
+		if err := accounts.Images.Recover(startup); err != nil {
+			return fmt.Errorf("recover image tasks before startup: %w", err)
+		}
+	}
 	if cfg.DatabaseURL == "" || cfg.RedisURL == "" {
 		logger.Warn("development without dependencies; readiness will return 503")
 	}
@@ -147,6 +158,8 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 	}
 	serveResult := make(chan error, 1)
 	if accounts != nil {
+		stopImages := startImageWorkers(ctx, accounts.Images)
+		defer stopImages()
 		stopMaintenance := startUserMaintenance(ctx, accounts.Users, logger)
 		defer stopMaintenance()
 		stopCalls := startCallMaintenance(ctx, accounts.Catalog, logger)

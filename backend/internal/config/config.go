@@ -27,6 +27,7 @@ type Config struct {
 	DevOrigin            string
 	SettingsOverrides    map[string]string
 	UpstreamAllowPrivate bool
+	DataDir              string
 }
 
 // Load accepts an environment lookup so tests do not mutate process state.
@@ -47,6 +48,11 @@ func Load(getenv func(string) string) (Config, error) {
 	if cfg.Environment != "development" && cfg.Environment != "production" && cfg.Environment != "test" {
 		return Config{}, fmt.Errorf("APP_ENV must be development, production or test")
 	}
+	defaultDirectory := "data"
+	if cfg.Environment == "production" {
+		defaultDirectory = "/data"
+	}
+	cfg.DataDir = value(getenv, "DATA_DIR", defaultDirectory)
 	if _, _, err := net.SplitHostPort(cfg.HTTPAddress); err != nil {
 		return Config{}, fmt.Errorf("parse HTTP_ADDR: %w", err)
 	}
