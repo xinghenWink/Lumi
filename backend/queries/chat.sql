@@ -54,6 +54,27 @@ UPDATE conversations SET lease_until=now()+interval '45 seconds' WHERE id=$1 AND
 -- name: FinishChatRun :exec
 UPDATE conversations SET active_run_id=NULL,lease_until=NULL,cancel_requested=false WHERE id=$1 AND active_run_id=$2;
 
+-- name: PersistChatRun :one
+-- Lock the lease first, then checkpoint and release it atomically in one round trip.
+WITH owner AS MATERIALIZED (
+    SELECT c.id,c.cancel_requested,c.deleted_at FROM conversations c
+    WHERE c.id=sqlc.arg(conversation_id) AND c.active_run_id=sqlc.arg(run_id)::uuid FOR UPDATE
+), saved AS (
+    UPDATE messages m SET content=sqlc.arg(content),status=sqlc.arg(status),
+        upstream_id=sqlc.narg(upstream_id)::uuid,meta=sqlc.arg(meta)::jsonb
+    WHERE m.id=sqlc.arg(run_id)::uuid AND m.status='streaming'
+        AND EXISTS(SELECT 1 FROM owner o WHERE sqlc.arg(final)::boolean OR (NOT o.cancel_requested AND o.deleted_at IS NULL))
+    RETURNING m.id
+), renewed AS (
+    UPDATE conversations c SET
+        active_run_id=CASE WHEN sqlc.arg(final)::boolean THEN NULL ELSE c.active_run_id END,
+        lease_until=CASE WHEN sqlc.arg(final)::boolean THEN NULL ELSE now()+interval '45 seconds' END,
+        cancel_requested=CASE WHEN sqlc.arg(final)::boolean THEN false ELSE c.cancel_requested END
+    WHERE c.id=sqlc.arg(conversation_id) AND EXISTS(SELECT 1 FROM saved)
+    RETURNING c.id
+)
+SELECT o.cancel_requested,o.deleted_at,EXISTS(SELECT 1 FROM saved) AS saved,EXISTS(SELECT 1 FROM renewed) AS renewed FROM owner o;
+
 -- name: CancelChatRun :exec
 UPDATE conversations SET cancel_requested=true WHERE id=$1 AND user_id=$2 AND type='chat' AND deleted_at IS NULL AND active_run_id IS NOT NULL;
 

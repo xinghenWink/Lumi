@@ -474,6 +474,74 @@ func (q *Queries) LockCreditUser(ctx context.Context, id uuid.UUID) (User, error
 	return i, err
 }
 
+const readCreditAccount = `-- name: ReadCreditAccount :one
+WITH owner AS MATERIALIZED (
+    SELECT u.id FROM users u WHERE u.id=$1 AND u.deleted_at IS NULL FOR SHARE OF u
+), locked AS MATERIALIZED (
+    SELECT a.user_id, a.permanent_balance, a.daily_balance, a.daily_reset_on, a.version FROM credit_accounts a JOIN owner o ON o.id=a.user_id FOR UPDATE OF a
+), changed AS (
+    UPDATE credit_accounts a SET daily_balance=$2::bigint,
+        daily_reset_on=$3::date,
+        version=a.version+1+(CASE WHEN l.daily_balance>0 THEN 1 ELSE 0 END)+(CASE WHEN $2::bigint>0 THEN 1 ELSE 0 END)
+    FROM locked l WHERE a.user_id=l.user_id AND (l.daily_reset_on IS NULL OR l.daily_reset_on<$3::date)
+    RETURNING a.user_id, a.permanent_balance, a.daily_balance, a.daily_reset_on, a.version
+), expired AS (
+    INSERT INTO credit_ledger(id,user_id,type,bucket,delta,bucket_balance_after,total_after,idempotency_key)
+    SELECT $4::uuid,l.user_id,'daily_expire','daily',-l.daily_balance,0,l.permanent_balance,
+        'daily:'||l.user_id::text||':'||to_char(c.daily_reset_on,'YYYY-MM-DD')||':expire'
+    FROM changed c JOIN locked l ON l.user_id=c.user_id WHERE l.daily_balance>0
+    RETURNING id
+), granted AS (
+    INSERT INTO credit_ledger(id,user_id,type,bucket,delta,bucket_balance_after,total_after,idempotency_key)
+    SELECT $5::uuid,c.user_id,'daily_grant','daily',c.daily_balance,c.daily_balance,c.permanent_balance+c.daily_balance,
+        'daily:'||c.user_id::text||':'||to_char(c.daily_reset_on,'YYYY-MM-DD')||':grant'
+    FROM changed c WHERE c.daily_balance>0
+    RETURNING id
+)
+SELECT l.user_id,l.permanent_balance,
+    (CASE WHEN c.user_id IS NULL THEN l.daily_balance ELSE c.daily_balance END)::bigint AS daily_balance,
+    coalesce(c.daily_reset_on,l.daily_reset_on)::date AS daily_reset_on,
+    coalesce(c.version,l.version)::bigint AS version
+FROM locked l LEFT JOIN changed c ON c.user_id=l.user_id
+`
+
+type ReadCreditAccountParams struct {
+	UserID      uuid.UUID
+	GrantAmount int64
+	Today       time.Time
+	ExpireID    uuid.UUID
+	GrantID     uuid.UUID
+}
+
+type ReadCreditAccountRow struct {
+	UserID           uuid.UUID
+	PermanentBalance int64
+	DailyBalance     int64
+	DailyResetOn     time.Time
+	Version          int64
+}
+
+// Keep lazy reset and both immutable ledger entries in one atomic statement.
+// Lock the owner before the account, matching every other financial mutation.
+func (q *Queries) ReadCreditAccount(ctx context.Context, arg ReadCreditAccountParams) (ReadCreditAccountRow, error) {
+	row := q.db.QueryRow(ctx, readCreditAccount,
+		arg.UserID,
+		arg.GrantAmount,
+		arg.Today,
+		arg.ExpireID,
+		arg.GrantID,
+	)
+	var i ReadCreditAccountRow
+	err := row.Scan(
+		&i.UserID,
+		&i.PermanentBalance,
+		&i.DailyBalance,
+		&i.DailyResetOn,
+		&i.Version,
+	)
+	return i, err
+}
+
 const readCreditConfigurationLock = `-- name: ReadCreditConfigurationLock :exec
 SELECT pg_advisory_xact_lock_shared(6218401004)
 `
@@ -481,6 +549,31 @@ SELECT pg_advisory_xact_lock_shared(6218401004)
 func (q *Queries) ReadCreditConfigurationLock(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, readCreditConfigurationLock)
 	return err
+}
+
+const readCurrentCreditAccount = `-- name: ReadCurrentCreditAccount :one
+SELECT a.user_id, a.permanent_balance, a.daily_balance, a.daily_reset_on, a.version FROM credit_accounts a JOIN users u ON u.id=a.user_id
+WHERE a.user_id=$1 AND u.deleted_at IS NULL
+  AND a.daily_reset_on>=$2::date
+`
+
+type ReadCurrentCreditAccountParams struct {
+	UserID uuid.UUID
+	Today  time.Time
+}
+
+// Current-day balance views use a committed snapshot without taking financial write locks.
+func (q *Queries) ReadCurrentCreditAccount(ctx context.Context, arg ReadCurrentCreditAccountParams) (CreditAccount, error) {
+	row := q.db.QueryRow(ctx, readCurrentCreditAccount, arg.UserID, arg.Today)
+	var i CreditAccount
+	err := row.Scan(
+		&i.UserID,
+		&i.PermanentBalance,
+		&i.DailyBalance,
+		&i.DailyResetOn,
+		&i.Version,
+	)
+	return i, err
 }
 
 const saveCreditAccount = `-- name: SaveCreditAccount :exec

@@ -754,8 +754,10 @@ func (q *Queries) RecordCircuitFailure(ctx context.Context, arg RecordCircuitFai
 
 const recordCircuitSuccess = `-- name: RecordCircuitSuccess :exec
 UPDATE upstreams SET consecutive_failures=0,open_until=NULL,probe_until=NULL,last_error='' WHERE id=$1
+AND (consecutive_failures<>0 OR open_until IS NOT NULL OR probe_until IS NOT NULL OR last_error<>'')
 `
 
+// Healthy calls must not serialize behind redundant updates of the same channel row.
 func (q *Queries) RecordCircuitSuccess(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, recordCircuitSuccess, id)
 	return err

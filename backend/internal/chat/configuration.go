@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
@@ -20,11 +21,25 @@ func configView(row query.ChatSetting) Configuration {
 	return Configuration{PerMinute: row.PerMinute, PerDay: row.PerDay, ContextMessages: row.ContextMessages, ContextTokens: row.ContextTokens, SystemPrompt: row.SystemPrompt, TitleModelID: row.TitleModelID, Version: row.Version}
 }
 func (s *Service) Configuration(ctx context.Context) (Configuration, error) {
+	s.configMu.Lock()
+	defer s.configMu.Unlock()
+	if time.Now().Before(s.configUntil) {
+		return copyConfiguration(s.config), nil
+	}
 	row, err := s.q.GetChatSettings(ctx)
 	if err != nil {
 		return Configuration{}, fmt.Errorf("read chat settings: %w", err)
 	}
-	return configView(row), nil
+	s.config = configView(row)
+	s.configUntil = time.Now().Add(30 * time.Second)
+	return copyConfiguration(s.config), nil
+}
+func copyConfiguration(value Configuration) Configuration {
+	if value.TitleModelID != nil {
+		id := *value.TitleModelID
+		value.TitleModelID = &id
+	}
+	return value
 }
 func (s *Service) SaveConfiguration(ctx context.Context, actor user.Actor, input Configuration) (Configuration, error) {
 	if input.PerMinute < 0 || input.PerMinute > 1000 || input.PerDay < 0 || input.PerDay > 100000 || input.ContextMessages < 1 || input.ContextMessages > 200 || input.ContextTokens < 128 || input.ContextTokens > 1000000 || len(input.SystemPrompt) > 32000 || !utf8.ValidString(input.SystemPrompt) || strings.ContainsRune(input.SystemPrompt, 0) {
@@ -40,7 +55,7 @@ func (s *Service) SaveConfiguration(ctx context.Context, actor user.Actor, input
 			return fmt.Errorf("read changed chat settings: %w", err)
 		}
 		if input.TitleModelID != nil {
-			if _, _, err := s.catalog.ChatTargets(ctx, *input.TitleModelID); err != nil {
+			if _, _, err := s.catalog.ChatTargetsTx(ctx, q, *input.TitleModelID); err != nil {
 				return err
 			}
 		}
@@ -59,5 +74,10 @@ func (s *Service) SaveConfiguration(ctx context.Context, actor user.Actor, input
 		after.SystemPrompt = ""
 		return audit.Write(ctx, q, audit.Entry{ActorID: &actor.ID, Action: "settings.update", TargetType: "chat", Before: old, After: after, IP: actor.IP})
 	})
+	if err == nil {
+		s.configMu.Lock()
+		s.configUntil = time.Time{}
+		s.configMu.Unlock()
+	}
 	return result, err
 }

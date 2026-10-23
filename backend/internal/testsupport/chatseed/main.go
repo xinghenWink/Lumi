@@ -67,7 +67,7 @@ func seed(ctx context.Context) error {
 	if _, err := transaction.Exec(ctx, "INSERT INTO lumi.conversations(id,user_id,title,last_message_at,title_auto) VALUES($1,$2,$3,$4,false)", conversation, owner, prefix+"-performance", base); err != nil {
 		return fmt.Errorf("insert conversation fixture: %w", err)
 	}
-	for i := 0; i < 260; i++ {
+	for i := 0; i < 500; i++ {
 		id, err := uuid.NewV7()
 		if err != nil {
 			return err

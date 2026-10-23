@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	_ "time/tzdata" // Standalone binaries must resolve credit reset zones without a host Go installation.
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -70,6 +71,7 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 	logger = platformlogger.New(os.Stdout, cfg.LogLevel)
 	health := handler.Health{}
 	var database *pgxpool.Pool
+	var interactive *pgxpool.Pool
 	var cache *platformredis.Client
 	startup, cancelStartup := context.WithTimeout(ctx, 60*time.Second)
 	defer cancelStartup()
@@ -82,13 +84,32 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 			logger.Error("PostgreSQL connection failed")
 			return fmt.Errorf("open database: %w", err)
 		}
-		defer pool.Close()
-		database = pool
 		if err := migrations.Up(startup, pool); err != nil {
+			pool.Close()
 			logger.Error("database migration failed")
 			return fmt.Errorf("migrate database: %w", err)
 		}
+		if command == "serve" {
+			pool.Close()
+			pool, err = db.OpenPrepared(startup, cfg.DatabaseURL)
+			if err != nil {
+				logger.Error("PostgreSQL preparation failed")
+				return fmt.Errorf("prepare database: %w", err)
+			}
+		}
+		defer pool.Close()
+		database = pool
 		health.Postgres = pool.Ping
+		if command == "serve" {
+			interactive, err = db.OpenInteractive(startup, cfg.DatabaseURL)
+			if err != nil {
+				return fmt.Errorf("prepare interactive database: %w", err)
+			}
+			defer interactive.Close()
+			health.Postgres = func(ctx context.Context) error {
+				return errors.Join(pool.Ping(ctx), interactive.Ping(ctx))
+			}
+		}
 	}
 	if command == "migrate" {
 		logger.Info("database migrations completed")
@@ -118,7 +139,7 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 		}()
 		health.Redis = cache.Ping
 	}
-	accounts, err := configureAccounts(startup, cfg, database, cache, logger)
+	accounts, err := configureAccounts(startup, cfg, database, interactive, cache, logger)
 	if err != nil {
 		logger.Error("account service initialization failed")
 		return fmt.Errorf("initialize accounts: %w", err)

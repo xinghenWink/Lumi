@@ -74,7 +74,7 @@ func Routes(services *Services, security Security, logger *slog.Logger) func(*gi
 			}
 			engine.Use(services.Metrics.Handler())
 		}
-		api := engine.Group("/api/v1", h.available, func(c *gin.Context) { c.Header("Cache-Control", "no-store"); c.Next() })
+		api := engine.Group("/api/v1", h.available, admitReads(2), func(c *gin.Context) { c.Header("Cache-Control", "no-store"); c.Next() })
 		api.GET("/public/config", h.publicConfig)
 		authRoutes := api.Group("/auth", h.csrf)
 		authRoutes.POST("/register", h.register)

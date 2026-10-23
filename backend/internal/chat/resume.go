@@ -112,9 +112,6 @@ func (s *Service) Buffered(ctx context.Context, owner, id, request uuid.UUID, af
 	if request == uuid.Nil || len(after) > 40 || (after != "" && !regexp.MustCompile(`^\d+-\d+$`).MatchString(after)) {
 		return problem.Invalid()
 	}
-	if _, err := s.Conversation(ctx, owner, id); err != nil {
-		return err
-	}
 	checked := time.Time{}
 	idle := time.Now()
 	for {

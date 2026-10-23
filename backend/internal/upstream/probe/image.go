@@ -1,13 +1,34 @@
 package probe
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image"
+	_ "image/jpeg"
 	"io"
 	"net/http"
 	"os"
+
+	_ "golang.org/x/image/webp"
 )
+
+func imageDimensions(value json.RawMessage) string {
+	var encoded string
+	if json.Unmarshal(value, &encoded) != nil {
+		return "unavailable"
+	}
+	raw, err := base64.StdEncoding.Strict().DecodeString(encoded)
+	if err != nil || len(raw) > 20<<20 {
+		return "unavailable"
+	}
+	configuration, _, err := image.DecodeConfig(bytes.NewReader(raw))
+	if err != nil {
+		return "unavailable"
+	}
+	return fmt.Sprintf("%dx%d", configuration.Width, configuration.Height)
+}
 
 func readReference(path string) (result []byte, resultErr error) {
 	file, err := os.Open(path) // #nosec G304 -- An explicit CLI reference-file argument selects this local input.

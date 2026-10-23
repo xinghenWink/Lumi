@@ -428,7 +428,16 @@ test('M4 real streaming history stop editing isolation and bounded rendering', a
     })
     await member.goto('/chat/' + performanceID)
     const older = member.getByRole('button', { name: '加载更早的消息', exact: true })
-    await older.click()
+    // Load all 500 rows before asserting virtualized DOM size.
+    await expect(older).toBeVisible()
+    let hasMore = true
+    while (hasMore) {
+      const response = member.waitForResponse(
+        (r) => r.url().includes('/messages?') && r.status() === 200,
+      )
+      await older.click()
+      hasMore = record(await (await response).json()).next_cursor !== ''
+    }
     await expect(member.locator('.chat-virtual-row').first()).toBeVisible()
     expect(await member.locator('.chat-message').count()).toBeLessThan(60)
     await member.keyboard.press('Control+k')

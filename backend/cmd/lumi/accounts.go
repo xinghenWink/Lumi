@@ -25,8 +25,8 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/user"
 )
 
-func configureAccounts(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, cache *platformredis.Client, logger *slog.Logger) (*account.Services, error) {
-	if pool == nil || cache == nil {
+func configureAccounts(ctx context.Context, cfg config.Config, pool, interactive *pgxpool.Pool, cache *platformredis.Client, logger *slog.Logger) (*account.Services, error) {
+	if pool == nil || interactive == nil || cache == nil {
 		return nil, nil
 	}
 	if err := cfg.ValidateAccounts(); err != nil {
@@ -59,10 +59,10 @@ func configureAccounts(ctx context.Context, cfg config.Config, pool *pgxpool.Poo
 	if err != nil {
 		return nil, fmt.Errorf("initialize image storage: %w", err)
 	}
-	conversations := chat.New(pool, models, cache)
+	conversations := chat.New(interactive, models, cache)
 	conversations.SetFiles(files)
 	if err := models.Bootstrap(ctx, cfg.UpstreamBaseURL, cfg.UpstreamAPIKey); err != nil {
 		return nil, fmt.Errorf("bootstrap upstream: %w", err)
 	}
-	return &account.Services{Operations: operations.New(pool), Mailer: sender, PublicBaseURL: cfg.PublicBaseURL, Version: version, Commit: commit, BuildTime: buildTime, Auth: auth.New(pool, passwords, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: models, Chat: conversations, Files: files, Images: images.New(pool, billing, models, files, cache, logger)}, nil
+	return &account.Services{Operations: operations.New(pool), Mailer: sender, PublicBaseURL: cfg.PublicBaseURL, Version: version, Commit: commit, BuildTime: buildTime, Auth: auth.New(interactive, passwords, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: models, Chat: conversations, Files: files, Images: images.New(pool, billing, models, files, cache, logger)}, nil
 }

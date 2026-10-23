@@ -220,11 +220,7 @@ func (s *Service) recordCall(ctx context.Context, id uuid.UUID, call upstream.Ca
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
 	// User cancellation and content rejection do not indicate provider health failures.
-	if call.ErrorCode == "" {
-		if err := s.queries.RecordCircuitSuccess(ctx, id); err != nil && s.logger != nil {
-			s.logger.ErrorContext(ctx, "reset upstream circuit failed")
-		}
-	} else if call.ErrorCode != "UPSTREAM_CANCELED" && call.ErrorCode != "UPSTREAM_REJECTED" && call.ErrorCode != "UPSTREAM_REQUEST_INVALID" {
+	if call.ErrorCode != "" && call.ErrorCode != "UPSTREAM_CANCELED" && call.ErrorCode != "UPSTREAM_REJECTED" && call.ErrorCode != "UPSTREAM_REQUEST_INVALID" {
 		threshold, duration, cfgErr := s.circuitConfig(ctx)
 		if cfgErr == nil {
 			if err := s.queries.RecordCircuitFailure(ctx, query.RecordCircuitFailureParams{ID: id, LastError: call.ErrorCode, Threshold: threshold, Duration: duration}); err != nil && s.logger != nil {
@@ -234,7 +230,12 @@ func (s *Service) recordCall(ctx context.Context, id uuid.UUID, call upstream.Ca
 	}
 	callID, err := validation.NewID()
 	if err == nil {
-		err = s.queries.AppendUpstreamCall(ctx, query.AppendUpstreamCallParams{ID: callID, UpstreamID: id, Model: call.Model, Kind: call.Kind, LatencyMs: call.LatencyMS, Status: int32(status), ErrorSummary: call.ErrorCode, RequestID: middleware.RequestID(ctx)})
+		entry := query.AppendUpstreamCallParams{ID: callID, UpstreamID: id, Model: call.Model, Kind: call.Kind, LatencyMs: call.LatencyMS, Status: int32(status), ErrorSummary: call.ErrorCode, RequestID: middleware.RequestID(ctx)}
+		if call.ErrorCode == "" {
+			err = s.queries.RecordSuccessfulUpstreamCall(ctx, entry)
+		} else {
+			err = s.queries.AppendUpstreamCall(ctx, entry)
+		}
 	}
 	if err != nil && s.logger != nil {
 		s.logger.ErrorContext(ctx, "record upstream call failed", "error_type", fmt.Sprintf("%T", err))

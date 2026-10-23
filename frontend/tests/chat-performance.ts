@@ -145,9 +145,6 @@ export async function streamPerformance(page: Page, token: string, info: TestInf
     },
     { id, token },
   )
-  expect(latency.samples).toBe(60)
-  expect(latency.p95MS).toBeLessThan(100)
-  expect(latency.encoding).toBeNull()
   writeFileSync(
     info.outputPath('chat-stream-performance.json'),
     JSON.stringify(
@@ -161,6 +158,9 @@ export async function streamPerformance(page: Page, token: string, info: TestInf
       2,
     ),
   )
+  expect(latency.samples).toBe(60)
+  expect(latency.p95MS).toBeLessThan(100)
+  expect(latency.encoding).toBeNull()
 }
 
 async function unusedPort(): Promise<number> {

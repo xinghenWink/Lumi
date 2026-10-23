@@ -8,13 +8,20 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/problem"
 	"github.com/xinghenWink/Lumi/backend/internal/upstream"
 )
 
 // ImageTarget resolves one route without retrying an upstream image write.
 func (s *Service) ImageTarget(ctx context.Context, id uuid.UUID) (PublicModel, *upstream.Client, string, error) {
-	row, err := s.queries.GetPlatformModel(ctx, id)
+	return s.ImageTargetTx(ctx, s.queries, id)
+}
+
+// ImageTargetTx keeps route lookups on the caller's transaction connection.
+// Acquiring another pool connection here can deadlock concurrent submissions.
+func (s *Service) ImageTargetTx(ctx context.Context, q *query.Queries, id uuid.UUID) (PublicModel, *upstream.Client, string, error) {
+	row, err := q.GetPlatformModel(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && (row.Type != "image" || !row.Enabled)) {
 		return PublicModel{}, nil, "", problem.New("IMAGE_MODEL_UNAVAILABLE", http.StatusConflict)
 	}
@@ -25,7 +32,7 @@ func (s *Service) ImageTarget(ctx context.Context, id uuid.UUID) (PublicModel, *
 	if err != nil {
 		return model, nil, "", err
 	}
-	targets, err := s.routeTargets(ctx, id)
+	targets, err := routeTargets(ctx, q, id)
 	if err != nil {
 		return model, nil, "", fmt.Errorf("read image routes: %w", err)
 	}

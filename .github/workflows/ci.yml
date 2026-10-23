@@ -12,7 +12,7 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     services:
       postgres:
         image: postgres:16-alpine
@@ -44,14 +44,68 @@ jobs:
           cache: pnpm
       - run: make install
       - run: make lint test
+      - name: Scan production dependencies
+        run: |
+          cd backend && go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+          cd .. && pnpm audit --prod --audit-level high --registry https://registry.npmjs.org
       - name: Check generated contracts
         run: |
           make sqlc api
           git diff --exit-code -- backend/internal/platform/db/query frontend/src/api/schema.d.ts
       - run: make test-integration
       - run: make build
-      - run: pnpm --filter @lumi/frontend exec playwright install --with-deps chromium
+      - name: Install Chromium and its system dependencies
+        run: |
+          # Keep signed Ubuntu packages while avoiding the slow HTTP Azure mirror.
+          if test -f /etc/apt/apt-mirrors.txt; then
+            printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
+          fi
+          pnpm --filter @lumi/frontend exec playwright install --with-deps chromium
       - run: pnpm test:e2e
+      - name: Install pinned k6
+        run: |
+          curl --fail --location --silent --show-error https://github.com/grafana/k6/releases/download/v1.3.0/k6-v1.3.0-linux-amd64.tar.gz -o "$RUNNER_TEMP/k6.tar.gz"
+          printf '84d26fc1f7bc03e02f2e016b3b1b20c032e05dfe461fca82de4e3a6ebe72ddbd  %s\n' "$RUNNER_TEMP/k6.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/k6.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/k6-v1.3.0-linux-amd64" >> "$GITHUB_PATH"
+      - name: Prepare isolated capacity dependencies
+        run: |
+          lumi_load_password=$(openssl rand -hex 24)
+          printf '::add-mask::%s\n' "$lumi_load_password"
+          # Match the target rehearsal's direct loopback path, without host port forwarding.
+          docker run -d --name lumi-capacity-postgres --network host \
+            -e POSTGRES_USER=lumi -e POSTGRES_PASSWORD="$lumi_load_password" -e POSTGRES_DB=lumi_m7_load \
+            postgres:16-alpine postgres -c listen_addresses=127.0.0.1 -p 15432
+          docker run -d --name lumi-capacity-redis --network host redis:7-alpine \
+            redis-server --bind 127.0.0.1 --port 16379 --requirepass "$lumi_load_password"
+          for attempt in $(seq 1 60); do
+            if docker exec lumi-capacity-postgres pg_isready -h 127.0.0.1 -p 15432 -U lumi -d lumi_m7_load \
+              && docker exec lumi-capacity-redis redis-cli -p 16379 -a "$lumi_load_password" ping 2>/dev/null | grep -qx PONG; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec lumi-capacity-postgres pg_isready -h 127.0.0.1 -p 15432 -U lumi -d lumi_m7_load
+          docker exec lumi-capacity-redis redis-cli -p 16379 -a "$lumi_load_password" ping 2>/dev/null | grep -qx PONG
+          printf 'E2E_DATABASE_URL=postgres://lumi:%s@127.0.0.1:15432/lumi_m7_load?sslmode=disable\nE2E_REDIS_URL=redis://:%s@127.0.0.1:16379/0\n' \
+            "$lumi_load_password" "$lumi_load_password" >> "$GITHUB_ENV"
+      - name: Measure 100 distinct users with a local upstream
+        env:
+          GOMAXPROCS: '2'
+          LUMI_DIAGNOSTICS: '1'
+        run: |
+          node scripts/performance/run.mjs
+      - name: Stop isolated capacity dependencies
+        if: always()
+        run: docker rm -f lumi-capacity-postgres lumi-capacity-redis 2>/dev/null || true
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: k6-results
+          path: |
+            .tools/m7-load/summary.json
+            .tools/m7-load/environment.json
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:
@@ -65,6 +119,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
       - name: Build the application image
         run: docker build --build-arg VERSION=ci --build-arg COMMIT="$GITHUB_SHA" -t lumi:ci .
       - name: Generate ephemeral container credentials
@@ -92,6 +148,18 @@ jobs:
           curl --fail --silent http://127.0.0.1:8080/readyz
           curl --fail --silent http://127.0.0.1:8080/api/version
           curl --fail --silent http://127.0.0.1:8080/ | grep -q '<div id="app">'
+      - name: Stop initial stack before isolated deployment rehearsal
+        env:
+          POSTGRES_PASSWORD: ci-database-only
+          REDIS_PASSWORD: ci-cache-only
+        run: docker compose --env-file deploy/.env -f deploy/docker-compose.yml down --volumes
+      - name: Build the previous milestone for rollback verification
+        run: |
+          mkdir -p "$RUNNER_TEMP/previous"
+          git archive e9f87b2 | tar -x -C "$RUNNER_TEMP/previous"
+          docker build --build-arg VERSION=previous -t lumi:previous "$RUNNER_TEMP/previous"
+      - name: Rehearse installation, upgrade, rollback and backup restore
+        run: sudo env LUMI_CURRENT_IMAGE=lumi:ci LUMI_PREVIOUS_IMAGE=lumi:previous bash scripts/deploy-smoke.sh
       - name: Print container diagnostics
         if: failure()
         env:

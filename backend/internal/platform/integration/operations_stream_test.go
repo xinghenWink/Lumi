@@ -18,8 +18,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
 	"github.com/xinghenWink/Lumi/backend/internal/chat"
+	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	platformredis "github.com/xinghenWink/Lumi/backend/internal/platform/redis"
 	"github.com/xinghenWink/Lumi/backend/internal/upstream"
 	"github.com/xinghenWink/Lumi/backend/internal/user"
@@ -102,9 +104,41 @@ func TestM6BufferedChatResumesWithoutSecondProviderCallAndSupportsVision(t *test
 	}
 	input := chat.SendInput{RequestID: uuid.New(), ModelID: model.ID, Action: "send", Content: "Describe this image", ReferenceFileIDs: []uuid.UUID{file.ID}}
 	request, cancelRequest := context.WithCancel(f.ctx)
-	if err := s.StartBuffered(request, actor, id, input, nil); err != nil {
+	client := f.client(t)
+	client.Timeout = 5 * time.Second
+	login := f.login(t, client, f.adminEmail, f.adminPassword)
+	// Saturated bulk work must not block authentication or turn acceptance.
+	// Routing and vision metadata must also fit in one remaining interactive connection.
+	var held []*pgxpool.Conn
+	defer func() {
+		for _, connection := range held {
+			connection.Release()
+		}
+	}()
+	for _, reservation := range []struct {
+		pool  *pgxpool.Pool
+		count int32
+	}{{f.pool, f.pool.Config().MaxConns}, {f.interactive, f.interactive.Config().MaxConns - 1}} {
+		for range reservation.count {
+			connection, err := reservation.pool.Acquire(f.ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			held = append(held, connection)
+		}
+	}
+	if response := f.call(t, client, http.MethodGet, "/api/v1/me", login.AccessToken, nil); response.status != http.StatusOK {
+		t.Fatal("authentication waited behind bulk work")
+	}
+	accept, cancelAccept := context.WithTimeout(request, 5*time.Second)
+	defer cancelAccept()
+	if err := s.StartBuffered(accept, actor, id, input, nil); err != nil {
 		t.Fatal(err)
 	}
+	for _, connection := range held {
+		connection.Release()
+	}
+	held = nil
 	select {
 	case <-started:
 	case <-time.After(5 * time.Second):
@@ -233,4 +267,26 @@ func TestM6CircuitSkipsOpenRoutesAndAllowsOneHalfOpenProbe(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	t.Run("healthy calls avoid the channel write lock", func(t *testing.T) {
+		transaction, err := f.pool.Begin(f.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := transaction.Rollback(f.ctx); err != nil {
+				t.Error(err)
+			}
+		}()
+		if _, err := transaction.Exec(f.ctx, "SELECT id FROM upstreams WHERE id=$1 FOR UPDATE", channel.ID); err != nil {
+			t.Fatal(err)
+		}
+		bounded, cancel := context.WithTimeout(f.ctx, time.Second)
+		defer cancel()
+		if err := query.New(f.pool).RecordCircuitSuccess(bounded, channel.ID); err != nil {
+			t.Fatalf("healthy success waited for an unrelated row writer: %v", err)
+		}
+		if err := query.New(f.pool).RecordSuccessfulUpstreamCall(bounded, query.AppendUpstreamCallParams{ID: uuid.New(), UpstreamID: channel.ID, Model: "healthy", Kind: "chat", Status: 200}); err != nil {
+			t.Fatalf("successful call batch waited for an unrelated row writer: %v", err)
+		}
+	})
 }

@@ -70,6 +70,25 @@ func TestInfrastructure(t *testing.T) {
 	if alive, err := query.New(pool).Ping(ctx); err != nil || alive != 1 {
 		t.Fatalf("generated query = %d, error = %v", alive, err)
 	}
+	t.Run("prepared pool describes writes without executing them", func(t *testing.T) {
+		prepared, err := db.OpenPrepared(ctx, "postgres://lumi:integration-only@"+postgresAddress+"/lumi?sslmode=disable")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer prepared.Close()
+		connection, err := prepared.Acquire(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer connection.Release()
+		var descriptions, mutations int
+		if err := connection.QueryRow(ctx, "SELECT count(*) FROM pg_prepared_statements WHERE statement LIKE '-- name:%'").Scan(&descriptions); err != nil || descriptions < 20 {
+			t.Fatalf("hot descriptions=%d error=%v", descriptions, err)
+		}
+		if err := connection.QueryRow(ctx, "SELECT (SELECT count(*) FROM users)+(SELECT count(*) FROM credit_ledger)+(SELECT count(*) FROM messages)").Scan(&mutations); err != nil || mutations != 0 {
+			t.Fatalf("preparation executed business writes: rows=%d error=%v", mutations, err)
+		}
+	})
 
 	cache, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
@@ -98,6 +117,43 @@ func TestInfrastructure(t *testing.T) {
 	if err := client.Ping(ctx); err != nil {
 		t.Fatalf("ping Redis: %v", err)
 	}
+	t.Run("blocking chat readers cannot starve commands", func(t *testing.T) {
+		// A single general-purpose connection makes accidental pool sharing observable.
+		isolated, err := platformredis.Open(ctx, fmt.Sprintf("redis://:integration-only@%s/0?pool_size=1", cacheAddress))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := isolated.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		readContext, cancelReaders := context.WithCancel(ctx)
+		defer cancelReaders()
+		var readers sync.WaitGroup
+		started := make(chan struct{})
+		for i := 0; i < 20; i++ {
+			readers.Go(func() {
+				started <- struct{}{}
+				if _, err := isolated.ReadChat(readContext, fmt.Sprintf("load-reader-%d", i), ""); err != nil && readContext.Err() == nil {
+					t.Error(err)
+				}
+			})
+		}
+		for range 20 {
+			<-started
+		}
+		writeContext, cancelWrite := context.WithTimeout(ctx, time.Second)
+		defer cancelWrite()
+		if err := isolated.AppendChat(writeContext, "load-producer", "delta", `{}`); err != nil {
+			t.Errorf("blocked readers delayed event production: %v", err)
+		}
+		if err := isolated.Ping(writeContext); err != nil {
+			t.Errorf("blocked readers delayed ordinary commands: %v", err)
+		}
+		cancelReaders()
+		readers.Wait()
+	})
 	if err := cache.Stop(ctx, nil); err != nil {
 		t.Fatalf("stop Redis: %v", err)
 	}

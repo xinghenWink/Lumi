@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
 	"github.com/xinghenWink/Lumi/backend/internal/images"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
@@ -190,6 +191,31 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 		}
 		return result
 	}
+	t.Run("submission needs only one available database connection", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(f.ctx, 5*time.Second)
+		defer cancel()
+		// Reserve every spare connection to reproduce nested pool acquisition starvation.
+		var held []*pgxpool.Conn
+		defer func() {
+			for _, connection := range held {
+				connection.Release()
+			}
+		}()
+		for range f.pool.Config().MaxConns - 1 {
+			connection, err := f.pool.Acquire(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			held = append(held, connection)
+		}
+		task, err := service.Submit(ctx, actor, uuid.NewString(), input("single connection", 1))
+		if err != nil || task.Status != "queued" {
+			t.Fatalf("submission starved with one free connection: status=%s error=%v", task.Status, err)
+		}
+		if _, err := service.Cancel(ctx, actor, task.ID); err != nil {
+			t.Fatal(err)
+		}
+	})
 	t.Run("creation and charge roll back together", func(t *testing.T) {
 		before := creditBalance(t, f, actor.ID)
 		if _, err := f.pool.Exec(f.ctx, "CREATE FUNCTION reject_image_task() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected'; END; $$; CREATE TRIGGER reject_image_task BEFORE INSERT ON image_tasks FOR EACH ROW EXECUTE FUNCTION reject_image_task()"); err != nil {

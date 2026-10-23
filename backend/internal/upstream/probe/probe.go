@@ -51,6 +51,7 @@ type Observation struct {
 	Done         bool     `json:"done,omitempty"`
 	Results      int      `json:"results,omitempty"`
 	Formats      []string `json:"formats,omitempty"`
+	Dimensions   []string `json:"dimensions,omitempty"`
 }
 type Report struct {
 	Version      int           `json:"version"`
@@ -251,6 +252,9 @@ func observe(ctx context.Context, client *http.Client, options Options, base *ur
 				result.SavedImage, result.Error = saveImage(options.ImageOutput, body.Data[0]["b64_json"])
 			}
 			for _, item := range body.Data {
+				if value, exists := item["b64_json"]; exists {
+					result.Dimensions = append(result.Dimensions, imageDimensions(value))
+				}
 				for _, format := range []string{"b64_json", "url"} {
 					if _, exists := item[format]; exists && !slices.Contains(result.Formats, format) {
 						result.Formats = append(result.Formats, format)

@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"
 	"github.com/xinghenWink/Lumi/backend/internal/credits"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
@@ -68,6 +70,42 @@ func creditBalance(t *testing.T, f *fixture, id uuid.UUID) credits.Account {
 	}
 	return value
 }
+func TestM7CurrentBalanceReadDoesNotWaitForFinancialWrites(t *testing.T) {
+	f := newAccountFixture(t)
+	actor := creditActor(t, f)
+	creditPricing(t, f, actor, 5)
+	member := creditMember(t, f, actor, 10)
+	before := creditBalance(t, f, member.ID)
+	tx, err := f.pool.Begin(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := tx.Rollback(f.ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			t.Error(err)
+		}
+	}()
+	if _, err := tx.Exec(f.ctx, "UPDATE credit_accounts SET permanent_balance=permanent_balance+7 WHERE user_id=$1", member.ID); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(f.ctx, 500*time.Millisecond)
+	defer cancel()
+	current, err := f.services.Credits.Read(ctx, member.ID)
+	if err != nil {
+		t.Fatalf("current balance waited for an unrelated uncommitted write: %v", err)
+	}
+	if current.PermanentBalance != before.PermanentBalance || current.DailyBalance != 5 || current.Version != before.Version {
+		t.Fatalf("balance did not retain the committed snapshot: before=%+v current=%+v", before, current)
+	}
+	if err := tx.Rollback(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	after := creditBalance(t, f, member.ID)
+	if after.PermanentBalance != before.PermanentBalance || after.Version != before.Version {
+		t.Fatal("read-only balance access changed the financial account")
+	}
+}
+
 func TestM2CreditConsistency(t *testing.T) {
 	f := newAccountFixture(t)
 	actor := creditActor(t, f)
@@ -105,6 +143,21 @@ func TestM2CreditConsistency(t *testing.T) {
 			if count != want {
 				t.Fatalf("signup ledger count=%d want=%d", count, want)
 			}
+		}
+	})
+	t.Run("pricing changes invalidate cached daily settings immediately", func(t *testing.T) {
+		creditPricing(t, f, actor, 0)
+		old := creditMember(t, f, actor, 0)
+		if balance := creditBalance(t, f, old.ID); balance.DailyBalance != 0 {
+			t.Fatal("disabled gift was granted")
+		}
+		creditPricing(t, f, actor, 5)
+		fresh := creditMember(t, f, actor, 0)
+		if balance := creditBalance(t, f, fresh.ID); balance.DailyBalance != 5 {
+			t.Fatal("cached configuration hid the enabled gift")
+		}
+		if balance := creditBalance(t, f, old.ID); balance.DailyBalance != 0 {
+			t.Fatal("configuration change granted the same day's gift twice")
 		}
 	})
 	t.Run("concurrent charges cannot overdraw", func(t *testing.T) {
@@ -208,6 +261,35 @@ func TestM2CreditConsistency(t *testing.T) {
 			}
 		}
 		if _, err := f.services.Credits.SavePricing(f.ctx, actor, prices); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("lazy read rolls back the reset and both ledger entries together", func(t *testing.T) {
+		creditPricing(t, f, actor, 5)
+		member := creditMember(t, f, actor, 0)
+		stamp := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+		billing := credits.New(f.pool, f.vault, f.cache, func() time.Time { return stamp })
+		before, err := billing.Read(f.ctx, member.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stamp = stamp.Add(24 * time.Hour)
+		if _, err := f.pool.Exec(f.ctx, "CREATE FUNCTION reject_daily_grant() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.type='daily_grant' THEN RAISE EXCEPTION 'injected'; END IF; RETURN NEW; END; $$; CREATE TRIGGER reject_daily_grant BEFORE INSERT ON credit_ledger FOR EACH ROW EXECUTE FUNCTION reject_daily_grant()"); err != nil {
+			t.Fatal(err)
+		}
+		_, readErr := billing.Read(f.ctx, member.ID)
+		if _, err := f.pool.Exec(f.ctx, "DROP TRIGGER reject_daily_grant ON credit_ledger; DROP FUNCTION reject_daily_grant()"); err != nil {
+			t.Fatal(err)
+		}
+		row, err := query.New(f.pool).LockCreditAccount(f.ctx, member.ID)
+		if readErr == nil || err != nil || row.DailyBalance != before.DailyBalance || row.DailyResetOn.Format(time.DateOnly) != before.DailyResetOn || row.Version != before.Version {
+			t.Fatalf("failed grant changed the account: read=%v snapshot=%+v error=%v", readErr, row, err)
+		}
+		var count int
+		if err := f.pool.QueryRow(f.ctx, "SELECT count(*) FROM credit_ledger WHERE user_id=$1", member.ID).Scan(&count); err != nil || count != 1 {
+			t.Fatalf("failed grant left a partial ledger: count=%d error=%v", count, err)
+		}
+		if _, err := billing.Read(f.ctx, member.ID); err != nil {
 			t.Fatal(err)
 		}
 	})

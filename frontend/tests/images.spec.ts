@@ -1,6 +1,8 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { deflateSync } from 'node:zlib'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { expect, test, type Page } from '@playwright/test'
 import { record } from '../src/api/transport'
 import { defaultCapabilities } from '../src/api/catalog-contracts'
@@ -86,6 +88,14 @@ test('M5 real image generation editing gallery cancellation and administrator pr
       response.end(JSON.stringify({ data: [{ id: wire }] }))
       return
     }
+    if (request.url === '/v1/chat/completions') {
+      for await (const chunk of request) void chunk
+      response.setHeader('Content-Type', 'text/event-stream')
+      response.end(
+        'data: {"choices":[{"delta":{"content":"旅程中的第一段回答。"}}]}\n\ndata: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+      )
+      return
+    }
     const chunks: Buffer[] = []
     for await (const chunk of request)
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)))
@@ -147,6 +157,7 @@ test('M5 real image generation editing gallery cancellation and administrator pr
   observeErrors(member, errors)
   let adminToken = '',
     modelID = '',
+    chatModelID = '',
     channelID = ''
   let oldPricing: Record<string, unknown> | undefined,
     oldSettings: ReturnType<typeof parseImageConfiguration> | undefined
@@ -198,6 +209,30 @@ test('M5 real image generation editing gallery cancellation and administrator pr
       note: '',
     })
     channelID = String(channel.id)
+    chatModelID = String(
+      (
+        await api('POST', '/admin/models', {
+          version: 0,
+          display_name: 'Journey Chat ' + suffix,
+          type: 'chat',
+          description: '',
+          icon: '',
+          sort_order: 0,
+          enabled: true,
+          is_default: true,
+          capabilities: defaultCapabilities('chat'),
+          routes: [
+            {
+              upstream_id: channelID,
+              upstream_model_name: wire,
+              priority: 0,
+              weight: 1,
+              enabled: true,
+            },
+          ],
+        })
+      ).id,
+    )
     const model = await api('POST', '/admin/models', {
       version: 0,
       display_name: modelName,
@@ -230,6 +265,7 @@ test('M5 real image generation editing gallery cancellation and administrator pr
     if (!Array.isArray(oldPricing.rules)) throw new Error('Missing price rules')
     await api('PUT', '/admin/pricing', {
       ...oldPricing,
+      configuration: { ...record(oldPricing.configuration), signup_bonus_credits: 10 },
       rules: [
         ...oldPricing.rules,
         ...(['generate', 'edit'] as const).flatMap((operation) =>
@@ -255,14 +291,64 @@ test('M5 real image generation editing gallery cancellation and administrator pr
       admin_can_view_content: false,
     })
     const memberEmail = 'image-member-' + suffix + '@lumi.test'
-    const memberUser = await api('POST', '/admin/users', {
-      email: memberEmail,
-      password,
-      nickname: 'Image member',
-      role: 'user',
-      initial_credits: 10000,
+    const registration = await api('GET', '/admin/settings/registration')
+    await api('PUT', '/admin/settings/registration', {
+      registration: {
+        ...record(registration.registration),
+        enabled: true,
+        email_verification_enabled: false,
+      },
     })
-    const memberToken = await login(member, memberEmail, password)
+    await member.goto('/register')
+    await member.getByLabel('昵称', { exact: true }).fill('Image member')
+    await member.getByLabel('邮箱地址', { exact: true }).fill(memberEmail)
+    await member.getByLabel('密码', { exact: true }).fill(password)
+    await member.getByRole('checkbox').check()
+    const registered = member.waitForResponse(
+      (r) => r.url().endsWith('/auth/register') && r.request().method() === 'POST',
+    )
+    await member.getByRole('button', { name: '创建账号', exact: true }).click()
+    const registrationResult = record(await (await registered).json())
+    const memberToken = String(registrationResult.access_token),
+      memberUser = record(registrationResult.user)
+    await expect(member).toHaveURL(/\/chat$/)
+    await member.getByLabel('消息内容', { exact: true }).fill('开始完整旅程')
+    await member.getByLabel('消息内容', { exact: true }).press('Enter')
+    await expect(member.locator('.chat-message-assistant').last()).toContainText(
+      '旅程中的第一段回答。',
+    )
+    const batch = await api(
+      'POST',
+      '/admin/redeem-batches',
+      {
+        name: 'Journey ' + suffix,
+        note: '',
+        prefix: '',
+        quantity: 1,
+        credits: 10000,
+        max_uses: 1,
+        expires_at: null,
+      },
+      adminToken,
+      randomUUID(),
+    )
+    const codes = await api('GET', '/admin/redeem-codes?batch_id=' + String(batch.id))
+    if (!Array.isArray(codes.items)) throw new Error('Journey code missing')
+    await member.goto('/me/credits')
+    await member.getByLabel('兑换积分', { exact: true }).fill(String(record(codes.items[0]).code))
+    await member.getByRole('button', { name: '确认兑换', exact: true }).click()
+    await expect(member.getByTestId('permanent-balance')).toHaveText('10,010')
+    const beforeAdjustment = record(await api('GET', '/me/credits', undefined, memberToken))
+    const adjusted = await api(
+      'POST',
+      '/admin/users/' + String(memberUser.id) + '/credits',
+      { action: 'add', bucket: 'permanent', amount: 5, note: 'M7 full journey' },
+      adminToken,
+      randomUUID(),
+    )
+    expect(Number(adjusted.total)).toBe(Number(beforeAdjustment.total) + 5)
+    await member.reload()
+    await expect(member.getByTestId('permanent-balance')).toHaveText('10,015')
     await member.goto('/create')
     await expect(member.getByRole('button', { name: '选择模型', exact: true })).toContainText(
       modelName,
@@ -579,6 +665,41 @@ test('M5 real image generation editing gallery cancellation and administrator pr
       path: info.outputPath('image-gallery-virtualized.png'),
       animations: 'disabled',
     })
+    execFileSync('go', ['run', '-tags=integration', './internal/testsupport/galleryseed'], {
+      cwd: fileURLToPath(new URL('../../backend', import.meta.url)),
+      env: {
+        ...process.env,
+        APP_ENV: 'test',
+        E2E_IMAGE_USER_ID: String((await api('GET', '/me', undefined, galleryToken)).id),
+        E2E_DATA_DIR: fileURLToPath(new URL('../../.tools/e2e-data', import.meta.url)),
+      },
+      stdio: 'pipe',
+      timeout: 90_000,
+    })
+    await member.reload()
+    // Load every cursor page, then exercise the beginning, middle and end of 1000 real files.
+    for (let loaded = 40; loaded < 1000; loaded += 40) {
+      const response = member.waitForResponse(
+        (r) =>
+          r.url().includes('/api/v1/me/images?') &&
+          r.url().includes('cursor=') &&
+          r.status() === 200,
+      )
+      await member.getByRole('button', { name: '加载更多', exact: true }).click()
+      await response
+    }
+    await expect(member.getByRole('button', { name: '加载更多', exact: true })).toHaveCount(0)
+    for (const fraction of [0, 0.5, 1]) {
+      await member.locator('.image-gallery-scroll').evaluate((el, ratio) => {
+        el.scrollTop = (el.scrollHeight - el.clientHeight) * ratio
+      }, fraction)
+      await expect(bounded.first()).toBeVisible()
+      expect(await bounded.count()).toBeLessThan(info.project.name === 'mobile' ? 12 : 30)
+    }
+    await member.screenshot({
+      path: info.outputPath('image-gallery-1000.png'),
+      animations: 'disabled',
+    })
     expect(errors).toEqual([])
   } finally {
     await memberContext.close()
@@ -589,6 +710,7 @@ test('M5 real image generation editing gallery cancellation and administrator pr
     }
     if (channelID) await api('DELETE', '/admin/upstreams/' + channelID)
     if (modelID) await api('DELETE', '/admin/models/' + modelID)
+    if (chatModelID) await api('DELETE', '/admin/models/' + chatModelID)
     server.closeAllConnections()
     await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())))
   }

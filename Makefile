@@ -6,7 +6,7 @@ COMMIT := $(shell git rev-parse --short HEAD)
 BUILD_TIME := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buildTime=$(BUILD_TIME)
 
-.PHONY: install dev dev-deps lint lint-go test test-integration e2e build build-go migrate sqlc api docker
+.PHONY: install dev dev-deps lint lint-go test test-integration e2e build build-go migrate sqlc api docker load-test deploy-smoke
 
 install:
 	pnpm install --frozen-lockfile
@@ -55,3 +55,10 @@ api:
 
 docker:
 	docker compose --env-file deploy/.env -f deploy/docker-compose.yml -f deploy/docker-compose.build.yml up --build -d --wait
+
+# Both targets require isolated test infrastructure; see docs/DEPLOYMENT.md.
+load-test: build
+	node scripts/performance/run.mjs
+
+deploy-smoke:
+	bash scripts/deploy-smoke.sh

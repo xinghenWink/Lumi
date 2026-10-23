@@ -19,17 +19,18 @@ type Queue interface {
 	PopImages(context.Context) ([]string, error)
 }
 type Service struct {
-	pool    *pgxpool.Pool
-	q       *query.Queries
-	billing *credits.Service
-	catalog *catalog.Service
-	files   *media.Store
-	queue   Queue
-	logger  *slog.Logger
+	pool        *pgxpool.Pool
+	q           *query.Queries
+	billing     *credits.Service
+	catalog     *catalog.Service
+	files       *media.Store
+	queue       Queue
+	logger      *slog.Logger
+	submissions chan struct{}
 }
 
 func New(pool *pgxpool.Pool, billing *credits.Service, models *catalog.Service, files *media.Store, queue Queue, logger *slog.Logger) *Service {
-	return &Service{pool: pool, q: query.New(pool), billing: billing, catalog: models, files: files, queue: queue, logger: logger}
+	return &Service{pool: pool, q: query.New(pool), billing: billing, catalog: models, files: files, queue: queue, logger: logger, submissions: make(chan struct{}, 2)}
 }
 
 type Configuration struct {

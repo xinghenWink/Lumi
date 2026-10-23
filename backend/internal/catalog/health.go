@@ -81,7 +81,10 @@ func WeightedOrder(rows []query.AvailableModelRoutesRow) ([]query.AvailableModel
 	return ordered, nil
 }
 func (s *Service) routeTargets(ctx context.Context, id uuid.UUID) ([]query.AvailableModelRoutesRow, error) {
-	rows, err := s.queries.AvailableModelRoutes(ctx, id)
+	return routeTargets(ctx, s.queries, id)
+}
+func routeTargets(ctx context.Context, q *query.Queries, id uuid.UUID) ([]query.AvailableModelRoutesRow, error) {
+	rows, err := q.AvailableModelRoutes(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("read available routes: %w", err)
 	}
