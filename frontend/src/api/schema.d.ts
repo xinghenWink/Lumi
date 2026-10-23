@@ -510,6 +510,146 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/models': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listAvailableModels */
+    get: operations['listAvailableModels']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/upstreams': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listUpstreams */
+    get: operations['listUpstreams']
+    put?: never
+    /** createUpstream */
+    post: operations['createUpstream']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/upstreams/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    /** updateUpstream */
+    put: operations['updateUpstream']
+    post?: never
+    /** deleteUpstream */
+    delete: operations['deleteUpstream']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/upstreams/{id}/test': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** testUpstreamModels */
+    post: operations['testUpstreamModels']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/upstreams/{id}/discover': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** discoverUpstreamModels */
+    post: operations['discoverUpstreamModels']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/upstreams/{id}/import': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** importUpstreamModels */
+    post: operations['importUpstreamModels']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/models': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listPlatformModels */
+    get: operations['listPlatformModels']
+    put?: never
+    /** createPlatformModel */
+    post: operations['createPlatformModel']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/models/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    /** updatePlatformModel */
+    put: operations['updatePlatformModel']
+    post?: never
+    /** deletePlatformModel */
+    delete: operations['deletePlatformModel']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -971,6 +1111,166 @@ export interface components {
     }
     RedeemCodeDeleteInput: {
       ids: string[]
+    }
+    UpstreamInput: {
+      version: number
+      name: string
+      /**
+       * Format: uri
+       * @description HTTP or HTTPS base URL, including /v1 when required; no credentials, query or fragment.
+       */
+      base_url: string
+      /** @description Required for creation. Omitted or null preserves the saved key. Empty clears it only on a disabled channel. Never returned. */
+      api_key?: string | null
+      timeout_chat_s: number
+      timeout_image_s: number
+      proxy_url: string
+      enabled: boolean
+      priority: number
+      weight: number
+      /** @enum {string} */
+      edit_format: 'multipart' | 'json'
+      note: string
+    }
+    Upstream: {
+      version: number
+      name: string
+      /**
+       * Format: uri
+       * @description HTTP or HTTPS base URL, including /v1 when required; no credentials, query or fragment.
+       */
+      base_url: string
+      timeout_chat_s: number
+      timeout_image_s: number
+      proxy_url: string
+      enabled: boolean
+      priority: number
+      weight: number
+      /** @enum {string} */
+      edit_format: 'multipart' | 'json'
+      note: string
+      /** Format: uuid */
+      id: string
+      api_key_configured: boolean
+      /** Format: date-time */
+      created_at: string
+      /** Format: date-time */
+      updated_at: string
+    }
+    UpstreamPage: {
+      items: components['schemas']['Upstream'][]
+      next_cursor: string
+    }
+    ModelCapabilities: {
+      vision: boolean
+      stream: boolean
+      max_context_tokens: number
+      qualities: ('low' | 'medium' | 'high')[]
+      sizes: string[]
+      max_n: number
+      supports_edit: boolean
+      max_reference_images: number
+      /** @enum {string} */
+      response_format: '' | 'b64_json' | 'url'
+    }
+    ModelRouteInput: {
+      /** Format: uuid */
+      upstream_id: string
+      upstream_model_name: string
+      priority: number
+      weight: number
+      enabled: boolean
+    }
+    ModelRoute: {
+      /** Format: uuid */
+      upstream_id: string
+      upstream_model_name: string
+      priority: number
+      weight: number
+      enabled: boolean
+      /** Format: uuid */
+      id: string
+      upstream_name: string
+      upstream_enabled: boolean
+    }
+    PublicModel: {
+      /** Format: uuid */
+      id: string
+      display_name: string
+      /** @enum {string} */
+      type: 'chat' | 'image'
+      description: string
+      icon: string
+      sort_order: number
+      is_default: boolean
+      capabilities: components['schemas']['ModelCapabilities']
+    }
+    PlatformModel: {
+      /** Format: uuid */
+      id: string
+      display_name: string
+      /** @enum {string} */
+      type: 'chat' | 'image'
+      description: string
+      icon: string
+      sort_order: number
+      is_default: boolean
+      capabilities: components['schemas']['ModelCapabilities']
+      version: number
+      enabled: boolean
+      routes: components['schemas']['ModelRoute'][]
+      /** Format: date-time */
+      created_at: string
+      /** Format: date-time */
+      updated_at: string
+    }
+    PlatformModelInput: {
+      version: number
+      display_name: string
+      /** @enum {string} */
+      type: 'chat' | 'image'
+      description: string
+      icon: string
+      sort_order: number
+      enabled: boolean
+      is_default: boolean
+      capabilities: components['schemas']['ModelCapabilities']
+      routes: components['schemas']['ModelRouteInput'][]
+    }
+    PlatformModelPage: {
+      items: components['schemas']['PlatformModel'][]
+      next_cursor: string
+    }
+    PublicModelCatalog: {
+      items: components['schemas']['PublicModel'][]
+    }
+    UpstreamDiscovery: {
+      /** Format: uuid */
+      upstream_id: string
+      version: number
+      models: {
+        id: string
+      }[]
+    }
+    UpstreamConnectionTest: {
+      success: boolean
+      latency_ms: number
+      status: number
+      error_code: string
+      model_count: number
+    }
+    UpstreamImportInput: {
+      version: number
+      models: {
+        remote_id: string
+        display_name: string
+        /** @enum {string} */
+        type: 'chat' | 'image'
+        capabilities: components['schemas']['ModelCapabilities']
+      }[]
+    }
+    UpstreamImportResult: {
+      items: components['schemas']['PlatformModel'][]
     }
   }
   responses: {
@@ -2070,6 +2370,319 @@ export interface operations {
         content: {
           'text/csv': string
         }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listAvailableModels: {
+    parameters: {
+      query: {
+        type: 'chat' | 'image'
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PublicModelCatalog']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listUpstreams: {
+    parameters: {
+      query?: {
+        search?: string
+        state?: 'enabled' | 'disabled'
+        cursor?: string
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UpstreamPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  createUpstream: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpstreamInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Upstream']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  updateUpstream: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpstreamInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Upstream']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  deleteUpstream: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  testUpstreamModels: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UpstreamConnectionTest']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  discoverUpstreamModels: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UpstreamDiscovery']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  importUpstreamModels: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpstreamImportInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UpstreamImportResult']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listPlatformModels: {
+    parameters: {
+      query?: {
+        search?: string
+        state?: 'enabled' | 'disabled'
+        cursor?: string
+        limit?: number
+        type?: 'chat' | 'image'
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PlatformModelPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  createPlatformModel: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PlatformModelInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PlatformModel']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  updatePlatformModel: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PlatformModelInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PlatformModel']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  deletePlatformModel: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
       default: components['responses']['APIError']
     }

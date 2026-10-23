@@ -76,6 +76,31 @@ type CreditOperation struct {
 	CreatedAt   time.Time
 }
 
+type Model struct {
+	ID           uuid.UUID
+	DisplayName  string
+	Type         string
+	Description  string
+	Icon         string
+	SortOrder    int32
+	Enabled      bool
+	IsDefault    bool
+	Capabilities []byte
+	Version      int64
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+type ModelRoute struct {
+	ID                uuid.UUID
+	ModelID           uuid.UUID
+	UpstreamID        uuid.UUID
+	UpstreamModelName string
+	Priority          int32
+	Weight            int32
+	Enabled           bool
+}
+
 type PricingRule struct {
 	ID              uuid.UUID
 	ModelID         *uuid.UUID
@@ -127,6 +152,37 @@ type Setting struct {
 	Value     []byte
 	UpdatedBy *uuid.UUID
 	UpdatedAt time.Time
+}
+
+type Upstream struct {
+	ID            uuid.UUID
+	Name          string
+	BaseUrl       string
+	ApiKeyEnc     string
+	TimeoutChatS  int32
+	TimeoutImageS int32
+	ProxyUrl      string
+	Enabled       bool
+	Priority      int32
+	Weight        int32
+	CircuitState  string
+	EditFormat    string
+	Note          string
+	Version       int64
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+type UpstreamCall struct {
+	ID           uuid.UUID
+	UpstreamID   uuid.UUID
+	Model        string
+	Kind         string
+	LatencyMs    int64
+	Status       int32
+	ErrorSummary string
+	RequestID    string
+	CreatedAt    time.Time
 }
 
 type User struct {

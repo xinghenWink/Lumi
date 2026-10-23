@@ -36,6 +36,24 @@ export const router = createRouter({
           component: () => import('../pages/ProfilePage.vue'),
           meta: { title: 'nav.account' },
         },
+        {
+          path: 'create',
+          name: 'image-workspace',
+          component: () => import('../pages/WorkspacePage.vue'),
+          meta: { title: 'nav.create' },
+        },
+        {
+          path: 'admin/upstreams',
+          name: 'upstreams',
+          component: () => import('../pages/admin/UpstreamsPage.vue'),
+          meta: { admin: true, title: 'nav.upstreams' },
+        },
+        {
+          path: 'admin/models',
+          name: 'models',
+          component: () => import('../pages/admin/ModelsPage.vue'),
+          meta: { admin: true, title: 'nav.models' },
+        },
         { path: 'admin', redirect: '/admin/users', meta: { admin: true } },
         {
           path: 'me/credits',

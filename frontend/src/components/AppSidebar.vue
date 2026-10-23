@@ -12,6 +12,8 @@ import {
   Coins,
   Ticket,
   SlidersHorizontal,
+  Server,
+  Boxes,
 } from 'lucide-vue-next'
 import BrandMark from './BrandMark.vue'
 import AccountMenu from './AccountMenu.vue'
@@ -24,6 +26,8 @@ const links = computed(() =>
   props.admin
     ? [
         { path: '/admin/users', key: 'nav.users', icon: Users },
+        { path: '/admin/upstreams', key: 'nav.upstreams', icon: Server },
+        { path: '/admin/models', key: 'nav.models', icon: Boxes },
         { path: '/admin/pricing', key: 'nav.pricing', icon: SlidersHorizontal },
         { path: '/admin/redeem-codes', key: 'nav.redeemCodes', icon: Ticket },
         { path: '/admin/credit-ledger', key: 'nav.creditLedger', icon: Coins },
@@ -54,10 +58,10 @@ const links = computed(() =>
         @click="emit('navigate')"
         ><component :is="link.icon" :size="18" />{{ t(link.key) }}</RouterLink
       >
-      <button v-if="!admin" class="sidebar-link unavailable" disabled>
+      <RouterLink v-if="!admin" to="/create" class="sidebar-link" @click="emit('navigate')">
         <Image :size="18" />{{ t('nav.image')
         }}<span class="soon-badge">{{ t('nav.comingSoon') }}</span>
-      </button>
+      </RouterLink>
     </nav>
     <div class="sidebar-spacer" />
     <RouterLink

@@ -149,6 +149,8 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 	if accounts != nil {
 		stopMaintenance := startUserMaintenance(ctx, accounts.Users, logger)
 		defer stopMaintenance()
+		stopCalls := startCallMaintenance(ctx, accounts.Catalog, logger)
+		defer stopCalls()
 	}
 	go func() { serveResult <- server.Serve(listener) }()
 	logger.Info("server started", "address", cfg.HTTPAddress, "version", version)

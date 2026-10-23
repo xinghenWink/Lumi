@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"
+	"github.com/xinghenWink/Lumi/backend/internal/catalog"
 	"github.com/xinghenWink/Lumi/backend/internal/config"
 	"github.com/xinghenWink/Lumi/backend/internal/credits"
 	"github.com/xinghenWink/Lumi/backend/internal/http/account"
@@ -16,6 +17,7 @@ import (
 	platformredis "github.com/xinghenWink/Lumi/backend/internal/platform/redis"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/secrets"
 	"github.com/xinghenWink/Lumi/backend/internal/settings"
+	"github.com/xinghenWink/Lumi/backend/internal/upstream"
 	"github.com/xinghenWink/Lumi/backend/internal/user"
 )
 
@@ -48,5 +50,5 @@ func configureAccounts(ctx context.Context, cfg config.Config, pool *pgxpool.Poo
 		return nil, fmt.Errorf("bootstrap administrator: %w", err)
 	}
 	sender := mailer.New(configuration, cfg.Environment, logger)
-	return &account.Services{Auth: auth.New(pool, passwords, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing}, nil
+	return &account.Services{Auth: auth.New(pool, passwords, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: catalog.New(pool, vault, upstream.NetworkPolicy{AllowPrivate: cfg.UpstreamAllowPrivate}, logger)}, nil
 }
