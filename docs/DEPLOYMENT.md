@@ -125,13 +125,13 @@ Playwright 包含单用户注册 → 聊天 → 兑换 → 生图 → 管理员�
 
 ## 正式发布门槛
 
-核对 [M7 验收](M7_ACCEPTANCE.md)。CI 完整通过，真实上游能力核定、干净目标服务器 HTTPS 部署 / 重启 / 升级回滚 / 恢复验收完成后，为**已验收的同一提交**打 `v1.0.0` 并推送。release workflow 再运行全部 CI，发布 amd64 / arm64 GHCR manifest；两种原生架构按 digest 启动验证通过后创建带完整附件的 GitHub Release **草稿**。等待整个工作流全绿，再将官方镜像固定到目标服务器复验；可按上文使用只读 Packages PAT 或官方离线归档。SSH 凭据不上传 Actions。
+核对 [M7 验收](M7_ACCEPTANCE.md)。CI 完整通过，真实上游能力核定、干净目标服务器 HTTPS 部署 / 重启 / 升级回滚 / 恢复验收完成后，为**已验收的同一提交**打 `v0.1.0` 并推送。release workflow 再运行全部 CI，发布 amd64 / arm64 GHCR manifest；两种原生架构按 digest 启动验证通过后创建带完整附件的 GitHub Release **草稿**。等待整个工作流全绿，再将官方镜像固定到目标服务器复验；可按上文使用只读 Packages PAT 或官方离线归档。SSH 凭据不上传 Actions。
 
 ```sh
-git tag -a v1.0.0 VERIFIED_COMMIT -m 'release: v1.0.0'
-git push origin v1.0.0
+git tag -a v0.1.0 VERIFIED_COMMIT -m 'release: v0.1.0'
+git push origin v0.1.0
 ```
 
-授权发布者完成正式镜像部署验收后执行 `gh release edit v1.0.0 --draft=false`，才视为正式发布。若任何验收失败，保留草稿、修复后重新验证；不把已有 tag、GHCR manifest 或草稿当作发布完成。
+授权发布者完成正式镜像部署验收后执行 `gh release edit v0.1.0 --draft=false`，才视为正式发布。若任何验收失败，保留草稿、修复后重新验证；不把已有 tag、GHCR manifest 或草稿当作发布完成。
 
 缺少真实服务器或上游证据时保持未发布状态，在验收记录明确列出未通过项。自动更新仅为运营可选策略，本项目不默认启用 Watchtower。

@@ -10,6 +10,8 @@
 | 部署   | `deploy/docker-deploy.sh`、`backup.sh`、`restore.sh`、代理示例，`scripts/deploy-smoke.sh`        | forward-only 迁移保持不变        |
 | 发布   | `.github/workflows/`、Makefile、README、`docs/DEPLOYMENT.md`、`M7_ACCEPTANCE.md`、`DECISIONS.md` | OpenAPI 版本与生成类型保持一致   |
 
-验收顺序：`make lint test` → sqlc / OpenAPI 一致性 → 集成 → 生产构建 → 全量 Playwright / Lighthouse → k6 → 空目录 Compose 部署 / 重启 / 升级回滚 / 备份恢复 → CI → v1.0.0 双架构发布。
+验收顺序：`make lint test` → sqlc / OpenAPI 一致性 → 集成 → 生产构建 → 全量 Playwright / Lighthouse → k6 → 空目录 Compose 部署 / 重启 / 升级回滚 / 备份恢复 → CI → v0.1.0 双架构发布。
+
+产品版本按用户确认的 [版本策略](VERSIONING.md) 从 0.0.1 演进至首个可运行的 0.1.0；M7 验收完成不自动意味着进入成熟的 1.0 阶段。
 
 每项记录实测来源和限制。未通过的验收不勾选；本地 Compose 演练不冒充远程干净服务器，fixture 不冒充真实上游参数遵守证明。前序里程碑 PR 不由本轮自动合并。
