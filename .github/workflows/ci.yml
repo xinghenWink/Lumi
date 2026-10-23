@@ -68,15 +68,36 @@ jobs:
           printf '84d26fc1f7bc03e02f2e016b3b1b20c032e05dfe461fca82de4e3a6ebe72ddbd  %s\n' "$RUNNER_TEMP/k6.tar.gz" | sha256sum --check
           tar -xzf "$RUNNER_TEMP/k6.tar.gz" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/k6-v1.3.0-linux-amd64" >> "$GITHUB_PATH"
+      - name: Prepare isolated capacity dependencies
+        run: |
+          lumi_load_password=$(openssl rand -hex 24)
+          printf '::add-mask::%s\n' "$lumi_load_password"
+          # Match the target rehearsal's direct loopback path, without host port forwarding.
+          docker run -d --name lumi-capacity-postgres --network host \
+            -e POSTGRES_USER=lumi -e POSTGRES_PASSWORD="$lumi_load_password" -e POSTGRES_DB=lumi_m7_load \
+            postgres:16-alpine postgres -c listen_addresses=127.0.0.1 -p 15432
+          docker run -d --name lumi-capacity-redis --network host redis:7-alpine \
+            redis-server --bind 127.0.0.1 --port 16379 --requirepass "$lumi_load_password"
+          for attempt in $(seq 1 60); do
+            if docker exec lumi-capacity-postgres pg_isready -h 127.0.0.1 -p 15432 -U lumi -d lumi_m7_load \
+              && docker exec lumi-capacity-redis redis-cli -p 16379 -a "$lumi_load_password" ping 2>/dev/null | grep -qx PONG; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec lumi-capacity-postgres pg_isready -h 127.0.0.1 -p 15432 -U lumi -d lumi_m7_load
+          docker exec lumi-capacity-redis redis-cli -p 16379 -a "$lumi_load_password" ping 2>/dev/null | grep -qx PONG
+          printf 'E2E_DATABASE_URL=postgres://lumi:%s@127.0.0.1:15432/lumi_m7_load?sslmode=disable\nE2E_REDIS_URL=redis://:%s@127.0.0.1:16379/0\n' \
+            "$lumi_load_password" "$lumi_load_password" >> "$GITHUB_ENV"
       - name: Measure 100 distinct users with a local upstream
         env:
           GOMAXPROCS: '2'
           LUMI_DIAGNOSTICS: '1'
-          E2E_DATABASE_URL: postgres://lumi:ci-e2e-only@127.0.0.1:5432/lumi_m7_load?sslmode=disable
-          E2E_REDIS_URL: redis://127.0.0.1:6379/1
         run: |
-          docker exec '${{ job.services.postgres.id }}' psql -U lumi -d lumi -v ON_ERROR_STOP=1 -c 'CREATE DATABASE lumi_m7_load'
           node scripts/performance/run.mjs
+      - name: Stop isolated capacity dependencies
+        if: always()
+        run: docker rm -f lumi-capacity-postgres lumi-capacity-redis 2>/dev/null || true
       - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:
