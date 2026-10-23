@@ -1,6 +1,6 @@
 # Lumi 开发分析与里程碑计划
 
-M0～M7 均已完成验收，稳定版本 [v1.0.0](https://github.com/xinghenWink/Lumi/releases/tag/v1.0.0) 已正式发布并部署。主分支 `main` 归并全部里程碑成果，M2～M7 对应 PR #3～#8 按顺序合并并保留提交历史；已发布标签继续指向验收提交 `71cb7dcb37af722f2814b2dee1ad441dcb53dd0e`。实际功能、技术栈与部署入口见 [README](../README.md)，完整发布与服务器证据见 [M7 验收](M7_ACCEPTANCE.md)。下文保留开发顺序与早期阶段的历史边界。
+M0～M7 的初期范围均已完成验收，当前可用版本定位为 [v0.1.0](https://github.com/xinghenWink/Lumi/releases/tag/v0.1.0)。主分支 `main` 已归并全部里程碑成果；产品版本按 `v0.0.1 → v0.1.0 → 后续 0.x` 逐步迭代，成熟后再进入 1.0，见 [版本策略](VERSIONING.md)。原 v1.0.0 编号的历史构建和验收证据保留，不将里程碑完成视为产品成熟版本承诺。实际功能、技术栈与部署入口见 [README](../README.md)，原始代码与服务器证据见 [M7 验收](M7_ACCEPTANCE.md)。下文保留开发顺序与早期阶段的历史边界。
 
 ## 基线与约束
 

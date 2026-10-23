@@ -1,6 +1,6 @@
 # 官方离线镜像身份核验
 
-适用于 v1.0.0 的 amd64 官方归档。仅处理从受信 GitHub Release 下载的归档及同名 JSON；先执行 `docker load -i lumi-linux-amd64.tar.gz`。以下可选核验使用 Python 3.10+ 标准库，目标 Ubuntu 24.04 自带的 Python 3.12 已实测，不安装 pip 包，也不属于应用运行依赖。
+适用于 v0.1.0 及使用相同格式的历史 amd64 官方归档。仅处理从受信 GitHub Release 下载的归档及同名 JSON；先执行 `docker load -i lumi-linux-amd64.tar.gz`。版本和提交以本次下载的官方 JSON 为准，不将旧版本归档改名后冒充新版本。以下可选核验使用 Python 3.10+ 标准库，目标 Ubuntu 24.04 自带的 Python 3.12 已实测，不安装 pip 包，也不属于应用运行依赖。
 
 发布 runner 的传统 Docker 存储将配置 digest 显示为 image ID；Docker 29 的 containerd 存储在导入 OCI 归档后可以显示归档 manifest digest。两者不同不直接代表镜像内容不同，也不能忽略差异。归档 manifest 使用未压缩层，因此也不必等于 GHCR 多架构 index 的 digest。
 

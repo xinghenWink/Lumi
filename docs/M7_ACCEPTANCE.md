@@ -1,6 +1,6 @@
 # M7 加固与发布验收
 
-日期：2026-10-23。分支 `codex/m7-release`，基于 M6 `e9f87b2`。**v1.0.0 已正式发布，14 项 DoD 均通过**。发布提交为 `71cb7dcb37af722f2814b2dee1ad441dcb53dd0e`，固定证据见 [最终代码 CI](https://github.com/xinghenWink/Lumi/actions/runs/39914634255)、[正式发布工作流](https://github.com/xinghenWink/Lumi/actions/runs/39915922612) 和 [Release](https://github.com/xinghenWink/Lumi/releases/tag/v1.0.0)。代码、工具和文档范围见 [计划](M7_PLAN.md)，归并结果见 [M7 PR](https://github.com/xinghenWink/Lumi/pull/8)。
+日期：2026-10-23。分支 `codex/m7-release`，基于 M6 `e9f87b2`。**初期范围的 14 项 DoD 均通过；产品可用版本按用户确认的策略编号为 v0.1.0**。当前发布入口为 [v0.1.0 Release](https://github.com/xinghenWink/Lumi/releases/tag/v0.1.0)，版本路线见 [版本策略](VERSIONING.md)。本文件保留原始验收基线 `71cb7dcb37af722f2814b2dee1ad441dcb53dd0e` 的证据：[代码 CI](https://github.com/xinghenWink/Lumi/actions/runs/39914634255)、[历史构建工作流](https://github.com/xinghenWink/Lumi/actions/runs/39915922612)。代码、工具和文档范围见 [计划](M7_PLAN.md)，归并结果见 [M7 PR](https://github.com/xinghenWink/Lumi/pull/8)。
 
 ## 第 18 章逐项对照
 
@@ -33,7 +33,9 @@
 
 ## 发布状态
 
-v1.0.0 于 2026-10-23 15:38（Asia/Shanghai）正式发布。最终代码 CI 的 quality / container 与 Release 工作流的质量检查、容器检查、镜像发布、原生 amd64 / arm64 验证及 Release 共 6 个任务全部成功。正式 amd64 镜像已在目标服务器按配置、各层内容和归档 manifest 完成身份核验，再核对运行版本与提交；标签和官方镜像未因后续文档整理而移动。
+历史构建最初以 v1.0.0 编号于 2026-10-23 15:38（Asia/Shanghai）发布，随后按用户确认的 0.x 产品路线转为草稿保留；该编号不再作为当前公开发行版本。原始代码 CI 的 quality / container 与历史 Release 工作流的质量检查、容器检查、镜像发布、原生 amd64 / arm64 验证及 Release 共 6 个任务全部成功。历史 amd64 镜像曾在目标服务器按配置、各层内容和归档 manifest 完成身份核验；这些已发生的证据不改写为 v0.1.0 的构建结果。
+
+v0.1.0 使用相同的业务代码重新构建，完整 CI、双架构和目标服务器验证仍是正式发布门槛；对应提交、官方镜像身份与本轮结果以 v0.1.0 Release 的说明及附件为准。没有新增业务 API、运行依赖或 SQL 迁移，部署默认版本和运行时 `/api/version` 同步使用新编号。
 
 最终 Release 的 100 VU / 60 秒负载完整计入首轮样本：平台额外耗时 p95 **54.71ms**、读请求 p95 **4.55ms**，200 次完整流、70 张图、23,240 个业务断言全部通过。目标服务器最终直接依赖拓扑复测 p95 **82.37ms**、读请求 p95 **6.55ms**，200 次完整流、69 张图、22,878 个断言全部通过。前表和检查列表保留之前的已通过轮次，不以它们替代最终发布证据。
 

@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   verify:
+    if: github.event.deleted != true
     uses: ./.github/workflows/ci.yml
 
   publish:
