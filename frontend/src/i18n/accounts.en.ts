@@ -263,6 +263,7 @@ export default {
       credit_ledger: 'Credit ledger',
       upstream: 'Upstream channel',
       model: 'Platform model',
+      chat: 'Chat settings',
     },
     actions: {
       credits: {
@@ -322,10 +323,10 @@ export default {
     content:
       'Only submit content you are authorized to use. Administrator access is granted by the server. Ordinary accounts cannot elevate their own permissions.',
     dataTitle: 'Data we process',
-    data: 'Account use involves your email, display name, password hash, sign-in IP, device information and necessary security records. Credit use records balance changes, charge settlements, redemption times, code tails and source IPs. Passwords are not stored in plain text. Only refresh token hashes are stored.',
+    data: 'Account use involves your email, display name, password hash, sign-in IP, device information and necessary security records. Chat stores conversation titles, messages and generation status, and sends the required context and title requests to the selected upstream. Credit use records balance changes, charge settlements, redemption times, code tails and source IPs. Passwords are not stored in plain text. Only refresh token hashes are stored.',
     purposeTitle: 'Why it is used',
     purpose:
-      'This information supports authentication, account management, security and operation history. Credit ledger, charge settlement and redemption records retain a stable user identifier after account cleanup to preserve accounting history. Administration requires authorization. Sensitive credentials are not returned to the browser.',
+      'This information supports authentication, account management, chat generation and history recovery, security and operation history. Deleting chat history immediately hides conversations using soft deletion. Chat data is removed after the 30-day deleted-account retention period. Credit ledger, charge settlement and redemption records retain a stable user identifier after account cleanup to preserve accounting history. Administration requires authorization. Sensitive credentials are not returned to the browser.',
     contactTitle: 'Contact',
     contact:
       'Use the contact information provided by the site operator for account or data questions.',

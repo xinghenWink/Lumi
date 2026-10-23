@@ -27,7 +27,7 @@ export const router = createRouter({
         {
           path: 'chat',
           name: 'workspace',
-          component: () => import('../pages/WorkspacePage.vue'),
+          component: () => import('../pages/ChatPage.vue'),
           meta: { title: 'nav.workspace' },
         },
         {
@@ -39,8 +39,26 @@ export const router = createRouter({
         {
           path: 'create',
           name: 'image-workspace',
-          component: () => import('../pages/WorkspacePage.vue'),
+          component: () => import('../pages/ChatPage.vue'),
           meta: { title: 'nav.create' },
+        },
+        {
+          path: 'chat/:id',
+          name: 'conversation',
+          component: () => import('../pages/ChatPage.vue'),
+          meta: { title: 'nav.chat' },
+        },
+        {
+          path: 'me/chats',
+          name: 'chat-history',
+          component: () => import('../pages/ChatHistoryPage.vue'),
+          meta: { title: 'nav.chatHistory' },
+        },
+        {
+          path: 'admin/chat-settings',
+          name: 'chat-settings',
+          component: () => import('../pages/admin/ChatSettingsPage.vue'),
+          meta: { admin: true, title: 'nav.chatSettings' },
         },
         {
           path: 'admin/upstreams',

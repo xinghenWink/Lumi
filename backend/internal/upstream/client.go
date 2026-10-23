@@ -117,6 +117,9 @@ func FailureCode(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "UPSTREAM_TIMEOUT"
 	}
+	if errors.Is(err, context.Canceled) {
+		return "UPSTREAM_CANCELED"
+	}
 	return "UPSTREAM_UNAVAILABLE"
 }
 func (c *Client) observe(ctx context.Context, kind, model string, start time.Time, status int, err error) {

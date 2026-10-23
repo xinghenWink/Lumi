@@ -1,11 +1,11 @@
 openapi: 3.1.0
 info:
   title: Lumi API
-  version: 0.3.0
+  version: 0.4.0
   description: >-
-    M2 accounts, dual-bucket credits, pricing, redemption and administration. Financial mutations
-    are transactional and idempotent. Mutations require a matching Origin/Referer and X-Lumi-CSRF:
-    1. Image task execution is introduced in later milestones.
+    Accounts, credits, upstream configuration and owner-isolated chat. Mutations require Origin and
+    X-Lumi-CSRF: 1. Chat POST streams use meta, delta, error, done and ping SSE events. Reuse request_id
+    only with identical input; a live duplicate returns CHAT_BUSY. No image task execution yet.
 servers:
   - url: /
 paths:
@@ -569,9 +569,9 @@ paths:
       operationId: deleteUser
       summary: deleteUser
       description: >-
-        Soft-delete the account after email confirmation and immediately revoke its sessions. An
-        internal maintenance task permanently removes accounts after 30 days, cascades their
-        sessions, and preserves audit history in the same transaction.
+        Soft-delete the account after email confirmation and immediately revoke its sessions. An internal
+        maintenance task permanently removes accounts after 30 days, cascades their sessions, and
+        preserves audit history in the same transaction.
       security:
         - bearerAuth: []
       parameters:
@@ -910,8 +910,8 @@ paths:
             maxLength: 128
             pattern: ^[A-Za-z0-9_.:-]+$
             description: >-
-              Scoped to actor and request. Exact replays return the original result; changed payload
-              or operation returns IDEMPOTENCY_CONFLICT.
+              Scoped to actor and request. Exact replays return the original result; changed payload or
+              operation returns IDEMPOTENCY_CONFLICT.
       responses:
         '200':
           description: Success
@@ -1020,8 +1020,8 @@ paths:
             maxLength: 128
             pattern: ^[A-Za-z0-9_.:-]+$
             description: >-
-              Scoped to actor and request. Exact replays return the original result; changed payload
-              or operation returns IDEMPOTENCY_CONFLICT.
+              Scoped to actor and request. Exact replays return the original result; changed payload or
+              operation returns IDEMPOTENCY_CONFLICT.
       responses:
         '200':
           description: Success
@@ -1176,8 +1176,8 @@ paths:
             maxLength: 128
             pattern: ^[A-Za-z0-9_.:-]+$
             description: >-
-              Scoped to actor and request. Exact replays return the original result; changed payload
-              or operation returns IDEMPOTENCY_CONFLICT.
+              Scoped to actor and request. Exact replays return the original result; changed payload or
+              operation returns IDEMPOTENCY_CONFLICT.
       responses:
         '201':
           description: Success
@@ -1309,9 +1309,7 @@ paths:
               $ref: '#/components/schemas/RedeemCodeEnableInput'
     delete:
       operationId: deleteUnusedRedeemCodes
-      summary: >-
-        Only unused codes can be deleted; the whole selection is rolled back if any code has been
-        used
+      summary: Only unused codes can be deleted; the whole selection is rolled back if any code has been used
       security:
         - bearerAuth: []
       parameters:
@@ -1870,6 +1868,292 @@ paths:
           description: Success
         default:
           $ref: '#/components/responses/APIError'
+  /api/v1/conversations:
+    get:
+      operationId: listChatConversations
+      summary: listChatConversations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatConversationPage'
+        default:
+          $ref: '#/components/responses/APIError'
+    post:
+      operationId: createChatConversation
+      summary: createChatConversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatConversation'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCreateInput'
+  /api/v1/conversations/delete:
+    post:
+      operationId: deleteChatConversations
+      summary: deleteChatConversations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Success
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatDeleteInput'
+  /api/v1/conversations/{id}:
+    get:
+      operationId: getChatConversation
+      summary: getChatConversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatConversation'
+        default:
+          $ref: '#/components/responses/APIError'
+    patch:
+      operationId: updateChatConversation
+      summary: updateChatConversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatConversation'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatUpdateInput'
+  /api/v1/conversations/{id}/messages:
+    get:
+      operationId: listChatMessages
+      summary: listChatMessages
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessagePage'
+        default:
+          $ref: '#/components/responses/APIError'
+    post:
+      operationId: sendChatMessage
+      summary: sendChatMessage
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: >-
+            SSE meta/delta/error/done/ping. Completed duplicates replay stored metadata. Streaming
+            duplicates return 409. Client disconnect preserves partial output.
+          headers:
+            X-Accel-Buffering:
+              schema:
+                type: string
+                const: 'no'
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: |+
+                event: delta
+                data: {"content":"Hello"}
+
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatSendInput'
+  /api/v1/conversations/{id}/stop:
+    post:
+      operationId: stopChatGeneration
+      summary: stopChatGeneration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Success
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/chat-settings:
+    get:
+      operationId: getChatConfiguration
+      summary: getChatConfiguration
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatConfiguration'
+        default:
+          $ref: '#/components/responses/APIError'
+    put:
+      operationId: saveChatConfiguration
+      summary: saveChatConfiguration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatConfiguration'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatConfiguration'
 components:
   headers:
     RequestID:
@@ -3167,8 +3451,8 @@ components:
             - 'null'
           maxLength: 4096
           description: >-
-            Required for creation. Omitted or null preserves the saved key. Empty clears it only on
-            a disabled channel. Never returned.
+            Required for creation. Omitted or null preserves the saved key. Empty clears it only on a
+            disabled channel. Never returned.
         timeout_chat_s:
           type: integer
           minimum: 1
@@ -3666,6 +3950,279 @@ components:
             $ref: '#/components/schemas/PlatformModel'
       required:
         - items
+    ChatConversation:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        model_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        pinned:
+          type: boolean
+        busy:
+          type: boolean
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        last_message_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - model_id
+        - pinned
+        - busy
+        - version
+        - last_message_at
+        - created_at
+    ChatUsage:
+      type: object
+      additionalProperties: false
+      properties:
+        prompt_tokens:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        completion_tokens:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        total_tokens:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+      required:
+        - prompt_tokens
+        - completion_tokens
+        - total_tokens
+    ChatMetadata:
+      type: object
+      additionalProperties: false
+      properties:
+        finish_reason:
+          type: string
+        latency_ms:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        error_code:
+          type: string
+        usage:
+          $ref: '#/components/schemas/ChatUsage'
+      required: []
+    ChatMessage:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        request_id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum:
+            - user
+            - assistant
+        content:
+          type: string
+        status:
+          type: string
+          enum:
+            - streaming
+            - completed
+            - interrupted
+            - error
+        model_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        meta:
+          $ref: '#/components/schemas/ChatMetadata'
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - request_id
+        - role
+        - content
+        - status
+        - model_id
+        - meta
+        - created_at
+    ChatConversationPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatConversation'
+        next_cursor:
+          type: string
+      required:
+        - items
+        - next_cursor
+    ChatMessagePage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+        next_cursor:
+          type: string
+      required:
+        - items
+        - next_cursor
+    ChatCreateInput:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        model_id:
+          type: string
+          format: uuid
+      required:
+        - id
+        - model_id
+    ChatUpdateInput:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        pinned:
+          type: boolean
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+      required:
+        - title
+        - pinned
+        - version
+    ChatDeleteInput:
+      type: object
+      additionalProperties: false
+      properties:
+        ids:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+        all:
+          type: boolean
+      required:
+        - ids
+        - all
+    ChatSendInput:
+      type: object
+      additionalProperties: false
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        model_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+          maxLength: 64000
+        action:
+          type: string
+          enum:
+            - send
+            - regenerate
+            - edit
+        last_message_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+      required:
+        - request_id
+        - model_id
+        - content
+        - action
+    ChatConfiguration:
+      type: object
+      additionalProperties: false
+      properties:
+        per_minute:
+          type: integer
+          minimum: 0
+          maximum: 1000
+        per_day:
+          type: integer
+          minimum: 0
+          maximum: 100000
+        context_messages:
+          type: integer
+          minimum: 1
+          maximum: 200
+        context_tokens:
+          type: integer
+          minimum: 128
+          maximum: 1000000
+        system_prompt:
+          type: string
+          maxLength: 32000
+        title_model_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+      required:
+        - per_minute
+        - per_day
+        - context_messages
+        - context_tokens
+        - system_prompt
+        - title_model_id
+        - version
+    ChatEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        conversation:
+          $ref: '#/components/schemas/ChatConversation'
+        user:
+          $ref: '#/components/schemas/ChatMessage'
+        assistant:
+          $ref: '#/components/schemas/ChatMessage'
+        content:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+      required: []
   securitySchemes:
     bearerAuth:
       type: http
@@ -3677,9 +4234,7 @@ components:
       name: lumi_refresh
   responses:
     APIError:
-      description: >-
-        Validation, authorization, conflict, rate limit or service failure. Translate code in the
-        client.
+      description: Validation, authorization, conflict, rate limit or service failure. Translate code in the client.
       headers:
         X-Request-ID:
           $ref: '#/components/headers/RequestID'

@@ -650,6 +650,112 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/conversations': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listChatConversations */
+    get: operations['listChatConversations']
+    put?: never
+    /** createChatConversation */
+    post: operations['createChatConversation']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/conversations/delete': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** deleteChatConversations */
+    post: operations['deleteChatConversations']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/conversations/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** getChatConversation */
+    get: operations['getChatConversation']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /** updateChatConversation */
+    patch: operations['updateChatConversation']
+    trace?: never
+  }
+  '/api/v1/conversations/{id}/messages': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** listChatMessages */
+    get: operations['listChatMessages']
+    put?: never
+    /** sendChatMessage */
+    post: operations['sendChatMessage']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/conversations/{id}/stop': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** stopChatGeneration */
+    post: operations['stopChatGeneration']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/chat-settings': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** getChatConfiguration */
+    get: operations['getChatConfiguration']
+    /** saveChatConfiguration */
+    put: operations['saveChatConfiguration']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -1271,6 +1377,99 @@ export interface components {
     }
     UpstreamImportResult: {
       items: components['schemas']['PlatformModel'][]
+    }
+    ChatConversation: {
+      /** Format: uuid */
+      id: string
+      title: string
+      /** Format: uuid */
+      model_id: string | null
+      pinned: boolean
+      busy: boolean
+      version: number
+      /** Format: date-time */
+      last_message_at: string
+      /** Format: date-time */
+      created_at: string
+    }
+    ChatUsage: {
+      prompt_tokens: number
+      completion_tokens: number
+      total_tokens: number
+    }
+    ChatMetadata: {
+      finish_reason?: string
+      latency_ms?: number
+      error_code?: string
+      usage?: components['schemas']['ChatUsage']
+    }
+    ChatMessage: {
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      request_id: string
+      /** @enum {string} */
+      role: 'user' | 'assistant'
+      content: string
+      /** @enum {string} */
+      status: 'streaming' | 'completed' | 'interrupted' | 'error'
+      /** Format: uuid */
+      model_id: string | null
+      meta: components['schemas']['ChatMetadata']
+      /** Format: date-time */
+      created_at: string
+    }
+    ChatConversationPage: {
+      items: components['schemas']['ChatConversation'][]
+      next_cursor: string
+    }
+    ChatMessagePage: {
+      items: components['schemas']['ChatMessage'][]
+      next_cursor: string
+    }
+    ChatCreateInput: {
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      model_id: string
+    }
+    ChatUpdateInput: {
+      title: string
+      pinned: boolean
+      version: number
+    }
+    ChatDeleteInput: {
+      ids: string[]
+      all: boolean
+    }
+    ChatSendInput: {
+      /** Format: uuid */
+      request_id: string
+      /** Format: uuid */
+      model_id: string
+      content: string
+      /** @enum {string} */
+      action: 'send' | 'regenerate' | 'edit'
+      /** Format: uuid */
+      last_message_id?: string | null
+    }
+    ChatConfiguration: {
+      per_minute: number
+      per_day: number
+      context_messages: number
+      context_tokens: number
+      system_prompt: string
+      /** Format: uuid */
+      title_model_id: string | null
+      version: number
+    }
+    ChatEvent: {
+      conversation?: components['schemas']['ChatConversation']
+      user?: components['schemas']['ChatMessage']
+      assistant?: components['schemas']['ChatMessage']
+      content?: string
+      code?: string
+      message?: string
     }
   }
   responses: {
@@ -2683,6 +2882,266 @@ export interface operations {
           [name: string]: unknown
         }
         content?: never
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listChatConversations: {
+    parameters: {
+      query?: {
+        cursor?: string
+        limit?: number
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChatConversationPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  createChatConversation: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChatCreateInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChatConversation']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  deleteChatConversations: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChatDeleteInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getChatConversation: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChatConversation']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  updateChatConversation: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChatUpdateInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChatConversation']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listChatMessages: {
+    parameters: {
+      query?: {
+        cursor?: string
+        limit?: number
+      }
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChatMessagePage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  sendChatMessage: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChatSendInput']
+      }
+    }
+    responses: {
+      /** @description SSE meta/delta/error/done/ping. Completed duplicates replay stored metadata. Streaming duplicates return 409. Client disconnect preserves partial output. */
+      200: {
+        headers: {
+          'X-Accel-Buffering'?: 'no'
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example event: delta
+           *     data: {"content":"Hello"}
+           */
+          'text/event-stream': string
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  stopChatGeneration: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getChatConfiguration: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChatConfiguration']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  saveChatConfiguration: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChatConfiguration']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ChatConfiguration']
+        }
       }
       default: components['responses']['APIError']
     }

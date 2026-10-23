@@ -151,6 +151,8 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 		defer stopMaintenance()
 		stopCalls := startCallMaintenance(ctx, accounts.Catalog, logger)
 		defer stopCalls()
+		stopChat := startChatMaintenance(ctx, accounts.Chat, logger)
+		defer stopChat()
 	}
 	go func() { serveResult <- server.Serve(listener) }()
 	logger.Info("server started", "address", cfg.HTTPAddress, "version", version)

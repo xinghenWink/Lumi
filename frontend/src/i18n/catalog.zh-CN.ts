@@ -95,7 +95,7 @@ export default {
     base64: 'Base64 图片',
     url: '图片 URL',
     routes: '路由绑定',
-    routesHint: '仅启用且有可用渠道绑定的模型会出现在用户目录中。',
+    routesHint: '仅启用且有可用渠道绑定的模型会出现在用户目录中；聊天模型还需支持流式输出。',
     addRoute: '添加路由',
     removeRoute: '移除此路由',
     channel: '渠道',

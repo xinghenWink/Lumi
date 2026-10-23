@@ -9,6 +9,7 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
+	"github.com/xinghenWink/Lumi/backend/internal/chat"
 	"github.com/xinghenWink/Lumi/backend/internal/config"
 	"github.com/xinghenWink/Lumi/backend/internal/credits"
 	"github.com/xinghenWink/Lumi/backend/internal/http/account"
@@ -50,5 +51,6 @@ func configureAccounts(ctx context.Context, cfg config.Config, pool *pgxpool.Poo
 		return nil, fmt.Errorf("bootstrap administrator: %w", err)
 	}
 	sender := mailer.New(configuration, cfg.Environment, logger)
-	return &account.Services{Auth: auth.New(pool, passwords, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: catalog.New(pool, vault, upstream.NetworkPolicy{AllowPrivate: cfg.UpstreamAllowPrivate}, logger)}, nil
+	models := catalog.New(pool, vault, upstream.NetworkPolicy{AllowPrivate: cfg.UpstreamAllowPrivate}, logger)
+	return &account.Services{Auth: auth.New(pool, passwords, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: models, Chat: chat.New(pool, models, cache)}, nil
 }

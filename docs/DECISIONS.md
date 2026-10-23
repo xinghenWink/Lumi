@@ -1,5 +1,23 @@
 # 技术决策记录
 
+## M4（2026-10-22）
+
+| 编号    | 决策与理由                                                                                                                                                                                                                           |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ADR-047 | M4 独立分支 / PR 暂基于已全绿但未合并的 M3，不自动合并前序里程碑。新增 00006 会话、消息、聊天设置和每日计数；查询按用户隔离。                                                                                                        |
+| ADR-048 | 每次生成有客户端请求 UUID / 输入摘要，数据库事务先保存用户与助手消息并独占会话，再开始 SSE；重复请求不重复调用 / 计数，编辑和重生成为新请求。                                                                                        |
+| ADR-049 | 2 秒检查点 / 权限重验、45 秒租约、15 秒恢复扫描；停止或断线取消上游并以独立 5 秒 context 保存部分。崩溃保留最后检查点，跨实例恢复只处理到期租约。                                                                                    |
+| ADR-050 | 上下文按条数 / 保守 token 估算 / 模型上限取交集，保留 system，丢弃最早完整轮次；超大最后一条明确拒绝。每日计数统一 UTC，Redis 每分钟与 PG 每日计数相互独立，0 不限。                                                                 |
+| ADR-051 | 新增锁定依赖 markdown-it 15.0.3（块解析）、DOMPurify 3.4.17（最终 HTML 清洗）、Shiki 4.5.0（按需代码高亮）、KaTeX 0.19.0（按需数学）、@tanstack/vue-virtual 3.13.47（可变高度长消息与侧栏）；类型包仅开发依赖，pnpm-lock.yaml 锁定。 |
+| ADR-052 | 流文本按 animation frame 合并，消息 shallowRef 不可变更新，Markdown 缓存已完成块；编辑器独立组件，IntersectionObserver 控制跟随滚动。原始 HTML 关闭，图片不自动向外站加载，链接过滤危险协议。                                        |
+| ADR-053 | 首次完成后调用标题模型，10 秒失败回退首句 20 字；先保存回答再生成标题，手动重命名不会被覆盖。首文本前按优先级回退路由，流开始后保留内容并报错；加权路由 / 熔断 / 断线续传仍属 P1。                                                   |
+
+ADR-054：新增仅开发依赖 Lighthouse 13.5.0，验收登录后的桌面冷 HTTP 缓存性能；使用隔离的临时 Chromium profile，不保存认证报告。其 Node 下限为 22.19，工作区同步提高下限。工具链 OpenTelemetry API 固定 1.9.0，满足 SDK 声明的 <1.10 peer 范围。以 60 次顺序 SSE 请求的首文本往返减去 fixture 内部耗时，测量包含认证 / 数据库 / 首文本前回退 / 转发的平台额外延迟；另测流式期间交互事件上界与长任务比例，报告注明 CI 环境及测量边界，不代替生产负载或现场 INP。Shiki 使用 core + JavaScript 正则引擎及显式语法按需加载，避免携带 WASM 与无关语言。
+
+ADR-055：KaTeX 的动态尺寸与 Shiki 双主题高亮需要 style 属性。CSP 仅以 style-src-attr 允许样式属性，style-src-elem / script-src 保持 self，script-src-attr 明确 none。原始 Markdown HTML 禁用，最终生成 HTML 仍经 DOMPurify，KaTeX trust=false 并限制展开 / 尺寸。Vite assetsInlineLimit=0 将小字体输出为同源静态文件，维持 font-src self。通过 HTTP 头回归与实际浏览器零 CSP 错误确认；不通过全局 unsafe-inline 放宽脚本或样式标签。依据：[CSP3](https://www.w3.org/TR/CSP3/#directive-style-src-attr)、[MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/style-src-attr)。
+
+Markdown 安全与按需加载依据：[markdown-it](https://markdown-it.github.io/markdown-it/)、[DOMPurify](https://github.com/cure53/DOMPurify)、[Shiki](https://shiki.style/guide/bundles)、[KaTeX](https://katex.org/docs/options)。
+
 ## M3（2026-10-22）
 
 | 编号    | 决策与理由                                                                                                                                                      |

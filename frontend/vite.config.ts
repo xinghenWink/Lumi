@@ -7,6 +7,8 @@ export default defineConfig({
   build: {
     outDir: '../backend/web/dist',
     emptyOutDir: true,
+    // Keep small KaTeX fonts on the same origin instead of data URLs blocked by CSP.
+    assetsInlineLimit: 0,
     // Keep the entry budget comfortably below the 250 KB gzip requirement.
     chunkSizeWarningLimit: 250,
   },

@@ -18,6 +18,7 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
+	"github.com/xinghenWink/Lumi/backend/internal/chat"
 	"github.com/xinghenWink/Lumi/backend/internal/credits"
 	"github.com/xinghenWink/Lumi/backend/internal/http/middleware"
 	"github.com/xinghenWink/Lumi/backend/internal/http/response"
@@ -35,6 +36,7 @@ type Services struct {
 	Gate     auth.Gate
 	Credits  *credits.Service
 	Catalog  *catalog.Service
+	Chat     *chat.Service
 }
 type Security struct {
 	Origins        []string
@@ -76,6 +78,7 @@ func Routes(services *Services, security Security, logger *slog.Logger) func(*gi
 		admin.GET("/audit-logs", h.listAudit)
 		h.creditRoutes(protected, admin)
 		h.catalogRoutes(protected, admin)
+		h.chatRoutes(protected, admin)
 		return nil
 	}
 }

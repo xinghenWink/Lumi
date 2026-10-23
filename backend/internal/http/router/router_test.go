@@ -61,6 +61,12 @@ func TestInfrastructureRoutes(t *testing.T) {
 				if recorder.Header().Get("Content-Security-Policy") == "" || recorder.Header().Get("X-Content-Type-Options") != "nosniff" {
 					t.Errorf("%s missing security headers", route.path)
 				}
+				policy := recorder.Header().Get("Content-Security-Policy")
+				for _, directive := range []string{"script-src 'self';", "script-src-attr 'none';", "style-src-elem 'self';", "style-src-attr 'unsafe-inline';"} {
+					if !strings.Contains(policy, directive) {
+						t.Errorf("%s CSP failed the script/style boundary", route.path)
+					}
+				}
 				if recorder.Code >= 400 {
 					var body response.Error
 					if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {

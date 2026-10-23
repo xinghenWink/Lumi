@@ -312,7 +312,8 @@ func (q *Queries) ListModelRoutes(ctx context.Context, modelID uuid.UUID) ([]Lis
 }
 
 const listPublicModels = `-- name: ListPublicModels :many
-SELECT m.id, m.display_name, m.type, m.description, m.icon, m.sort_order, m.enabled, m.is_default, m.capabilities, m.version, m.created_at, m.updated_at FROM models m WHERE m.type=$1 AND m.enabled AND EXISTS (
+SELECT m.id, m.display_name, m.type, m.description, m.icon, m.sort_order, m.enabled, m.is_default, m.capabilities, m.version, m.created_at, m.updated_at FROM models m WHERE m.type=$1 AND m.enabled
+AND (m.type<>'chat' OR m.capabilities @> '{"stream":true}'::jsonb) AND EXISTS (
     SELECT 1 FROM model_routes r JOIN upstreams u ON u.id=r.upstream_id
     WHERE r.model_id=m.id AND r.enabled AND u.enabled AND u.api_key_enc<>''
 ) ORDER BY m.sort_order,m.id LIMIT 1000

@@ -23,6 +23,40 @@ type AuditLog struct {
 	CreatedAt  time.Time
 }
 
+type ChatDailyUsage struct {
+	UserID uuid.UUID
+	Day    time.Time
+	Count  int32
+}
+
+type ChatSetting struct {
+	Singleton       bool
+	PerMinute       int32
+	PerDay          int32
+	ContextMessages int32
+	ContextTokens   int32
+	SystemPrompt    string
+	TitleModelID    *uuid.UUID
+	Version         int64
+}
+
+type Conversation struct {
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	Type            string
+	Title           string
+	ModelID         *uuid.UUID
+	Pinned          bool
+	TitleAuto       bool
+	LastMessageAt   time.Time
+	DeletedAt       *time.Time
+	ActiveRunID     *uuid.UUID
+	LeaseUntil      *time.Time
+	CancelRequested bool
+	CreatedAt       time.Time
+	Version         int64
+}
+
 type CreditAccount struct {
 	UserID           uuid.UUID
 	PermanentBalance int64
@@ -74,6 +108,21 @@ type CreditOperation struct {
 	RequestHash string
 	Response    []byte
 	CreatedAt   time.Time
+}
+
+type Message struct {
+	ID             uuid.UUID
+	ConversationID uuid.UUID
+	RequestID      uuid.UUID
+	RequestHash    string
+	Role           string
+	Content        string
+	Status         string
+	ModelID        *uuid.UUID
+	UpstreamID     *uuid.UUID
+	Meta           []byte
+	DeletedAt      *time.Time
+	CreatedAt      time.Time
 }
 
 type Model struct {

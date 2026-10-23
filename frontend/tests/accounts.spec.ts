@@ -64,7 +64,7 @@ test('M1 real registration, sessions, administration, settings and audit', async
     await member.getByRole('checkbox').check()
     await member.getByRole('button', { name: '创建账号', exact: true }).click()
     await expect(member).toHaveURL(/\/chat$/)
-    await expect(member.getByText('账号已就绪', { exact: true })).toBeVisible()
+    await expect(member.getByRole('heading', { name: '有什么想聊的？', exact: true })).toBeVisible()
     const cookie = (await memberContext.cookies()).find((entry) => entry.name === 'lumi_refresh')
     expect(cookie?.httpOnly).toBe(true)
     expect(cookie?.sameSite).toBe('Lax')

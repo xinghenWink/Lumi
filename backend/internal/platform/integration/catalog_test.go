@@ -112,6 +112,24 @@ func TestCatalogTransactionsDiscoveryAndIsolation(t *testing.T) {
 	if err != nil || len(public) != 2 {
 		t.Fatalf("public models=%+v error=%v", public, err)
 	}
+	t.Run("chat catalog requires streaming capability", func(t *testing.T) {
+		proposal := secondInput
+		proposal.DisplayName = "Non-streaming model"
+		proposal.Capabilities.Stream = false
+		unsupported, err := service.SaveModel(f.ctx, actor, uuid.Nil, proposal)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if listed, err := service.Public(f.ctx, "chat"); err != nil || len(listed) != 2 {
+			t.Fatalf("non-streaming model published: %v", err)
+		}
+		if _, _, err := service.ChatTargets(f.ctx, unsupported.ID); creditCode(err) != "CHAT_MODEL_UNAVAILABLE" {
+			t.Fatalf("non-streaming model accepted for chat: %v", err)
+		}
+		if err := service.DeleteModel(f.ctx, actor, unsupported.ID); err != nil {
+			t.Fatal(err)
+		}
+	})
 	encoded, err := json.Marshal(public)
 	if err != nil {
 		t.Fatal(err)
