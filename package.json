@@ -8,11 +8,14 @@
   },
   "scripts": {
     "dev": "pnpm --filter @lumi/frontend dev",
+    "dev:react": "pnpm --filter @lumi/frontend dev:react",
     "build": "pnpm --filter @lumi/frontend build",
+    "build:react": "pnpm --filter @lumi/frontend build:react",
     "lint": "pnpm --filter @lumi/frontend lint && pnpm format:check",
     "typecheck": "pnpm --filter @lumi/frontend typecheck",
     "test": "pnpm --filter @lumi/frontend test",
     "test:e2e": "pnpm --filter @lumi/frontend test:e2e",
+    "test:e2e:react": "pnpm --filter @lumi/frontend test:e2e:react",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "api:generate": "openapi-typescript docs/openapi.yaml -o frontend/src/api/schema.d.ts && prettier --write frontend/src/api/schema.d.ts"

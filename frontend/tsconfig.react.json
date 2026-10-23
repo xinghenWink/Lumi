@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "paths": {
+      "@lumi/session": ["./src/react/features/auth/session-adapter.ts"],
+      "@/*": ["./src/react/*"]
+    }
+  },
+  "include": ["src/react/**/*.ts", "src/react/**/*.tsx", "src/api/**/*.ts", "tests/react/**/*.ts"],
+  "exclude": ["src/api/session.legacy.ts"]
+}
