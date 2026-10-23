@@ -1,5 +1,11 @@
 # 技术决策记录
 
+## React UI 重构（2026-10-24）
+
+- ADR-112：基于 main `c28be7f`，建立独立 `codex/react-ui` 集成分支与 PR-0～PR-7 阶段分支。用户已授权阶段验收通过后自动继续下一阶段；main 和生产入口的最终切换单独提出发布 PR。PR-0 只提交仓库审查、功能/协议矩阵、文件变化、任务依赖、测试计划和参考设计，不修改 Go 业务、SQL、API、任务或账务规则，也不新增依赖。详见 REACT_UI_REFACTOR.md、REACT_UI_COMPATIBILITY.md、REACT_UI_TEST_PLAN.md 与 REACT_UI_BASELINE.md。
+- ADR-113：React 候选源码置于 `frontend/src/react/`，与现有 Vue 入口并存。PR-1 提供独立候选构建/测试模式；两种产物继续写入 `backend/web/dist`，由独立 CI 作业或顺序构建避免覆盖。PR-1～PR-6 保留旧版完整回归和生产默认入口；全部 React 功能、Chrome 双端、SSE/积分/改图、Docker embed 验收通过后，PR-7 才切换入口和清理旧依赖，清理后再次完整验收。保持 `#app` 与现有 Go 静态资源、CSP 和 Compose 契约。
+- ADR-114：保留框架无关 API 类型、运行时校验和 SSE 解析；`api/protected.ts` 的 Pinia 会话耦合通过独立会话端口和适配器移除。TanStack Query 管服务端快照，Zustand 管草稿和界面状态，独立控制器管流订阅与迟到响应。草稿/缓存按用户、模式和会话隔离；切账号取消私有请求并清理状态。报价和结算结果取后端，不在前端扣费或推算退款。依赖精确版本、peer 兼容性和新增理由在 PR-1 核定并锁定。
+
 ## 版本策略调整（2026-10-23）
 
 - ADR-111：本次需撤下误用的版本引用，Release 工作流的入口校验任务排除 `github.event.deleted=true`，让删除引用事件跳过后续构建、镜像推送和发行任务，避免归档操作再次构建被撤下的编号。正常 main / tag 推送仍执行完整发布检查，不跳过质量门槛。无运行依赖或业务接口变化。
