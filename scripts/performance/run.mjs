@@ -2,7 +2,8 @@ import { createServer } from 'node:http'
 import { createServer as createPortProbe } from 'node:net'
 import { spawn, execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { mkdirSync, openSync, closeSync, writeFileSync } from 'node:fs'
+import { mkdirSync, openSync, closeSync, writeFileSync, readFileSync } from 'node:fs'
+import { availableParallelism, totalmem, freemem, loadavg } from 'node:os'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -25,6 +26,25 @@ await new Promise((done, reject) => {
 await new Promise((done, reject) => portProbe.close((error) => (error ? reject(error) : done())))
 const output = resolve(root, '.tools/m7-load')
 mkdirSync(output, { recursive: true })
+function resources() {
+  function optionalFile(path) {
+    try {
+      return readFileSync(path, 'utf8').trim()
+    } catch {
+      return null
+    }
+  }
+  return {
+    availableCPUs: availableParallelism(),
+    totalMemoryBytes: totalmem(),
+    freeMemoryBytes: freemem(),
+    loadAverage: loadavg(),
+    cpuQuota: optionalFile('/sys/fs/cgroup/cpu.max'),
+    cpuStat: optionalFile('/sys/fs/cgroup/cpu.stat'),
+    cpuPressure: optionalFile('/proc/pressure/cpu'),
+    ioPressure: optionalFile('/proc/pressure/io'),
+  }
+}
 const key = randomBytes(32).toString('base64url')
 // Small valid PNG: image decoding, normalization, thumbnails and billing still execute.
 const png =
@@ -156,6 +176,7 @@ try {
     LUMI_ACTORS: env.E2E_LOAD_OUTPUT,
   }
   // The runner expects k6 on PATH; CI installs a pinned standalone binary.
+  const resourcesBefore = resources()
   const k6 = spawn(
     process.env.K6_BIN ?? 'k6',
     [
@@ -181,6 +202,8 @@ try {
         duration: process.env.LUMI_DURATION ?? '60s',
         goMaxProcs: process.env.GOMAXPROCS ?? 'runtime default',
         upstream: 'local deterministic SSE / PNG fixture; excludes real upstream latency',
+        resourcesBefore,
+        resourcesAfter: resources(),
         exitCode: code,
       },
       null,
