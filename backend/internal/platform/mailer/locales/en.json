@@ -1,4 +1,8 @@
 {
+  "test_subject":"Lumi test email",
+  "test_body":"An administrator sent this test email to verify the SMTP configuration.",
+  "reset_subject": "Reset your Lumi password",
+  "reset_body": "Open this single-use link to reset your password within 30 minutes:\n{link}\n\nIf you did not request this, ignore this email.",
   "subject": "Your {site} verification code",
   "body": "Your registration code is: {code}\n\nThis code expires in 10 minutes. Do not share it with anyone. If you did not request this email, you can ignore it.\n\n{site}"
 }

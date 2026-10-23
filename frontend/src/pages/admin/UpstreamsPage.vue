@@ -10,7 +10,7 @@ import ApiNotice from '../../components/ApiNotice.vue'
 import ModalDialog from '../../components/ModalDialog.vue'
 import CursorControls from '../../components/credits/CursorControls.vue'
 import ImportModelsDialog from '../../components/catalog/ImportModelsDialog.vue'
-const { t } = useI18n()
+const { t, te } = useI18n()
 const filters = reactive({ search: '', state: '' })
 let applied = { ...filters }
 const { data, loading, error, load, reset, next, previous, pageNumber } = useCursorPage(
@@ -222,6 +222,16 @@ function imported(count: number) {
                 ><code class="table-secondary compact-id">{{ row.id }}</code
                 ><span class="table-secondary">{{
                   t(row.api_key_configured ? 'catalog.keySaved' : 'catalog.keyMissing')
+                }}</span>
+                <span v-if="row.circuit_state" class="table-secondary"
+                  >{{ t('ops.circuit_' + row.circuit_state) }} ·
+                  {{ row.consecutive_failures }}</span
+                ><span v-if="row.last_error" class="danger-text">{{
+                  t(
+                    te('errors.' + row.last_error)
+                      ? 'errors.' + row.last_error
+                      : 'errors.UNKNOWN_ERROR',
+                  )
                 }}</span>
               </td>
               <td>

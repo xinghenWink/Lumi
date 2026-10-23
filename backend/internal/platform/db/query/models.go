@@ -11,6 +11,16 @@ import (
 	"github.com/google/uuid"
 )
 
+type Announcement struct {
+	ID        uuid.UUID
+	Content   string
+	StartsAt  time.Time
+	EndsAt    *time.Time
+	Enabled   bool
+	Version   int64
+	CreatedAt time.Time
+}
+
 type AuditLog struct {
 	ID         uuid.UUID
 	ActorID    *uuid.UUID
@@ -193,19 +203,26 @@ type ImageTaskItem struct {
 	ErrorCode string
 }
 
+type JobRun struct {
+	Name        string
+	CompletedAt time.Time
+	Affected    int64
+}
+
 type Message struct {
-	ID             uuid.UUID
-	ConversationID uuid.UUID
-	RequestID      uuid.UUID
-	RequestHash    string
-	Role           string
-	Content        string
-	Status         string
-	ModelID        *uuid.UUID
-	UpstreamID     *uuid.UUID
-	Meta           []byte
-	DeletedAt      *time.Time
-	CreatedAt      time.Time
+	ID               uuid.UUID
+	ConversationID   uuid.UUID
+	RequestID        uuid.UUID
+	RequestHash      string
+	Role             string
+	Content          string
+	Status           string
+	ModelID          *uuid.UUID
+	UpstreamID       *uuid.UUID
+	Meta             []byte
+	DeletedAt        *time.Time
+	CreatedAt        time.Time
+	ReferenceFileIds []uuid.UUID
 }
 
 type Model struct {
@@ -231,6 +248,15 @@ type ModelRoute struct {
 	Priority          int32
 	Weight            int32
 	Enabled           bool
+}
+
+type PasswordReset struct {
+	TokenHash    string
+	UserID       uuid.UUID
+	TokenVersion int64
+	ExpiresAt    time.Time
+	UsedAt       *time.Time
+	CreatedAt    time.Time
 }
 
 type PricingRule struct {
@@ -287,22 +313,26 @@ type Setting struct {
 }
 
 type Upstream struct {
-	ID            uuid.UUID
-	Name          string
-	BaseUrl       string
-	ApiKeyEnc     string
-	TimeoutChatS  int32
-	TimeoutImageS int32
-	ProxyUrl      string
-	Enabled       bool
-	Priority      int32
-	Weight        int32
-	CircuitState  string
-	EditFormat    string
-	Note          string
-	Version       int64
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID                  uuid.UUID
+	Name                string
+	BaseUrl             string
+	ApiKeyEnc           string
+	TimeoutChatS        int32
+	TimeoutImageS       int32
+	ProxyUrl            string
+	Enabled             bool
+	Priority            int32
+	Weight              int32
+	CircuitState        string
+	EditFormat          string
+	Note                string
+	Version             int64
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	ConsecutiveFailures int32
+	OpenUntil           *time.Time
+	LastError           string
+	ProbeUntil          *time.Time
 }
 
 type UpstreamCall struct {
@@ -334,6 +364,16 @@ type User struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DeletedAt       *time.Time
+	PurgeAfter      *time.Time
+}
+
+type UserPreference struct {
+	UserID       uuid.UUID
+	Theme        string
+	Instructions string
+	ImageQuality string
+	ImageRatio   string
+	ImageCount   int32
 }
 
 type UserSession struct {

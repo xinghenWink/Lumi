@@ -13,6 +13,7 @@ import ProtectedImage from '../components/images/ProtectedImage.vue'
 import ImagePreview from '../components/images/ImagePreview.vue'
 import ModalDialog from '../components/ModalDialog.vue'
 import ApiNotice from '../components/ApiNotice.vue'
+import { operations } from '../api/operations'
 const { t } = useI18n(),
   auth = useAuthStore(),
   store = useImageStore(),
@@ -30,6 +31,34 @@ const selected = shallowRef<GalleryItem>(),
   preview = ref(false),
   deleting = shallowRef<GalleryItem>(),
   deletingBusy = ref(false)
+const batchIDs = ref<string[]>([]),
+  batchDeleteOpen = ref(false),
+  batchBusy = ref(false)
+async function downloadBatch() {
+  batchBusy.value = true
+  error.value = undefined
+  try {
+    await operations.downloadImages(batchIDs.value)
+  } catch (e) {
+    error.value = e
+  } finally {
+    batchBusy.value = false
+  }
+}
+async function deleteBatch() {
+  batchBusy.value = true
+  error.value = undefined
+  try {
+    await operations.deleteImages(batchIDs.value)
+    batchIDs.value = []
+    batchDeleteOpen.value = false
+    await load()
+  } catch (e) {
+    error.value = e
+  } finally {
+    batchBusy.value = false
+  }
+}
 let controller: AbortController | undefined, resize: ResizeObserver | undefined
 const rows = computed(() => Math.ceil(items.value.length / columns.value))
 const virtual = useVirtualizer(
@@ -51,6 +80,7 @@ async function load(more = false) {
   loading.value = true
   error.value = null
   if (!more) {
+    batchIDs.value = []
     items.value = []
     cursor.value = ''
     scroller.value?.scrollTo(0, 0)
@@ -134,6 +164,22 @@ onUnmounted(() => {
       </div>
     </div>
     <ImageFilters @apply="filter" /><ApiNotice :error="error || actions.error.value" />
+    <div class="ops-toolbar">
+      <span>{{ t('ops.selected', { n: batchIDs.length }) }}</span
+      ><button
+        class="button"
+        :disabled="!batchIDs.length || batchIDs.length > 50 || batchBusy"
+        @click="downloadBatch"
+      >
+        {{ t('ops.downloadZIP') }}</button
+      ><button
+        class="button danger"
+        :disabled="!batchIDs.length || batchBusy"
+        @click="batchDeleteOpen = true"
+      >
+        {{ t('ops.batchDelete') }}
+      </button>
+    </div>
     <div ref="scroller" class="image-gallery-scroll" tabindex="0" :aria-label="t('images.gallery')">
       <div
         v-if="items.length"
@@ -156,6 +202,14 @@ onUnmounted(() => {
             :key="item.file.id"
             class="image-gallery-card panel"
           >
+            <label class="checkbox-row"
+              ><input
+                v-model="batchIDs"
+                type="checkbox"
+                :value="item.file.id"
+                :disabled="batchBusy"
+              />{{ t('ops.select') }}</label
+            >
             <button
               class="image-gallery-open"
               :aria-label="t('images.preview')"
@@ -234,4 +288,18 @@ onUnmounted(() => {
       </div></ModalDialog
     >
   </div>
+  <ModalDialog
+    :open="batchDeleteOpen"
+    :title="t('ops.batchDelete')"
+    :description="t('ops.batchImageConfirm')"
+    :busy="batchBusy"
+    @update:open="batchDeleteOpen = $event"
+    ><ApiNotice :error="error" /><button
+      class="button danger"
+      :disabled="batchBusy"
+      @click="deleteBatch"
+    >
+      {{ t('ops.confirm') }}
+    </button></ModalDialog
+  >
 </template>

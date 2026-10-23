@@ -144,6 +144,15 @@ export const useChatStore = defineStore('chat', () => {
       upsert(row)
       if (!running[id]) put(id, [...page.items].reverse())
       older[id] = page.next_cursor
+      const streaming = page.items.find(
+        (message) => message.role === 'assistant' && message.status === 'streaming',
+      )
+      if (row.busy && streaming && !running[id] && row.model_id)
+        void send(
+          id,
+          { request_id: streaming.request_id, model_id: row.model_id, action: 'send', content: '' },
+          true,
+        )
     } catch (error) {
       if (
         owner === epoch &&
@@ -191,14 +200,14 @@ export const useChatStore = defineStore('chat', () => {
     createID = ''
     return id
   }
-  async function send(id: string, input: SendInput) {
+  async function send(id: string, input: SendInput, resumeOnly = false) {
     if (running[id] || deleted.has(id)) return
     const owner = epoch,
       controller = new AbortController()
     controllers.set(id, controller)
     running[id] = true
     failure(id, null)
-    pending.set(id, input)
+    if (!resumeOnly) pending.set(id, input)
     let delta = '',
       frame: number | undefined,
       assistant: Message | undefined
@@ -216,48 +225,54 @@ export const useChatStore = defineStore('chat', () => {
         })
     }
     try {
-      await chats.send(id, input, controller.signal, (e) => {
-        if (owner !== epoch || deleted.has(id)) return
-        if (e.type === 'meta') {
-          if (e.conversation) upsert(e.conversation)
-          if (input.action === 'edit') {
-            const rows = cache.value[id] ?? []
-            const index = rows.findIndex((r) => r.id === input.last_message_id)
-            if (index >= 0) put(id, rows.slice(0, index))
+      await chats.send(
+        id,
+        input,
+        controller.signal,
+        (e) => {
+          if (owner !== epoch || deleted.has(id)) return
+          if (e.type === 'meta') {
+            if (e.conversation) upsert(e.conversation)
+            if (input.action === 'edit') {
+              const rows = cache.value[id] ?? []
+              const index = rows.findIndex((r) => r.id === input.last_message_id)
+              if (index >= 0) put(id, rows.slice(0, index))
+            }
+            if (input.action === 'regenerate') {
+              const rows = cache.value[id] ?? []
+              const index = rows.findIndex((r) => r.id === input.last_message_id)
+              if (index >= 0) put(id, rows.slice(0, index + 1))
+            }
+            if (e.user) message(id, e.user)
+            if (e.assistant) {
+              assistant = e.assistant
+              message(id, e.assistant)
+            }
           }
-          if (input.action === 'regenerate') {
-            const rows = cache.value[id] ?? []
-            const index = rows.findIndex((r) => r.id === input.last_message_id)
-            if (index >= 0) put(id, rows.slice(0, index + 1))
+          if (e.type === 'delta') {
+            delta += e.content
+            schedule()
           }
-          if (e.user) message(id, e.user)
-          if (e.assistant) {
-            assistant = e.assistant
-            message(id, e.assistant)
+          if (e.type === 'error') {
+            flush()
+            failure(id, new ApiError(e.code))
+            if (e.assistant) {
+              assistant = e.assistant
+              message(id, e.assistant)
+            }
           }
-        }
-        if (e.type === 'delta') {
-          delta += e.content
-          schedule()
-        }
-        if (e.type === 'error') {
-          flush()
-          failure(id, new ApiError(e.code))
-          if (e.assistant) {
-            assistant = e.assistant
-            message(id, e.assistant)
+          if (e.type === 'done') {
+            flush()
+            if (e.assistant) {
+              assistant = e.assistant
+              message(id, e.assistant)
+            }
+            if (e.conversation) upsert(e.conversation)
+            pending.delete(id)
           }
-        }
-        if (e.type === 'done') {
-          flush()
-          if (e.assistant) {
-            assistant = e.assistant
-            message(id, e.assistant)
-          }
-          if (e.conversation) upsert(e.conversation)
-          pending.delete(id)
-        }
-      })
+        },
+        resumeOnly,
+      )
     } catch (error) {
       if (owner === epoch)
         failure(

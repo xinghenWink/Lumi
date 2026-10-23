@@ -109,8 +109,13 @@ export async function streamPerformance(page: Page, token: string, info: TestInf
             while (end >= 0) {
               const frame = buffer.slice(0, end)
               buffer = buffer.slice(end + 2)
-              if (frame.startsWith('event: delta\n')) {
-                const value: unknown = JSON.parse(frame.slice(frame.indexOf('data: ') + 6))
+              const lines = frame.split('\n')
+              if (lines.some((line) => line.trim() === 'event: delta')) {
+                const data = lines
+                  .filter((line) => line.startsWith('data:'))
+                  .map((line) => line.slice(5).trimStart())
+                  .join('\n')
+                const value: unknown = JSON.parse(data)
                 if (
                   typeof value === 'object' &&
                   value !== null &&

@@ -11,6 +11,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ edit: [message: Message]; regenerate: [] }>()
 const Markdown = defineAsyncComponent(() => import('./MarkdownContent.vue'))
+const References = defineAsyncComponent(() => import('./ChatReferences.vue'))
 const { t } = useI18n()
 const copied = ref(false)
 async function copy() {
@@ -34,6 +35,7 @@ async function copy() {
       }}</span>
     </div>
     <p v-if="message.role === 'user'" class="chat-user-text">{{ message.content }}</p>
+    <References v-if="message.reference_file_ids?.length" :ids="message.reference_file_ids" />
     <div v-else>
       <Markdown
         v-if="message.content"

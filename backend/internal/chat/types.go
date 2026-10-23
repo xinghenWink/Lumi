@@ -3,22 +3,29 @@ package chat
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
+	"github.com/xinghenWink/Lumi/backend/internal/media"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
+	platformredis "github.com/xinghenWink/Lumi/backend/internal/platform/redis"
 )
 
 type Gate interface {
 	Allow(context.Context, string, string, int, time.Duration) (bool, int, error)
 }
 type Service struct {
-	pool    *pgxpool.Pool
-	q       *query.Queries
-	catalog *catalog.Service
-	gate    Gate
+	files    *media.Store
+	resume   *platformredis.Client
+	lifetime context.Context
+	workers  sync.WaitGroup
+	pool     *pgxpool.Pool
+	q        *query.Queries
+	catalog  *catalog.Service
+	gate     Gate
 }
 
 func New(pool *pgxpool.Pool, catalog *catalog.Service, gate Gate) *Service {
@@ -56,25 +63,27 @@ type Usage struct {
 	TotalTokens      int64 `json:"total_tokens"`
 }
 type Message struct {
-	ID        uuid.UUID  `json:"id"`
-	RequestID uuid.UUID  `json:"request_id"`
-	Role      string     `json:"role"`
-	Content   string     `json:"content"`
-	Status    string     `json:"status"`
-	ModelID   *uuid.UUID `json:"model_id"`
-	Meta      Metadata   `json:"meta"`
-	CreatedAt time.Time  `json:"created_at"`
+	ReferenceFileIDs []uuid.UUID `json:"reference_file_ids"`
+	ID               uuid.UUID   `json:"id"`
+	RequestID        uuid.UUID   `json:"request_id"`
+	Role             string      `json:"role"`
+	Content          string      `json:"content"`
+	Status           string      `json:"status"`
+	ModelID          *uuid.UUID  `json:"model_id"`
+	Meta             Metadata    `json:"meta"`
+	CreatedAt        time.Time   `json:"created_at"`
 }
 type Page[T any] struct {
 	Items      []T    `json:"items"`
 	NextCursor string `json:"next_cursor"`
 }
 type SendInput struct {
-	RequestID     uuid.UUID  `json:"request_id"`
-	ModelID       uuid.UUID  `json:"model_id"`
-	Content       string     `json:"content"`
-	Action        string     `json:"action"`
-	LastMessageID *uuid.UUID `json:"last_message_id"`
+	ReferenceFileIDs []uuid.UUID `json:"reference_file_ids,omitempty"`
+	RequestID        uuid.UUID   `json:"request_id"`
+	ModelID          uuid.UUID   `json:"model_id"`
+	Content          string      `json:"content"`
+	Action           string      `json:"action"`
+	LastMessageID    *uuid.UUID  `json:"last_message_id"`
 }
 type Event struct {
 	Type         string        `json:"-"`
@@ -95,5 +104,6 @@ func messageView(row query.Message) Message {
 	if err := json.Unmarshal(row.Meta, &meta); err != nil {
 		meta = Metadata{}
 	}
-	return Message{ID: row.ID, RequestID: row.RequestID, Role: row.Role, Content: row.Content, Status: row.Status, ModelID: row.ModelID, Meta: meta, CreatedAt: row.CreatedAt.UTC()}
+	refs := append([]uuid.UUID{}, row.ReferenceFileIds...)
+	return Message{ReferenceFileIDs: refs, ID: row.ID, RequestID: row.RequestID, Role: row.Role, Content: row.Content, Status: row.Status, ModelID: row.ModelID, Meta: meta, CreatedAt: row.CreatedAt.UTC()}
 }

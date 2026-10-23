@@ -61,6 +61,25 @@ func shortTitle(text string) string {
 	return string(runes[:min(20, len(runes))])
 }
 func (s *Service) Submit(ctx context.Context, actor user.Actor, key string, input Input) (Task, error) {
+	settings, settingsErr := s.q.ListSettings(ctx)
+	if settingsErr != nil {
+		return Task{}, fmt.Errorf("read content settings: %w", settingsErr)
+	}
+	for _, record := range settings {
+		if record.Key == "operations" {
+			var cfg struct {
+				Words []string `json:"sensitive_words"`
+			}
+			if err := json.Unmarshal(record.Value, &cfg); err != nil {
+				return Task{}, fmt.Errorf("decode content settings: %w", err)
+			}
+			for _, word := range cfg.Words {
+				if strings.Contains(strings.ToLower(input.Prompt), strings.ToLower(word)) {
+					return Task{}, problem.New("CONTENT_BLOCKED", 400)
+				}
+			}
+		}
+	}
 	if !credits.ValidKey(key) {
 		return Task{}, problem.New("IDEMPOTENCY_KEY_INVALID", 400)
 	}

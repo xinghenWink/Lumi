@@ -59,7 +59,7 @@ func (q *Queries) CancelChatRun(ctx context.Context, arg CancelChatRunParams) er
 }
 
 const chatMessageByRequest = `-- name: ChatMessageByRequest :one
-SELECT id, conversation_id, request_id, request_hash, role, content, status, model_id, upstream_id, meta, deleted_at, created_at FROM messages WHERE conversation_id=$1 AND request_id=$2 AND role='assistant'
+SELECT id, conversation_id, request_id, request_hash, role, content, status, model_id, upstream_id, meta, deleted_at, created_at, reference_file_ids FROM messages WHERE conversation_id=$1 AND request_id=$2 AND role='assistant'
 `
 
 type ChatMessageByRequestParams struct {
@@ -83,35 +83,40 @@ func (q *Queries) ChatMessageByRequest(ctx context.Context, arg ChatMessageByReq
 		&i.Meta,
 		&i.DeletedAt,
 		&i.CreatedAt,
+		&i.ReferenceFileIds,
 	)
 	return i, err
 }
 
 const chatRouteTargets = `-- name: ChatRouteTargets :many
-SELECT r.id AS route_id,r.upstream_model_name,u.id, u.name, u.base_url, u.api_key_enc, u.timeout_chat_s, u.timeout_image_s, u.proxy_url, u.enabled, u.priority, u.weight, u.circuit_state, u.edit_format, u.note, u.version, u.created_at, u.updated_at FROM model_routes r JOIN upstreams u ON r.upstream_id=u.id JOIN models m ON m.id=r.model_id
+SELECT r.id AS route_id,r.upstream_model_name,u.id, u.name, u.base_url, u.api_key_enc, u.timeout_chat_s, u.timeout_image_s, u.proxy_url, u.enabled, u.priority, u.weight, u.circuit_state, u.edit_format, u.note, u.version, u.created_at, u.updated_at, u.consecutive_failures, u.open_until, u.last_error, u.probe_until FROM model_routes r JOIN upstreams u ON r.upstream_id=u.id JOIN models m ON m.id=r.model_id
 WHERE m.id=$1 AND m.type='chat' AND m.enabled AND r.enabled AND u.enabled AND u.api_key_enc<>''
 ORDER BY r.priority,u.priority,r.id LIMIT 20
 `
 
 type ChatRouteTargetsRow struct {
-	RouteID           uuid.UUID
-	UpstreamModelName string
-	ID                uuid.UUID
-	Name              string
-	BaseUrl           string
-	ApiKeyEnc         string
-	TimeoutChatS      int32
-	TimeoutImageS     int32
-	ProxyUrl          string
-	Enabled           bool
-	Priority          int32
-	Weight            int32
-	CircuitState      string
-	EditFormat        string
-	Note              string
-	Version           int64
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	RouteID             uuid.UUID
+	UpstreamModelName   string
+	ID                  uuid.UUID
+	Name                string
+	BaseUrl             string
+	ApiKeyEnc           string
+	TimeoutChatS        int32
+	TimeoutImageS       int32
+	ProxyUrl            string
+	Enabled             bool
+	Priority            int32
+	Weight              int32
+	CircuitState        string
+	EditFormat          string
+	Note                string
+	Version             int64
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	ConsecutiveFailures int32
+	OpenUntil           *time.Time
+	LastError           string
+	ProbeUntil          *time.Time
 }
 
 func (q *Queries) ChatRouteTargets(ctx context.Context, id uuid.UUID) ([]ChatRouteTargetsRow, error) {
@@ -142,6 +147,10 @@ func (q *Queries) ChatRouteTargets(ctx context.Context, id uuid.UUID) ([]ChatRou
 			&i.Version,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ConsecutiveFailures,
+			&i.OpenUntil,
+			&i.LastError,
+			&i.ProbeUntil,
 		); err != nil {
 			return nil, err
 		}
@@ -311,7 +320,7 @@ func (q *Queries) HeartbeatChatRun(ctx context.Context, arg HeartbeatChatRunPara
 }
 
 const insertChatMessage = `-- name: InsertChatMessage :one
-INSERT INTO messages (id,conversation_id,request_id,role,content,status,model_id,request_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, conversation_id, request_id, request_hash, role, content, status, model_id, upstream_id, meta, deleted_at, created_at
+INSERT INTO messages (id,conversation_id,request_id,role,content,status,model_id,request_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, conversation_id, request_id, request_hash, role, content, status, model_id, upstream_id, meta, deleted_at, created_at, reference_file_ids
 `
 
 type InsertChatMessageParams struct {
@@ -350,12 +359,13 @@ func (q *Queries) InsertChatMessage(ctx context.Context, arg InsertChatMessagePa
 		&i.Meta,
 		&i.DeletedAt,
 		&i.CreatedAt,
+		&i.ReferenceFileIds,
 	)
 	return i, err
 }
 
 const listChatMessages = `-- name: ListChatMessages :many
-SELECT id, conversation_id, request_id, request_hash, role, content, status, model_id, upstream_id, meta, deleted_at, created_at FROM messages WHERE conversation_id=$1 AND deleted_at IS NULL
+SELECT id, conversation_id, request_id, request_hash, role, content, status, model_id, upstream_id, meta, deleted_at, created_at, reference_file_ids FROM messages WHERE conversation_id=$1 AND deleted_at IS NULL
 AND ($2::timestamptz IS NULL OR (created_at,id) < ($2::timestamptz,$3::uuid))
 ORDER BY created_at DESC,id DESC LIMIT $4
 `
@@ -394,6 +404,7 @@ func (q *Queries) ListChatMessages(ctx context.Context, arg ListChatMessagesPara
 			&i.Meta,
 			&i.DeletedAt,
 			&i.CreatedAt,
+			&i.ReferenceFileIds,
 		); err != nil {
 			return nil, err
 		}
@@ -407,7 +418,7 @@ func (q *Queries) ListChatMessages(ctx context.Context, arg ListChatMessagesPara
 
 const listConversations = `-- name: ListConversations :many
 SELECT id, user_id, type, title, model_id, pinned, title_auto, last_message_at, deleted_at, active_run_id, lease_until, cancel_requested, created_at, version FROM conversations WHERE user_id=$1 AND type='chat' AND deleted_at IS NULL
-AND ($2::text='' OR title ILIKE '%'||$2::text||'%')
+AND ($2::text='' OR title ILIKE '%'||$2::text||'%' OR EXISTS(SELECT 1 FROM messages m WHERE m.conversation_id=conversations.id AND m.deleted_at IS NULL AND m.content ILIKE '%'||$2::text||'%'))
 AND ($3::timestamptz IS NULL OR (pinned,last_message_at,id) < ($4::boolean,$3::timestamptz,$5::uuid))
 ORDER BY pinned DESC,last_message_at DESC,id DESC LIMIT $6
 `

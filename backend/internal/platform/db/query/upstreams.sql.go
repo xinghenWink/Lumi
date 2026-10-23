@@ -44,7 +44,7 @@ func (q *Queries) AppendUpstreamCall(ctx context.Context, arg AppendUpstreamCall
 
 const createUpstream = `-- name: CreateUpstream :one
 INSERT INTO upstreams (id,name,base_url,api_key_enc,timeout_chat_s,timeout_image_s,proxy_url,enabled,priority,weight,edit_format,note)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id, name, base_url, api_key_enc, timeout_chat_s, timeout_image_s, proxy_url, enabled, priority, weight, circuit_state, edit_format, note, version, created_at, updated_at
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id, name, base_url, api_key_enc, timeout_chat_s, timeout_image_s, proxy_url, enabled, priority, weight, circuit_state, edit_format, note, version, created_at, updated_at, consecutive_failures, open_until, last_error, probe_until
 `
 
 type CreateUpstreamParams struct {
@@ -95,6 +95,10 @@ func (q *Queries) CreateUpstream(ctx context.Context, arg CreateUpstreamParams) 
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ConsecutiveFailures,
+		&i.OpenUntil,
+		&i.LastError,
+		&i.ProbeUntil,
 	)
 	return i, err
 }
@@ -109,7 +113,7 @@ func (q *Queries) DeleteUpstream(ctx context.Context, id uuid.UUID) error {
 }
 
 const getUpstream = `-- name: GetUpstream :one
-SELECT id, name, base_url, api_key_enc, timeout_chat_s, timeout_image_s, proxy_url, enabled, priority, weight, circuit_state, edit_format, note, version, created_at, updated_at FROM upstreams WHERE id=$1
+SELECT id, name, base_url, api_key_enc, timeout_chat_s, timeout_image_s, proxy_url, enabled, priority, weight, circuit_state, edit_format, note, version, created_at, updated_at, consecutive_failures, open_until, last_error, probe_until FROM upstreams WHERE id=$1
 `
 
 func (q *Queries) GetUpstream(ctx context.Context, id uuid.UUID) (Upstream, error) {
@@ -132,12 +136,16 @@ func (q *Queries) GetUpstream(ctx context.Context, id uuid.UUID) (Upstream, erro
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ConsecutiveFailures,
+		&i.OpenUntil,
+		&i.LastError,
+		&i.ProbeUntil,
 	)
 	return i, err
 }
 
 const listUpstreams = `-- name: ListUpstreams :many
-SELECT id, name, base_url, api_key_enc, timeout_chat_s, timeout_image_s, proxy_url, enabled, priority, weight, circuit_state, edit_format, note, version, created_at, updated_at FROM upstreams
+SELECT id, name, base_url, api_key_enc, timeout_chat_s, timeout_image_s, proxy_url, enabled, priority, weight, circuit_state, edit_format, note, version, created_at, updated_at, consecutive_failures, open_until, last_error, probe_until FROM upstreams
 WHERE ($1::text = '' OR name ILIKE '%' || $1::text || '%' OR id::text = $1::text)
 AND ($2::text = '' OR enabled = ($2::text = 'enabled'))
 AND ($3::timestamptz IS NULL OR (created_at,id) < ($3::timestamptz,$4::uuid))
@@ -184,6 +192,10 @@ func (q *Queries) ListUpstreams(ctx context.Context, arg ListUpstreamsParams) ([
 			&i.Version,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ConsecutiveFailures,
+			&i.OpenUntil,
+			&i.LastError,
+			&i.ProbeUntil,
 		); err != nil {
 			return nil, err
 		}
@@ -205,7 +217,7 @@ func (q *Queries) LockModelConfiguration(ctx context.Context) error {
 }
 
 const lockUpstream = `-- name: LockUpstream :one
-SELECT id, name, base_url, api_key_enc, timeout_chat_s, timeout_image_s, proxy_url, enabled, priority, weight, circuit_state, edit_format, note, version, created_at, updated_at FROM upstreams WHERE id=$1 FOR UPDATE
+SELECT id, name, base_url, api_key_enc, timeout_chat_s, timeout_image_s, proxy_url, enabled, priority, weight, circuit_state, edit_format, note, version, created_at, updated_at, consecutive_failures, open_until, last_error, probe_until FROM upstreams WHERE id=$1 FOR UPDATE
 `
 
 func (q *Queries) LockUpstream(ctx context.Context, id uuid.UUID) (Upstream, error) {
@@ -228,6 +240,10 @@ func (q *Queries) LockUpstream(ctx context.Context, id uuid.UUID) (Upstream, err
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ConsecutiveFailures,
+		&i.OpenUntil,
+		&i.LastError,
+		&i.ProbeUntil,
 	)
 	return i, err
 }
@@ -248,7 +264,7 @@ func (q *Queries) PurgeUpstreamCalls(ctx context.Context) (int64, error) {
 
 const updateUpstream = `-- name: UpdateUpstream :one
 UPDATE upstreams SET name=$2,base_url=$3,api_key_enc=$4,timeout_chat_s=$5,timeout_image_s=$6,proxy_url=$7,enabled=$8,priority=$9,weight=$10,edit_format=$11,note=$12,version=version+1,updated_at=now()
-WHERE id=$1 RETURNING id, name, base_url, api_key_enc, timeout_chat_s, timeout_image_s, proxy_url, enabled, priority, weight, circuit_state, edit_format, note, version, created_at, updated_at
+WHERE id=$1 RETURNING id, name, base_url, api_key_enc, timeout_chat_s, timeout_image_s, proxy_url, enabled, priority, weight, circuit_state, edit_format, note, version, created_at, updated_at, consecutive_failures, open_until, last_error, probe_until
 `
 
 type UpdateUpstreamParams struct {
@@ -299,6 +315,10 @@ func (q *Queries) UpdateUpstream(ctx context.Context, arg UpdateUpstreamParams) 
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ConsecutiveFailures,
+		&i.OpenUntil,
+		&i.LastError,
+		&i.ProbeUntil,
 	)
 	return i, err
 }

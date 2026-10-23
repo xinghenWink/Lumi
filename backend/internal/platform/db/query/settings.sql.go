@@ -12,7 +12,7 @@ import (
 )
 
 const listSettings = `-- name: ListSettings :many
-SELECT key, value, updated_by, updated_at FROM settings WHERE key IN ('site', 'registration', 'mail')
+SELECT key, value, updated_by, updated_at FROM settings WHERE key IN ('site', 'registration', 'mail', 'operations')
 `
 
 func (q *Queries) ListSettings(ctx context.Context) ([]Setting, error) {

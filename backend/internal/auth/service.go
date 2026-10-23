@@ -72,19 +72,21 @@ type Result struct {
 	RefreshExpires time.Time    `json:"-"`
 }
 type RegisterInput struct {
-	Email       string `json:"email"`
-	Password    string `json:"password"`
-	Nickname    string `json:"nickname"`
-	Code        string `json:"code"`
-	AcceptTerms bool   `json:"accept_terms"`
+	TurnstileToken string `json:"turnstile_token"`
+	Email          string `json:"email"`
+	Password       string `json:"password"`
+	Nickname       string `json:"nickname"`
+	Code           string `json:"code"`
+	AcceptTerms    bool   `json:"accept_terms"`
 }
 type LoginInput struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 type CodeInput struct {
-	Email  string `json:"email"`
-	Locale string `json:"locale"`
+	TurnstileToken string `json:"turnstile_token"`
+	Email          string `json:"email"`
+	Locale         string `json:"locale"`
 }
 type Principal struct {
 	User     user.Profile
@@ -135,6 +137,9 @@ func (s *Service) SendCode(ctx context.Context, input CodeInput, client Client) 
 	}
 	if !cfg.Registration.EmailVerificationEnabled {
 		return problem.New("VERIFICATION_NOT_REQUIRED", http.StatusBadRequest)
+	}
+	if err := ValidateTurnstile(ctx, nil, cfg.Operations, input.TurnstileToken, "send_code", client.IP.String()); err != nil {
+		return err
 	}
 	if err := s.rate(ctx, "send-code-ip", client.IP.String(), cfg.Registration.CodePerMinute); err != nil {
 		return err
@@ -210,6 +215,9 @@ func (s *Service) Register(ctx context.Context, input RegisterInput, client Clie
 	if err := s.rate(ctx, "register", client.IP.String(), cfg.Registration.RegisterPerMinute); err != nil {
 		return Result{}, err
 	}
+	if err := ValidateTurnstile(ctx, nil, cfg.Operations, input.TurnstileToken, "register", client.IP.String()); err != nil {
+		return Result{}, err
+	}
 	hash, err := s.passwords.Hash(ctx, input.Password)
 	if err != nil {
 		return Result{}, err
@@ -223,6 +231,15 @@ func (s *Service) Register(ctx context.Context, input RegisterInput, client Clie
 	err = db.Transaction(ctx, s.pool, func(q *query.Queries) error {
 		if err := q.LockRegistration(ctx, email); err != nil {
 			return fmt.Errorf("lock registration: %w", err)
+		}
+		if cfg.Operations.RegisterPerIPDay > 0 {
+			allowed, retry, err := s.gate.Allow(ctx, "register-ip-day", client.IP.String(), cfg.Operations.RegisterPerIPDay, 24*time.Hour)
+			if err != nil {
+				return err
+			}
+			if !allowed {
+				return problem.Retry("REGISTRATION_IP_LIMIT", retry)
+			}
 		}
 		if cfg.Registration.EmailVerificationEnabled {
 			verification, err := q.GetVerificationForUpdate(ctx, email)

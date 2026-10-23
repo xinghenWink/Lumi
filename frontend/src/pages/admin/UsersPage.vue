@@ -10,6 +10,7 @@ import { addDateRange, validEmail, validPassword } from '../../features/accounts
 import { useTime } from '../../features/accounts/time'
 import ApiNotice from '../../components/ApiNotice.vue'
 import ModalDialog from '../../components/ModalDialog.vue'
+import { operations } from '../../api/operations'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -51,10 +52,55 @@ const rowBusy = ref('')
 const modalError = shallowRef<unknown>(null)
 const validation = ref('')
 const self = computed(() => selected.value?.id === auth.user?.id)
+const batchIDs = ref<string[]>([]),
+  batchAction = ref(''),
+  batchAmount = ref(1),
+  batchNote = ref(''),
+  batchKey = ref('')
+function batch(action: string) {
+  batchAction.value = action
+  batchKey.value = crypto.randomUUID()
+  batchNote.value = ''
+}
+async function applyBatch() {
+  busy.value = true
+  modalError.value = null
+  try {
+    await operations.batchUsers(
+      batchIDs.value,
+      batchAction.value,
+      batchAmount.value,
+      batchNote.value,
+      batchKey.value,
+    )
+    batchIDs.value = []
+    batchAction.value = ''
+    notice.value = t('ops.batchDone')
+    await load()
+  } catch (e) {
+    modalError.value = e
+  } finally {
+    busy.value = false
+  }
+}
+async function exportUsers() {
+  busy.value = true
+  error.value = null
+  try {
+    await operations.exportUsers(
+      new URLSearchParams({ search: applied.search, role: applied.role, status: applied.status }),
+    )
+  } catch (e) {
+    error.value = e
+  } finally {
+    busy.value = false
+  }
+}
 onMounted(() => void load())
 onUnmounted(() => controller?.abort())
 
 async function load() {
+  batchIDs.value = []
   const current = ++generation
   controller?.abort()
   controller = new AbortController()
@@ -259,6 +305,20 @@ async function toggle(user: User) {
       </div>
     </form>
     <ApiNotice :error="error" />
+    <div class="ops-toolbar">
+      <span>{{ t('ops.selected', { n: batchIDs.length }) }}</span
+      ><button
+        v-for="action in ['enable', 'disable', 'grant', 'delete']"
+        :key="action"
+        class="button"
+        :disabled="!batchIDs.length || busy"
+        @click="batch(action)"
+      >
+        {{ t(action === 'delete' ? 'ops.batchDelete' : 'ops.' + action) }}</button
+      ><button class="button" :disabled="busy" @click="exportUsers">
+        {{ t('ops.exportUsers') }}
+      </button>
+    </div>
     <p v-if="notice" class="success-message" role="status">{{ notice }}</p>
     <div class="panel data-panel" :aria-busy="loading">
       <div v-if="loading" class="loading-state" role="status">{{ t('common.loading') }}</div>
@@ -275,6 +335,7 @@ async function toggle(user: User) {
           <table>
             <thead>
               <tr>
+                <th>{{ t('ops.select') }}</th>
                 <th>{{ t('admin.users.identity') }}</th>
                 <th>{{ t('admin.users.role') }}</th>
                 <th>{{ t('admin.users.status') }}</th>
@@ -286,6 +347,15 @@ async function toggle(user: User) {
             </thead>
             <tbody>
               <tr v-for="user in page.items" :key="user.id">
+                <td>
+                  <input
+                    v-model="batchIDs"
+                    type="checkbox"
+                    :value="user.id"
+                    :disabled="user.id === auth.user?.id || busy"
+                    :aria-label="t('ops.select') + ' ' + user.email"
+                  />
+                </td>
                 <td>
                   <RouterLink class="identity-link" :to="`/admin/users/${user.id}`"
                     ><span class="small-avatar">{{ Array.from(user.nickname)[0] }}</span
@@ -495,4 +565,28 @@ async function toggle(user: User) {
       </form>
     </ModalDialog>
   </div>
+  <ModalDialog
+    :open="!!batchAction"
+    :title="t('ops.confirm')"
+    :description="t('ops.batchConfirm', { n: batchIDs.length })"
+    :busy="busy"
+    @update:open="batchAction = ''"
+    ><form class="ops-form" @submit.prevent="applyBatch">
+      <template v-if="batchAction === 'grant'"
+        ><label
+          >{{ t('ops.amount')
+          }}<input
+            v-model.number="batchAmount"
+            type="number"
+            min="1"
+            max="1000000000000"
+            required /></label
+        ><label
+          >{{ t('ops.note')
+          }}<input v-model="batchNote" maxlength="200" required /></label></template
+      ><ApiNotice :error="modalError" /><button class="button danger" :disabled="busy">
+        {{ t('ops.confirm') }}
+      </button>
+    </form></ModalDialog
+  >
 </template>

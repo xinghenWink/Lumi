@@ -11,6 +11,8 @@ import chatZH from './chat.zh-CN'
 import chatEN from './chat.en'
 import imagesZH from './images.zh-CN'
 import imagesEN from './images.en'
+import operationsZH from './operations.zh-CN'
+import operationsEN from './operations.en'
 
 export const i18n = createI18n({
   legacy: false,
@@ -24,12 +26,14 @@ export const i18n = createI18n({
       ...catalogZH,
       ...chatZH,
       ...imagesZH,
+      ...operationsZH,
       nav: {
         ...accountsZH.nav,
         ...creditsZH.nav,
         ...catalogZH.nav,
         ...chatZH.nav,
         ...imagesZH.nav,
+        ...operationsZH.nav,
       },
       errors: {
         ...accountsZH.errors,
@@ -37,6 +41,7 @@ export const i18n = createI18n({
         ...catalogZH.errors,
         ...chatZH.errors,
         ...imagesZH.errors,
+        ...operationsZH.errors,
       },
     },
     en: {
@@ -46,12 +51,14 @@ export const i18n = createI18n({
       ...catalogEN,
       ...chatEN,
       ...imagesEN,
+      ...operationsEN,
       nav: {
         ...accountsEN.nav,
         ...creditsEN.nav,
         ...catalogEN.nav,
         ...chatEN.nav,
         ...imagesEN.nav,
+        ...operationsEN.nav,
       },
       errors: {
         ...accountsEN.errors,
@@ -59,6 +66,7 @@ export const i18n = createI18n({
         ...catalogEN.errors,
         ...chatEN.errors,
         ...imagesEN.errors,
+        ...operationsEN.errors,
       },
     },
   },

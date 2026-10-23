@@ -10,6 +10,8 @@ import ApiNotice from '../../components/ApiNotice.vue'
 import CreditOverview from '../../components/credits/CreditOverview.vue'
 import CreditLedgerTable from '../../components/credits/CreditLedgerTable.vue'
 import RedemptionRecords from '../../components/credits/RedemptionRecords.vue'
+import { operations } from '../../api/operations'
+import ModalDialog from '../../components/ModalDialog.vue'
 const route = useRoute()
 const { t } = useI18n()
 const formatTime = useTime()
@@ -17,6 +19,21 @@ const data = shallowRef<UserDetail | null>(null)
 const loading = ref(false)
 const error = shallowRef<unknown>(null)
 const notice = ref('')
+const revokeOpen = ref(false),
+  revokeBusy = ref(false)
+async function revokeAll() {
+  revokeBusy.value = true
+  error.value = null
+  try {
+    await operations.revokeAll(String(route.params.id))
+    revokeOpen.value = false
+    await load()
+  } catch (e) {
+    error.value = e
+  } finally {
+    revokeBusy.value = false
+  }
+}
 const tab = ref('profile'),
   creditRevision = ref(0)
 let controller: AbortController | null = null
@@ -70,6 +87,12 @@ async function copy() {
       </div>
     </div>
     <ApiNotice :error="error" />
+    <div class="ops-toolbar">
+      <button class="button" @click="revokeOpen = true">{{ t('ops.revokeAll') }}</button
+      ><RouterLink class="button" :to="'/admin/conversations?user_id=' + String(route.params.id)">{{
+        t('nav.adminChats')
+      }}</RouterLink>
+    </div>
     <div v-if="loading" class="loading-state" role="status">{{ t('common.loading') }}</div>
     <button v-else-if="error" class="button" @click="load">{{ t('common.retry') }}</button
     ><template v-else-if="data"
@@ -208,4 +231,18 @@ async function copy() {
       </section></template
     >
   </div>
+  <ModalDialog
+    :open="revokeOpen"
+    :title="t('ops.revokeAll')"
+    :description="t('ops.revokeConfirm')"
+    :busy="revokeBusy"
+    @update:open="revokeOpen = $event"
+    ><ApiNotice :error="error" /><button
+      class="button danger"
+      :disabled="revokeBusy"
+      @click="revokeAll"
+    >
+      {{ t('ops.confirm') }}
+    </button></ModalDialog
+  >
 </template>

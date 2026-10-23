@@ -24,6 +24,19 @@ function response(text: string, step = 1) {
   )
 }
 describe('chat streaming contracts', () => {
+  it('records resume IDs only after valid frames are delivered', async () => {
+    const ids: string[] = [],
+      events: ChatEvent[] = []
+    await consumeChat(
+      response(
+        'id: 100-1\nevent: delta\ndata: {"content":"first"}\n\nid: invalid\nevent: delta\ndata: {"content":"second"}\n\nid: 100-2\nevent: done\ndata: {}\n\n',
+      ),
+      (e) => events.push(e),
+      (id) => ids.push(id),
+    )
+    expect(ids).toEqual(['100-1', '100-2'])
+    expect(events.map((e) => e.type)).toEqual(['delta', 'delta', 'done'])
+  })
   it('parses split UTF-8 and CRLF without relying on transport chunk boundaries', async () => {
     const events: ChatEvent[] = []
     await consumeChat(

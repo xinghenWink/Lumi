@@ -15,9 +15,12 @@ import { Menu, X } from 'lucide-vue-next'
 import AppSidebar from '../components/AppSidebar.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import { useSiteStore } from '../stores/site'
+import { useAuthStore } from '../stores/auth'
+import RuntimeBanner from '../components/RuntimeBanner.vue'
 const route = useRoute()
 const { t } = useI18n()
 const site = useSiteStore()
+const auth = useAuthStore()
 const admin = computed(() => route.path.startsWith('/admin'))
 const menuOpen = ref(false)
 const title = computed(() =>
@@ -81,7 +84,19 @@ function searchShortcut(event: KeyboardEvent) {
         <div class="topbar-spacer" />
         <ThemeToggle />
       </header>
-      <main id="main-content" class="app-content"><RouterView /></main>
+      <RuntimeBanner />
+      <main id="main-content" class="app-content">
+        <div
+          v-if="site.config?.maintenance && auth.user?.role !== 'admin'"
+          class="ops-maintenance"
+          role="status"
+        >
+          <h1>{{ t('ops.maintenanceTitle') }}</h1>
+          <p>{{ t('ops.maintenanceBody') }}</p>
+          <button class="button" @click="site.load">{{ t('ops.reload') }}</button>
+        </div>
+        <RouterView v-else />
+      </main>
     </div>
   </div>
 </template>

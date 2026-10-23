@@ -55,6 +55,7 @@ func BuildContext(rows []query.Message, config Configuration, modelLimit int32) 
 		cost := used
 		for _, row := range rows[first:] {
 			cost += EstimateTokens(row.Content)
+			cost += len(row.ReferenceFileIds) * 1024
 		}
 		if cost <= budget {
 			for _, row := range rows[first:] {

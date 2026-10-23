@@ -516,9 +516,8 @@ test('M5 real image generation editing gallery cancellation and administrator pr
       { id: galleryConversation, model_id: modelID },
       galleryToken,
     )
-    let lastTaskID = ''
     for (let index = 0; index < 15; index++) {
-      const row = await api(
+      await api(
         'POST',
         '/image-tasks',
         {
@@ -534,15 +533,17 @@ test('M5 real image generation editing gallery cancellation and administrator pr
         galleryToken,
         randomUUID(),
       )
-      lastTaskID = String(row.id)
     }
+    // Workers can finish queued tasks out of submission order; wait for the full fixture.
     await expect
       .poll(
-        async () =>
-          (await api('GET', '/image-tasks/' + lastTaskID, undefined, galleryToken)).status,
+        async () => {
+          const gallery = await api('GET', '/me/images?limit=100', undefined, galleryToken)
+          return Array.isArray(gallery.items) ? gallery.items.length : 0
+        },
         { timeout: 60_000, intervals: [500] },
       )
-      .toBe('succeeded')
+      .toBe(60)
     const requested: string[] = []
     member.on('request', (request) => {
       if (request.url().includes('/api/v1/files/')) requested.push(request.url())

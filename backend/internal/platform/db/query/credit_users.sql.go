@@ -19,7 +19,7 @@ WITH balances AS (
            THEN $14::bigint ELSE c.daily_balance END)::bigint AS credit_total
     FROM credit_accounts c
 )
-SELECT u.id, u.email, u.password_hash, u.nickname, u.avatar_file_id, u.role, u.status, u.token_version, u.locale, u.timezone, u.last_login_at, u.last_login_ip, u.terms_accepted_at, u.created_at, u.updated_at, u.deleted_at, b.credit_total FROM users u JOIN balances b ON b.user_id=u.id
+SELECT u.id, u.email, u.password_hash, u.nickname, u.avatar_file_id, u.role, u.status, u.token_version, u.locale, u.timezone, u.last_login_at, u.last_login_ip, u.terms_accepted_at, u.created_at, u.updated_at, u.deleted_at, u.purge_after, b.credit_total FROM users u JOIN balances b ON b.user_id=u.id
 WHERE u.deleted_at IS NULL
 AND ($1::text='' OR u.email::text ILIKE '%'||$1||'%'
  OR u.nickname ILIKE '%'||$1||'%' OR u.id::text=$1)
@@ -104,6 +104,7 @@ func (q *Queries) ListUsersWithCredits(ctx context.Context, arg ListUsersWithCre
 			&i.User.CreatedAt,
 			&i.User.UpdatedAt,
 			&i.User.DeletedAt,
+			&i.User.PurgeAfter,
 			&i.CreditTotal,
 		); err != nil {
 			return nil, err

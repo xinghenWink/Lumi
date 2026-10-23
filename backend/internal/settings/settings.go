@@ -23,6 +23,8 @@ import (
 )
 
 type Site struct {
+	LogoURL     string `json:"logo_url"`
+	FaviconURL  string `json:"favicon_url"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Footer      string `json:"footer"`
@@ -51,6 +53,7 @@ type Mail struct {
 	Password          string `json:"-"`
 }
 type Snapshot struct {
+	Operations   Operations
 	Site         Site
 	Registration Registration
 	Mail         Mail
@@ -83,9 +86,12 @@ type Update struct {
 	Mail         *MailInput    `json:"mail,omitempty"`
 }
 type Public struct {
-	Site                     Site `json:"site"`
-	RegistrationEnabled      bool `json:"registration_enabled"`
-	EmailVerificationEnabled bool `json:"email_verification_enabled"`
+	Maintenance              bool   `json:"maintenance"`
+	TurnstileEnabled         bool   `json:"turnstile_enabled"`
+	TurnstileSiteKey         string `json:"turnstile_site_key"`
+	Site                     Site   `json:"site"`
+	RegistrationEnabled      bool   `json:"registration_enabled"`
+	EmailVerificationEnabled bool   `json:"email_verification_enabled"`
 }
 
 type Service struct {
@@ -149,7 +155,7 @@ func (s *Service) Public(ctx context.Context) (Public, error) {
 	if err != nil {
 		return Public{}, err
 	}
-	return Public{Site: value.Site, RegistrationEnabled: value.Registration.Enabled, EmailVerificationEnabled: value.Registration.EmailVerificationEnabled}, nil
+	return Public{Site: value.Site, RegistrationEnabled: value.Registration.Enabled, EmailVerificationEnabled: value.Registration.EmailVerificationEnabled, Maintenance: value.Operations.Maintenance, TurnstileEnabled: value.Operations.TurnstileEnabled, TurnstileSiteKey: value.Operations.TurnstileSiteKey}, nil
 }
 func (s *Service) View(ctx context.Context) (View, error) {
 	value, err := s.Read(ctx)
@@ -176,6 +182,9 @@ func (s *Service) Save(ctx context.Context, actor user.Actor, group string, inpu
 				return problem.Invalid()
 			}
 			after.Site = *input.Site
+			if !validAssetLink(after.Site.LogoURL) || !validAssetLink(after.Site.FaviconURL) {
+				return problem.Invalid()
+			}
 			if !validation.Text(after.Site.Name, 1, 40) || !validation.Text(after.Site.Description, 0, 200) || !validation.Text(after.Site.Footer, 0, 200) || !validation.Text(after.Site.Contact, 0, 200) || !validation.Link(after.Site.TermsURL) || !validation.Link(after.Site.PrivacyURL) {
 				return problem.Invalid()
 			}
@@ -245,10 +254,16 @@ func (s *Service) read(ctx context.Context, q *query.Queries) (Snapshot, error) 
 			err = json.Unmarshal(record.Value, &value.Registration)
 		case "mail":
 			err = json.Unmarshal(record.Value, &value.Mail)
+		case "operations":
+			err = json.Unmarshal(record.Value, &value.Operations)
 		}
 		if err != nil {
 			return Snapshot{}, fmt.Errorf("decode settings: %w", err)
 		}
+	}
+	value.Operations.TurnstileSecret, err = s.vault.Decrypt(value.Operations.TurnstileSecretEncrypted, "settings.turnstile.secret")
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("decrypt challenge settings: %w", err)
 	}
 	value.Mail.Password, err = s.vault.Decrypt(value.Mail.PasswordEncrypted, "settings.mail.password")
 	if err != nil {
@@ -261,6 +276,7 @@ func defaults() Snapshot {
 	return Snapshot{Site: Site{Name: "Lumi", Description: "对话与生图", Footer: "给灵感一点空间。", TermsURL: "/terms", PrivacyURL: "/privacy"}, Registration: Registration{Enabled: true, EmailVerificationEnabled: true, DomainAllowlist: []string{}, DomainBlocklist: []string{}, LoginFailureLimit: 5, LoginLockMinutes: 15, LoginPerMinute: 20, RegisterPerMinute: 10, CodePerMinute: 3}, Mail: Mail{Port: 587, Encryption: "starttls"}}
 }
 func clone(value Snapshot) Snapshot {
+	value.Operations.SensitiveWords = slices.Clone(value.Operations.SensitiveWords)
 	value.Registration.DomainAllowlist = slices.Clone(value.Registration.DomainAllowlist)
 	value.Registration.DomainBlocklist = slices.Clone(value.Registration.DomainBlocklist)
 	return value

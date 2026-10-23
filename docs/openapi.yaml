@@ -1,11 +1,11 @@
 openapi: 3.1.0
 info:
   title: Lumi API
-  version: 0.5.0
+  version: 0.6.0
   description: >-
     Accounts, credits, upstream configuration and owner-isolated chat. Mutations require Origin and
     X-Lumi-CSRF: 1. Chat POST streams use meta, delta, error, done and ping SSE events. Reuse request_id
-    only with identical input; a live duplicate returns CHAT_BUSY. Image tasks charge and settle atomically, run independently of HTTP, and expose only owner-scoped signed files.
+    only with identical input; live duplicates replay the owner-scoped Redis stream (five-minute TTL). Image tasks charge and settle atomically, run independently of HTTP, and expose only owner-scoped signed files.
 servers:
   - url: /
 paths:
@@ -323,6 +323,69 @@ paths:
                 $ref: '#/components/schemas/User'
         default:
           $ref: '#/components/responses/APIError'
+    delete:
+      summary: /api/v1/me
+      operationId: m6_delete__api_v1_me
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Completed
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteOwnAccountInput'
   /api/v1/me/password:
     post:
       operationId: changePassword
@@ -2970,6 +3033,1881 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ImageConfiguration'
+  /api/v1/auth/forgot-password:
+    post:
+      summary: /api/v1/auth/forgot-password
+      operationId: m6_post__api_v1_auth_forgot_password
+      security: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Completed
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordInput'
+  /api/v1/auth/reset-password:
+    post:
+      summary: /api/v1/auth/reset-password
+      operationId: m6_post__api_v1_auth_reset_password
+      security: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Completed
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordInput'
+  /api/v1/me/preferences:
+    get:
+      summary: /api/v1/me/preferences
+      operationId: m6_get__api_v1_me_preferences
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preferences'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: /api/v1/me/preferences
+      operationId: m6_put__api_v1_me_preferences
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preferences'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Preferences'
+  /api/v1/me/sessions:
+    get:
+      summary: /api/v1/me/sessions
+      operationId: m6_get__api_v1_me_sessions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceList'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/me/sessions/{id}:
+    delete:
+      summary: /api/v1/me/sessions/{id}
+      operationId: m6_delete__api_v1_me_sessions__id_
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Completed
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/me/chat-export:
+    get:
+      summary: /api/v1/me/chat-export
+      operationId: m6_get__api_v1_me_chat_export
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum:
+              - json
+              - markdown
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatExport'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{id}/export:
+    get:
+      summary: /api/v1/conversations/{id}/export
+      operationId: m6_get__api_v1_conversations__id__export
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum:
+              - json
+              - markdown
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatExport'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{id}/events:
+    get:
+      summary: /api/v1/conversations/{id}/events
+      operationId: m6_get__api_v1_conversations__id__events
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Last-Event-ID
+          in: header
+          schema:
+            type: string
+        - name: request_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Success
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/announcements:
+    get:
+      summary: /api/v1/announcements
+      operationId: m6_get__api_v1_announcements
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnouncementPage'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/me/images/batch-download:
+    post:
+      summary: /api/v1/me/images/batch-download
+      operationId: m6_post__api_v1_me_images_batch_download
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchImagesInput'
+  /api/v1/me/images/batch-delete:
+    post:
+      summary: /api/v1/me/images/batch-delete
+      operationId: m6_post__api_v1_me_images_batch_delete
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Completed
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchImagesInput'
+  /api/v1/admin/dashboard:
+    get:
+      summary: /api/v1/admin/dashboard
+      operationId: m6_get__api_v1_admin_dashboard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            enum:
+              - 1
+              - 7
+              - 30
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/users/batch:
+    post:
+      summary: /api/v1/admin/users/batch
+      operationId: m6_post__api_v1_admin_users_batch
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          schema:
+            type: string
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Completed
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchUsersInput'
+  /api/v1/admin/users/export:
+    get:
+      summary: /api/v1/admin/users/export
+      operationId: m6_get__api_v1_admin_users_export
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            text/csv:
+              schema:
+                type: string
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/users/{id}/sessions:
+    delete:
+      summary: /api/v1/admin/users/{id}/sessions
+      operationId: m6_delete__api_v1_admin_users__id__sessions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Completed
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/conversations:
+    get:
+      summary: /api/v1/admin/conversations
+      operationId: m6_get__api_v1_admin_conversations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMetadataPage'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/conversations/{id}/messages:
+    get:
+      summary: /api/v1/admin/conversations/{id}/messages
+      operationId: m6_get__api_v1_admin_conversations__id__messages
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessagePage'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/announcements:
+    get:
+      summary: /api/v1/admin/announcements
+      operationId: m6_get__api_v1_admin_announcements
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnouncementPage'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: /api/v1/admin/announcements
+      operationId: m6_post__api_v1_admin_announcements
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Announcement'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnouncementInput'
+  /api/v1/admin/announcements/{id}:
+    put:
+      summary: /api/v1/admin/announcements/{id}
+      operationId: m6_put__api_v1_admin_announcements__id_
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Announcement'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnouncementInput'
+    delete:
+      summary: /api/v1/admin/announcements/{id}
+      operationId: m6_delete__api_v1_admin_announcements__id_
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Completed
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/operations-settings:
+    get:
+      summary: /api/v1/admin/operations-settings
+      operationId: m6_get__api_v1_admin_operations_settings
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsSettings'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: /api/v1/admin/operations-settings
+      operationId: m6_put__api_v1_admin_operations_settings
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsSettings'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationsSettingsInput'
+  /api/v1/admin/mail/test:
+    post:
+      summary: /api/v1/admin/mail/test
+      operationId: m6_post__api_v1_admin_mail_test
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Completed
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/system:
+    get:
+      summary: /api/v1/admin/system
+      operationId: m6_get__api_v1_admin_system
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemInfo'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/system/cleanup:
+    post:
+      summary: /api/v1/admin/system/cleanup
+      operationId: m6_post__api_v1_admin_system_cleanup
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Completed
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/image-tasks/{id}/refund:
+    post:
+      summary: /api/v1/admin/image-tasks/{id}/refund
+      operationId: m6_post__api_v1_admin_image_tasks__id__refund
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Completed
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualRefundInput'
+  /metrics:
+    get:
+      summary: Administrator-authenticated Prometheus metrics
+      operationId: m6_get__metrics
+      security:
+        - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: Success
+          content:
+            text/plain:
+              schema:
+                type: string
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   headers:
     RequestID:
@@ -2977,6 +4915,545 @@ components:
       schema:
         type: string
   schemas:
+    ManualRefundInput:
+      type: object
+      additionalProperties: false
+      properties:
+        note:
+          type: string
+          minLength: 1
+          maxLength: 200
+      required:
+        - note
+    DeleteOwnAccountInput:
+      type: object
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          maxLength: 512
+      required:
+        - email
+        - password
+    BatchImagesInput:
+      type: object
+      additionalProperties: false
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+          maxItems: 100
+      required:
+        - ids
+    BatchUsersInput:
+      type: object
+      additionalProperties: false
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+          maxItems: 100
+        action:
+          type: string
+          enum:
+            - enable
+            - disable
+            - delete
+            - grant
+        amount:
+          type: integer
+          minimum: 0
+        note:
+          type: string
+          maxLength: 200
+        confirm:
+          type: boolean
+      required:
+        - ids
+        - action
+    ResetPasswordInput:
+      type: object
+      additionalProperties: false
+      properties:
+        token:
+          type: string
+          minLength: 43
+          maxLength: 43
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+      required:
+        - token
+        - password
+    ForgotPasswordInput:
+      type: object
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        locale:
+          type: string
+          enum:
+            - zh-CN
+            - en
+      required:
+        - email
+    ChatExport:
+      type: object
+      additionalProperties: false
+      properties:
+        conversation:
+          $ref: '#/components/schemas/ChatConversation'
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+      required:
+        - conversation
+        - messages
+    ChatMetadataPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminChatMetadata'
+        next_cursor:
+          type: string
+      required:
+        - items
+        - next_cursor
+    AdminChatMetadata:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        model_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        last_message_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        busy:
+          type: boolean
+      required:
+        - id
+        - user_id
+        - model_id
+        - last_message_at
+        - created_at
+        - busy
+    SystemInfo:
+      type: object
+      additionalProperties: false
+      properties:
+        version:
+          type: string
+        commit:
+          type: string
+        build_time:
+          type: string
+        uptime_seconds:
+          type: integer
+          minimum: 0
+        database_ok:
+          type: boolean
+        redis_ok:
+          type: boolean
+        image_bytes:
+          type: integer
+          minimum: 0
+      required:
+        - version
+        - commit
+        - build_time
+        - uptime_seconds
+        - database_ok
+        - redis_ok
+        - image_bytes
+    Dashboard:
+      type: object
+      additionalProperties: false
+      properties:
+        users:
+          type: integer
+          minimum: 0
+        active_streams:
+          type: integer
+          minimum: 0
+        credit_changes:
+          type: integer
+          minimum: 0
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardDay'
+        upstreams:
+          type: array
+          items:
+            $ref: '#/components/schemas/UpstreamStats'
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskCount'
+      required:
+        - users
+        - active_streams
+        - credit_changes
+        - days
+        - upstreams
+        - tasks
+    TaskCount:
+      type: object
+      additionalProperties: false
+      properties:
+        Status:
+          type: string
+        Count:
+          type: integer
+          minimum: 0
+      required:
+        - Status
+        - Count
+    UpstreamStats:
+      type: object
+      additionalProperties: false
+      properties:
+        UpstreamID:
+          type: string
+          format: uuid
+        Calls:
+          type: integer
+          minimum: 0
+        Successes:
+          type: integer
+          minimum: 0
+        LatencyMs:
+          type: integer
+          minimum: 0
+      required:
+        - UpstreamID
+        - Calls
+        - Successes
+        - LatencyMs
+    DashboardDay:
+      type: object
+      additionalProperties: false
+      properties:
+        signup_credits:
+          type: integer
+          minimum: 0
+        daily_credits:
+          type: integer
+          minimum: 0
+        redeem_credits:
+          type: integer
+          minimum: 0
+        admin_credits:
+          type: integer
+          minimum: 0
+        date:
+          type: string
+          format: date
+        new_users:
+          type: integer
+          minimum: 0
+        active_users:
+          type: integer
+          minimum: 0
+        chat_messages:
+          type: integer
+          minimum: 0
+        image_success:
+          type: integer
+          minimum: 0
+        image_failed:
+          type: integer
+          minimum: 0
+        credits_granted:
+          type: integer
+          minimum: 0
+        credits_spent:
+          type: integer
+          minimum: 0
+      required:
+        - signup_credits
+        - daily_credits
+        - redeem_credits
+        - admin_credits
+        - date
+        - new_users
+        - active_users
+        - chat_messages
+        - image_success
+        - image_failed
+        - credits_granted
+        - credits_spent
+    OperationsSettingsInput:
+      type: object
+      additionalProperties: false
+      properties:
+        maintenance:
+          type: boolean
+        turnstile_enabled:
+          type: boolean
+        turnstile_site_key:
+          type: string
+        turnstile_hostname:
+          type: string
+        register_per_ip_day:
+          type: integer
+          minimum: 0
+          maximum: 1000
+        circuit_failures:
+          type: integer
+          minimum: 1
+          maximum: 100
+        circuit_seconds:
+          type: integer
+          minimum: 1
+          maximum: 3600
+        sensitive_words:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+          maxItems: 200
+        turnstile_secret:
+          type: string
+          maxLength: 4096
+      required:
+        - maintenance
+        - turnstile_enabled
+        - turnstile_site_key
+        - turnstile_hostname
+        - register_per_ip_day
+        - circuit_failures
+        - circuit_seconds
+        - sensitive_words
+    OperationsSettings:
+      type: object
+      additionalProperties: false
+      properties:
+        maintenance:
+          type: boolean
+        turnstile_enabled:
+          type: boolean
+        turnstile_site_key:
+          type: string
+        turnstile_hostname:
+          type: string
+        turnstile_secret_configured:
+          type: boolean
+        register_per_ip_day:
+          type: integer
+          minimum: 0
+          maximum: 1000
+        circuit_failures:
+          type: integer
+          minimum: 1
+          maximum: 100
+        circuit_seconds:
+          type: integer
+          minimum: 1
+          maximum: 3600
+        sensitive_words:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+          maxItems: 200
+      required:
+        - maintenance
+        - turnstile_enabled
+        - turnstile_site_key
+        - turnstile_hostname
+        - turnstile_secret_configured
+        - register_per_ip_day
+        - circuit_failures
+        - circuit_seconds
+        - sensitive_words
+    AnnouncementPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Announcement'
+        next_cursor:
+          type: string
+      required:
+        - items
+        - next_cursor
+    AnnouncementInput:
+      type: object
+      additionalProperties: false
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 10000
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        enabled:
+          type: boolean
+        version:
+          type: integer
+          minimum: 0
+      required:
+        - content
+        - starts_at
+        - ends_at
+        - enabled
+        - version
+    Announcement:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        content:
+          type: string
+          minLength: 1
+          maxLength: 10000
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        enabled:
+          type: boolean
+        version:
+          type: integer
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - content
+        - starts_at
+        - ends_at
+        - enabled
+        - version
+        - created_at
+    DeviceList:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Device'
+        current_id:
+          type: string
+          format: uuid
+        next_cursor:
+          type: string
+      required:
+        - items
+        - current_id
+        - next_cursor
+    Device:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        device:
+          type: string
+        ip:
+          type: string
+        user_agent:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - device
+        - ip
+        - user_agent
+        - created_at
+        - expires_at
+    Preferences:
+      type: object
+      additionalProperties: false
+      properties:
+        theme:
+          type: string
+          enum:
+            - light
+            - dark
+            - system
+        instructions:
+          type: string
+          maxLength: 4000
+        image_quality:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+        image_ratio:
+          type: string
+          enum:
+            - '1:1'
+            - '3:2'
+            - '2:3'
+            - '4:3'
+            - '3:4'
+            - '16:9'
+            - '9:16'
+        image_count:
+          type: integer
+          minimum: 1
+          maximum: 4
+      required:
+        - theme
+        - instructions
+        - image_quality
+        - image_ratio
+        - image_count
     Health:
       type: object
       additionalProperties: false
@@ -3178,6 +5655,9 @@ components:
           type: boolean
           enum:
             - true
+        turnstile_token:
+          type: string
+          maxLength: 2048
     SendCodeInput:
       type: object
       additionalProperties: false
@@ -3193,6 +5673,9 @@ components:
             - zh-CN
             - en
           default: zh-CN
+        turnstile_token:
+          type: string
+          maxLength: 2048
     CodeSent:
       type: object
       additionalProperties: false
@@ -3398,6 +5881,10 @@ components:
         privacy_url:
           type: string
           maxLength: 2048
+        logo_url:
+          type: string
+        favicon_url:
+          type: string
     RegistrationSettings:
       type: object
       additionalProperties: false
@@ -3564,6 +6051,12 @@ components:
           type: boolean
         email_verification_enabled:
           type: boolean
+        maintenance:
+          type: boolean
+        turnstile_enabled:
+          type: boolean
+        turnstile_site_key:
+          type: string
     AuditRecord:
       type: object
       additionalProperties: false
@@ -4368,6 +6861,22 @@ components:
         updated_at:
           type: string
           format: date-time
+        circuit_state:
+          type: string
+          enum:
+            - closed
+            - open
+            - half_open
+        consecutive_failures:
+          type: integer
+          minimum: 0
+        open_until:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        last_error:
+          type: string
       required:
         - version
         - name
@@ -4876,6 +7385,11 @@ components:
         created_at:
           type: string
           format: date-time
+        reference_file_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
       required:
         - id
         - request_id
@@ -4981,6 +7495,12 @@ components:
             - string
             - 'null'
           format: uuid
+        reference_file_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 4
       required:
         - request_id
         - model_id

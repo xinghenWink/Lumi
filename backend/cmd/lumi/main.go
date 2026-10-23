@@ -160,6 +160,10 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 	if accounts != nil {
 		stopImages := startImageWorkers(ctx, accounts.Images)
 		defer stopImages()
+		stopResume := accounts.Chat.EnableResume(ctx, cache)
+		defer stopResume()
+		stopOperations := startOperationJobs(ctx, database, cache, logger)
+		defer stopOperations()
 		stopMaintenance := startUserMaintenance(ctx, accounts.Users, logger)
 		defer stopMaintenance()
 		stopCalls := startCallMaintenance(ctx, accounts.Catalog, logger)

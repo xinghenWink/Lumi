@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/problem"
 	"github.com/xinghenWink/Lumi/backend/internal/upstream"
 )
@@ -26,14 +25,56 @@ func (s *Service) ImageTarget(ctx context.Context, id uuid.UUID) (PublicModel, *
 	if err != nil {
 		return model, nil, "", err
 	}
-	targets, err := s.queries.ImageRouteTargets(ctx, id)
+	targets, err := s.routeTargets(ctx, id)
 	if err != nil {
 		return model, nil, "", fmt.Errorf("read image routes: %w", err)
 	}
 	if len(targets) == 0 {
 		return model, nil, "", problem.New("IMAGE_MODEL_UNAVAILABLE", http.StatusConflict)
 	}
-	target := targets[0]
-	client, err := s.adapter(query.Upstream{ID: target.ID, BaseUrl: target.BaseUrl, ApiKeyEnc: target.ApiKeyEnc, ProxyUrl: target.ProxyUrl, TimeoutChatS: target.TimeoutChatS, TimeoutImageS: target.TimeoutImageS, EditFormat: target.EditFormat})
-	return model, client, target.UpstreamModelName, err
+	for _, target := range targets {
+		client, err := s.adapter(target.Upstream)
+		if err == nil {
+			return model, client, target.UpstreamModelName, nil
+		}
+	}
+	return model, nil, "", problem.New("IMAGE_MODEL_UNAVAILABLE", 503)
+}
+
+// RoutedImages retries only explicit refusals, never an ambiguous image write timeout.
+func (s *Service) RoutedImages(ctx context.Context, id uuid.UUID, input upstream.ImageRequest, refs []upstream.Reference) ([]upstream.ImageResult, *upstream.Client, error) {
+	targets, err := s.routeTargets(ctx, id)
+	if err != nil {
+		return nil, nil, err
+	}
+	last := problem.New("IMAGE_MODEL_UNAVAILABLE", 503)
+	for _, target := range targets {
+		if err := s.permit(ctx, target.Upstream.ID); err != nil {
+			last = err
+			continue
+		}
+		client, err := s.adapter(target.Upstream)
+		if err != nil {
+			last = err
+			continue
+		}
+		request := input
+		request.Model = target.UpstreamModelName
+		var results []upstream.ImageResult
+		if len(refs) > 0 {
+			results, err = client.EditImages(ctx, upstream.EditRequest{ImageRequest: request, References: refs})
+		} else {
+			results, err = client.GenerateImages(ctx, request)
+		}
+		if err == nil {
+			return results, client, nil
+		}
+		last = err
+		client.Close()
+		code := upstream.FailureCode(err)
+		if code != "UPSTREAM_RATE_LIMITED" && code != "UPSTREAM_AUTH_FAILED" && code != "UPSTREAM_NETWORK_BLOCKED" {
+			return nil, nil, err
+		}
+	}
+	return nil, nil, last
 }

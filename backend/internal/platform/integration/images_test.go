@@ -536,4 +536,26 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			t.Fatal("administrator deletion was not audited", err)
 		}
 	})
+	t.Run("M6 manual refund is atomic and repeated requests cannot grant twice", func(t *testing.T) {
+		result := execute(submit("manual-refund", 2).ID)
+		before := creditBalance(t, f, actor.ID)
+		var wait sync.WaitGroup
+		for i := 0; i < 2; i++ {
+			wait.Go(func() {
+				if err := service.ManualRefund(f.ctx, admin, result.ID, "M6 refund fixture"); err != nil {
+					t.Error(err)
+				}
+			})
+		}
+		wait.Wait()
+		after := creditBalance(t, f, actor.ID)
+		row, err := query.New(f.pool).GetImageTask(f.ctx, result.ID)
+		if err != nil || row.RefundedCost != row.TotalCost || after.Total-before.Total != result.ActualCost {
+			t.Fatalf("manual refund mismatch: %v", err)
+		}
+		var count int
+		if err := f.pool.QueryRow(f.ctx, "SELECT count(*) FROM audit_logs WHERE action='image.refund' AND target_id=$1", result.ID).Scan(&count); err != nil || count != 1 {
+			t.Fatalf("manual refund audit count=%d error=%v", count, err)
+		}
+	})
 }

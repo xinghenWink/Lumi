@@ -7,6 +7,7 @@ import ImageTaskCard from '../../components/images/ImageTaskCard.vue'
 import ModalDialog from '../../components/ModalDialog.vue'
 import ApiNotice from '../../components/ApiNotice.vue'
 import { useAuthStore } from '../../stores/auth'
+import { operations } from '../../api/operations'
 const auth = useAuthStore()
 const { t, te } = useI18n(),
   items = shallowRef<ImageTask[]>([]),
@@ -18,6 +19,28 @@ let query = new URLSearchParams({ limit: '40' }),
   controller: AbortController | undefined
 let alive = true,
   detailVersion = 0
+const refundOpen = ref(false),
+  refundNote = ref(''),
+  refundBusy = ref(false)
+function openRefund() {
+  refundNote.value = ''
+  refundOpen.value = true
+}
+async function refund() {
+  if (!selected.value) return
+  refundBusy.value = true
+  error.value = undefined
+  try {
+    await operations.refund(selected.value.id, refundNote.value)
+    refundOpen.value = false
+    await detail(selected.value)
+    await load()
+  } catch (e) {
+    error.value = e
+  } finally {
+    refundBusy.value = false
+  }
+}
 async function load(more = false) {
   controller?.abort()
   const current = new AbortController()
@@ -148,7 +171,34 @@ onUnmounted(() => {
       :description="t('images.adminHint')"
       wide
       @update:open="selected = undefined"
-      ><ImageTaskCard v-if="selected" :task="selected" admin @changed="detail(selected!)"
-    /></ModalDialog>
+      ><ImageTaskCard v-if="selected" :task="selected" admin @changed="detail(selected!)" />
+      <button
+        v-if="
+          selected &&
+          ['succeeded', 'partial', 'failed', 'canceled'].includes(selected.status) &&
+          selected.actual_cost > 0
+        "
+        class="button danger"
+        @click="openRefund"
+      >
+        {{ t('ops.refund') }}
+      </button>
+    </ModalDialog>
+    <ModalDialog
+      :open="refundOpen"
+      :title="t('ops.refund')"
+      :description="t('ops.refundHint')"
+      :busy="refundBusy"
+      @update:open="refundOpen = $event"
+      ><form class="ops-form" @submit.prevent="refund">
+        <label>{{ t('ops.note') }}<input v-model="refundNote" maxlength="200" required /></label
+        ><ApiNotice :error="error" /><button
+          class="button danger"
+          :disabled="refundBusy || !refundNote.trim()"
+        >
+          {{ t('ops.confirm') }}
+        </button>
+      </form></ModalDialog
+    >
   </div>
 </template>

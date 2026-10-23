@@ -204,6 +204,13 @@ async function save() {
                 required
                 :disabled="busy"
             /></label>
+            <label class="field"
+              >{{ t('ops.logo')
+              }}<input v-model="site.logo_url" maxlength="2048" :disabled="busy" /></label
+            ><label class="field"
+              >{{ t('ops.favicon')
+              }}<input v-model="site.favicon_url" maxlength="2048" :disabled="busy"
+            /></label>
             <p class="field-hint">{{ t('settings.linksHint') }}</p></template
           >
           <template v-else-if="group === 'registration'"

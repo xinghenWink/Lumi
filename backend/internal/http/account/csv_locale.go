@@ -10,6 +10,7 @@ import (
 var csvMessages embed.FS
 
 type csvCatalog struct {
+	UserHeaders   []string          `json:"user_headers"`
 	LedgerHeaders []string          `json:"ledger_headers"`
 	CodeHeaders   []string          `json:"code_headers"`
 	Types         map[string]string `json:"types"`

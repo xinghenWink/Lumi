@@ -221,6 +221,10 @@ func (h *Handler) chatSend(c *gin.Context) {
 		return
 	}
 	_, token, _ := strings.Cut(c.GetHeader("Authorization"), " ")
+	if h.services.Chat.CanResume() {
+		h.bufferedChat(c, &input)
+		return
+	}
 	opened := false
 	emit := func(event chat.Event) error {
 		encoded, err := json.Marshal(event)

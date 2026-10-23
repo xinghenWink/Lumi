@@ -11,6 +11,7 @@ export class ApiError extends Error {
 }
 
 export interface RequestOptions {
+  lastEventID?: string
   idempotencyKey?: string
   responseType?: 'blob'
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
@@ -33,6 +34,7 @@ export async function openResponse(path: string, options: RequestOptions = {}): 
   if (options.body !== undefined) headers.set('Content-Type', 'application/json')
   if (options.token) headers.set('Authorization', `Bearer ${options.token}`)
   if (options.idempotencyKey) headers.set('Idempotency-Key', options.idempotencyKey)
+  if (options.lastEventID) headers.set('Last-Event-ID', options.lastEventID)
   let response: Response
   try {
     response = await fetch(path, {

@@ -92,7 +92,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (U
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, email, password_hash, nickname, role, status, terms_accepted_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at
+VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at, purge_after
 `
 
 type CreateUserParams struct {
@@ -133,6 +133,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.PurgeAfter,
 	)
 	return i, err
 }
@@ -169,7 +170,7 @@ func (q *Queries) FailVerification(ctx context.Context, id uuid.UUID) error {
 }
 
 const getAuthenticatedUser = `-- name: GetAuthenticatedUser :one
-SELECT u.id, u.email, u.password_hash, u.nickname, u.avatar_file_id, u.role, u.status, u.token_version, u.locale, u.timezone, u.last_login_at, u.last_login_ip, u.terms_accepted_at, u.created_at, u.updated_at, u.deleted_at FROM users u WHERE u.id = $1 AND u.token_version = $2 AND u.status = 'active'
+SELECT u.id, u.email, u.password_hash, u.nickname, u.avatar_file_id, u.role, u.status, u.token_version, u.locale, u.timezone, u.last_login_at, u.last_login_ip, u.terms_accepted_at, u.created_at, u.updated_at, u.deleted_at, u.purge_after FROM users u WHERE u.id = $1 AND u.token_version = $2 AND u.status = 'active'
 AND u.deleted_at IS NULL AND EXISTS (SELECT 1 FROM user_sessions s WHERE s.user_id = u.id
 AND s.family_id = $3 AND s.revoked_at IS NULL AND s.expires_at > now())
 `
@@ -200,6 +201,7 @@ func (q *Queries) GetAuthenticatedUser(ctx context.Context, arg GetAuthenticated
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.PurgeAfter,
 	)
 	return i, err
 }
@@ -251,7 +253,7 @@ func (q *Queries) GetSessionByHashForUpdate(ctx context.Context, tokenHash strin
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at FROM users WHERE id = $1 AND deleted_at IS NULL
+SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at, purge_after FROM users WHERE id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
@@ -274,12 +276,13 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.PurgeAfter,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at FROM users WHERE email = $1 AND deleted_at IS NULL
+SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at, purge_after FROM users WHERE email = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -302,12 +305,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.PurgeAfter,
 	)
 	return i, err
 }
 
 const getUserForUpdate = `-- name: GetUserForUpdate :one
-SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE
+SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at, purge_after FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE
 `
 
 func (q *Queries) GetUserForUpdate(ctx context.Context, id uuid.UUID) (User, error) {
@@ -330,6 +334,7 @@ func (q *Queries) GetUserForUpdate(ctx context.Context, id uuid.UUID) (User, err
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.PurgeAfter,
 	)
 	return i, err
 }
@@ -425,7 +430,7 @@ func (q *Queries) ListUserSessions(ctx context.Context, userID uuid.UUID) ([]Lis
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at FROM users
+SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at, purge_after FROM users
 WHERE deleted_at IS NULL
   AND ($1::text = '' OR email::text ILIKE '%' || $1 || '%'
        OR nickname ILIKE '%' || $1 || '%' OR id::text = $1)
@@ -488,6 +493,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.PurgeAfter,
 		); err != nil {
 			return nil, err
 		}
@@ -500,7 +506,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 }
 
 const listUsersForPurge = `-- name: ListUsersForPurge :many
-SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at FROM users WHERE deleted_at < now() - interval '30 days'
+SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at, purge_after FROM users WHERE deleted_at < now() - interval '30 days'
 AND NOT EXISTS(SELECT 1 FROM credit_charges c WHERE c.user_id=users.id AND NOT c.settled)
 ORDER BY deleted_at, id LIMIT $1 FOR UPDATE SKIP LOCKED
 `
@@ -531,6 +537,7 @@ func (q *Queries) ListUsersForPurge(ctx context.Context, limit int32) ([]User, e
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.PurgeAfter,
 		); err != nil {
 			return nil, err
 		}
@@ -624,7 +631,7 @@ func (q *Queries) UpdateLogin(ctx context.Context, arg UpdateLoginParams) error 
 const updateUser = `-- name: UpdateUser :one
 UPDATE users SET email = $2, nickname = $3, role = $4, status = $5,
 password_hash = $6, token_version = $7, locale = $8, timezone = $9, updated_at = now()
-WHERE id = $1 AND deleted_at IS NULL RETURNING id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at
+WHERE id = $1 AND deleted_at IS NULL RETURNING id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at, purge_after
 `
 
 type UpdateUserParams struct {
@@ -669,6 +676,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.PurgeAfter,
 	)
 	return i, err
 }

@@ -417,7 +417,7 @@ func (q *Queries) LockCreditOperation(ctx context.Context, dollar_1 string) erro
 }
 
 const lockCreditOwnerForSettlement = `-- name: LockCreditOwnerForSettlement :one
-SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at FROM users WHERE id=$1 FOR SHARE
+SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at, purge_after FROM users WHERE id=$1 FOR SHARE
 `
 
 func (q *Queries) LockCreditOwnerForSettlement(ctx context.Context, id uuid.UUID) (User, error) {
@@ -440,12 +440,13 @@ func (q *Queries) LockCreditOwnerForSettlement(ctx context.Context, id uuid.UUID
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.PurgeAfter,
 	)
 	return i, err
 }
 
 const lockCreditUser = `-- name: LockCreditUser :one
-SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at FROM users WHERE id = $1 AND deleted_at IS NULL FOR SHARE
+SELECT id, email, password_hash, nickname, avatar_file_id, role, status, token_version, locale, timezone, last_login_at, last_login_ip, terms_accepted_at, created_at, updated_at, deleted_at, purge_after FROM users WHERE id = $1 AND deleted_at IS NULL FOR SHARE
 `
 
 func (q *Queries) LockCreditUser(ctx context.Context, id uuid.UUID) (User, error) {
@@ -468,6 +469,7 @@ func (q *Queries) LockCreditUser(ctx context.Context, id uuid.UUID) (User, error
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.PurgeAfter,
 	)
 	return i, err
 }

@@ -31,21 +31,25 @@ type ChannelInput struct {
 
 // Channel is an allowlist: API credentials and encrypted values have no DTO field.
 type Channel struct {
-	ID               uuid.UUID `json:"id"`
-	Version          int64     `json:"version"`
-	Name             string    `json:"name"`
-	BaseURL          string    `json:"base_url"`
-	APIKeyConfigured bool      `json:"api_key_configured"`
-	TimeoutChatS     int32     `json:"timeout_chat_s"`
-	TimeoutImageS    int32     `json:"timeout_image_s"`
-	ProxyURL         string    `json:"proxy_url"`
-	Enabled          bool      `json:"enabled"`
-	Priority         int32     `json:"priority"`
-	Weight           int32     `json:"weight"`
-	EditFormat       string    `json:"edit_format"`
-	Note             string    `json:"note"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	CircuitState        string     `json:"circuit_state"`
+	ConsecutiveFailures int32      `json:"consecutive_failures"`
+	OpenUntil           *time.Time `json:"open_until"`
+	LastError           string     `json:"last_error"`
+	ID                  uuid.UUID  `json:"id"`
+	Version             int64      `json:"version"`
+	Name                string     `json:"name"`
+	BaseURL             string     `json:"base_url"`
+	APIKeyConfigured    bool       `json:"api_key_configured"`
+	TimeoutChatS        int32      `json:"timeout_chat_s"`
+	TimeoutImageS       int32      `json:"timeout_image_s"`
+	ProxyURL            string     `json:"proxy_url"`
+	Enabled             bool       `json:"enabled"`
+	Priority            int32      `json:"priority"`
+	Weight              int32      `json:"weight"`
+	EditFormat          string     `json:"edit_format"`
+	Note                string     `json:"note"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 type Capabilities struct {
 	Vision             bool     `json:"vision"`
