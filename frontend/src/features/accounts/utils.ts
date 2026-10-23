@@ -6,7 +6,9 @@ export function validEmail(value: string): boolean {
   return value.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)
 }
 export function safeRedirect(value: unknown): string {
-  return typeof value === 'string' && /^\/(chat|me|admin)(\/|$)/.test(value) ? value : '/chat'
+  return typeof value === 'string' && /^\/(chat|create|me|admin)(\/|\?|#|$)/.test(value)
+    ? value
+    : '/chat'
 }
 export function addDateRange(query: URLSearchParams, from: string, until: string) {
   if (from) query.set('from', new Date(`${from}T00:00:00Z`).toISOString())

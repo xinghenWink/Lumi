@@ -9,6 +9,11 @@ describe('account input and navigation', () => {
     for (const value of ['https://evil.test', '//evil.test', '/login', '/administrator', ['bad']])
       expect(safeRedirect(value)).toBe('/chat')
     expect(safeRedirect('/admin/users')).toBe('/admin/users')
+    expect(safeRedirect('/create/owned-conversation?mode=edit')).toBe(
+      '/create/owned-conversation?mode=edit',
+    )
+    expect(safeRedirect('/create?draft=new')).toBe('/create?draft=new')
+    expect(safeRedirect('/create-elsewhere')).toBe('/chat')
   })
   it('validates password characters and builds exclusive UTC date boundaries', () => {
     expect(validPassword('TestOnlyPassword42')).toBe(true)

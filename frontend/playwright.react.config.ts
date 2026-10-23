@@ -7,8 +7,15 @@ export default defineConfig({
   testIgnore: [],
   outputDir: './test-results/react',
   projects: [
-    { name: 'chrome-desktop', use: { channel: 'chrome', viewport: { width: 1440, height: 900 } } },
-    ...[320, 390].map((width) => ({
+    {
+      name: 'chrome-desktop',
+      use: {
+        channel: 'chrome',
+        viewport: { width: 1440, height: 900 },
+        extraHTTPHeaders: { 'X-Forwarded-For': '198.19.0.1' },
+      },
+    },
+    ...[320, 390].map((width, index) => ({
       name: `chrome-mobile-${width}`,
       use: {
         ...devices['Pixel 7'],
@@ -16,6 +23,7 @@ export default defineConfig({
         viewport: { width, height: 740 },
         isMobile: true,
         hasTouch: true,
+        extraHTTPHeaders: { 'X-Forwarded-For': `198.19.0.${index + 2}` },
       },
     })),
   ],
