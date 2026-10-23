@@ -1,79 +1,216 @@
 # Lumi
 
-AI 对话与图像创作平台：Go + Gin + PostgreSQL 16 + Redis 7，Vue 3 + TypeScript + Vite。前端嵌入单一 Go 二进制，所有模型通过自部署的 OpenAI 兼容上游提供。
+**可自行部署的 AI 对话与图像创作平台。**
 
-当前阶段：**M7 加固与发布验收**。正式发布状态和未通过项见 [M7 验收](docs/M7_ACCEPTANCE.md)；部署从 [部署、备份与发布](docs/DEPLOYMENT.md) 开始。
+[![CI](https://github.com/xinghenWink/Lumi/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/xinghenWink/Lumi/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/xinghenWink/Lumi)](https://github.com/xinghenWink/Lumi/releases) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+Lumi 把流式聊天、生图与改图、积分兑换和管理后台整合到一个站点。前端嵌入 Go 二进制，配合 PostgreSQL、Redis 和持久文件目录运行，通过 OpenAI 兼容上游调用模型，适合部署自己的 AI 创作服务。
+
+当前稳定版本为 **[v1.0.0](https://github.com/xinghenWink/Lumi/releases/tag/v1.0.0)**，M0～M7 已完成。正式版本已通过真实上游、服务器部署、升级回滚及备份恢复验收，支持 `linux/amd64` 和 `linux/arm64`。
+
+[功能](#功能) · [技术与架构](#技术与架构) · [快速部署](#快速部署) · [首次配置](#首次配置) · [运维](#运维) · [本地开发](#本地开发) · [文档](#文档)
 
 ## 功能
 
-- 邮箱注册、验证码、登录与令牌轮换、忘记密码、Turnstile、IP 配额、设备管理和账号删除。
-- 免费流式聊天、Markdown / 公式 / 代码、自定义指令、图片理解、Redis 五分钟续传、历史与导出。
-- 生图与改图独立会话、参考图复用、异步队列、SSE / 轮询、签名图片与 WebP 缩略图、历史图库和批量操作。
-- 每日 / 永久双桶整数积分，原子扣费、价格快照、部分失败退款、幂等兑换与只增不改流水。
-- 管理后台：用户、兑换码、定价、上游与模型路由、熔断、任务、统计看板、公告、系统设置和审计。
+| 模块       | 能力                                                                                                                          |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| AI 对话    | SSE 流式输出、停止与重试、Markdown / 公式 / 代码高亮、上下文控制、自定义指令、历史与导出、断线续传；图片理解按模型能力启用。  |
+| 图像创作   | 文生图、参考图改图、质量 / 尺寸 / 比例 / 数量选择、异步任务、进度与取消、历史图库、已有图片加入编辑、签名下载及 WebP 缩略图。 |
+| 积分与兑换 | 每日 / 永久双桶积分、注册与每日赠送、质量定价和倍率、扣费快照、失败退款、兑换码批量生成与 CSV 导出、流水及使用统计。          |
+| 账号       | 邮箱注册与验证码、登录、忘记密码、会话与设备管理、个人偏好、账号删除、Turnstile 和 IP 注册配额。                              |
+| 管理后台   | 用户与余额管理、上游渠道与模型路由、连接测试与模型发现、熔断、任务、定价、看板、公告、邮件与系统设置、审计日志。              |
+| 使用体验   | 中文优先的国际化、浅色 / 深色主题、响应式布局，聊天与生图分别保存会话和草稿。                                                 |
 
-本期不包含支付、开放 API Key、团队、RAG、联网搜索、工具调用、原生 App、蒙版重绘或上游账号池。未复制参考项目代码。
+聊天免费，生图按积分计费。每日积分先消费、永久积分后消费；生图以创建任务时的价格结算，部分失败退还失败张数对应的积分。每日赠送不累计，跨日退款进入永久桶。
 
-## 文档
+当前版本不包含在线支付、对外 API Key、团队空间、RAG、工具调用、原生 App、蒙版重绘或上游账号池。模型实际能力取决于接入的上游，已验证参数及限制见 [上游实测契约](docs/UPSTREAM_CONTRACT.md)。
 
-[需求](docs/REQUIREMENTS.md) · [技术决策](docs/DECISIONS.md) · [OpenAPI](docs/openapi.yaml) · [上游实测契约](docs/UPSTREAM_CONTRACT.md) · [安全检查](docs/SECURITY_REVIEW.md) · [M7 计划](docs/M7_PLAN.md)
+## 技术与架构
 
-验收：[M0](docs/M0_ACCEPTANCE.md) · [M1](docs/M1_ACCEPTANCE.md) · [M2](docs/M2_ACCEPTANCE.md) · [M3](docs/M3_ACCEPTANCE.md) · [M4](docs/M4_ACCEPTANCE.md) · [M5](docs/M5_ACCEPTANCE.md) · [M6](docs/M6_ACCEPTANCE.md) · [M7](docs/M7_ACCEPTANCE.md)
+| 层         | 技术                                                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------------------------- |
+| 后端       | Go 1.26.10、Gin、pgx、sqlc、goose；JWT / Argon2id、SSE、OpenAPI 3.1。                                      |
+| 前端       | Vue 3、TypeScript strict、Vite 8、Pinia、Vue Router、Tailwind CSS 4、Reka UI、vue-i18n。                   |
+| 数据与任务 | PostgreSQL 16 保存账号、会话、任务与账务；Redis 7 处理队列、限流和流式续传；图片保存在持久目录。           |
+| 部署       | 单个非 root 应用镜像、Docker Compose、Caddy / Nginx HTTPS 反代；GitHub Actions 发布到 GHCR。               |
+| 质量检查   | golangci-lint、ESLint、Prettier、Vitest、真实 PG / Redis 集成、Playwright、Lighthouse、k6 和依赖漏洞扫描。 |
 
-## 开发
+```mermaid
+flowchart LR
+    Browser[浏览器] -->|HTTPS / SSE| Proxy[Caddy / Nginx]
+    Proxy --> App[Lumi：Go API + 内嵌 Vue 前端]
+    App --> PG[(PostgreSQL)]
+    App --> Redis[(Redis)]
+    App --> Files[持久图片目录]
+    App -->|聊天 / 生图 / 改图| Upstream[OpenAI 兼容上游]
+```
 
-发布与 CI 固定 Go 1.26.10；Node 22.19+（22.x）、pnpm 10.27.0。完整集成与 E2E 需要 Docker。建议设置 `GOTOOLCHAIN=go1.26.10`，较新的未打补丁 Go 版本不能替代发布工具链。Make 以 Linux / macOS / WSL 为主。
+Lumi 提供平台和管理能力，上游推理服务需要单独准备。默认适配器使用 `/v1/models`、`/v1/chat/completions`、`/v1/images/generations` 和 `/v1/images/edits`；不同服务支持的模型和参数应逐项确认。
+
+## 快速部署
+
+### 1. 准备环境
+
+- Linux 服务器，安装 Docker Engine 和 Compose v2；部署脚本使用 Bash、OpenSSL、curl、tar、coreutils、flock。
+- 准备公开 HTTPS 入口，通常使用域名和 Caddy / Nginx；IP 地址 HTTPS 的配置见 [部署手册](docs/DEPLOYMENT.md#ip-地址-https)。
+- 应用容量参考为 2 vCPU / 2 GB，PostgreSQL、Redis 与图片存储需另留资源。图片默认永久保存，应预留磁盘和备份空间。
+
+### 2. 下载正式部署包
 
 ```sh
+curl --fail --location \
+  https://github.com/xinghenWink/Lumi/releases/download/v1.0.0/lumi-deploy.tar.gz \
+  --output lumi-deploy.tar.gz
+sudo install -d -m 700 /opt/lumi
+sudo tar -xzf lumi-deploy.tar.gz -C /opt/lumi
+sudo bash /opt/lumi/docker-deploy.sh /opt/lumi
+sudoedit /opt/lumi/.env
+```
+
+安装器生成数据库 / Redis 密码、JWT / 加密密钥和初始管理员密码，写入权限为 `0600` 的 `.env`；重复运行保留既有配置。先修改这些字段，保留生成的随机密钥：
+
+```dotenv
+LUMI_IMAGE=ghcr.io/xinghenwink/lumi
+LUMI_VERSION=v1.0.0
+ADMIN_EMAIL=admin@example.com
+PUBLIC_BASE_URL=https://lumi.example.com
+COOKIE_SECURE=true
+# Configure SMTP before opening public registration.
+REGISTRATION_ENABLED=false
+```
+
+不要把 `.env`、上游密钥或备份提交到仓库。只有本机 HTTP 演练可使用 `PUBLIC_BASE_URL=http://127.0.0.1:8080` 和 `COOKIE_SECURE=false`。
+
+### 3. 启动服务
+
+以下命令在 root 终端执行，需要时先运行 `sudo -i`：
+
+```sh
+cd /opt/lumi
+# If the registry requires authentication, log in with read:packages first.
+docker compose pull
+docker compose up -d --wait --wait-timeout 180
+curl --fail http://127.0.0.1:8080/readyz
+curl --fail http://127.0.0.1:8080/api/version
+```
+
+Compose 启动应用、PostgreSQL 和 Redis，应用自动执行迁移。应用仅绑定宿主机 `127.0.0.1:8080`，数据库与 Redis 不暴露公网端口；三个服务均配置重启策略，数据保存在 `/opt/lumi/data`。
+
+若 GHCR 返回未授权，先使用仅有 `read:packages` 权限的凭据登录。amd64 也可从同一 Release 下载 `lumi-linux-amd64.tar.gz` 和同名 JSON，通过 `docker load` 离线导入；必须完成 [镜像身份核验](docs/OFFLINE_IMAGE_VERIFICATION.md)，随后启动时跳过 `pull`。不要在服务器保存工作站的广泛仓库凭据。
+
+### 4. 配置 HTTPS 反代
+
+在宿主机安装 Caddy 或 Nginx，使用部署包内的 `Caddyfile.example` 或 `nginx.conf.example`，替换域名 / 证书路径并启用服务。模板已包含 SSE 无缓冲和客户端 IP 转发配置。
+
+确认应用实际看到的代理地址，例如宿主反代经过 Docker 转发时查看网桥网关：
+
+```sh
+docker network inspect lumi_default --format '{{(index .IPAM.Config 0).Gateway}}'
+```
+
+将该实际地址的 `/32`（IPv6 用 `/128`）写入 `.env` 的 `TRUSTED_PROXIES`，再运行 `docker compose up -d --wait`。仅信任真实代理来源，不填写整个私网或 `0.0.0.0/0`。
+
+完成后打开 `https://你的域名`，访问 `/admin` 进入后台。完整 TLS、代理、权限和离线部署说明见 [部署手册](docs/DEPLOYMENT.md)。
+
+## 首次配置
+
+1. **管理员登录**：邮箱使用 `.env` 中的 `ADMIN_EMAIL`，初始密码由 root 在同一文件查看 `ADMIN_PASSWORD`。登录后在个人中心修改密码；没有固定的默认账号或密码。管理员仅首次创建，修改环境密码不会重置已有账号。
+2. **接入上游**：后台「上游渠道」填写 Base URL（包含 `/v1`）和 API Key，执行连接测试与模型发现；导入模型后检查路由、默认模型及启用状态，按实测能力开放参数。不要把未验证的 vision、多参考图等能力直接启用。
+3. **配置积分和定价**：设置注册 / 每日赠送、每日重置时区、生图质量价格与倍率，按需生成兑换码。默认注册赠送 10、每日赠送 5，生图低 / 中 / 高质量为 5 / 7 / 10 积分每张。
+4. **配置邮件与注册**：填写 SMTP 并发送测试邮件，再开放注册和找回密码。环境变量优先于后台设置；如果设置了 `REGISTRATION_ENABLED=false`，需先移除该覆盖并重新创建应用容器，才能在后台开启注册。
+
+也可在**首次空目录启动前**同时设置 `UPSTREAM_BASE_URL` 和 `UPSTREAM_API_KEY`，自动引导一个渠道和默认模型。该引导预设聊天 `gpt-5-3-mini`、生图 `gpt-image-2`，生图先开放 low / 1024×1024 / 单张 / 单参考图；其他上游建议使用后台配置。已有渠道时不会重复引导。
+
+## 运维
+
+在 `/opt/lumi` 的 root 终端执行：
+
+```sh
+# Check services and readiness.
+docker compose ps
+docker compose logs --tail 100 app
+curl --fail https://lumi.example.com/readyz
+
+# Create a consistent backup; briefly stop the app to align PG and image files.
+BACKUP_KEEP=7 bash backup.sh
+```
+
+备份包含数据库、图片、`.env` 和镜像清单，默认保留最近 7 份。请按 [部署手册](docs/DEPLOYMENT.md#一致备份与恢复) 设置定时任务、加密和异地保存；安装器不会自动安排定时备份。恢复必须使用可信归档和空目标目录，避免覆盖运行中的实例。
+
+升级前先备份，在 `.env` 固定到已验收版本，再执行 `docker compose pull && docker compose up -d --wait`。迁移只增不改，回滚需确认旧二进制兼容新 schema；不兼容时恢复到隔离实例。生产建议使用版本标签或 digest，`edge` 用于跟进主分支开发。
+
+`/healthz` 检查进程，`/readyz` 检查数据库和 Redis，`/api/version` 返回版本 / 提交 / 构建时间，`/metrics` 需要管理员 Bearer。管理员密码救援、磁盘规划与升级恢复命令见部署手册。
+
+## 本地开发
+
+需要 Go **1.26.10**、Node **22.19+（22.x）**、pnpm **10.27.0**、Docker 和 Compose。Make 命令以 Linux / macOS / WSL 为主；Go 版本与 CI / 发布保持一致。
+
+```sh
+git clone https://github.com/xinghenWink/Lumi.git
+cd Lumi
+export GOTOOLCHAIN=go1.26.10
 corepack enable
 corepack prepare pnpm@10.27.0 --activate
 make install
 make dev-deps
 pnpm build
-```
 
-本地环境示例（不要提交实际密钥）：
-
-```sh
 export DATABASE_URL='postgres://lumi:lumi-dev-only@127.0.0.1:5432/lumi?sslmode=disable'
 export REDIS_URL='redis://:lumi-dev-only@127.0.0.1:6379/0'
 export JWT_SECRET="$(openssl rand -hex 32)"
 export ENCRYPTION_KEY="$(openssl rand -base64 32)"
 export ADMIN_EMAIL='admin@example.com'
-read -rs ADMIN_PASSWORD; export ADMIN_PASSWORD
+read -rs -p 'Initial admin password: ' ADMIN_PASSWORD; echo
+export ADMIN_PASSWORD
 make dev
-# 另一终端运行 pnpm dev，打开 http://127.0.0.1:5173。
 ```
 
-PowerShell 使用 `$env:变量名 = '值'` 后从 backend 运行 `go run ./cmd/lumi serve`。Go 不自动读取 .env；Compose 会读取。随机密钥应安全持久保存，重启复用。管理员只在系统没有管理员时创建，修改环境密码不会重置已有账号。生产密钥、管理员救援、TLS / 代理、数据库迁移和文件权限见部署手册。
+在另一终端运行 `pnpm dev`，访问 `http://127.0.0.1:5173`；后端在 `8080`。Go 不自动加载 `.env`，Compose 会加载；开发时请安全保存并复用随机密钥。PowerShell 使用 `$env:变量名 = '值'` 设置环境，然后从 `backend` 运行 `go run ./cmd/lumi serve`。
 
-无数据库 / Redis 的开发模式仅供访客页面检查，readyz 为 503。生产模式要求全部依赖。开发验证码仅在 development 日志输出，生产需 SMTP。
+开发模式且未配置 SMTP 时，验证码只输出到开发日志；生产模式需要真实 SMTP。没有 PG / Redis 时仅能检查访客页，`/readyz` 返回 503。
 
-## 构建与验证
+### 构建与验证
 
 ```sh
-make lint test
-make sqlc api
-make test-integration
-make build
+make lint test                 # Go / frontend lint, types and unit tests
+make sqlc api                  # Regenerate SQL queries and API types
+make test-integration          # Real PostgreSQL / Redis integration tests
+make build                     # Build frontend and embed it into the Go binary
 pnpm --filter @lumi/frontend exec playwright install --with-deps chromium
-pnpm test:e2e
+pnpm test:e2e                  # Desktop and mobile browser tests
 ```
 
-E2E 需显式设置 E2E_DATABASE_URL / E2E_REDIS_URL，使用**空的独立测试数据库 / 缓存**；不同运行的临时管理员密码与加密密钥不同，不可复用有旧账号 / 渠道的数据库。测试启动 18080 端口真实应用，验证桌面 / 320px 手机的注册、聊天、兑换、生图和后台操作。无依赖可用 `pnpm test:e2e --grep '@guest'`。
+集成 / E2E 需要 Docker。E2E 还需显式设置 `E2E_DATABASE_URL` 和 `E2E_REDIS_URL`，指向**空的独立测试数据库与缓存**，不要使用生产数据。测试启动 `18080` 端口的真实应用；仅检查访客页可运行 `pnpm test:e2e --grep '@guest'`。
 
-100 VU、Lighthouse、500 消息、1000 图、双版本部署 / 升级回滚 / 备份恢复的可重复命令和测量边界见部署手册。`production` 构建先构建前端，再嵌入二进制；内嵌时区使独立运行不依赖宿主 Go 安装。数据库迁移只增不改。
+CI 覆盖质量检查、契约生成一致性、真实集成、完整用户流程、Lighthouse、100 VU 压测、容器部署与恢复及生产依赖漏洞。完整参数、性能测量边界和验收证据见 [M7 验收](docs/M7_ACCEPTANCE.md)。
 
-## 数据与运行边界
+### 目录
 
-聊天免费；生图按创建时价格快照扣费，先每日后永久。失败按成功张数结算，跨日退款转永久桶。重试必须复用原请求键，未知图像写入结果不自动重发。管理员内容查看默认关闭，开启后每次查看审计。访问他人会话 / 图片 / 任务返回 404。
+```text
+backend/             Go 服务、业务模块、SQL 查询及数据库迁移
+frontend/            Vue 页面、组件、状态、API 类型及浏览器测试
+deploy/              Compose、环境模板、安装与备份恢复脚本、反代示例
+scripts/             部署验收与性能测试工具
+docs/                需求、OpenAPI、技术决策及里程碑验收
+.github/workflows/   CI、双架构镜像与 Release 自动化
+```
 
-access token 仅放前端内存；refresh 为 HttpOnly / SameSite=Lax Cookie。公开生产部署必须 HTTPS + Secure Cookie，仅回环 HTTP 允许本地演练例外。上游密钥 AES-GCM 加密，DTO / 审计不回传；默认拒绝私网目的地和全部重定向。真实上游已确认能力与未测能力见契约，不把 fixture 当作供应商实测。
+## 文档
 
-图片存于 DATA_DIR/images，生产 /data，持久挂载必需。上传按魔数 / 大小 / 像素限制校验，PNG 重编码去除元数据，缩略图长边 ≤512 WebP；原图和缩略图均鉴权并签名。多实例需共享目录和密钥，自动备份脚本只面向单应用实例、内置 PG / Redis。
+| 文档                                                                | 内容                                                               |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| [部署、备份与发布](docs/DEPLOYMENT.md)                              | 首次部署、HTTPS / 代理、管理员救援、升级回滚、备份恢复、发布门槛。 |
+| [离线镜像核验](docs/OFFLINE_IMAGE_VERIFICATION.md)                  | 官方 amd64 归档及 Docker 存储后端的身份验证。                      |
+| [上游实测契约](docs/UPSTREAM_CONTRACT.md)                           | 已验证的请求格式、质量 / 尺寸 / 数量与供应商差异。                 |
+| [OpenAPI](docs/openapi.yaml)                                        | 平台账号、聊天、生图、积分与后台接口契约。                         |
+| [技术决策](docs/DECISIONS.md)                                       | 实现选择、依赖及运行边界。                                         |
+| [安全检查](docs/SECURITY_REVIEW.md)                                 | 认证、授权、CSRF、上传、SSRF、日志和备份检查。                     |
+| [需求](docs/REQUIREMENTS.md) / [开发计划](docs/DEVELOPMENT_PLAN.md) | 产品范围、业务规则和里程碑。                                       |
 
-## CI 与发布
+历史验收：[M0](docs/M0_ACCEPTANCE.md) · [M1](docs/M1_ACCEPTANCE.md) · [M2](docs/M2_ACCEPTANCE.md) · [M3](docs/M3_ACCEPTANCE.md) · [M4](docs/M4_ACCEPTANCE.md) · [M5](docs/M5_ACCEPTANCE.md) · [M6](docs/M6_ACCEPTANCE.md) · [M7](docs/M7_ACCEPTANCE.md)。
 
-CI 检查 lint / 类型 / 单测 / 真实集成 / 生成一致性 / 构建 / 全流程 E2E / Lighthouse / 100 VU / 容器部署恢复及生产依赖漏洞。所有报告保留为受限 CI artifact，测试令牌文件不上传。
+## 贡献与许可证
 
-main 生成 edge / sha 镜像；已验收版本 tag 生成版本 / X.Y / latest 的 amd64 + arm64 GHCR 镜像。两种原生架构按 digest 验证后生成带部署包及官方 amd64 归档的 Release 草稿；整个工作流全绿且正式镜像在目标服务器验收后，授权发布者才发布草稿。私有镜像可使用只读 Packages PAT 或官方离线归档。M7 未通过项完成前不创建 v1.0.0 标签。
+欢迎通过 Issue 反馈问题，或提交范围明确的 PR。请遵循 [AGENTS.md](AGENTS.md)，使用 Conventional Commits；业务改动附测试、必要文档和 API 契约更新，SQL 迁移只增不改。提交前运行 `make lint test`。
+
+本项目采用 [MIT License](LICENSE)，独立实现，未复制参考项目代码。接入的模型和上游服务遵循各自的使用条款。

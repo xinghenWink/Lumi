@@ -1,6 +1,6 @@
 # M7 加固与发布验收
 
-日期：2026-10-23。分支 `codex/m7-release`，基于 M6 `e9f87b2`。本文件固定发布前检查的实测证据；CI 与正式镜像的实时验收结果见 [M7 PR](https://github.com/xinghenWink/Lumi/pull/8) 和 [Release 工作流](https://github.com/xinghenWink/Lumi/actions/workflows/release.yml)。代码、工具和文档范围见 [计划](M7_PLAN.md)。
+日期：2026-10-23。分支 `codex/m7-release`，基于 M6 `e9f87b2`。**v1.0.0 已正式发布，14 项 DoD 均通过**。发布提交为 `71cb7dcb37af722f2814b2dee1ad441dcb53dd0e`，固定证据见 [最终代码 CI](https://github.com/xinghenWink/Lumi/actions/runs/39914634255)、[正式发布工作流](https://github.com/xinghenWink/Lumi/actions/runs/39915922612) 和 [Release](https://github.com/xinghenWink/Lumi/releases/tag/v1.0.0)。代码、工具和文档范围见 [计划](M7_PLAN.md)，归并结果见 [M7 PR](https://github.com/xinghenWink/Lumi/pull/8)。
 
 ## 第 18 章逐项对照
 
@@ -29,8 +29,16 @@
 - 发布工具链 `GOTOOLCHAIN=go1.26.10` + govulncheck 1.9.0：0 个可调用 / 已导入包漏洞；另 1 个仅间接声明且未导入模块漏洞，退出 0。生产 npm audit：无已知漏洞。
 - OpenAPI / sqlc 生成无代码差异；M7 无 SQL 迁移，不改 00001～00008，无运行时新依赖，quic-go 修复补丁已锁定。
 
-负载与浏览器性能使用可控上游；真实供应商参数验收独立执行。服务器验收使用用户授权的真实机器、独立空目录及 Compose 项目，不变更既有服务。失败轮次保留在忽略的 `.tools/`；最终 CI / 正式发布证据由 PR 验收清单与 Release 工作流提供。本轮无公网域名及公开可信证书，HTTPS 结果仅限明确标注的回环测试。
+负载与浏览器性能使用可控上游；真实供应商参数验收独立执行。发布前的服务器演练使用用户授权的真实机器、独立空目录及 Compose 项目，不变更既有服务，HTTPS 结果仅限表中明确标注的回环测试。失败轮次保留在忽略的 `.tools/`；正式发布后的长期部署另完成下述公网 HTTPS 验证。
 
 ## 发布状态
 
-发布状态以 [v1.0.0 Release](https://github.com/xinghenWink/Lumi/releases/tag/v1.0.0) 为准。真实上游参数矩阵、目标服务器部署恢复、HTTPS、本地与服务器的完整 100 VU 门槛已实测通过；仍须按 [部署手册](DEPLOYMENT.md) 先等待同一提交的 CI 全绿，再推送 v1.0.0。Release 必须等待正式双架构镜像验收成功，不能以脚本可执行或镜像构建成功代替实际启动验证。
+v1.0.0 于 2026-10-23 15:38（Asia/Shanghai）正式发布。最终代码 CI 的 quality / container 与 Release 工作流的质量检查、容器检查、镜像发布、原生 amd64 / arm64 验证及 Release 共 6 个任务全部成功。正式 amd64 镜像已在目标服务器按配置、各层内容和归档 manifest 完成身份核验，再核对运行版本与提交；标签和官方镜像未因后续文档整理而移动。
+
+最终 Release 的 100 VU / 60 秒负载完整计入首轮样本：平台额外耗时 p95 **54.71ms**、读请求 p95 **4.55ms**，200 次完整流、70 张图、23,240 个业务断言全部通过。目标服务器最终直接依赖拓扑复测 p95 **82.37ms**、读请求 p95 **6.55ms**，200 次完整流、69 张图、22,878 个断言全部通过。前表和检查列表保留之前的已通过轮次，不以它们替代最终发布证据。
+
+## 正式长期部署补充
+
+用户授权正式部署后，在独立生产目录使用同一 v1.0.0 官方镜像，接入其提供的真实上游。受信任的 Let's Encrypt IP 证书和 Caddy 自动续期已启用；从工作站直接通过系统信任验证 HTTPS、首页静态资源与 readiness，无跳过证书校验。管理员登录、Secure / HttpOnly 刷新 Cookie、上游发现 12 个模型、真实聊天 SSE、真实生图、签名 PNG 和 WebP 缩略图均通过。
+
+应用与反代重启后管理员、聊天、图片 SHA256 和上游配置保留，原有 claude2api 的容器 ID 与启动时间不变。首份一致备份和 SHA256 校验通过，生产实例另设置每日 03:15（Asia/Shanghai）备份、保留最近 7 份；该定时任务是部署时配置，安装器本身不自动创建。未提供 SMTP，公开注册暂时关闭。地址、账号、密码、原始日志与备份只在受限运维记录保存，不写入公开文档。

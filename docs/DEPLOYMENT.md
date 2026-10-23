@@ -30,6 +30,39 @@ curl --fail http://127.0.0.1:8080/api/version
 
 管理员登录后配置 SMTP、上游、平台模型和价格。可选环境引导必须同时提供 UPSTREAM_BASE_URL / UPSTREAM_API_KEY，仅空目录首次生效。内网上游 / 代理只有在明确可信时设置 UPSTREAM_ALLOW_PRIVATE_NETWORKS=true。真实实例参数能力以 [契约](UPSTREAM_CONTRACT.md) 为准，未实测的质量 / 尺寸不要开放。
 
+## IP 地址 HTTPS
+
+没有域名而有固定公网 IP 时，可以使用 Let's Encrypt 的 `shortlived` IP 证书。正式部署已用 Caddy 2.11.7 验证签发、受信任的公网访问和反代重启；选择固定版本的官方二进制，并按同一 Release 的 checksums 文件校验（2.11.7 使用 SHA512）。应用镜像不需要修改。
+
+以下为宿主机 Caddy 配置，**先将两处 `203.0.113.10` 替换为实际公网 IP**：
+
+```caddyfile
+{
+    admin 127.0.0.1:2019
+    default_sni 203.0.113.10
+}
+
+https://203.0.113.10 {
+    tls {
+        issuer acme https://acme-v02.api.letsencrypt.org/directory {
+            profile shortlived
+        }
+    }
+    request_body {
+        max_size 30MB
+    }
+    header Strict-Transport-Security "max-age=31536000"
+    reverse_proxy 127.0.0.1:8080 {
+        flush_interval -1
+        header_up X-Forwarded-For {remote_host}
+    }
+}
+```
+
+云主机可能通过 NAT 使用不同的内网地址；`default_sni` 为未发送 SNI 的 IP 地址客户端选择正确的公网证书。将 `.env` 设为 `PUBLIC_BASE_URL=https://实际公网IP`、`COOKIE_SECURE=true`，并按前文配置实际代理来源。Caddy 需常驻、开机自启并持久保存证书 / ACME 账号状态；80/443 须可供公网验证与续期。短期证书由 Caddy 自动续期，不需要手工每周签发。验收时从另一台机器直接访问 HTTPS，检查系统证书信任与 `/readyz`，不能用 `curl -k` 作为通过依据。
+
+参考：[Let's Encrypt IP 证书](https://letsencrypt.org/2026/01/15/6day-and-ip-general-availability)、[Caddy ACME 配置](https://caddyserver.com/docs/caddyfile/directives/tls)、[default_sni](https://caddyserver.com/docs/caddyfile/options#default-sni)。
+
 ## 日常运行与磁盘
 
 检查 `/readyz`、容器健康、脱敏 JSON 日志；`/metrics` 需管理员 Bearer，可接 Prometheus。应用不自动加载宿主 `.env`，Compose 会加载。不要输出 `docker compose config` 到公共日志，其中可能包含密钥。
