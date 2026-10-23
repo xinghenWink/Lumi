@@ -104,19 +104,31 @@ func TestM6BufferedChatResumesWithoutSecondProviderCallAndSupportsVision(t *test
 	}
 	input := chat.SendInput{RequestID: uuid.New(), ModelID: model.ID, Action: "send", Content: "Describe this image", ReferenceFileIDs: []uuid.UUID{file.ID}}
 	request, cancelRequest := context.WithCancel(f.ctx)
-	// Vision metadata must not request another connection while holding its transaction.
+	client := f.client(t)
+	client.Timeout = 5 * time.Second
+	login := f.login(t, client, f.adminEmail, f.adminPassword)
+	// Saturated bulk work must not block authentication or turn acceptance.
+	// Routing and vision metadata must also fit in one remaining interactive connection.
 	var held []*pgxpool.Conn
 	defer func() {
 		for _, connection := range held {
 			connection.Release()
 		}
 	}()
-	for range f.pool.Config().MaxConns - 1 {
-		connection, err := f.pool.Acquire(f.ctx)
-		if err != nil {
-			t.Fatal(err)
+	for _, reservation := range []struct {
+		pool  *pgxpool.Pool
+		count int32
+	}{{f.pool, f.pool.Config().MaxConns}, {f.interactive, f.interactive.Config().MaxConns - 1}} {
+		for range reservation.count {
+			connection, err := reservation.pool.Acquire(f.ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			held = append(held, connection)
 		}
-		held = append(held, connection)
+	}
+	if response := f.call(t, client, http.MethodGet, "/api/v1/me", login.AccessToken, nil); response.status != http.StatusOK {
+		t.Fatal("authentication waited behind bulk work")
 	}
 	accept, cancelAccept := context.WithTimeout(request, 5*time.Second)
 	defer cancelAccept()

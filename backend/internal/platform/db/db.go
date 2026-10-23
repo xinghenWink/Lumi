@@ -11,22 +11,28 @@ import (
 )
 
 func Open(ctx context.Context, connectionURL string) (*pgxpool.Pool, error) {
-	return open(ctx, connectionURL, nil)
+	return open(ctx, connectionURL, nil, 8)
 }
 
 // OpenPrepared is called only after migrations, so descriptions use the final schema.
 func OpenPrepared(ctx context.Context, connectionURL string) (*pgxpool.Pool, error) {
-	return open(ctx, connectionURL, query.PrepareLatencyQueries)
+	return open(ctx, connectionURL, query.PrepareLatencyQueries, 8)
 }
 
-func open(ctx context.Context, connectionURL string, prepare func(context.Context, *pgx.Conn) error) (*pgxpool.Pool, error) {
+// OpenInteractive reserves connections for authentication and chat, independently
+// of image processing, credit reads and administrative background work.
+func OpenInteractive(ctx context.Context, connectionURL string) (*pgxpool.Pool, error) {
+	return open(ctx, connectionURL, query.PrepareLatencyQueries, 4)
+}
+
+func open(ctx context.Context, connectionURL string, prepare func(context.Context, *pgx.Conn) error, capacity int32) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(connectionURL)
 	if err != nil {
 		// pgx parse errors can contain the original URL; do not expose them.
 		return nil, fmt.Errorf("invalid PostgreSQL connection configuration")
 	}
-	cfg.MaxConns = 16
-	cfg.MinConns = 16
+	cfg.MaxConns = capacity
+	cfg.MinConns = capacity
 	cfg.MaxConnLifetime = 30 * time.Minute
 	cfg.MaxConnLifetimeJitter = 5 * time.Minute
 	cfg.ConnConfig.ConnectTimeout = 5 * time.Second

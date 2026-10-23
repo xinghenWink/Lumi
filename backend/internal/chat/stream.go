@@ -146,7 +146,7 @@ func (s *Service) Stream(ctx context.Context, actor user.Actor, id uuid.UUID, in
 	if err != nil {
 		return err
 	}
-	model, targets, err := s.catalog.ChatTargets(ctx, input.ModelID)
+	model, targets, err := s.catalog.ChatTargetsTx(ctx, s.q, input.ModelID)
 	if err != nil {
 		return err
 	}
@@ -297,7 +297,7 @@ func (s *Service) title(ctx context.Context, config Configuration, model uuid.UU
 	if config.TitleModelID != nil {
 		model = *config.TitleModelID
 	}
-	_, targets, err := s.catalog.ChatTargets(ctx, model)
+	_, targets, err := s.catalog.ChatTargetsTx(ctx, s.q, model)
 	if err != nil {
 		return fallback
 	}

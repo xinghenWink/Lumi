@@ -71,6 +71,7 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 	logger = platformlogger.New(os.Stdout, cfg.LogLevel)
 	health := handler.Health{}
 	var database *pgxpool.Pool
+	var interactive *pgxpool.Pool
 	var cache *platformredis.Client
 	startup, cancelStartup := context.WithTimeout(ctx, 60*time.Second)
 	defer cancelStartup()
@@ -99,6 +100,16 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 		defer pool.Close()
 		database = pool
 		health.Postgres = pool.Ping
+		if command == "serve" {
+			interactive, err = db.OpenInteractive(startup, cfg.DatabaseURL)
+			if err != nil {
+				return fmt.Errorf("prepare interactive database: %w", err)
+			}
+			defer interactive.Close()
+			health.Postgres = func(ctx context.Context) error {
+				return errors.Join(pool.Ping(ctx), interactive.Ping(ctx))
+			}
+		}
 	}
 	if command == "migrate" {
 		logger.Info("database migrations completed")
@@ -128,7 +139,7 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 		}()
 		health.Redis = cache.Ping
 	}
-	accounts, err := configureAccounts(startup, cfg, database, cache, logger)
+	accounts, err := configureAccounts(startup, cfg, database, interactive, cache, logger)
 	if err != nil {
 		logger.Error("account service initialization failed")
 		return fmt.Errorf("initialize accounts: %w", err)

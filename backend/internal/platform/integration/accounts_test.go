@@ -67,6 +67,7 @@ type fixture struct {
 	vault                     *secrets.Vault
 	ctx                       context.Context
 	pool                      *pgxpool.Pool
+	interactive               *pgxpool.Pool
 	cache                     *platformredis.Client
 	services                  *account.Services
 	sender                    *captureMailer
@@ -102,6 +103,11 @@ func newAccountFixture(t *testing.T) *fixture {
 	if err := migrations.Up(ctx, pool); err != nil {
 		t.Fatalf("account migrations: %v", err)
 	}
+	interactive, err := db.OpenInteractive(ctx, pool.Config().ConnString())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(interactive.Close)
 	// Legacy account scenarios exercise many invalid signups from one fixture IP.
 	// M6 quota tests explicitly enable their own limit; production defaults stay unchanged.
 	if _, err := pool.Exec(ctx, "UPDATE settings SET value=jsonb_set(value,'{register_per_ip_day}','0') WHERE key='operations'"); err != nil {
@@ -150,8 +156,8 @@ func newAccountFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	sender := &captureMailer{codes: make(map[string]string)}
-	services := &account.Services{Auth: auth.New(pool, hasher, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: catalog.New(pool, vault, upstream.NetworkPolicy{AllowPrivate: true}, nil)}
-	services.Chat = chat.New(pool, services.Catalog, cache)
+	services := &account.Services{Auth: auth.New(interactive, hasher, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: catalog.New(pool, vault, upstream.NetworkPolicy{AllowPrivate: true}, nil)}
+	services.Chat = chat.New(interactive, services.Catalog, cache)
 	services.Operations = operations.New(pool)
 	dataDir := t.TempDir()
 	services.Files, err = media.New(pool, dataDir, key)
@@ -171,7 +177,7 @@ func newAccountFixture(t *testing.T) *fixture {
 	}
 	server := httptest.NewTLSServer(engine)
 	t.Cleanup(server.Close)
-	return &fixture{ctx: ctx, pool: pool, cache: cache, services: services, sender: sender, server: server, adminEmail: email, adminPassword: value, vault: vault, dataDir: dataDir}
+	return &fixture{ctx: ctx, pool: pool, interactive: interactive, cache: cache, services: services, sender: sender, server: server, adminEmail: email, adminPassword: value, vault: vault, dataDir: dataDir}
 }
 
 func (f *fixture) client(t *testing.T) *http.Client {
