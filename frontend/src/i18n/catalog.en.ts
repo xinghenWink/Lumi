@@ -34,6 +34,7 @@ export default {
     keySaved: 'Key configured',
     keyMissing: 'No key configured',
     keyPlaceholder: 'Enter a new API Key',
+    clearKey: 'Clear the saved channel key (disabled channels only)',
     chatTimeout: 'Text timeout (seconds)',
     imageTimeout: 'Image timeout (seconds)',
     proxyURL: 'Proxy URL (optional)',

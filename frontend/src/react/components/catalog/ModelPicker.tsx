@@ -58,6 +58,7 @@ export function ModelPicker({ kind, disabled = false }: { kind: ModelKind; disab
             sideOffset={10}
             collisionPadding={12}
             aria-label={t('catalog.availableModels')}
+            aria-labelledby={undefined}
             className="z-70 max-h-[min(420px,var(--radix-dropdown-menu-content-available-height))] w-[320px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-xl border border-border bg-card p-1.5 text-foreground shadow-xl"
           >
             {items.map((model) => (

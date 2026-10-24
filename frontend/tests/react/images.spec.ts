@@ -542,10 +542,42 @@ test('React real image generation editing gallery cancellation and administrator
     const adminView = await api('GET', '/admin/image-tasks/' + firstID)
     expect(adminView.content_visible).toBe(false)
     expect(adminView.prompt).toBe('')
-    // Admin forms remain covered by the legacy suite until PR-6. Check the same real privacy contract here.
     expect(adminView.items).toEqual(persisted.items.map((item) => ({ ...item, file: null })))
-    const settings = parseImageConfiguration(await api('GET', '/admin/image-settings'))
-    await api('PUT', '/admin/image-settings', { ...settings, admin_can_view_content: true })
+    await page.goto('/admin/image-tasks')
+    await page.getByLabel('用户 ID', { exact: true }).fill(String(memberUser.id))
+    await page.getByRole('button', { name: '筛选', exact: true }).click()
+    await page
+      .getByRole('row')
+      .filter({ hasText: firstID })
+      .getByRole('button', { name: '任务详情', exact: true })
+      .click()
+    await expect(
+      page.getByRole('dialog').getByText('内容访问未开启', { exact: true }),
+    ).toBeVisible()
+    await expect(page.getByRole('dialog').getByRole('img')).toHaveCount(0)
+    await expect(
+      page.getByRole('dialog').getByRole('button', { name: '删除图片 1', exact: true }),
+    ).toBeVisible()
+    await page.screenshot({
+      path: info.outputPath('image-admin-private.png'),
+      animations: 'disabled',
+    })
+    await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
+    await page.goto('/admin/image-settings')
+    await page.getByLabel('允许管理员查看提示词、参考图与结果', { exact: true }).check()
+    await page.getByRole('button', { name: '保存修改', exact: true }).click()
+    await expect(page.getByRole('status')).toContainText('生图设置已保存')
+    await page.screenshot({ path: info.outputPath('image-settings.png'), animations: 'disabled' })
+    await page.goto('/admin/image-tasks')
+    await page.getByLabel('用户 ID', { exact: true }).fill(String(memberUser.id))
+    await page.getByRole('button', { name: '筛选', exact: true }).click()
+    await page
+      .getByRole('row')
+      .filter({ hasText: firstID })
+      .getByRole('button', { name: '任务详情', exact: true })
+      .click()
+    await expect(page.getByRole('dialog').getByText('partial', { exact: true })).toBeVisible()
+    await page.screenshot({ path: info.outputPath('image-admin-task.png'), animations: 'disabled' })
     const visible = parseTask(await api('GET', '/admin/image-tasks/' + firstID))
     expect(visible.content_visible).toBe(true)
     expect(visible.prompt).toBe('partial')
@@ -745,6 +777,52 @@ test('React real image generation editing gallery cancellation and administrator
       path: info.outputPath('image-gallery-1000.png'),
       animations: 'disabled',
     })
+    const beforeRefund = await api('GET', '/me/credits', undefined, memberToken)
+    const refundable = parseTask(await api('GET', '/admin/image-tasks/' + firstID))
+    expect(refundable.actual_cost).toBeGreaterThan(0)
+    await page.goto('/admin/image-tasks')
+    await page.getByLabel('用户 ID', { exact: true }).fill(String(memberUser.id))
+    await page.getByRole('button', { name: '筛选', exact: true }).click()
+    await page
+      .getByRole('row')
+      .filter({ hasText: firstID })
+      .getByRole('button', { name: '任务详情', exact: true })
+      .click()
+    await page
+      .getByRole('dialog', { name: '任务详情', exact: true })
+      .getByRole('button', { name: '手动退还剩余费用', exact: true })
+      .click()
+    const refundDialog = page.getByRole('dialog', { name: '手动退还剩余费用', exact: true }),
+      refundNote = 'React manual refund ' + randomUUID()
+    await refundDialog.getByLabel('操作备注', { exact: true }).fill(refundNote)
+    let refundDropped = false,
+      refundCalls = 0
+    await page.route('**/api/v1/admin/image-tasks/' + firstID + '/refund', async (route) => {
+      refundCalls++
+      const response = await route.fetch()
+      if (response.ok() && !refundDropped) {
+        refundDropped = true
+        await route.abort('failed')
+      } else await route.fulfill({ response })
+    })
+    await refundDialog.getByRole('button', { name: '确认操作', exact: true }).click()
+    await expect(refundDialog.getByRole('alert')).toContainText('网络')
+    await refundDialog.getByRole('button', { name: '确认操作', exact: true }).click()
+    await expect(refundDialog).not.toBeVisible()
+    await expect(page.getByRole('button', { name: '手动退还剩余费用', exact: true })).toHaveCount(0)
+    expect(refundCalls).toBe(2)
+    await page.unroute('**/api/v1/admin/image-tasks/' + firstID + '/refund')
+    const afterRefund = await api('GET', '/me/credits', undefined, memberToken)
+    expect(afterRefund.total).toBe(Number(beforeRefund.total) + refundable.actual_cost)
+    const refunded = parseTask(await api('GET', '/admin/image-tasks/' + firstID))
+    expect(refunded.actual_cost).toBe(0)
+    expect(refunded.refunded_cost).toBe(refunded.total_cost)
+    const refundAudit = await api(
+      'GET',
+      '/admin/audit-logs?target_id=' + firstID + '&action=image.refund',
+    )
+    if (!Array.isArray(refundAudit.items)) throw new Error('Missing real refund audit')
+    expect(refundAudit.items).toHaveLength(1)
     expect(errors).toEqual([])
   } finally {
     await memberContext.close()

@@ -31,15 +31,22 @@ test('real administrator code generation, cursor binding, copy, export, redempti
         email_verification_enabled: false,
       },
     })
-    await f.api('PUT', '/admin/pricing', {
-      ...pricing,
-      configuration: {
-        ...record(pricing.configuration),
-        signup_bonus_credits: 10,
-        daily_free_credits: 5,
-        credits_timezone: 'Asia/Shanghai',
-      },
-    })
+    await page.goto('/admin/pricing')
+    await page.getByLabel('注册赠送积分', { exact: true }).fill('10')
+    await page.getByLabel('每日赠送积分', { exact: true }).fill('5')
+    await page.getByLabel('每日重置时区', { exact: true }).fill('Asia/Shanghai')
+    await page.getByLabel('每张积分 生图 低', { exact: true }).fill('6')
+    await page.getByRole('button', { name: '保存价格与赠送', exact: true }).click()
+    await expect(page.getByRole('status')).toContainText('价格与赠送配置已保存')
+    await page.reload()
+    await expect(page.getByLabel('每张积分 生图 低', { exact: true })).toHaveValue('6')
+    await noOverflow(page)
+    await page.screenshot({ path: info.outputPath('pricing.png'), animations: 'disabled' })
+    await page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: '价格规则', exact: true }) })
+      .scrollIntoViewIfNeeded()
+    await page.screenshot({ path: info.outputPath('pricing-rules.png'), animations: 'disabled' })
     const created = await f.api('POST', '/admin/users', {
       email,
       password,
