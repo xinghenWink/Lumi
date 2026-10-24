@@ -1,0 +1,108 @@
+.chat-markdown {
+  overflow-wrap: anywhere;
+}
+.chat-markdown p {
+  margin: 0 0 12px;
+}
+.chat-markdown h1,
+.chat-markdown h2,
+.chat-markdown h3 {
+  margin: 20px 0 10px;
+  line-height: 1.4;
+  font-weight: 650;
+}
+.chat-markdown h1 {
+  font-size: 24px;
+}
+.chat-markdown h2 {
+  font-size: 20px;
+}
+.chat-markdown h3 {
+  font-size: 17px;
+}
+.chat-markdown ul,
+.chat-markdown ol {
+  padding-left: 24px;
+  margin: 8px 0 14px;
+  list-style: revert;
+}
+.chat-markdown a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.chat-markdown blockquote {
+  border-left: 3px solid var(--primary);
+  padding-left: 15px;
+  margin: 12px 0;
+  color: var(--muted-foreground);
+}
+.chat-markdown :not(pre) > code {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 0.87em;
+}
+.chat-markdown pre {
+  overflow-x: auto;
+  border-radius: 0 0 10px 10px;
+  padding: 14px 16px;
+  margin: 0;
+  background: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+  tab-size: 4;
+  white-space: pre;
+}
+.chat-code {
+  margin: 12px 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  overflow: hidden;
+}
+.chat-code-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--muted);
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.chat-code-heading button {
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+.chat-code-heading button:focus-visible {
+  outline: 2px solid var(--primary);
+}
+.chat-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 12px 0 18px;
+  font-size: 12px;
+}
+.chat-markdown th,
+.chat-markdown td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  white-space: normal;
+  min-width: 90px;
+}
+.chat-markdown th {
+  background: var(--muted);
+  font-weight: 600;
+}
+.chat-markdown .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 0;
+}
+[data-theme='dark'] .chat-markdown .shiki,
+[data-theme='dark'] .chat-markdown .shiki span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
+}

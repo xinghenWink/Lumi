@@ -1,10 +1,19 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
-import { useSystemStore } from './system'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { QueryClient } from '@tanstack/react-query'
+import { getVersion } from '../api/client'
+
+let client: QueryClient
+const options = {
+  queryKey: ['public', 'version'],
+  queryFn: ({ signal }: { signal: AbortSignal }) => getVersion(signal),
+  retry: false,
+}
+beforeEach(() => {
+  client = new QueryClient()
+})
+afterEach(() => client.clear())
 
 describe('system version', () => {
-  beforeEach(() => setActivePinia(createPinia()))
-
   it('loads build metadata from the backend', async () => {
     vi.stubGlobal(
       'fetch',
@@ -18,48 +27,46 @@ describe('system version', () => {
         ),
       ),
     )
-    const store = useSystemStore()
-    await store.loadVersion()
-    expect(store.status).toBe('ready')
-    expect(store.version?.version).toBe('v0.0.1')
+    await client.fetchQuery(options)
+    expect(client.getQueryState(options.queryKey)?.status).toBe('success')
+    expect(
+      client.getQueryData<Awaited<ReturnType<typeof getVersion>>>(options.queryKey)?.version,
+    ).toBe('v0.0.1')
   })
-
   it('allows retry after a backend error and rejects malformed JSON', async () => {
-    const fetch = vi
+    const fetcher = vi
       .fn()
       .mockResolvedValueOnce(new Response('unavailable', { status: 503 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ version: 123 })))
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ version: 'dev', commit: 'unknown', build_time: 'unknown' })),
       )
-    vi.stubGlobal('fetch', fetch)
-    const store = useSystemStore()
-    await store.loadVersion()
-    expect(store.status).toBe('error')
-    expect(store.version).toBeNull()
-    await store.loadVersion()
-    expect(store.status).toBe('error')
-    await store.loadVersion()
-    expect(store.status).toBe('ready')
+    vi.stubGlobal('fetch', fetcher)
+    await expect(client.fetchQuery(options)).rejects.toThrow('VERSION_UNAVAILABLE')
+    expect(client.getQueryState(options.queryKey)?.status).toBe('error')
+    expect(client.getQueryData(options.queryKey)).toBeUndefined()
+    await expect(client.fetchQuery(options)).rejects.toThrow('VERSION_INVALID')
+    expect(client.getQueryState(options.queryKey)?.status).toBe('error')
+    await client.fetchQuery(options)
+    expect(client.getQueryState(options.queryKey)?.status).toBe('success')
   })
-
   it('coalesces overlapping requests', async () => {
     let resolveResponse: ((response: Response) => void) | undefined
-    const fetch = vi.fn().mockImplementation(
+    const fetcher = vi.fn().mockImplementation(
       () =>
         new Promise<Response>((resolve) => {
           resolveResponse = resolve
         }),
     )
-    vi.stubGlobal('fetch', fetch)
-    const store = useSystemStore()
-    const firstRequest = store.loadVersion()
-    await store.loadVersion()
-    expect(fetch).toHaveBeenCalledTimes(1)
+    vi.stubGlobal('fetch', fetcher)
+    const firstRequest = client.fetchQuery(options),
+      secondRequest = client.fetchQuery(options)
+    expect(fetcher).toHaveBeenCalledTimes(1)
     if (!resolveResponse) throw new Error('Request did not start')
     resolveResponse(
       new Response(JSON.stringify({ version: 'dev', commit: 'unknown', build_time: 'unknown' })),
     )
-    await firstRequest
+    await Promise.all([firstRequest, secondRequest])
+    expect(client.getQueryState(options.queryKey)?.status).toBe('success')
   })
 })

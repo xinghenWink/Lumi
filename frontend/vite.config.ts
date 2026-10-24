@@ -1,15 +1,42 @@
 import { defineConfig } from 'vitest/config'
-import vue from '@vitejs/plugin-vue'
+import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
-  plugins: [vue(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    {
+      name: 'lumi-react-production',
+      generateBundle(
+        _options: unknown,
+        bundle: Record<string, { type: string; modules?: Record<string, unknown> }>,
+      ) {
+        const legacy =
+          /[/\\]node_modules[/\\](?:@vue[/\\]|vue[/\\]|vue-router[/\\]|pinia[/\\]|vue-i18n[/\\]|reka-ui[/\\]|lucide-vue-next[/\\]|@tanstack[/\\]vue-virtual[/\\])/
+        for (const chunk of Object.values(bundle)) {
+          if (
+            chunk.type === 'chunk' &&
+            Object.keys(chunk.modules ?? {}).some((id) => legacy.test(id))
+          )
+            throw new Error('Production build includes a legacy Vue dependency')
+        }
+      },
+    },
+  ],
+  resolve: {
+    alias: {
+      '@lumi/session': fileURLToPath(
+        new URL('./src/react/features/auth/session-adapter.ts', import.meta.url),
+      ),
+      '@': fileURLToPath(new URL('./src/react', import.meta.url)),
+    },
+  },
   build: {
     outDir: '../backend/web/dist',
     emptyOutDir: true,
-    // Keep small KaTeX fonts on the same origin instead of data URLs blocked by CSP.
     assetsInlineLimit: 0,
-    // Keep the entry budget comfortably below the 250 KB gzip requirement.
     chunkSizeWarningLimit: 250,
   },
   server: {
@@ -23,7 +50,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+    exclude: ['node_modules/**'],
     restoreMocks: true,
     unstubGlobals: true,
   },

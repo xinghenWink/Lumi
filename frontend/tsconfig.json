@@ -15,7 +15,13 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["vite/client", "node"]
+    "paths": {
+      "@lumi/session": ["./src/react/features/auth/session-adapter.ts"],
+      "@/*": ["./src/react/*"]
+    },
+    "types": ["vite/client", "node"],
+    "jsx": "react-jsx"
   },
-  "include": ["src/**/*.ts", "src/**/*.vue", "*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "*.ts", "tests/**/*.ts"],
+  "exclude": ["node_modules", "test-results", "playwright-report"]
 }

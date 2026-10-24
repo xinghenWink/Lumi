@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createI18n } from 'vue-i18n'
+import { createAppI18n } from '../../react/i18n'
 import {
   parseCreditAccount,
   parseLedger,
@@ -7,7 +7,7 @@ import {
   parseRedeemed,
 } from '../../api/credit-contracts'
 import { request } from '../../api/transport'
-import { useMutationKey } from './resources'
+import { createMutationKey } from '../../react/features/accounts/resources'
 import zh from '../../i18n/credits.zh-CN'
 import en from '../../i18n/credits.en'
 
@@ -74,7 +74,7 @@ describe('credit contracts', () => {
     ).toThrow()
   })
   it('keeps one key for uncertain retries and rotates after confirmation or changed input', () => {
-    const key = useMutationKey()
+    const key = createMutationKey()
     const first = key.forPayload({ amount: 10, note: 'Support' })
     expect(key.forPayload({ amount: 10, note: 'Support' })).toBe(first)
     const second = key.forPayload({ amount: 11, note: 'Support' })
@@ -111,7 +111,7 @@ describe('credit contracts', () => {
       'RESPONSE_INVALID',
     )
   })
-  it('provides matching translatable Chinese and English credit messages', () => {
+  it('provides matching translatable Chinese and English credit messages', async () => {
     function paths(value: unknown, prefix = ''): string[] {
       if (typeof value !== 'object' || value === null) return [prefix]
       return Object.entries(value)
@@ -119,12 +119,12 @@ describe('credit contracts', () => {
         .sort()
     }
     expect(paths(zh)).toEqual(paths(en))
-    const i18n = createI18n({ legacy: false, locale: 'zh-CN', messages: { 'zh-CN': zh, en } })
+    const i18n = await createAppI18n()
     for (const locale of ['zh-CN', 'en'] as const) {
-      i18n.global.locale.value = locale
+      await i18n.changeLanguage(locale)
       for (const path of paths(zh))
         expect(() =>
-          i18n.global.t(path, {
+          i18n.t(path, {
             time: '12:00',
             zone: 'Asia/Shanghai',
             amount: 5,

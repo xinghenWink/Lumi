@@ -79,68 +79,101 @@ export async function streamPerformance(page: Page, token: string, info: TestInf
         })
       ).json()) as { model_id: string | null }
       const samples: number[] = []
+      const requests: {
+        attempt: number
+        headersMS: number
+        observedMS: number
+        upstreamMS: number
+        platformMS: number
+      }[] = []
+      const browserLongTasksMS: number[] = []
+      const visibility = document.visibilityState
+      const observer = new PerformanceObserver((list) => {
+        browserLongTasksMS.push(...list.getEntries().map((entry) => entry.duration))
+      })
+      observer.observe({ type: 'longtask' })
       let encoding: string | null = null
-      for (let attempt = 0; attempt < 60; attempt++) {
-        const started = Date.now()
-        const response = await fetch('/api/v1/conversations/' + id + '/messages', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Lumi-CSRF': '1',
-            Authorization: 'Bearer ' + token,
-          },
-          body: JSON.stringify({
-            request_id: crypto.randomUUID(),
-            model_id: model.model_id,
-            action: 'send',
-            content: 'latency',
-          }),
-        })
-        if (!response.ok || !response.body) throw new Error('Latency stream rejected')
-        const reader = response.body.getReader(),
-          decoder = new TextDecoder()
-        let buffer = ''
-        try {
-          while (true) {
-            const chunk = await reader.read()
-            buffer += decoder.decode(chunk.value, { stream: !chunk.done })
-            let end = buffer.indexOf('\n\n')
-            while (end >= 0) {
-              const frame = buffer.slice(0, end)
-              buffer = buffer.slice(end + 2)
-              const lines = frame.split('\n')
-              if (lines.some((line) => line.trim() === 'event: delta')) {
-                const data = lines
-                  .filter((line) => line.startsWith('data:'))
-                  .map((line) => line.slice(5).trimStart())
-                  .join('\n')
-                const value: unknown = JSON.parse(data)
-                if (
-                  typeof value === 'object' &&
-                  value !== null &&
-                  'content' in value &&
-                  typeof value.content === 'string'
-                )
-                  for (const match of value.content.matchAll(/@(\d+),(\d+)\|/g))
-                    samples.push(
-                      Math.max(0, Date.now() - started - (Number(match[1]) - Number(match[2]))),
-                    )
+      try {
+        for (let attempt = 0; attempt < 60; attempt++) {
+          const perfStarted = performance.now()
+          const started = Date.now()
+          const response = await fetch('/api/v1/conversations/' + id + '/messages', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Lumi-CSRF': '1',
+              Authorization: 'Bearer ' + token,
+            },
+            body: JSON.stringify({
+              request_id: crypto.randomUUID(),
+              model_id: model.model_id,
+              action: 'send',
+              content: 'latency',
+            }),
+          })
+          const headersMS = performance.now() - perfStarted
+          if (!response.ok || !response.body) throw new Error('Latency stream rejected')
+          const reader = response.body.getReader(),
+            decoder = new TextDecoder()
+          let buffer = ''
+          try {
+            while (true) {
+              const chunk = await reader.read()
+              buffer += decoder.decode(chunk.value, { stream: !chunk.done })
+              let end = buffer.indexOf('\n\n')
+              while (end >= 0) {
+                const frame = buffer.slice(0, end)
+                buffer = buffer.slice(end + 2)
+                const lines = frame.split('\n')
+                if (lines.some((line) => line.trim() === 'event: delta')) {
+                  const data = lines
+                    .filter((line) => line.startsWith('data:'))
+                    .map((line) => line.slice(5).trimStart())
+                    .join('\n')
+                  const value: unknown = JSON.parse(data)
+                  if (
+                    typeof value === 'object' &&
+                    value !== null &&
+                    'content' in value &&
+                    typeof value.content === 'string'
+                  )
+                    for (const match of value.content.matchAll(/@(\d+),(\d+)\|/g)) {
+                      const upstreamMS = Number(match[1]) - Number(match[2])
+                      const platformMS = Math.max(0, Date.now() - started - upstreamMS)
+                      samples.push(platformMS)
+                      requests.push({
+                        attempt,
+                        headersMS,
+                        observedMS: performance.now() - perfStarted,
+                        upstreamMS,
+                        platformMS,
+                      })
+                    }
+                }
+                end = buffer.indexOf('\n\n')
               }
-              end = buffer.indexOf('\n\n')
+              if (chunk.done) break
             }
-            if (chunk.done) break
+          } finally {
+            reader.releaseLock()
           }
-        } finally {
-          reader.releaseLock()
+          encoding = response.headers.get('Content-Encoding')
         }
-        encoding = response.headers.get('Content-Encoding')
+      } finally {
+        browserLongTasksMS.push(...observer.takeRecords().map((entry) => entry.duration))
+        observer.disconnect()
       }
+      const orderedSamplesMS = [...samples]
       samples.sort((a, b) => a - b)
       return {
         samples: samples.length,
         p95MS: samples[Math.max(0, Math.ceil(samples.length * 0.95) - 1)] ?? -1,
         encoding,
+        orderedSamplesMS,
+        requests,
+        browserLongTasksMS,
+        visibility,
       }
     },
     { id, token },
@@ -157,6 +190,18 @@ export async function streamPerformance(page: Page, token: string, info: TestInf
       null,
       2,
     ),
+  )
+  console.log(
+    'SSE acceptance ' +
+      JSON.stringify({
+        project: info.project.name,
+        samples: latency.samples,
+        p95MS: latency.p95MS,
+        maximumMS: Math.max(...latency.orderedSamplesMS),
+        slowSamples: latency.orderedSamplesMS.filter((sample) => sample >= 100).length,
+        visibility: latency.visibility,
+        browserLongTaskMaxMS: Math.max(0, ...latency.browserLongTasksMS),
+      }),
   )
   expect(latency.samples).toBe(60)
   expect(latency.p95MS).toBeLessThan(100)
@@ -178,10 +223,12 @@ export async function desktopLighthouse(
   email: string,
   password: string,
   info: TestInfo,
+  channel?: 'chrome',
 ) {
   const port = await unusedPort()
   const context = await chromium.launchPersistentContext('', {
     headless: true,
+    ...(channel ? { channel } : {}),
     args: ['--remote-debugging-port=' + port],
     viewport: { width: 1440, height: 900 },
   })

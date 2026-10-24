@@ -54,14 +54,15 @@ jobs:
           git diff --exit-code -- backend/internal/platform/db/query frontend/src/api/schema.d.ts
       - run: make test-integration
       - run: make build
-      - name: Install Chromium and its system dependencies
+      - name: Install Chrome and its system dependencies
         run: |
           # Keep signed Ubuntu packages while avoiding the slow HTTP Azure mirror.
           if test -f /etc/apt/apt-mirrors.txt; then
             printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
           fi
-          pnpm --filter @lumi/frontend exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
+          pnpm --filter @lumi/frontend exec playwright install --with-deps chrome
+      - name: Run full native Chrome acceptance
+        run: node scripts/native-e2e.mjs test:e2e
       - name: Install pinned k6
         run: |
           curl --fail --location --silent --show-error https://github.com/grafana/k6/releases/download/v1.3.0/k6-v1.3.0-linux-amd64.tar.gz -o "$RUNNER_TEMP/k6.tar.gz"
@@ -110,19 +111,104 @@ jobs:
         if: always()
         with:
           name: playwright-results
-          path: frontend/test-results
+          include-hidden-files: true
+          path: |
+            frontend/test-results
+            .tools/native-e2e/*/report.json
+            .tools/native-e2e/*/diagnostics.json
+          if-no-files-found: ignore
+
+  react-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lumi
+          POSTGRES_PASSWORD: ci-e2e-only
+          POSTGRES_DB: lumi
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U lumi -d lumi" --health-interval 3s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      E2E_DATABASE_URL: postgres://lumi:ci-e2e-only@127.0.0.1:5432/lumi?sslmode=disable
+      E2E_REDIS_URL: redis://127.0.0.1:6379/0
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7.0.0
+        with:
+          go-version: '1.26.10'
+          cache-dependency-path: backend/go.sum
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:react
+      - name: Install Chrome and system dependencies
+        run: |
+          if test -f /etc/apt/apt-mirrors.txt; then
+            printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
+          fi
+          pnpm --filter @lumi/frontend exec playwright install --with-deps chrome
+      - name: Run full native React Chrome acceptance
+        run: node scripts/native-e2e.mjs test:e2e:react
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: react-playwright-results
+          include-hidden-files: true
+          path: |
+            frontend/test-results/e2e
+            .tools/native-e2e/*/report.json
+            .tools/native-e2e/*/diagnostics.json
           if-no-files-found: ignore
 
   container:
-    needs: quality
+    needs: [quality, react-candidate]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
       - name: Build the application image
         run: docker build --build-arg VERSION=ci --build-arg COMMIT="$GITHUB_SHA" -t lumi:ci .
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chrome for production embed acceptance
+        run: |
+          if test -f /etc/apt/apt-mirrors.txt; then
+            printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
+          fi
+          pnpm --filter @lumi/frontend exec playwright install --with-deps chrome
+      - name: Verify production dependency readiness probes
+        run: node --test scripts/react-embed-readiness.test.mjs
+      - name: Verify the React production Docker embed
+        run: node scripts/react-embed-smoke.mjs
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: react-container-embed-results
+          include-hidden-files: true
+          path: |
+            frontend/test-results/embed
+            .tools/react-embed/*/report.json
+            .tools/react-embed/*/diagnostics.json
+          if-no-files-found: ignore
       - name: Generate ephemeral container credentials
         shell: bash
         run: |
@@ -165,10 +251,16 @@ jobs:
         env:
           POSTGRES_PASSWORD: ci-database-only
           REDIS_PASSWORD: ci-cache-only
-        run: docker compose --env-file deploy/.env -f deploy/docker-compose.yml logs --no-color
+        run: |
+          if test -f deploy/.env; then
+            docker compose --env-file deploy/.env -f deploy/docker-compose.yml logs --no-color
+          fi
       - name: Stop containers
         if: always()
         env:
           POSTGRES_PASSWORD: ci-database-only
           REDIS_PASSWORD: ci-cache-only
-        run: docker compose --env-file deploy/.env -f deploy/docker-compose.yml down --volumes
+        run: |
+          if test -f deploy/.env; then
+            docker compose --env-file deploy/.env -f deploy/docker-compose.yml down --volumes
+          fi

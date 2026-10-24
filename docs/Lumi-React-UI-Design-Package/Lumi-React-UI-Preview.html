@@ -1,0 +1,2819 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lumi · React UI 改版视觉原型</title>
+    <style>
+      :root {
+        --bg: #fafbfe;
+        --surface: #fff;
+        --sidebar: #f7f7fa;
+        --ink: #252537;
+        --muted: #9292a6;
+        --sub: #6e7186;
+        --line: #e9e9f0;
+        --line2: #f1f1f5;
+        --soft: #f4f3fa;
+        --accent: #6f58ee;
+        --accentDark: #634bdc;
+        --tint: #f0edff;
+        --shadow: 0 15px 50px rgba(45, 37, 83, 0.07);
+        --inputShadow: 0 4px 28px rgba(27, 22, 64, 0.055);
+        --good: #3c9a75;
+        --bad: #d56b70;
+      }
+      [data-theme='dark'] {
+        --bg: #14141c;
+        --surface: #1d1d27;
+        --sidebar: #191922;
+        --ink: #f0eef8;
+        --muted: #89899e;
+        --sub: #b1b0c4;
+        --line: #32313e;
+        --line2: #292935;
+        --soft: #282833;
+        --accent: #9886ff;
+        --accentDark: #b6a8ff;
+        --tint: #312948;
+        --shadow: 0 15px 45px rgba(0, 0, 0, 0.18);
+        --inputShadow: 0 4px 28px rgba(0, 0, 0, 0.21);
+        --good: #66cda4;
+        --bad: #e7979b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        min-height: 100%;
+        color: var(--ink);
+        font-family:
+          Inter,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          'PingFang SC',
+          'Microsoft YaHei',
+          sans-serif;
+        line-height: 1.5;
+        font-size: 14px;
+        -webkit-font-smoothing: antialiased;
+        background: var(--bg);
+      }
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+        color: inherit;
+      }
+      button {
+        border: 0;
+        cursor: pointer;
+        background: none;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+      }
+      svg {
+        display: block;
+      }
+      #app {
+        height: 100dvh;
+        display: flex;
+        overflow: hidden;
+      }
+      .ic {
+        width: 18px;
+        height: 18px;
+        flex: none;
+        stroke: currentColor;
+        stroke-width: 1.9;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        fill: none;
+      }
+      .ic.sm {
+        width: 16px;
+        height: 16px;
+      }
+      .ic.xs {
+        width: 14px;
+        height: 14px;
+      }
+      .ic.lg {
+        width: 22px;
+        height: 22px;
+      }
+      .sidebar {
+        width: 260px;
+        flex: 0 0 260px;
+        height: 100%;
+        background: var(--sidebar);
+        border-right: 1px solid var(--line);
+        padding: 25px 14px 14px;
+        display: flex;
+        flex-direction: column;
+        z-index: 8;
+        transition: transform 0.22s;
+      }
+      .brand {
+        height: 54px;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 0 13px;
+        margin-bottom: 22px;
+      }
+      .logo {
+        width: 35px;
+        height: 35px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        color: white;
+        background: linear-gradient(145deg, #8775fa, #6148dc);
+        box-shadow: 0 7px 16px #7359f13a;
+      }
+      .logo svg {
+        height: 20px;
+        width: 20px;
+      }
+      .brand strong {
+        font-size: 23px;
+        letter-spacing: -1.4px;
+        font-weight: 750;
+        line-height: 1.1;
+      }
+      .brand small {
+        display: block;
+        color: var(--muted);
+        font-size: 10px;
+        letter-spacing: 1.6px;
+        font-weight: 600;
+        margin-top: 4px;
+      }
+      .ghostIcon {
+        margin-left: auto;
+        color: var(--muted);
+        height: 32px;
+        width: 32px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+      }
+      .ghostIcon:hover {
+        color: var(--ink);
+        background: var(--soft);
+      }
+      .newBtn {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        height: 43px;
+        border: 1px solid #e3defb;
+        background: linear-gradient(180deg, #f9f7ff, #f3f0ff);
+        border-radius: 12px;
+        color: #6c54dc;
+        font-weight: 650;
+        box-shadow: 0 2px 9px #7563c408;
+        margin: 0 9px 22px;
+      }
+      .newBtn:hover {
+        border-color: #c4b6f9;
+        background: #f0ecff;
+      }
+      [data-theme='dark'] .newBtn {
+        background: var(--tint);
+        border-color: #51446f;
+        color: #c1b8ff;
+      }
+      .navLabel {
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 750;
+        letter-spacing: 1.4px;
+        margin: 11px 15px 8px;
+      }
+      .navButton {
+        width: 100%;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 0 13px;
+        border-radius: 10px;
+        color: var(--sub);
+        font-weight: 520;
+        text-align: left;
+        margin: 2px 0;
+      }
+      .navButton span {
+        flex: 1;
+      }
+      .navButton.active {
+        background: var(--surface);
+        color: var(--accent);
+        font-weight: 660;
+        box-shadow: 0 3px 12px rgba(25, 24, 55, 0.035);
+      }
+      .navButton:hover:not(.active) {
+        background: var(--soft);
+        color: var(--ink);
+      }
+      .navButton em {
+        font-size: 10px;
+        background: var(--tint);
+        color: var(--accent);
+        font-style: normal;
+        border-radius: 5px;
+        padding: 2px 5px;
+      }
+      .divider {
+        height: 1px;
+        background: var(--line);
+        margin: 19px 10px 9px;
+      }
+      .historyTitle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-right: 9px;
+      }
+      .historyTitle .navLabel {
+        margin-top: 13px;
+      }
+      .historyFind {
+        height: 34px;
+        border-radius: 9px;
+        background: transparent;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 0 12px;
+        color: var(--muted);
+        margin: 5px 4px 9px;
+        border: 1px solid transparent;
+      }
+      .historyFind:focus-within,
+      .historyFind:hover {
+        border-color: var(--line);
+        background: var(--surface);
+      }
+      .historyFind input {
+        min-width: 0;
+        background: transparent;
+        border: 0;
+        outline: none;
+        width: 100%;
+        font-size: 12px;
+        color: var(--ink);
+      }
+      .historyFind input::placeholder {
+        color: var(--muted);
+      }
+      .historyList {
+        overflow-y: auto;
+        min-height: 80px;
+        flex: 1;
+        padding: 0 2px;
+      }
+      .historyItem {
+        height: 36px;
+        border-radius: 9px;
+        color: var(--sub);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        font-size: 12px;
+        padding: 0 12px;
+        white-space: nowrap;
+        text-align: left;
+        gap: 8px;
+      }
+      .historyItem span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .historyItem:hover,
+      .historyItem.selected {
+        background: var(--soft);
+        color: var(--ink);
+      }
+      .historyEmpty {
+        font-size: 12px;
+        color: var(--muted);
+        padding: 14px;
+      }
+      .account {
+        border-top: 1px solid var(--line);
+        padding-top: 13px;
+        margin: 11px 6px 0;
+      }
+      .creditCard {
+        border: 1px solid var(--line);
+        background: var(--surface);
+        border-radius: 11px;
+        padding: 10px 11px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        text-align: left;
+        width: 100%;
+        margin-bottom: 10px;
+      }
+      .coin {
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
+        background: #fff3df;
+        color: #d5a34c;
+        display: grid;
+        place-items: center;
+      }
+      .creditCopy {
+        flex: 1;
+      }
+      .creditCopy strong {
+        font-size: 13px;
+        font-weight: 680;
+      }
+      .creditCopy span {
+        display: block;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .accountUser {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 6px 2px 3px;
+        width: 100%;
+        text-align: left;
+      }
+      .avatar {
+        width: 31px;
+        height: 31px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #dbb7fe, #7775e9);
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 730;
+      }
+      .accountUser strong {
+        font-size: 12px;
+        font-weight: 640;
+        flex: 1;
+      }
+      .accountUser small {
+        display: block;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .main {
+        flex: 1;
+        min-width: 0;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .topbar {
+        height: 68px;
+        padding: 0 31px;
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        border-bottom: 1px solid var(--line2);
+        background: var(--bg);
+      }
+      .crumb {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .crumb strong {
+        font-size: 13px;
+        color: var(--ink);
+        font-weight: 650;
+      }
+      .headerRight {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .roundBtn {
+        height: 35px;
+        width: 35px;
+        display: grid;
+        place-items: center;
+        color: var(--sub);
+        border-radius: 10px;
+      }
+      .roundBtn:hover {
+        background: var(--soft);
+        color: var(--accent);
+      }
+      .topChip {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        border-radius: 10px;
+        padding: 7px 10px;
+        font-size: 11px;
+        color: var(--sub);
+      }
+      .statusDot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #53b790;
+        box-shadow: 0 0 0 3px #58bd901a;
+      }
+      .mobileBtn {
+        display: none;
+      }
+      .view {
+        height: 100%;
+        display: none;
+        min-height: 0;
+        overflow: auto;
+      }
+      .view.active {
+        display: flex;
+        flex-direction: column;
+      }
+      .chatBody {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+      }
+      .welcome {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        padding: 52px 25px 10px;
+        min-height: 430px;
+        flex: 1;
+      }
+      .welcome .littleLogo {
+        width: 50px;
+        height: 50px;
+        border-radius: 17px;
+        background: var(--tint);
+        color: var(--accent);
+        display: grid;
+        place-items: center;
+        margin-bottom: 24px;
+      }
+      .welcome .littleLogo .ic {
+        height: 27px;
+        width: 27px;
+      }
+      .welcome h1 {
+        font-weight: 670;
+        font-size: 31px;
+        letter-spacing: -1.3px;
+        margin: 0 0 10px;
+      }
+      .welcome p {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 0 0 33px;
+      }
+      .ideas {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        max-width: 690px;
+        width: 100%;
+      }
+      .idea {
+        display: flex;
+        flex-direction: column;
+        gap: 13px;
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        background: var(--surface);
+        padding: 16px;
+        text-align: left;
+        min-height: 112px;
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s;
+      }
+      .idea:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow);
+      }
+      .idea svg {
+        color: var(--accent);
+      }
+      .idea b {
+        font-size: 12px;
+        font-weight: 640;
+      }
+      .idea small {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: -9px;
+      }
+      .composerShell {
+        flex: none;
+        width: min(824px, calc(100% - 52px));
+        margin: 0 auto;
+        padding: 0 0 24px;
+        z-index: 2;
+      }
+      .composer {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 19px;
+        box-shadow: var(--inputShadow);
+        padding: 13px 15px 12px;
+        position: relative;
+      }
+      .composer:focus-within {
+        border-color: #c6bef3;
+      }
+      .composer textarea {
+        resize: none;
+        min-height: 66px;
+        max-height: 170px;
+        display: block;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        outline: none;
+        color: var(--ink);
+        font-size: 13px;
+        line-height: 1.8;
+        padding: 4px 3px 6px;
+      }
+      .composer textarea::placeholder {
+        color: #a7a6b5;
+      }
+      .composerToolbar {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        flex-wrap: wrap;
+      }
+      .toolBtn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 9px;
+        border-radius: 9px;
+        color: var(--sub);
+        font-size: 11px;
+        font-weight: 570;
+        white-space: nowrap;
+      }
+      .toolBtn:hover,
+      .toolBtn.open {
+        background: var(--soft);
+        color: var(--accent);
+      }
+      .toolBtn.modeSelected {
+        background: var(--tint);
+        color: var(--accent);
+      }
+      .toolbarSep {
+        height: 19px;
+        width: 1px;
+        background: var(--line);
+        margin: 0 2px;
+      }
+      .toolbarRight {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .sendBtn {
+        background: var(--accent);
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        border-radius: 11px;
+        color: #fff;
+        transition: transform 0.15s;
+      }
+      .sendBtn:hover {
+        background: var(--accentDark);
+        transform: translateY(-1px);
+      }
+      .sendBtn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      .belowComposer {
+        text-align: center;
+        font-size: 10px;
+        color: var(--muted);
+        padding-top: 8px;
+      }
+      .modelMenu,
+      .settingPopover,
+      .profileMenu {
+        position: absolute;
+        z-index: 21;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        box-shadow: 0 16px 60px rgba(23, 22, 41, 0.15);
+        padding: 8px;
+        display: none;
+      }
+      .modelMenu.show,
+      .settingPopover.show,
+      .profileMenu.show {
+        display: block;
+      }
+      .modelMenu {
+        left: 17px;
+        bottom: 70px;
+        width: 255px;
+      }
+      .popupTitle {
+        color: var(--muted);
+        font-size: 10px;
+        padding: 8px 10px;
+        font-weight: 700;
+        letter-spacing: 1px;
+      }
+      .modelRow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: 9px;
+        width: 100%;
+        text-align: left;
+        font-size: 12px;
+      }
+      .modelRow:hover {
+        background: var(--soft);
+      }
+      .modelRow span {
+        flex: 1;
+      }
+      .modelRow small {
+        display: block;
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .modelRow .ic {
+        color: var(--accent);
+      }
+      .settingPopover {
+        left: 17px;
+        bottom: 70px;
+        width: 304px;
+        padding: 16px;
+      }
+      .settingRow {
+        margin-bottom: 17px;
+      }
+      .settingRow:last-child {
+        margin-bottom: 0;
+      }
+      .settingLabel {
+        font-size: 11px;
+        color: var(--sub);
+        font-weight: 660;
+        margin-bottom: 9px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .seg {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 5px;
+      }
+      .seg button {
+        border: 1px solid var(--line);
+        padding: 7px 1px;
+        border-radius: 8px;
+        font-size: 11px;
+        background: var(--bg);
+      }
+      .seg button.selected {
+        border-color: #c6bbfe;
+        background: var(--tint);
+        color: var(--accent);
+        font-weight: 680;
+      }
+      .settingSelect {
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        height: 36px;
+        border-radius: 8px;
+        padding: 0 9px;
+        font-size: 12px;
+      }
+      .estimate {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--accent);
+        font-size: 11px;
+        font-weight: 660;
+        padding: 7px 9px;
+        border-radius: 8px;
+        background: var(--tint);
+      }
+      .messageStream {
+        width: min(800px, calc(100% - 52px));
+        margin: 0 auto;
+        padding: 32px 0 25px;
+      }
+      .message {
+        margin: 0 0 34px;
+      }
+      .messageHead {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 12px;
+        font-weight: 680;
+        margin-bottom: 13px;
+      }
+      .miniAvatar {
+        height: 26px;
+        width: 26px;
+        border-radius: 9px;
+        display: grid;
+        place-items: center;
+        background: var(--tint);
+        color: var(--accent);
+      }
+      .miniAvatar.user {
+        background: #eaeaf0;
+        color: #77778a;
+      }
+      .bubble {
+        margin-left: 34px;
+        max-width: 610px;
+        font-size: 13px;
+        line-height: 1.9;
+        color: var(--ink);
+      }
+      .bubble.user {
+        background: var(--soft);
+        border-radius: 14px;
+        padding: 12px 15px;
+        width: fit-content;
+        margin-left: auto;
+        max-width: 72%;
+      }
+      .msgActions {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-top: 11px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .msgActions button {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--muted);
+      }
+      .msgActions button:hover {
+        color: var(--accent);
+      }
+      .imageStream {
+        width: min(900px, calc(100% - 52px));
+        padding: 34px 0 15px;
+        margin: 0 auto;
+      }
+      .imageIntro {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 25px;
+      }
+      .imageIntro h2 {
+        font-size: 20px;
+        letter-spacing: -0.5px;
+        margin: 0 0 5px;
+      }
+      .imageIntro p {
+        color: var(--muted);
+        font-size: 12px;
+        margin: 0;
+      }
+      .imageHistoryPrompt {
+        text-align: right;
+        margin: 0 0 22px;
+      }
+      .imageHistoryPrompt span {
+        display: inline-block;
+        text-align: left;
+        border-radius: 16px 16px 5px 16px;
+        background: var(--soft);
+        padding: 12px 18px;
+        color: var(--ink);
+        font-size: 12px;
+        max-width: 520px;
+      }
+      .imageAnswerHead {
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-weight: 680;
+        margin-bottom: 13px;
+      }
+      .imageAnswerHead .done {
+        font-size: 10px;
+        background: #ebf8ef;
+        color: #358767;
+        border-radius: 20px;
+        padding: 3px 8px;
+      }
+      [data-theme='dark'] .imageAnswerHead .done {
+        background: #233e30;
+        color: #8fdeb1;
+      }
+      .imageResultGrid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 15px;
+        max-width: 650px;
+        margin-left: 36px;
+      }
+      .artCard {
+        position: relative;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        padding: 7px;
+        overflow: hidden;
+        box-shadow: 0 5px 15px #08091508;
+      }
+      .artContent {
+        height: 230px;
+        width: 100%;
+        border-radius: 9px;
+        overflow: hidden;
+        display: grid;
+        place-items: center;
+        position: relative;
+      }
+      .artContent:before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        opacity: 0.5;
+        background: radial-gradient(circle at 65% 12%, #ffffff99 0, transparent 28%);
+      }
+      .artContent:after {
+        content: '';
+        position: absolute;
+        bottom: -28px;
+        left: -12px;
+        right: -12px;
+        height: 120px;
+        border-radius: 60% 50% 0 0;
+        background: linear-gradient(8deg, #0f3750b9, #45bbd570);
+        transform: rotate(-9deg);
+      }
+      .artContent svg {
+        height: 100%;
+        width: 100%;
+        position: absolute;
+        inset: 0;
+      }
+      .artA {
+        background: radial-gradient(
+          ellipse at 50% 26%,
+          #c7d0ff 0%,
+          #7e8bd3 30%,
+          #25385b 72%,
+          #15233d 100%
+        );
+      }
+      .artB {
+        background: radial-gradient(
+          ellipse at 58% 16%,
+          #f1cbd3 0%,
+          #9b8ac4 34%,
+          #46668b 75%,
+          #22354a 100%
+        );
+      }
+      .artB:after {
+        background: linear-gradient(8deg, #382e5cc4, #83b2c6a3);
+      }
+      .artFooter {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 3px 3px;
+      }
+      .artFooter span {
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .artFooter div {
+        display: flex;
+        gap: 7px;
+      }
+      .artFooter button {
+        color: var(--sub);
+        padding: 4px;
+      }
+      .artFooter button:hover {
+        color: var(--accent);
+      }
+      .taskActions {
+        display: flex;
+        gap: 8px;
+        margin: 15px 0 0 35px;
+      }
+      .taskActions button {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 7px 10px;
+        color: var(--sub);
+        font-size: 11px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--surface);
+      }
+      .taskActions button:hover {
+        color: var(--accent);
+        border-color: #c2bafa;
+      }
+      .references {
+        display: none;
+        gap: 8px;
+        margin-bottom: 5px;
+      }
+      .references.show {
+        display: flex;
+      }
+      .referenceThumb {
+        height: 40px;
+        width: 40px;
+        border-radius: 7px;
+        border: 1px dashed var(--accent);
+        background: var(--tint);
+        display: grid;
+        place-items: center;
+        color: var(--accent);
+        font-size: 10px;
+      }
+      .pageWrap {
+        width: min(1100px, calc(100% - 68px));
+        margin: 0 auto;
+        padding: 38px 0 45px;
+      }
+      .pageHeader {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 26px;
+      }
+      .pageHeader h1 {
+        font-size: 23px;
+        font-weight: 690;
+        letter-spacing: -0.6px;
+        margin: 0 0 7px;
+      }
+      .pageHeader p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .actionBtn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 10px 13px;
+        background: var(--accent);
+        color: white;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 640;
+      }
+      .actionBtn:hover {
+        background: var(--accentDark);
+      }
+      .secondaryBtn {
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--sub);
+        border-radius: 9px;
+        padding: 9px 12px;
+        display: inline-flex;
+        gap: 7px;
+        align-items: center;
+        font-size: 11px;
+      }
+      .secondaryBtn:hover {
+        color: var(--accent);
+      }
+      .filterBar {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 19px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .filterBar button {
+        border-radius: 9px;
+        padding: 7px 12px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        font-size: 11px;
+        color: var(--sub);
+      }
+      .filterBar button.selected {
+        background: var(--tint);
+        color: var(--accent);
+        border-color: transparent;
+      }
+      .galleryGrid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 17px;
+      }
+      .galleryCard {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface);
+        padding: 8px;
+        overflow: hidden;
+      }
+      .galleryCard .artContent {
+        height: 175px;
+      }
+      .galleryCard .artContent:after {
+        height: 70px;
+      }
+      .galleryCard strong {
+        display: block;
+        padding: 9px 5px 0;
+        font-size: 12px;
+      }
+      .galleryCard small {
+        color: var(--muted);
+        font-size: 10px;
+        padding: 0 5px 7px;
+        display: block;
+      }
+      .galleryCard button {
+        width: 100%;
+        background: var(--soft);
+        border-radius: 8px;
+        padding: 8px;
+        color: var(--sub);
+        font-size: 11px;
+      }
+      .galleryCard button:hover {
+        color: var(--accent);
+      }
+      .walletTop {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr;
+        gap: 15px;
+        margin-bottom: 28px;
+      }
+      .walletHero {
+        padding: 25px;
+        border: 1px solid #e4ddff;
+        background: linear-gradient(120deg, #f2efff, #fbfbff);
+        border-radius: 18px;
+        min-height: 185px;
+      }
+      [data-theme='dark'] .walletHero {
+        background: linear-gradient(120deg, #29263e, #242331);
+        border-color: #51466c;
+      }
+      .walletHero small {
+        color: var(--sub);
+        font-size: 12px;
+      }
+      .walletHero h2 {
+        font-size: 35px;
+        letter-spacing: -1px;
+        margin: 13px 0 4px;
+      }
+      .walletHero p {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .walletInfo {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--surface);
+        padding: 24px;
+      }
+      .walletInfo h3 {
+        font-size: 13px;
+        margin: 0 0 16px;
+      }
+      .walletInfo p {
+        font-size: 12px;
+        color: var(--sub);
+        display: flex;
+        justify-content: space-between;
+      }
+      .redeemRow {
+        display: flex;
+        gap: 8px;
+      }
+      .redeemRow input {
+        min-width: 0;
+        flex: 1;
+        height: 40px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 0 12px;
+        background: var(--surface);
+        font-size: 12px;
+      }
+      .dataCard {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface);
+        overflow: hidden;
+      }
+      .dataCard h3 {
+        padding: 17px 19px;
+        border-bottom: 1px solid var(--line2);
+        font-size: 13px;
+        margin: 0;
+      }
+      .dataTable {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        text-align: left;
+      }
+      .dataTable th {
+        background: var(--bg);
+        color: var(--muted);
+        font-weight: 550;
+        font-size: 11px;
+        padding: 13px 18px;
+      }
+      .dataTable td {
+        padding: 14px 18px;
+        border-top: 1px solid var(--line2);
+        color: var(--sub);
+      }
+      .dataTable td:first-child {
+        color: var(--ink);
+        font-weight: 550;
+      }
+      .pill {
+        color: var(--good);
+        background: #edf8f1;
+        padding: 4px 8px;
+        border-radius: 20px;
+        font-size: 10px;
+        white-space: nowrap;
+      }
+      [data-theme='dark'] .pill {
+        background: #264735;
+      }
+      .statGrid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 15px;
+        margin: 20px 0;
+      }
+      .stat {
+        border: 1px solid var(--line);
+        background: var(--surface);
+        border-radius: 15px;
+        padding: 18px;
+        min-height: 132px;
+      }
+      .stat .label {
+        display: flex;
+        justify-content: space-between;
+        color: var(--sub);
+        font-size: 12px;
+        align-items: center;
+      }
+      .stat .label svg {
+        color: var(--muted);
+      }
+      .stat strong {
+        font-size: 29px;
+        display: block;
+        margin: 13px 0 5px;
+        letter-spacing: -0.8px;
+      }
+      .stat small {
+        font-size: 10px;
+        color: var(--good);
+      }
+      .chartCard {
+        border: 1px solid var(--line);
+        background: var(--surface);
+        border-radius: 15px;
+        padding: 21px;
+        margin-bottom: 17px;
+      }
+      .chartTitle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 15px;
+      }
+      .chartTitle strong {
+        font-size: 13px;
+      }
+      .chartTitle span {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .trendChart {
+        width: 100%;
+        height: 190px;
+      }
+      .userActions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 18px;
+      }
+      .userActions input {
+        width: min(340px, 100%);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 11px 12px;
+        font-size: 12px;
+      }
+      .userActions .actionBtn {
+        margin-left: auto;
+      }
+      .adminNav {
+        display: none;
+      }
+      .sidebar.adminMode .adminNav {
+        display: block;
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+      }
+      .sidebar.adminMode > .newBtn,
+      .sidebar.adminMode > .navLabel,
+      .sidebar.adminMode > nav,
+      .sidebar.adminMode > .divider,
+      .sidebar.adminMode > .historyTitle,
+      .sidebar.adminMode > .historyFind,
+      .sidebar.adminMode > .historyList {
+        display: none !important;
+      }
+      .sidebar.adminMode .creditCard {
+        display: none;
+      }
+      .adminNav .navLabel {
+        margin-top: 17px;
+      }
+      .adminNav .navButton {
+        font-size: 12px;
+      }
+      .profileMenu {
+        bottom: 72px;
+        left: 13px;
+        width: 223px;
+      }
+      .profileMenu button {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        width: 100%;
+        padding: 10px;
+        border-radius: 9px;
+        text-align: left;
+        color: var(--sub);
+        font-size: 12px;
+      }
+      .profileMenu button:hover {
+        background: var(--soft);
+        color: var(--accent);
+      }
+      .notice {
+        position: fixed;
+        bottom: 22px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 100;
+        color: #fff;
+        background: #28263a;
+        padding: 10px 17px;
+        border-radius: 9px;
+        font-size: 12px;
+        box-shadow: 0 8px 25px #0003;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.18s;
+      }
+      .notice.show {
+        opacity: 1;
+      }
+      .modalMask {
+        position: fixed;
+        inset: 0;
+        background: #08091760;
+        z-index: 80;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+      }
+      .modalMask.show {
+        display: flex;
+      }
+      .modalBox {
+        width: min(450px, 100%);
+        border-radius: 18px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: 0 35px 80px #0003;
+        padding: 22px;
+      }
+      .modalBox header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .modalBox h3 {
+        margin: 0;
+        font-size: 17px;
+      }
+      .modalBox p {
+        color: var(--sub);
+        font-size: 12px;
+      }
+      .modalBox input {
+        height: 42px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        width: 100%;
+        padding: 0 10px;
+        background: var(--bg);
+      }
+      .modalBox .actionBtn {
+        margin-top: 14px;
+        width: 100%;
+        justify-content: center;
+      }
+      .demoRibbon {
+        position: fixed;
+        bottom: 12px;
+        right: 14px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        padding: 6px 9px;
+        border-radius: 6px;
+        font-size: 9px;
+        color: var(--muted);
+        z-index: 10;
+        pointer-events: none;
+      }
+      @media (max-width: 1050px) {
+        .sidebar {
+          width: 226px;
+          flex-basis: 226px;
+        }
+        .galleryGrid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .statGrid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 760px) {
+        .sidebar {
+          position: fixed;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          transform: translateX(-110%);
+          box-shadow: var(--shadow);
+          width: 268px;
+          flex-basis: 268px;
+        }
+        .sidebar.mobileOpen {
+          transform: translateX(0);
+        }
+        .mobileBtn {
+          display: grid;
+        }
+        .topbar {
+          height: 60px;
+          padding: 0 13px;
+        }
+        .topChip {
+          display: none;
+        }
+        .composerShell {
+          width: calc(100% - 24px);
+          padding-bottom: 15px;
+        }
+        .welcome {
+          min-height: 330px;
+          padding: 20px 15px;
+          justify-content: flex-end;
+        }
+        .welcome h1 {
+          font-size: 25px;
+        }
+        .ideas {
+          grid-template-columns: 1fr;
+          gap: 7px;
+          max-width: 450px;
+        }
+        .idea {
+          min-height: 65px;
+          padding: 10px 12px;
+          flex-direction: row;
+          align-items: center;
+          gap: 9px;
+        }
+        .idea small {
+          display: none;
+        }
+        .idea b {
+          font-size: 11px;
+        }
+        .chatBody {
+          min-height: 0;
+        }
+        .imageStream,
+        .messageStream {
+          width: calc(100% - 28px);
+          padding-top: 15px;
+        }
+        .imageResultGrid {
+          margin-left: 0;
+          gap: 8px;
+        }
+        .artContent {
+          height: 156px;
+        }
+        .imageAnswerHead {
+          margin-top: 5px;
+        }
+        .imageIntro h2 {
+          font-size: 17px;
+        }
+        .pageWrap {
+          width: calc(100% - 28px);
+          padding-top: 24px;
+        }
+        .pageHeader h1 {
+          font-size: 20px;
+        }
+        .walletTop {
+          grid-template-columns: 1fr;
+        }
+        .galleryGrid {
+          gap: 9px;
+        }
+        .galleryCard .artContent {
+          height: 126px;
+        }
+        .statGrid {
+          gap: 8px;
+        }
+        .stat {
+          padding: 13px;
+        }
+        .stat strong {
+          font-size: 23px;
+        }
+        .dataTable th:nth-child(3),
+        .dataTable td:nth-child(3) {
+          display: none;
+        }
+        .toolbarSep {
+          display: none;
+        }
+        .modelMenu,
+        .settingPopover {
+          bottom: 70px;
+        }
+        .demoRibbon {
+          display: none;
+        }
+      }
+      @media (max-width: 420px) {
+        .galleryGrid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .imageResultGrid {
+          grid-template-columns: 1fr;
+          max-width: 340px;
+        }
+        .artContent {
+          height: 205px;
+        }
+        .composerToolbar {
+          gap: 3px;
+        }
+        .toolBtn {
+          padding: 7px 6px;
+        }
+        .esttext {
+          display: none;
+        }
+        .belowComposer {
+          display: none;
+        }
+        .statGrid {
+          grid-template-columns: 1fr 1fr;
+        }
+        .topbar {
+          gap: 6px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <div class="logo">
+            <svg class="ic" viewBox="0 0 24 24">
+              <path d="m12 1.5 2.5 7.1L22 11l-7.5 2.4L12 21l-2.5-7.6L2 11l7.5-2.4z"></path>
+              <path d="m19 18 1 3 3 1-3 1"></path>
+            </svg>
+          </div>
+          <div><strong>Lumi</strong><small>AI CREATIVE SPACE</small></div>
+          <button
+            class="ghostIcon"
+            aria-label="折叠侧栏"
+            onclick="
+              mobileSidebar(false)
+              toast('桌面端可以继续优化为可收起侧边栏')
+            "
+          >
+            <svg class="ic"><use href="#ic-panel"></use></svg>
+          </button>
+        </div>
+        <button class="newBtn" onclick="newWork()">
+          <svg class="ic sm"><use href="#ic-plus"></use></svg> 新建创作
+          <span style="font-size: 10px; color: #a19bbb; margin-left: auto">⌘ K</span>
+        </button>
+        <div class="adminNav" id="adminNav">
+          <button
+            class="navButton"
+            style="margin: 3px 0 20px; color: var(--accent)"
+            onclick="showPage('chat')"
+          >
+            <svg class="ic">
+              <use
+                href="#ic-chevron-right"
+                style="transform: rotate(180deg); transform-origin: center"
+              ></use></svg
+            >返回创作空间
+          </button>
+          <div class="navLabel">工作台</div>
+          <button class="navButton" id="adminNav-admin" onclick="showPage('admin')">
+            <svg class="ic"><use href="#ic-chart"></use></svg>数据概览
+          </button>
+          <div class="navLabel">用户与财务</div>
+          <button class="navButton" id="adminNav-admin-users" onclick="showPage('admin-users')">
+            <svg class="ic"><use href="#ic-users"></use></svg>用户管理
+          </button>
+          <button class="navButton" onclick="toast('正式版：积分流水与充值兑换统一归入财务模块')">
+            <svg class="ic"><use href="#ic-wallet"></use></svg>积分账务
+          </button>
+          <button class="navButton" onclick="toast('正式版：批量生成、管理和导出兑换码')">
+            <svg class="ic"><use href="#ic-coin"></use></svg>兑换码
+          </button>
+          <div class="navLabel">AI 服务</div>
+          <button
+            class="navButton"
+            id="adminNav-admin-upstreams"
+            onclick="showPage('admin-upstreams')"
+          >
+            <svg class="ic"><use href="#ic-box"></use></svg>上游与模型
+          </button>
+          <button class="navButton" onclick="toast('正式版：生图任务、失败重试、模型能力设置')">
+            <svg class="ic"><use href="#ic-image"></use></svg>任务与定价
+          </button>
+          <div class="navLabel">运营与安全</div>
+          <button class="navButton" onclick="toast('正式版：系统公告、运行状态、邮件配置')">
+            <svg class="ic"><use href="#ic-bell"></use></svg>公告与系统
+          </button>
+          <button class="navButton" onclick="toast('正式版：系统审计、操作日志与安全设置')">
+            <svg class="ic"><use href="#ic-activity"></use></svg>审计与安全
+          </button>
+        </div>
+        <div class="navLabel">创作空间</div>
+        <nav aria-label="主要导航">
+          <button class="navButton active" id="nav-chat" onclick="showPage('chat')">
+            <svg class="ic"><use href="#ic-chat"></use></svg><span>AI 对话</span></button
+          ><button class="navButton" id="nav-image" onclick="showPage('image')">
+            <svg class="ic"><use href="#ic-image"></use></svg><span>AI 绘图</span
+            ><em>New</em></button
+          ><button class="navButton" id="nav-gallery" onclick="showPage('gallery')">
+            <svg class="ic"><use href="#ic-grid"></use></svg><span>我的作品</span>
+          </button>
+        </nav>
+        <div class="divider"></div>
+        <div class="navLabel">我的空间</div>
+        <nav aria-label="个人功能">
+          <button class="navButton" id="nav-wallet" onclick="showPage('wallet')">
+            <svg class="ic"><use href="#ic-wallet"></use></svg><span>积分与兑换</span></button
+          ><button class="navButton" id="nav-admin" onclick="showPage('admin')">
+            <svg class="ic"><use href="#ic-chart"></use></svg><span>管理后台</span>
+          </button>
+        </nav>
+        <div class="divider"></div>
+        <div class="historyTitle">
+          <div class="navLabel" id="historyLabel">最近对话</div>
+          <button
+            class="ghostIcon"
+            title="全部历史记录"
+            onclick="toast('可在真实版本接入历史记录分页、搜索和置顶')"
+          >
+            <svg class="ic xs"><use href="#ic-more"></use></svg>
+          </button>
+        </div>
+        <label class="historyFind"
+          ><svg class="ic xs"><use href="#ic-search"></use></svg
+          ><input
+            placeholder="搜索历史记录..."
+            aria-label="搜索历史记录"
+            id="historySearch"
+            oninput="filterHistory()"
+        /></label>
+        <div class="historyList" id="historyList"></div>
+        <div class="account">
+          <button class="creditCard" onclick="showPage('wallet')">
+            <div class="coin">
+              <svg class="ic sm"><use href="#ic-coin"></use></svg>
+            </div>
+            <div class="creditCopy">
+              <strong>128 <span style="font-size: 11px; color: var(--sub)">积分</span></strong
+              ><span>每日额度 · 剩余 5</span>
+            </div>
+            <svg class="ic xs" style="color: var(--muted)">
+              <use href="#ic-chevron-right"></use>
+            </svg></button
+          ><button class="accountUser" onclick="toggleProfile()">
+            <div class="avatar">星</div>
+            <div style="flex: 1"><strong>创作体验账户</strong><small>个人空间</small></div>
+            <svg class="ic sm" style="color: var(--muted)"><use href="#ic-more"></use></svg>
+          </button>
+        </div>
+        <div class="profileMenu" id="profileMenu">
+          <button
+            onclick="
+              showPage('wallet')
+              toggleProfile(false)
+            "
+          >
+            <svg class="ic sm"><use href="#ic-wallet"></use></svg>我的积分</button
+          ><button
+            onclick="
+              showPage('admin')
+              toggleProfile(false)
+            "
+          >
+            <svg class="ic sm"><use href="#ic-chart"></use></svg>管理后台</button
+          ><button
+            onclick="
+              toggleTheme()
+              toggleProfile(false)
+            "
+          >
+            <svg class="ic sm"><use href="#ic-moon"></use></svg>切换主题
+          </button>
+        </div>
+      </aside>
+      <div class="main">
+        <header class="topbar">
+          <button class="roundBtn mobileBtn" onclick="mobileSidebar(true)" aria-label="打开侧栏">
+            <svg class="ic"><use href="#ic-menu"></use></svg>
+          </button>
+          <div class="crumb">
+            <span>Lumi</span><svg class="ic xs"><use href="#ic-chevron-right"></use></svg
+            ><strong id="pageCrumb">AI 对话</strong>
+          </div>
+          <div class="headerRight">
+            <div class="topChip"><span class="statusDot"></span> 所有系统运行正常</div>
+            <button class="roundBtn" aria-label="主题切换" title="切换主题" onclick="toggleTheme()">
+              <svg class="ic"><use href="#ic-moon"></use></svg></button
+            ><button
+              class="roundBtn"
+              aria-label="通知"
+              title="通知"
+              onclick="toast('这里用于展示公告和任务消息')"
+            >
+              <svg class="ic"><use href="#ic-bell"></use></svg>
+            </button>
+            <div class="avatar" style="height: 29px; width: 29px; font-size: 11px">星</div>
+          </div>
+        </header>
+        <section class="view active" id="view-chat">
+          <div class="chatBody" id="chatScroll">
+            <div id="chatWelcome" class="welcome">
+              <div class="littleLogo">
+                <svg class="ic"><use href="#ic-sparkle"></use></svg>
+              </div>
+              <h1>今天想创造什么？</h1>
+              <p>让想法自由生长，Lumi 陪你一起探索。</p>
+              <div class="ideas">
+                <button
+                  class="idea"
+                  onclick="fillPrompt('帮我制定一个完整的短视频创作方案，包括创意、分镜和脚本。')"
+                >
+                  <svg class="ic"><use href="#ic-sparkle"></use></svg><b>激发创作灵感</b
+                  ><small>从一个灵感开始</small></button
+                ><button
+                  class="idea"
+                  onclick="fillPrompt('帮我优化下面这段文案，让它更有吸引力。')"
+                >
+                  <svg class="ic"><use href="#ic-pen"></use></svg><b>润色你的文字</b
+                  ><small>让表达更有力量</small></button
+                ><button class="idea" onclick="fillPrompt('请帮我设计一个极简现代的网页界面。')">
+                  <svg class="ic"><use href="#ic-code"></use></svg><b>一起构思产品</b
+                  ><small>从需求走向实现</small>
+                </button>
+              </div>
+            </div>
+            <div class="messageStream" id="chatMessages" style="display: none"></div>
+          </div>
+          <div class="composerShell">
+            <div class="composer">
+              <textarea
+                id="chatInput"
+                rows="2"
+                placeholder="向 Lumi 发送消息..."
+                onkeydown="inputKey(event, 'chat')"
+              ></textarea>
+              <div class="composerToolbar">
+                <button
+                  class="toolBtn"
+                  aria-label="添加附件"
+                  title="添加参考图片"
+                  onclick="toast('演示版不上传文件；真实 React 版沿用 /api/v1/files 上传流程')"
+                >
+                  <svg class="ic sm"><use href="#ic-plus"></use></svg></button
+                ><button class="toolBtn modeSelected" onclick="showPage('chat')">
+                  <svg class="ic sm"><use href="#ic-chat"></use></svg>对话</button
+                ><button class="toolBtn" onclick="showPage('image')">
+                  <svg class="ic sm"><use href="#ic-image"></use></svg>绘图
+                </button>
+                <div class="toolbarSep"></div>
+                <button class="toolBtn" onclick="toggleMenu('chatModelMenu')">
+                  <svg class="ic sm"><use href="#ic-box"></use></svg
+                  ><span id="chatModelText">GPT Chat</span
+                  ><svg class="ic xs"><use href="#ic-chevron-up"></use></svg>
+                </button>
+                <div class="toolbarRight">
+                  <button class="sendBtn" onclick="sendChat()" aria-label="发送消息">
+                    <svg class="ic sm"><use href="#ic-arrow-up"></use></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="modelMenu" id="chatModelMenu">
+                <div class="popupTitle">选择聊天模型</div>
+                <button class="modelRow" onclick="selectModel('chat', 'GPT Chat')">
+                  <svg class="ic"><use href="#ic-sparkle"></use></svg
+                  ><span>GPT Chat<small>通用对话 · 示例</small></span
+                  ><svg class="ic xs"><use href="#ic-check"></use></svg></button
+                ><button class="modelRow" onclick="selectModel('chat', 'Creative Writer')">
+                  <svg class="ic"><use href="#ic-pen"></use></svg
+                  ><span>Creative Writer<small>文案创作 · 示例</small></span>
+                </button>
+              </div>
+            </div>
+            <div class="belowComposer">Lumi 也可能会犯错，重要信息请核实 · UI 原型演示数据</div>
+          </div>
+        </section>
+        <section class="view" id="view-image">
+          <div class="chatBody">
+            <div class="imageStream">
+              <div class="imageIntro">
+                <div>
+                  <h2>把想象变成现实</h2>
+                  <p>描述你的灵感、上传参考图，让 Lumi 创造更多可能。</p>
+                </div>
+                <button class="secondaryBtn" onclick="newWork('image')">
+                  <svg class="ic xs"><use href="#ic-plus"></use></svg>新创作
+                </button>
+              </div>
+              <div id="imageRecords">
+                <div class="imageHistoryPrompt">
+                  <span>梦幻紫蓝色星空下的山间湖泊，电影级光影，唯美宁静</span>
+                </div>
+                <div class="imageAnswerHead">
+                  <div class="miniAvatar">
+                    <svg class="ic sm"><use href="#ic-sparkle"></use></svg>
+                  </div>
+                  Lumi 图像生成 <span class="done">已完成</span
+                  ><small style="color: var(--muted); font-weight: 400">今天 10:32</small>
+                </div>
+                <div class="imageResultGrid">
+                  <div class="artCard">
+                    <div class="artContent artA">
+                      <svg viewBox="0 0 300 240" preserveAspectRatio="none">
+                        <defs>
+                          <linearGradient id="rayA" x1="0" y1="0" x2="1" y2="1">
+                            <stop stop-color="#ffffff" stop-opacity=".3"></stop>
+                            <stop offset="1" stop-color="#fff" stop-opacity="0"></stop>
+                          </linearGradient>
+                        </defs>
+                        <circle cx="215" cy="72" r="30" fill="#f9eddb" opacity=".94"></circle>
+                        <path
+                          d="M-20 170 73 75l53 68 43-44 98 112H-20Z"
+                          fill="#283a65"
+                          opacity=".8"
+                        ></path>
+                        <path
+                          d="M0 183 89 111l43 62 61-47 107 75H0"
+                          fill="#8197ba"
+                          opacity=".65"
+                        ></path>
+                        <path
+                          d="M0 215 Q140 195 300 220 L300 240H0Z"
+                          fill="#8ab8d9"
+                          opacity=".45"
+                        ></path>
+                        <g fill="white" opacity=".65">
+                          <circle cx="40" cy="41" r="1"></circle>
+                          <circle cx="110" cy="30" r="1.7"></circle>
+                          <circle cx="145" cy="65" r="1"></circle>
+                          <circle cx="265" cy="39" r="1.3"></circle>
+                          <circle cx="278" cy="84" r="1.1"></circle>
+                          <circle cx="87" cy="57" r="1"></circle>
+                        </g>
+                      </svg>
+                    </div>
+                    <div class="artFooter">
+                      <span>1024 × 1024 · 高质量</span>
+                      <div>
+                        <button
+                          title="编辑这张图片"
+                          onclick="
+                            addReference()
+                            toast('已加入参考图（视觉模拟）')
+                          "
+                        >
+                          <svg class="ic sm"><use href="#ic-pen"></use></svg></button
+                        ><button
+                          title="下载"
+                          onclick="toast('下载功能需在 React 版接入真实文件 API')"
+                        >
+                          <svg class="ic sm"><use href="#ic-download"></use></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="artCard">
+                    <div class="artContent artB">
+                      <svg viewBox="0 0 300 240" preserveAspectRatio="none">
+                        <circle cx="175" cy="64" r="25" fill="#fff3e0" opacity=".95"></circle>
+                        <path
+                          d="M0 170 85 102l49 51 49-66 117 95v58H0"
+                          fill="#4b5781"
+                          opacity=".8"
+                        ></path>
+                        <path
+                          d="M0 198 88 138l52 51 52-48 108 71v30H0"
+                          fill="#89a2bf"
+                          opacity=".62"
+                        ></path>
+                        <path d="M0 216 Q190 188 300 220V240H0Z" fill="#bac8dc" opacity=".5"></path>
+                        <g fill="#fff">
+                          <circle cx="50" cy="35" r="1.1"></circle>
+                          <circle cx="95" cy="51" r="1"></circle>
+                          <circle cx="220" cy="25" r="1.5"></circle>
+                          <circle cx="260" cy="63" r="1"></circle>
+                        </g>
+                      </svg>
+                    </div>
+                    <div class="artFooter">
+                      <span>1024 × 1024 · 高质量</span>
+                      <div>
+                        <button
+                          title="编辑这张图片"
+                          onclick="
+                            addReference()
+                            toast('已加入参考图（视觉模拟）')
+                          "
+                        >
+                          <svg class="ic sm"><use href="#ic-pen"></use></svg></button
+                        ><button
+                          title="下载"
+                          onclick="toast('下载功能需在 React 版接入真实文件 API')"
+                        >
+                          <svg class="ic sm"><use href="#ic-download"></use></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="taskActions">
+                  <button
+                    onclick="
+                      addReference()
+                      toast('已加入图片参考（视觉模拟）')
+                    "
+                  >
+                    <svg class="ic xs"><use href="#ic-pen"></use></svg>继续编辑</button
+                  ><button
+                    onclick="
+                      document.getElementById('imageInput').value =
+                        '梦幻紫蓝色星空下的山间湖泊，电影级光影，唯美宁静'
+                      toast('已复用提示词')
+                    "
+                  >
+                    <svg class="ic xs"><use href="#ic-retry"></use></svg>复用提示词
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="composerShell">
+            <div class="composer">
+              <div class="references" id="references">
+                <div class="referenceThumb">
+                  <svg class="ic"><use href="#ic-image"></use></svg>
+                </div>
+                <button class="toolBtn" onclick="clearReference()">移除参考图 ×</button>
+              </div>
+              <textarea
+                id="imageInput"
+                rows="2"
+                placeholder="描述你想生成的画面，或上传参考图片进行修改..."
+                onkeydown="inputKey(event, 'image')"
+              ></textarea>
+              <div class="composerToolbar">
+                <button
+                  class="toolBtn"
+                  aria-label="上传参考图"
+                  title="上传参考图"
+                  onclick="
+                    addReference()
+                    toast('已加入示例参考图，真实版本使用上传 API')
+                  "
+                >
+                  <svg class="ic sm"><use href="#ic-plus"></use></svg></button
+                ><button class="toolBtn" onclick="showPage('chat')">
+                  <svg class="ic sm"><use href="#ic-chat"></use></svg>对话</button
+                ><button class="toolBtn modeSelected">
+                  <svg class="ic sm"><use href="#ic-image"></use></svg>绘图
+                </button>
+                <div class="toolbarSep"></div>
+                <button class="toolBtn" onclick="toggleMenu('imageModelMenu')">
+                  <svg class="ic sm"><use href="#ic-box"></use></svg
+                  ><span id="imageModelText">Image Creator</span
+                  ><svg class="ic xs"><use href="#ic-chevron-up"></use></svg></button
+                ><button class="toolBtn" onclick="toggleMenu('settingPopover')">
+                  <svg class="ic sm"><use href="#ic-sliders"></use></svg> 参数
+                  <svg class="ic xs"><use href="#ic-chevron-up"></use></svg>
+                </button>
+                <div class="toolbarRight">
+                  <div class="estimate">
+                    <svg class="ic xs"><use href="#ic-coin"></use></svg
+                    ><span id="estimateText">7 积分</span>
+                  </div>
+                  <button class="sendBtn" onclick="sendImage()" aria-label="生成图片">
+                    <svg class="ic sm"><use href="#ic-arrow-up"></use></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="modelMenu" id="imageModelMenu">
+                <div class="popupTitle">选择绘图模型</div>
+                <button class="modelRow" onclick="selectModel('image', 'Image Creator')">
+                  <svg class="ic"><use href="#ic-image"></use></svg
+                  ><span>Image Creator<small>图片生成与编辑 · 示例</small></span></button
+                ><button class="modelRow" onclick="selectModel('image', 'Image Creative')">
+                  <svg class="ic"><use href="#ic-sparkle"></use></svg
+                  ><span>Image Creative<small>高精度创作 · 示例</small></span>
+                </button>
+              </div>
+              <div class="settingPopover" id="settingPopover">
+                <div class="popupTitle" style="padding: 0 0 15px">生成参数</div>
+                <div class="settingRow">
+                  <div class="settingLabel">
+                    图片比例 <span id="ratioHint" style="color: var(--muted)">1:1 正方形</span>
+                  </div>
+                  <div class="seg" id="ratioSeg">
+                    <button class="selected" onclick="setRatio(this, '1:1')">1:1</button
+                    ><button onclick="setRatio(this, '3:4')">3:4</button
+                    ><button onclick="setRatio(this, '16:9')">16:9</button
+                    ><button onclick="setRatio(this, '9:16')">9:16</button>
+                  </div>
+                </div>
+                <div class="settingRow">
+                  <div class="settingLabel">生成质量</div>
+                  <select class="settingSelect" id="quality" onchange="priceCalc()">
+                    <option value="5">标准 · 5 积分/张</option>
+                    <option value="7" selected="">精致 · 7 积分/张</option>
+                    <option value="10">高清 · 10 积分/张</option>
+                  </select>
+                </div>
+                <div class="settingRow">
+                  <div class="settingLabel">图片数量</div>
+                  <div class="seg" id="countSeg">
+                    <button class="selected" onclick="setCount(this, 1)">1 张</button
+                    ><button onclick="setCount(this, 2)">2 张</button
+                    ><button onclick="setCount(this, 3)">3 张</button
+                    ><button onclick="setCount(this, 4)">4 张</button>
+                  </div>
+                </div>
+                <div style="font-size: 10px; color: var(--muted); line-height: 1.6">
+                  真实版本将根据模型能力、后端报价以及账户余额动态展示，不使用固定价格。
+                </div>
+              </div>
+            </div>
+            <div class="belowComposer">
+              图片生成消耗积分 · 创建前显示后端实际报价 · UI 原型演示数据
+            </div>
+          </div>
+        </section>
+        <section class="view" id="view-gallery">
+          <div class="pageWrap">
+            <div class="pageHeader">
+              <div>
+                <h1>我的作品</h1>
+                <p>所有灵感，都值得被好好收藏。</p>
+              </div>
+              <button class="actionBtn" onclick="showPage('image')">
+                <svg class="ic sm"><use href="#ic-plus"></use></svg>开始创作
+              </button>
+            </div>
+            <div class="filterBar">
+              <button class="selected" onclick="filterGallery(this, 'all')">全部作品</button
+              ><button onclick="filterGallery(this, 'generate')">文生图</button
+              ><button onclick="filterGallery(this, 'edit')">参考图编辑</button>
+            </div>
+            <div class="galleryGrid" id="galleryGrid"></div>
+          </div>
+        </section>
+        <section class="view" id="view-wallet">
+          <div class="pageWrap">
+            <div class="pageHeader">
+              <div>
+                <h1>积分中心</h1>
+                <p>清晰了解你的创作额度和使用记录。</p>
+              </div>
+            </div>
+            <div class="walletTop">
+              <div class="walletHero">
+                <small>可用总积分</small>
+                <h2>128 <span style="font-size: 15px; color: var(--sub)">积分</span></h2>
+                <p>每日赠送优先使用，未用完不会累积到下一天。</p>
+              </div>
+              <div class="walletInfo">
+                <h3>积分组成</h3>
+                <p>每日赠送积分 <strong>5</strong></p>
+                <p>永久积分 <strong>123</strong></p>
+                <p>预计重置 <strong>明日 00:00</strong></p>
+              </div>
+            </div>
+            <div class="pageHeader" style="margin-top: 7px">
+              <div>
+                <h1 style="font-size: 17px">兑换积分</h1>
+                <p>输入有效的兑换码，即可增加积分。</p>
+              </div>
+            </div>
+            <div class="redeemRow" style="max-width: 530px; margin-bottom: 27px">
+              <input id="redeemInput" placeholder="请输入兑换码" /><button
+                class="actionBtn"
+                onclick="toast('此处为 UI 演示，正式版本通过 /api/v1/me/redeem 兑换')"
+              >
+                立即兑换
+              </button>
+            </div>
+            <div class="dataCard">
+              <h3>近期积分明细</h3>
+              <table class="dataTable">
+                <thead>
+                  <tr>
+                    <th>类型</th>
+                    <th>金额</th>
+                    <th>时间</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>图片生成</td>
+                    <td>−7</td>
+                    <td>今天 10:32</td>
+                    <td><span class="pill">已完成</span></td>
+                  </tr>
+                  <tr>
+                    <td>每日赠送</td>
+                    <td style="color: var(--good)">+5</td>
+                    <td>今天 00:00</td>
+                    <td><span class="pill">已到账</span></td>
+                  </tr>
+                  <tr>
+                    <td>兑换码充值</td>
+                    <td style="color: var(--good)">+100</td>
+                    <td>昨天 18:40</td>
+                    <td><span class="pill">已到账</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+        <section class="view" id="view-admin">
+          <div class="pageWrap">
+            <div class="pageHeader">
+              <div>
+                <h1>数据概览</h1>
+                <p>掌握 Lumi 平台的运行与创作情况。</p>
+              </div>
+              <button class="secondaryBtn" onclick="toast('实时运营数据由后台接口提供')">
+                <svg class="ic sm"><use href="#ic-calendar"></use></svg>最近 7 天
+              </button>
+            </div>
+            <div class="statGrid">
+              <div class="stat">
+                <div class="label">
+                  总用户 <svg class="ic sm"><use href="#ic-users"></use></svg>
+                </div>
+                <strong>1,284</strong><small>↗ 12.4% 较上周</small>
+              </div>
+              <div class="stat">
+                <div class="label">
+                  活跃用户 <svg class="ic sm"><use href="#ic-activity"></use></svg>
+                </div>
+                <strong>368</strong><small>↗ 8.2% 较上周</small>
+              </div>
+              <div class="stat">
+                <div class="label">
+                  聊天请求 <svg class="ic sm"><use href="#ic-chat"></use></svg>
+                </div>
+                <strong>8,942</strong><small>↗ 18.6% 较上周</small>
+              </div>
+              <div class="stat">
+                <div class="label">
+                  图片生成 <svg class="ic sm"><use href="#ic-image"></use></svg>
+                </div>
+                <strong>2,106</strong><small>↗ 6.8% 较上周</small>
+              </div>
+            </div>
+            <div class="chartCard">
+              <div class="chartTitle">
+                <strong>创作趋势</strong><span>过去 7 天 · 示意数据</span>
+              </div>
+              <svg class="trendChart" viewBox="0 0 880 190" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="areaFill" x1="0" x2="0" y1="0" y2="1">
+                    <stop stop-color="#806ff8" stop-opacity=".23"></stop>
+                    <stop offset="1" stop-color="#806ff8" stop-opacity="0"></stop>
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M0 160H880 M0 110H880 M0 60H880"
+                  fill="none"
+                  stroke="var(--line)"
+                  stroke-width="1"
+                  stroke-dasharray="4 6"
+                ></path>
+                <path
+                  d="M10 144C60 138 75 125 130 132S230 92 275 104S367 140 415 110S500 82 550 98S650 35 690 61S770 45 870 25V185H10Z"
+                  fill="url(#areaFill)"
+                ></path>
+                <path
+                  d="M10 144C60 138 75 125 130 132S230 92 275 104S367 140 415 110S500 82 550 98S650 35 690 61S770 45 870 25"
+                  stroke="var(--accent)"
+                  stroke-width="3"
+                  fill="none"
+                  stroke-linecap="round"
+                ></path>
+                <path
+                  d="M10 157C74 159 94 143 140 154S230 139 285 142S362 120 420 134S520 112 561 125S650 88 706 109S815 72 870 87"
+                  stroke="#70b6b6"
+                  stroke-width="2.6"
+                  fill="none"
+                  stroke-linecap="round"
+                ></path>
+              </svg>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  font-size: 10px;
+                  color: var(--muted);
+                  margin: 4px 0 0;
+                "
+              >
+                <span>周一</span><span>周二</span><span>周三</span><span>周四</span><span>周五</span
+                ><span>周六</span><span>周日</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: center;
+                  gap: 22px;
+                  margin-top: 13px;
+                  font-size: 11px;
+                  color: var(--sub);
+                "
+              >
+                <span>● <span style="color: var(--accent)">聊天请求</span></span
+                ><span>● <span style="color: #70b6b6">图片生成</span></span>
+              </div>
+            </div>
+            <div class="dataCard">
+              <h3>最新生成任务</h3>
+              <table class="dataTable">
+                <thead>
+                  <tr>
+                    <th>任务</th>
+                    <th>用户</th>
+                    <th>时间</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>星空山间湖泊</td>
+                    <td>user_001</td>
+                    <td>10:32</td>
+                    <td><span class="pill">成功</span></td>
+                  </tr>
+                  <tr>
+                    <td>古风角色立绘</td>
+                    <td>user_012</td>
+                    <td>09:41</td>
+                    <td><span class="pill">成功</span></td>
+                  </tr>
+                  <tr>
+                    <td>宣传海报设计</td>
+                    <td>user_056</td>
+                    <td>09:09</td>
+                    <td><span class="pill">成功</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-admin-users">
+          <div class="pageWrap">
+            <div class="pageHeader">
+              <div>
+                <h1>用户管理</h1>
+                <p>查看、筛选和维护平台注册用户。</p>
+              </div>
+              <button
+                class="actionBtn"
+                onclick="toast('真实版本的新增用户对接已有 accounts.create API')"
+              >
+                <svg class="ic sm"><use href="#ic-plus"></use></svg>新增用户
+              </button>
+            </div>
+            <div class="userActions">
+              <input
+                id="userSearch"
+                placeholder="搜索邮箱或昵称..."
+                oninput="filterUsers()"
+              /><button
+                class="secondaryBtn"
+                onclick="toast('角色、状态、注册时间等高级筛选在真实版中展开')"
+              >
+                筛选用户
+              </button>
+            </div>
+            <div class="dataCard">
+              <table class="dataTable" id="usersTable">
+                <thead>
+                  <tr>
+                    <th>用户</th>
+                    <th>账户状态</th>
+                    <th>积分余额</th>
+                    <th>角色</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>creator@example.com</td>
+                    <td><span class="pill">正常</span></td>
+                    <td>128</td>
+                    <td>普通用户</td>
+                  </tr>
+                  <tr>
+                    <td>art@example.com</td>
+                    <td><span class="pill">正常</span></td>
+                    <td>420</td>
+                    <td>普通用户</td>
+                  </tr>
+                  <tr>
+                    <td>admin@example.com</td>
+                    <td><span class="pill">正常</span></td>
+                    <td>1000</td>
+                    <td>管理员</td>
+                  </tr>
+                  <tr>
+                    <td>new@example.com</td>
+                    <td><span class="pill">正常</span></td>
+                    <td>10</td>
+                    <td>普通用户</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p style="font-size: 11px; color: var(--muted); margin-top: 16px">
+              演示数据。正式 React 版保留原有分页、权限、禁用账号、余额调整、批量操作及操作确认。
+            </p>
+          </div>
+        </section>
+        <section class="view" id="view-admin-upstreams">
+          <div class="pageWrap">
+            <div class="pageHeader">
+              <div>
+                <h1>上游与模型</h1>
+                <p>统一管理模型提供方、路由和健康状态。</p>
+              </div>
+              <button
+                class="actionBtn"
+                onclick="toast('新增渠道将沿用 /api/v1/admin/upstreams API')"
+              >
+                <svg class="ic sm"><use href="#ic-plus"></use></svg>添加上游
+              </button>
+            </div>
+            <div class="statGrid" style="grid-template-columns: repeat(3, minmax(0, 1fr))">
+              <div class="stat">
+                <div class="label">接入渠道</div>
+                <strong>3</strong><small>示例配置</small>
+              </div>
+              <div class="stat">
+                <div class="label">启用模型</div>
+                <strong>8</strong><small>聊天 / 生图</small>
+              </div>
+              <div class="stat">
+                <div class="label">当前正常</div>
+                <strong>3/3</strong><small>示例健康状态</small>
+              </div>
+            </div>
+            <div class="dataCard">
+              <h3>上游渠道</h3>
+              <table class="dataTable">
+                <thead>
+                  <tr>
+                    <th>名称</th>
+                    <th>能力</th>
+                    <th>连接状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Chat Provider A</td>
+                    <td>文本、图片理解</td>
+                    <td><span class="pill">健康</span></td>
+                    <td>
+                      <button onclick="toast('正式版支持连接测试、模型发现和路由设置')">
+                        管理
+                      </button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Image Provider B</td>
+                    <td>生图、参考图编辑</td>
+                    <td><span class="pill">健康</span></td>
+                    <td>
+                      <button onclick="toast('正式版支持连接测试、模型发现和路由设置')">
+                        管理
+                      </button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Fallback Channel</td>
+                    <td>备用模型</td>
+                    <td><span class="pill">健康</span></td>
+                    <td>
+                      <button onclick="toast('正式版支持连接测试、模型发现和路由设置')">
+                        管理
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+      <div class="notice" id="notice"></div>
+      <div class="demoRibbon">LUMI UI CONCEPT · 模拟数据 / 非真实 API</div>
+      <svg
+        style="position: absolute; width: 0; height: 0; overflow: hidden"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <symbol id="ic-panel" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+            <path d="M9 4v16"></path>
+          </symbol>
+          <symbol id="ic-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></symbol>
+          <symbol id="ic-chat" viewBox="0 0 24 24">
+            <path d="M21 12a8 8 0 0 1-8 8H5l2-4.5A8 8 0 1 1 21 12Z"></path>
+          </symbol>
+          <symbol id="ic-image" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="18" height="18" rx="3"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <path d="m3 17 6-6 4 4 3-3 5 5"></path>
+          </symbol>
+          <symbol id="ic-grid" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+          </symbol>
+          <symbol id="ic-wallet" viewBox="0 0 24 24">
+            <rect x="3" y="6" width="18" height="15" rx="3"></rect>
+            <path d="M6 6V4a1 1 0 0 1 1-1h11"></path>
+            <path d="M16 13h5"></path>
+          </symbol>
+          <symbol id="ic-chart" viewBox="0 0 24 24">
+            <path d="M4 20h16M7 17v-6M12 17V5M17 17V9"></path>
+          </symbol>
+          <symbol id="ic-search" viewBox="0 0 24 24">
+            <circle cx="10.5" cy="10.5" r="6.5"></circle>
+            <path d="m16 16 5 5"></path>
+          </symbol>
+          <symbol id="ic-more" viewBox="0 0 24 24">
+            <circle cx="5" cy="12" r="1"></circle>
+            <circle cx="12" cy="12" r="1"></circle>
+            <circle cx="19" cy="12" r="1"></circle>
+          </symbol>
+          <symbol id="ic-coin" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="m10 8 2 4 2-4m-2 4v4m-4-4h8"></path>
+          </symbol>
+          <symbol id="ic-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></symbol>
+          <symbol id="ic-chevron-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"></path></symbol>
+          <symbol id="ic-moon" viewBox="0 0 24 24">
+            <path d="M20 14a8 8 0 0 1-10-10A8 8 0 1 0 20 14"></path>
+          </symbol>
+          <symbol id="ic-bell" viewBox="0 0 24 24">
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 9h18c0-1-3-2-3-9ZM10 21h4"></path>
+          </symbol>
+          <symbol id="ic-menu" viewBox="0 0 24 24">
+            <path d="M4 7h16M4 12h16M4 17h16"></path>
+          </symbol>
+          <symbol id="ic-sparkle" viewBox="0 0 24 24">
+            <path d="m12 2 2.3 7.7L22 12l-7.7 2.3L12 22l-2.3-7.7L2 12l7.7-2.3z"></path>
+          </symbol>
+          <symbol id="ic-pen" viewBox="0 0 24 24">
+            <path d="m4 16-1 5 5-1L20 8l-4-4L4 16ZM13 7l4 4"></path>
+          </symbol>
+          <symbol id="ic-code" viewBox="0 0 24 24">
+            <path d="m8 6-6 6 6 6m8-12 6 6-6 6M14 3l-4 18"></path>
+          </symbol>
+          <symbol id="ic-box" viewBox="0 0 24 24">
+            <rect x="4" y="5" width="16" height="14" rx="3"></rect>
+            <path d="M9 5v14M4 10h16"></path>
+          </symbol>
+          <symbol id="ic-arrow-up" viewBox="0 0 24 24">
+            <path d="M12 19V5m-6 6 6-6 6 6"></path>
+          </symbol>
+          <symbol id="ic-check" viewBox="0 0 24 24"><path d="m4 12 5 5 11-11"></path></symbol>
+          <symbol id="ic-sliders" viewBox="0 0 24 24">
+            <path d="M4 7h16M4 17h16M9 4v6M15 14v6"></path>
+          </symbol>
+          <symbol id="ic-download" viewBox="0 0 24 24">
+            <path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"></path>
+          </symbol>
+          <symbol id="ic-retry" viewBox="0 0 24 24">
+            <path d="M3 11a9 9 0 1 1 3 7M3 4v7h7"></path>
+          </symbol>
+          <symbol id="ic-calendar" viewBox="0 0 24 24">
+            <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+            <path d="M7 3v4M17 3v4M3 10h18"></path>
+          </symbol>
+          <symbol id="ic-users" viewBox="0 0 24 24">
+            <circle cx="9" cy="8" r="3"></circle>
+            <path d="M2 20v-2a7 7 0 0 1 14 0v2M17 5a3 3 0 0 1 0 6M18 14a6 6 0 0 1 4 6"></path>
+          </symbol>
+          <symbol id="ic-activity" viewBox="0 0 24 24">
+            <path d="M2 12h5l3-8 4 16 3-8h5"></path>
+          </symbol>
+        </defs>
+      </svg>
+      <script>
+        let current = 'chat',
+          imageCount = 1,
+          currentRatio = '1:1',
+          chatStarted = false,
+          chatCounter = 0
+        const historyData = {
+          chat: [
+            '分析 Lumi React 重构方案',
+            '构思短视频分镜脚本',
+            '设计一个精美的登录页',
+            'Go 项目部署优化',
+          ],
+          image: ['梦幻山间湖泊', '动漫角色立绘', '古风人物服装设计', '电影海报制作'],
+        }
+        function ic(id, cl = 'sm') {
+          return `<svg class="ic ${cl}"><use href="#ic-${id}"/></svg>`
+        }
+        function toast(text) {
+          const n = document.getElementById('notice')
+          n.textContent = text
+          n.classList.add('show')
+          clearTimeout(window.__toast)
+          window.__toast = setTimeout(() => n.classList.remove('show'), 2600)
+        }
+        function hidePopups() {
+          document
+            .querySelectorAll('.modelMenu,.settingPopover,.profileMenu')
+            .forEach((el) => el.classList.remove('show'))
+        }
+        function toggleMenu(id) {
+          const el = document.getElementById(id),
+            on = el.classList.contains('show')
+          hidePopups()
+          if (!on) el.classList.add('show')
+        }
+        function toggleProfile(force) {
+          const el = document.getElementById('profileMenu')
+          const on = el.classList.contains('show')
+          hidePopups()
+          if (force === true || (!on && force !== false)) el.classList.add('show')
+        }
+        function mobileSidebar(open) {
+          document.getElementById('sidebar').classList.toggle('mobileOpen', open)
+        }
+        function showPage(p) {
+          current = p
+          hidePopups()
+          mobileSidebar(false)
+          document.getElementById('sidebar').classList.toggle('adminMode', p.startsWith('admin'))
+          document
+            .querySelectorAll('.view')
+            .forEach((v) => v.classList.toggle('active', v.id === 'view-' + p))
+          document
+            .querySelectorAll('.navButton')
+            .forEach((v) =>
+              v.classList.toggle('active', v.id === 'nav-' + p || v.id === 'adminNav-' + p),
+            )
+          const names = {
+            chat: 'AI 对话',
+            image: 'AI 绘图',
+            gallery: '我的作品',
+            wallet: '积分与兑换',
+            admin: '管理后台',
+            'admin-users': '用户管理',
+            'admin-upstreams': '上游与模型',
+          }
+          document.getElementById('pageCrumb').textContent = names[p]
+          document.getElementById('historyLabel').textContent =
+            p === 'image' ? '绘图记录' : '最近对话'
+          renderHistory()
+          if (p === 'gallery') renderGallery()
+        }
+        function renderHistory() {
+          const isImage = current === 'image',
+            list = document.getElementById('historyList')
+          list.innerHTML = ''
+          const data = historyData[isImage ? 'image' : 'chat'],
+            query = document.getElementById('historySearch').value.trim().toLowerCase()
+          const found = data.filter((s) => s.toLowerCase().includes(query))
+          if (!found.length) list.innerHTML = '<div class="historyEmpty">没有匹配的记录</div>'
+          for (const s of found) {
+            const b = document.createElement('button')
+            b.className = 'historyItem'
+            b.innerHTML = `<span>${escapeHTML(s)}</span>${ic('more', 'xs')}`
+            b.onclick = () => {
+              if (isImage) showPage('image')
+              else {
+                showPage('chat')
+                toast('历史会话接入后端 API 后可查看')
+              }
+            }
+            list.appendChild(b)
+          }
+        }
+        function filterHistory() {
+          renderHistory()
+        }
+        function toggleTheme() {
+          const html = document.documentElement,
+            now = html.dataset.theme
+          html.dataset.theme = now === 'light' ? 'dark' : 'light'
+          toast(html.dataset.theme === 'dark' ? '已切换为深色模式' : '已切换为浅色模式')
+        }
+        function escapeHTML(s) {
+          return String(s).replace(
+            /[&<>"']/g,
+            (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[c],
+          )
+        }
+        function fillPrompt(s) {
+          document.getElementById('chatInput').value = s
+          document.getElementById('chatInput').focus()
+        }
+        function inputKey(e, kind) {
+          if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+            e.preventDefault()
+            if (kind === 'chat') sendChat()
+            else sendImage()
+          }
+        }
+        function addChatMessage(role, content) {
+          let box = document.getElementById('chatMessages')
+          const wrap = document.createElement('div')
+          wrap.className = 'message'
+          wrap.innerHTML = `<div class="messageHead"><div class="miniAvatar ${role === 'user' ? 'user' : ''}">${role === 'user' ? ic('users', 'sm') : ic('sparkle', 'sm')}</div>${role === 'user' ? '你' : 'Lumi'} <span style="color:var(--muted);font-weight:400;font-size:10px">刚刚</span></div><div class="bubble ${role === 'user' ? 'user' : ''}">${escapeHTML(content)}</div>${role === 'user' ? '' : `<div class="msgActions" style="margin-left:35px"><button onclick="toast('已复制示例内容')">${ic('check', 'xs')}复制</button><button onclick="toast('真实版本会调用重新生成 API')">${ic('retry', 'xs')}重新生成</button></div>`}`
+          box.appendChild(wrap)
+          box.style.display = 'block'
+          document.getElementById('chatWelcome').style.display = 'none'
+          document.getElementById('chatScroll').scrollTop =
+            document.getElementById('chatScroll').scrollHeight
+        }
+        function sendChat() {
+          const e = document.getElementById('chatInput')
+          const text = e.value.trim()
+          if (!text) return
+          addChatMessage('user', text)
+          e.value = ''
+          chatStarted = true
+          chatCounter++
+          if (chatCounter === 1) {
+            historyData.chat.unshift(text.length > 19 ? text.slice(0, 19) + '…' : text)
+            renderHistory()
+          }
+          setTimeout(
+            () =>
+              addChatMessage(
+                'assistant',
+                '这是 Lumi 全新界面的一次交互演示。正式 React 版本会接入现有 Go 后端，保留 SSE 流式输出、消息历史、图片理解、重试及停止生成等能力。',
+              ),
+            260,
+          )
+        }
+        function selectModel(kind, value) {
+          document.getElementById(
+            kind === 'chat' ? 'chatModelText' : 'imageModelText',
+          ).textContent = value
+          hidePopups()
+          toast('已选择 ' + value + '（演示模型）')
+        }
+        function setRatio(btn, ratio) {
+          currentRatio = ratio
+          document
+            .querySelectorAll('#ratioSeg button')
+            .forEach((el) => el.classList.toggle('selected', el === btn))
+          document.getElementById('ratioHint').textContent = ratio
+        }
+        function setCount(btn, n) {
+          imageCount = n
+          document
+            .querySelectorAll('#countSeg button')
+            .forEach((el) => el.classList.toggle('selected', el === btn))
+          priceCalc()
+        }
+        function priceCalc() {
+          document.getElementById('estimateText').textContent =
+            Number(document.getElementById('quality').value) * imageCount + ' 积分'
+        }
+        function addReference() {
+          document.getElementById('references').classList.add('show')
+          showPage('image')
+        }
+        function clearReference() {
+          document.getElementById('references').classList.remove('show')
+        }
+        function sendImage() {
+          const el = document.getElementById('imageInput'),
+            prompt = el.value.trim()
+          if (!prompt) return
+          const root = document.getElementById('imageRecords')
+          const p = document.createElement('div')
+          p.className = 'imageHistoryPrompt'
+          p.innerHTML = `<span>${escapeHTML(prompt)}</span>`
+          root.appendChild(p)
+          const reply = document.createElement('div')
+          reply.className = 'imageAnswerHead'
+          reply.innerHTML = `<div class="miniAvatar">${ic('sparkle')}</div>Lumi 图像生成 <span class="done">原型模拟</span>`
+          root.appendChild(reply)
+          const hint = document.createElement('p')
+          hint.style = 'font-size:12px;color:var(--sub);margin-left:35px'
+          hint.textContent = `新任务：${currentRatio} · ${imageCount} 张 · 预计 ${Number(document.getElementById('quality').value) * imageCount} 积分。真实生成由后端异步任务完成。`
+          root.appendChild(hint)
+          el.value = ''
+          historyData.image.unshift(prompt.slice(0, 20))
+          renderHistory()
+          document.querySelector('#view-image .chatBody').scrollTop = 10000
+          toast('已创建示例任务（未调用后台）')
+        }
+        function newWork(kind) {
+          const p = kind || (current === 'image' ? 'image' : 'chat')
+          showPage(p)
+          if (p === 'chat') {
+            document.getElementById('chatMessages').innerHTML = ''
+            document.getElementById('chatMessages').style.display = 'none'
+            document.getElementById('chatWelcome').style.display = 'flex'
+            chatCounter = 0
+            document.getElementById('chatInput').value = ''
+          } else {
+            document.getElementById('imageInput').value = ''
+            toast('已开始新的绘图创作（演示）')
+          }
+        }
+        function renderGallery() {
+          const data = [
+            ['星夜湖泊 · 01', 'artA', 'generate'],
+            ['星夜湖泊 · 02', 'artB', 'generate'],
+            ['氛围概念设计', 'artB', 'edit'],
+            ['霓虹色彩探索', 'artA', 'generate'],
+            ['梦境里的山峦', 'artB', 'edit'],
+            ['日落光影素材', 'artA', 'generate'],
+          ]
+          const root = document.getElementById('galleryGrid')
+          root.innerHTML = data
+            .map(
+              ([name, art, kind], i) =>
+                `<div class="galleryCard" data-kind="${kind}"><div class="artContent ${art}"><svg viewBox="0 0 300 240" preserveAspectRatio="none"><circle cx="${110 + i * 20}" cy="66" r="25" fill="#fff" opacity=".75"/><path d="M-5 200 90 83l45 78 57-45 108 88v40H0" fill="#233a5a" opacity=".6"/><path d="M0 220 120 155 183 183 300 155v90H0" fill="#99b5c9" opacity=".5"/></svg></div><strong>${name}</strong><small>${kind === 'edit' ? '参考图编辑' : '文生图'} · 2026.10.24</small><button onclick="showPage('image');addReference();toast('已从图库加入参考图（演示）')">${ic('pen', 'xs')} 加入编辑</button></div>`,
+            )
+            .join('')
+        }
+        function filterUsers() {
+          const q = document.getElementById('userSearch').value.toLowerCase()
+          document
+            .querySelectorAll('#usersTable tbody tr')
+            .forEach(
+              (row) =>
+                (row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none'),
+            )
+        }
+        function filterGallery(btn, kind) {
+          document
+            .querySelectorAll('.filterBar button')
+            .forEach((b) => b.classList.toggle('selected', b === btn))
+          document.querySelectorAll('.galleryCard').forEach((el) => {
+            el.style.display = kind === 'all' || el.dataset.kind === kind ? '' : 'none'
+          })
+        }
+        document.addEventListener('click', (e) => {
+          if (
+            e.target.closest('.modelMenu,.settingPopover,.profileMenu') ||
+            e.target.closest('.toolBtn, .accountUser')
+          )
+            return
+          hidePopups()
+        })
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            hidePopups()
+            mobileSidebar(false)
+          }
+          if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault()
+            newWork()
+          }
+        })
+        renderHistory()
+        renderGallery()
+      </script>
+    </div>
+  </body>
+</html>
