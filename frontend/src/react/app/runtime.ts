@@ -26,8 +26,10 @@ export function createAppRuntime(service: SessionService = session) {
   const modelStore = createModelSelectionStore()
   let epoch = service.getSnapshot().epoch
   let identity = service.getSnapshot().user?.id
+  let sessionExitTarget = ''
   const unsubscribe = service.subscribe(() => {
     const next = service.getSnapshot()
+    if (next.user) sessionExitTarget = ''
     if (next.epoch !== epoch || next.user?.id !== identity) {
       epoch = next.epoch
       identity = next.user?.id
@@ -44,6 +46,14 @@ export function createAppRuntime(service: SessionService = session) {
     chat,
     image,
     queryClient,
+    get sessionExitTarget() {
+      return sessionExitTarget
+    },
+    clearSession(target = '/login') {
+      // Publish the destination before synchronous session subscribers render their guards.
+      sessionExitTarget = target
+      service.clear()
+    },
     dispose() {
       unsubscribe()
       sessionState.dispose()

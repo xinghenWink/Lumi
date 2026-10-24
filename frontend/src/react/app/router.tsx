@@ -11,6 +11,9 @@ const LegalPage = lazy(() => import('../pages/LegalPage'))
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
 const ImagePage = lazy(() => import('../pages/ImagePage'))
 const ImageGalleryPage = lazy(() => import('../pages/ImageGalleryPage'))
+const CreditsPage = lazy(() => import('../pages/CreditsPage'))
+const ProfilePage = lazy(() => import('../pages/ProfilePage'))
+const SecurityPage = lazy(() => import('../pages/SecurityPage'))
 const ChatPage = lazy(() => import('../pages/ChatPage'))
 const ChatHistoryPage = lazy(() => import('../pages/ChatHistoryPage'))
 const SectionPage = lazy(() => import('../pages/SectionPage'))
@@ -65,10 +68,9 @@ const router = createBrowserRouter([
           })),
           { path: '/me/chats', element: pending(<ChatHistoryPage />) },
           { path: '/me/images', element: pending(<ImageGalleryPage />) },
-          ...['/me', '/me/security', '/me/credits'].map((path) => ({
-            path,
-            element: pending(<SectionPage />),
-          })),
+          { path: '/me', element: pending(<ProfilePage />) },
+          { path: '/me/security', element: pending(<SecurityPage />) },
+          { path: '/me/credits', element: pending(<CreditsPage />) },
         ],
       },
       {

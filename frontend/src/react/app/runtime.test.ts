@@ -3,6 +3,19 @@ import { createAppRuntime } from './runtime'
 import { createSessionService } from '../../api/auth-session'
 
 describe('application runtime isolation', () => {
+  it('publishes a confirmed session-exit destination before notifying route guards', () => {
+    const service = createSessionService(),
+      runtime = createAppRuntime(service)
+    let destination = ''
+    const unsubscribe = service.subscribe(() => {
+      destination = runtime.sessionExitTarget
+    })
+    runtime.clearSession('/login?changed=1')
+    expect(destination).toBe('/login?changed=1')
+    expect(runtime.sessionStore.getState().user).toBeNull()
+    unsubscribe()
+    runtime.dispose()
+  })
   it('also clears cached work created during the anonymous login transition', async () => {
     vi.stubGlobal(
       'fetch',

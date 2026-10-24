@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useSession } from '../../features/auth/hooks'
 import { useRuntime } from '../../app/context'
 import { ApiNotice } from './ApiNotice'
+import { UserAvatar } from './UserAvatar'
 
 export function AccountMenu({ onNavigate }: { onNavigate?: (() => void) | undefined }) {
   const { t } = useTranslation()
@@ -38,9 +39,7 @@ export function AccountMenu({ onNavigate }: { onNavigate?: (() => void) | undefi
           className="flex w-full items-center gap-3 rounded-xl p-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary"
           aria-label={t('nav.userMenu')}
         >
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-sm font-semibold text-primary">
-            {Array.from(user?.nickname || user?.email || '')[0]?.toUpperCase()}
-          </span>
+          <UserAvatar />
           <span className="min-w-0 flex-1">
             <strong className="block truncate text-xs font-semibold">{user?.nickname}</strong>
             <span className="block text-[11px] text-muted-foreground">

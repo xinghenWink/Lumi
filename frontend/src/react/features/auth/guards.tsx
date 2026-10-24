@@ -32,8 +32,9 @@ export function SessionBoundary() {
     return (
       <Navigate
         to={
+          runtime.sessionExitTarget ||
           '/login?redirect=' +
-          encodeURIComponent(location.pathname + location.search + location.hash)
+            encodeURIComponent(location.pathname + location.search + location.hash)
         }
         replace
       />
