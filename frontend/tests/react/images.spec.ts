@@ -301,17 +301,10 @@ test('React real image generation editing gallery cancellation and administrator
     )
     const codes = await api('GET', '/admin/redeem-codes?batch_id=' + String(batch.id))
     if (!Array.isArray(codes.items)) throw new Error('Journey code missing')
-    // Credit forms are assigned to PR-5; the original journey still covers them.
-    await api(
-      'POST',
-      '/me/redeem',
-      { code: String(record(codes.items[0]).code) },
-      memberToken,
-      randomUUID(),
-    )
-    expect(
-      Number((await api('GET', '/me/credits', undefined, memberToken)).permanent_balance),
-    ).toBe(10010)
+    await member.goto('/me/credits')
+    await member.getByLabel('兑换积分', { exact: true }).fill(String(record(codes.items[0]).code))
+    await member.getByRole('button', { name: '确认兑换', exact: true }).click()
+    await expect(member.getByTestId('permanent-balance')).toHaveText('10,010')
     const beforeAdjustment = record(await api('GET', '/me/credits', undefined, memberToken))
     const adjusted = await api(
       'POST',
@@ -321,9 +314,8 @@ test('React real image generation editing gallery cancellation and administrator
       randomUUID(),
     )
     expect(Number(adjusted.total)).toBe(Number(beforeAdjustment.total) + 5)
-    expect(
-      Number((await api('GET', '/me/credits', undefined, memberToken)).permanent_balance),
-    ).toBe(10015)
+    await member.reload()
+    await expect(member.getByTestId('permanent-balance')).toHaveText('10,015')
     await member.goto('/create')
     await expect(member.getByRole('button', { name: '选择模型', exact: true })).toContainText(
       modelName,
@@ -616,15 +608,13 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(member.locator('.image-gallery-card')).toHaveCount(1)
     const account = await api('GET', '/me/credits', undefined, memberToken)
     expect(Number(account.total)).toBeGreaterThanOrEqual(9970)
-    // Profile UI is assigned to PR-5. Retain the real avatar upload/ownership/dimension assertions.
-    const avatarResponse = await member.request.post('/api/v1/files?kind=avatar', {
-      headers: { Authorization: 'Bearer ' + memberToken, 'X-Lumi-CSRF': '1', Origin: baseURL },
-      multipart: { file: { name: 'avatar.png', mimeType: 'image/png', buffer: png } },
-    })
-    expect(avatarResponse.ok()).toBe(true)
-    const avatarUpload = record(await avatarResponse.json())
+    await member.goto('/me')
+    await member
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: png })
+    await expect(member.locator('.profile-avatar img')).toBeVisible()
     const profile = await api('GET', '/me', undefined, memberToken)
-    expect(profile.avatar_file_id).toBe(avatarUpload.id)
+    expect(typeof profile.avatar_file_id).toBe('string')
     const avatar = await api(
       'GET',
       '/files/' + String(profile.avatar_file_id) + '/metadata',
@@ -634,7 +624,10 @@ test('React real image generation editing gallery cancellation and administrator
     expect(avatar.width).toBe(256)
     expect(avatar.height).toBe(256)
     await member.reload()
-    expect((await api('GET', '/me', undefined, memberToken)).avatar_file_id).toBe(avatarUpload.id)
+    await expect(member.locator('.profile-avatar img')).toBeVisible()
+    expect((await api('GET', '/me', undefined, memberToken)).avatar_file_id).toBe(
+      profile.avatar_file_id,
+    )
     // Real generated files exercise cursor pagination and bounded gallery rendering.
     const galleryEmail = 'image-gallery-' + suffix + '@lumi.test'
     await api('POST', '/admin/users', {

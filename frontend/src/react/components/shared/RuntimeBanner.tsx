@@ -20,7 +20,7 @@ export function RuntimeBanner() {
   const preferences = useQuery({
     queryKey: ['user', user?.id, 'preferences'],
     enabled: !!user,
-    queryFn: () => operations.preferences(),
+    queryFn: ({ signal }) => operations.preferences(signal),
     staleTime: Infinity,
   })
   useEffect(() => {

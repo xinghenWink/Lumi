@@ -194,28 +194,33 @@ export async function downloadResponse(response: Response, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 export const operations = {
-  preferences: () => authorized('/api/v1/me/preferences', parsePreferences),
+  preferences: (signal?: AbortSignal) =>
+    authorized('/api/v1/me/preferences', parsePreferences, signal ? { signal } : {}),
   savePreferences: (body: Preferences) =>
     authorized('/api/v1/me/preferences', parsePreferences, { method: 'PUT', body }),
-  devices: (cursor = '') =>
-    authorized('/api/v1/me/sessions?limit=50&cursor=' + encodeURIComponent(cursor), (v) => {
-      const d = record(v)
-      return {
-        current_id: text(d.current_id),
-        next_cursor: text(d.next_cursor),
-        items: array(d.items, (v) => {
-          const r = record(v)
-          return {
-            id: text(r.id),
-            device: text(r.device),
-            ip: text(r.ip),
-            user_agent: text(r.user_agent),
-            created_at: text(r.created_at),
-            expires_at: text(r.expires_at),
-          }
-        }),
-      }
-    }),
+  devices: (cursor = '', signal?: AbortSignal) =>
+    authorized(
+      '/api/v1/me/sessions?limit=50&cursor=' + encodeURIComponent(cursor),
+      (v) => {
+        const d = record(v)
+        return {
+          current_id: text(d.current_id),
+          next_cursor: text(d.next_cursor),
+          items: array(d.items, (v) => {
+            const r = record(v)
+            return {
+              id: text(r.id),
+              device: text(r.device),
+              ip: text(r.ip),
+              user_agent: text(r.user_agent),
+              created_at: text(r.created_at),
+              expires_at: text(r.expires_at),
+            }
+          }),
+        }
+      },
+      signal ? { signal } : {},
+    ),
   revoke: (id: string) =>
     authorized('/api/v1/me/sessions/' + encodeURIComponent(id), noContent, { method: 'DELETE' }),
   revokeAll: (id: string) =>
