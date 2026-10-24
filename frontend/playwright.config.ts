@@ -1,4 +1,4 @@
-import { defineConfig } from '@playwright/test'
+import { defineConfig, devices } from '@playwright/test'
 import { randomBytes } from 'node:crypto'
 
 const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18080'
@@ -10,26 +10,34 @@ process.env.E2E_ENCRYPTION_KEY ??= randomBytes(32).toString('base64')
 
 export default defineConfig({
   testDir: './tests',
-  testIgnore: ['**/react/**', '**/embed/**'],
-  outputDir: './test-results/legacy',
+  // Original entry files import these complete ports; avoid collecting them twice.
+  testIgnore: [
+    '**/embed/**',
+    '**/react/account-settings.spec.ts',
+    '**/react/accounts-credits.spec.ts',
+    '**/react/admin-finance.spec.ts',
+    '**/react/catalog.spec.ts',
+    '**/react/chat.spec.ts',
+    '**/react/images.spec.ts',
+    '**/react/operations.spec.ts',
+  ],
+  testMatch: '**/*.spec.ts',
+  outputDir: './test-results/e2e',
   workers: 1,
   timeout: 120_000,
   use: { baseURL, trace: 'retain-on-failure', actionTimeout: 10_000, navigationTimeout: 15_000 },
   projects: [
-    {
-      name: 'desktop',
+    { name: 'chrome-desktop', use: { channel: 'chrome', viewport: { width: 1440, height: 900 } } },
+    ...[320, 390].map((width) => ({
+      name: `chrome-mobile-${width}`,
       use: {
-        viewport: { width: 1440, height: 900 },
-        extraHTTPHeaders: { 'X-Forwarded-For': '198.18.0.1' },
+        ...devices['Pixel 7'],
+        channel: 'chrome',
+        viewport: { width, height: 740 },
+        isMobile: true,
+        hasTouch: true,
       },
-    },
-    {
-      name: 'mobile',
-      use: {
-        viewport: { width: 320, height: 740 },
-        extraHTTPHeaders: { 'X-Forwarded-For': '198.18.0.2' },
-      },
-    },
+    })),
   ],
   webServer: {
     command: `go build -tags=production -o ${serverBinary} ./cmd/lumi && ${serverBinary} serve`,

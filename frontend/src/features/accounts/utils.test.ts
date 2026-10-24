@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createI18n } from 'vue-i18n'
+import { createAppI18n } from '../../react/i18n'
 import { addDateRange, safeRedirect, validPassword } from './utils'
 import zh from '../../i18n/accounts.zh-CN'
 import en from '../../i18n/accounts.en'
@@ -33,21 +33,21 @@ describe('account input and navigation', () => {
     }
     expect(keys(zh)).toEqual(keys(en))
   })
-  it('compiles every translated message, including literal email addresses', () => {
+  it('compiles every translated message, including literal email addresses', async () => {
     function paths(value: unknown, prefix = ''): string[] {
       if (typeof value !== 'object' || value === null) return [prefix]
       return Object.entries(value).flatMap(([key, nested]) =>
         paths(nested, prefix ? `${prefix}.${key}` : key),
       )
     }
-    const i18n = createI18n({ legacy: false, locale: 'zh-CN', messages: { 'zh-CN': zh, en } })
+    const i18n = await createAppI18n()
     for (const locale of ['zh-CN', 'en'] as const) {
-      i18n.global.locale.value = locale
+      await i18n.changeLanguage(locale)
       for (const key of paths(zh))
         expect(() =>
-          i18n.global.t(key, { page: 1, seconds: 60, name: 'Tester', action: 'event' }),
+          i18n.t(key, { page: 1, seconds: 60, name: 'Tester', action: 'event' }),
         ).not.toThrow()
-      expect(i18n.global.t('auth.emailPlaceholder')).toBe('you@example.com')
+      expect(i18n.t('auth.emailPlaceholder')).toBe('you@example.com')
     }
   })
 })

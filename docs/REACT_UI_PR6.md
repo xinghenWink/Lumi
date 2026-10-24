@@ -27,8 +27,8 @@ Each sub-PR runs frozen install, strict typecheck, lint/format, unit tests, both
 
 - [x] 6a users/finance and its browser/CI gates (PR #16, CI #98, integration merge `2583feb`).
 - [x] 6b AI services and its browser/CI gates (PR #17, CI #99, integration merge `24915ca`).
-- [ ] 6c operations/security and its browser/CI gates.
-- [ ] All administrative routes/actions covered before PR-7 entry switch, Docker acceptance and Vue cleanup.
+- [x] 6c operations/security and its browser/CI gates (PR #18, CI #101, integration merge ae05cbe).
+- [x] All administrative routes/actions and actual React Docker embed accepted before PR-7 entry switch and Vue cleanup.
 
 ## PR-6b source and verification plan
 

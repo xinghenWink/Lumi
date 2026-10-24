@@ -64,8 +64,6 @@ try {
   await run('docker', [
     'build',
     '--build-arg',
-    'FRONTEND_VARIANT=react',
-    '--build-arg',
     'VERSION=react-embed-smoke',
     '--build-arg',
     'COMMIT=' + buildCommit,

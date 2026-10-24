@@ -8,6 +8,8 @@ Lumi 把流式聊天、生图与改图、积分兑换和管理后台整合到一
 
 当前可用版本为 **[v0.1.0](https://github.com/xinghenWink/Lumi/releases/tag/v0.1.0)**，定位为首个可运行的基础版本。M0～M7 的初期功能与验收已完成，支持 `linux/amd64` 和 `linux/arm64`；产品仍在 0.x 阶段持续迭代。版本路线为 `0.0.1 → 0.1.0 → 0.1.x / 0.2.0…`，成熟后再发布 1.0.0，见 [版本策略](docs/VERSIONING.md)。
 
+本源码分支已迁移到 React；下方部署包链接仍指向已发布的 v0.1.0。React 重构的发布以最终发布 PR 为准，阶段记录与兼容性见 [迁移计划](docs/REACT_UI_REFACTOR.md)、[兼容清单](docs/REACT_UI_COMPATIBILITY.md) 和 [PR-7 验收](docs/REACT_UI_PR7.md)。
+
 [功能](#功能) · [技术与架构](#技术与架构) · [快速部署](#快速部署) · [首次配置](#首次配置) · [运维](#运维) · [本地开发](#本地开发) · [文档](#文档)
 
 ## 功能
@@ -27,18 +29,18 @@ Lumi 把流式聊天、生图与改图、积分兑换和管理后台整合到一
 
 ## 技术与架构
 
-| 层         | 技术                                                                                                       |
-| ---------- | ---------------------------------------------------------------------------------------------------------- |
-| 后端       | Go 1.26.10、Gin、pgx、sqlc、goose；JWT / Argon2id、SSE、OpenAPI 3.1。                                      |
-| 前端       | Vue 3、TypeScript strict、Vite 8、Pinia、Vue Router、Tailwind CSS 4、Reka UI、vue-i18n。                   |
-| 数据与任务 | PostgreSQL 16 保存账号、会话、任务与账务；Redis 7 处理队列、限流和流式续传；图片保存在持久目录。           |
-| 部署       | 单个非 root 应用镜像、Docker Compose、Caddy / Nginx HTTPS 反代；GitHub Actions 发布到 GHCR。               |
-| 质量检查   | golangci-lint、ESLint、Prettier、Vitest、真实 PG / Redis 集成、Playwright、Lighthouse、k6 和依赖漏洞扫描。 |
+| 层         | 技术                                                                                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 后端       | Go 1.26.10、Gin、pgx、sqlc、goose；JWT / Argon2id、SSE、OpenAPI 3.1。                                                                     |
+| 前端       | React、TypeScript strict、Vite 8、Tailwind CSS 4、shadcn/ui / Radix、lucide-react、React Router、TanStack Query、Zustand、react-i18next。 |
+| 数据与任务 | PostgreSQL 16 保存账号、会话、任务与账务；Redis 7 处理队列、限流和流式续传；图片保存在持久目录。                                          |
+| 部署       | 单个非 root 应用镜像、Docker Compose、Caddy / Nginx HTTPS 反代；GitHub Actions 发布到 GHCR。                                              |
+| 质量检查   | golangci-lint、ESLint、Prettier、Vitest、真实 PG / Redis 集成、Playwright、Lighthouse、k6 和依赖漏洞扫描。                                |
 
 ```mermaid
 flowchart LR
     Browser[浏览器] -->|HTTPS / SSE| Proxy[Caddy / Nginx]
-    Proxy --> App[Lumi：Go API + 内嵌 Vue 前端]
+    Proxy --> App[Lumi：Go API + 内嵌 React 前端]
     App --> PG[(PostgreSQL)]
     App --> Redis[(Redis)]
     App --> Files[持久图片目录]
@@ -176,8 +178,9 @@ make lint test                 # Go / frontend lint, types and unit tests
 make sqlc api                  # Regenerate SQL queries and API types
 make test-integration          # Real PostgreSQL / Redis integration tests
 make build                     # Build frontend and embed it into the Go binary
-pnpm --filter @lumi/frontend exec playwright install --with-deps chromium
-pnpm test:e2e                  # Desktop and mobile browser tests
+pnpm --filter @lumi/frontend exec playwright install --with-deps chrome
+pnpm test:e2e                  # Chrome desktop and 320/390px touch/mobile browser tests
+node scripts/react-embed-smoke.mjs # Isolated default production Docker embed acceptance
 ```
 
 集成 / E2E 需要 Docker。E2E 还需显式设置 `E2E_DATABASE_URL` 和 `E2E_REDIS_URL`，指向**空的独立测试数据库与缓存**，不要使用生产数据。测试启动 `18080` 端口的真实应用；仅检查访客页可运行 `pnpm test:e2e --grep '@guest'`。
@@ -188,7 +191,7 @@ CI 覆盖质量检查、契约生成一致性、真实集成、完整用户流�
 
 ```text
 backend/             Go 服务、业务模块、SQL 查询及数据库迁移
-frontend/            Vue 页面、组件、状态、API 类型及浏览器测试
+frontend/            React 页面、组件、状态、API 类型及浏览器测试
 deploy/              Compose、环境模板、安装与备份恢复脚本、反代示例
 scripts/             部署验收与性能测试工具
 docs/                需求、OpenAPI、技术决策及里程碑验收

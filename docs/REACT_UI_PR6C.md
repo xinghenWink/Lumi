@@ -35,9 +35,9 @@ CI retains its current quality, full legacy/candidate suites, capacity/audit, pr
 ## Progress
 
 - [x] All operations/security routes and existing functions migrated.
-- [ ] Real candidate/legacy, static/unit/performance and visual gates.
-- [ ] Actual React Docker production embed accepted locally and in CI.
-- [ ] Integration complete before PR-7 entry switch and Vue cleanup.
+- [x] Real candidate/legacy, static/unit/performance and visual gates.
+- [x] Actual React Docker production embed accepted locally and in CI.
+- [x] Integration complete before PR-7 entry switch and Vue cleanup.
 
 ## Implementation and regression evidence
 
@@ -48,3 +48,9 @@ The original account/settings/SMTP/audit and operations journeys retain their be
 The first focused run exposed an immediate visibility check racing lazy shell mounting; the candidate account helper now selects the mobile drawer by the actual viewport and lets Playwright await the trigger. A later focused run found an incorrectly written audit URL in the new test; it now uses the verified existing `/admin/audit-logs` endpoint. Assertions and original thresholds remain intact. Focused desktop account/operations writes pass; full three-viewport and container gates remain required.
 
 The local Docker runtime was recovered from an inaccessible stale runtime socket by preserving/renaming only its runtime directory. No factory reset, image/volume prune or application data removal was performed. Full suites use fresh owned PG/Redis fixtures after recovery.
+
+## Completed acceptance
+
+React Chrome 51/51 (desktop/320/390), original Vue 16/16, frozen install, both strict typechecks, lint/format, 50 original/shared and 42 React/shared units, both builds and visual inspection pass. Desktop Lighthouse is 100, initial script gzip 249440 bytes, SSE p95 21/19/19 ms, interaction maximum 16 ms and long tasks 0; all original bounds remain unchanged.
+
+The first Docker run exposed inherited server appearance across projects on the same isolated account. The test explicitly normalizes light before dark, retaining theme assertions. Exact-head Docker embed passes 3/3 on 2b6d0e3, image sha256:91d3d178a63b79a02e5c3e8fed7ec6e52e33296181cb19ea3e27c3f6a769f53b; owned resources and credential files are cleaned. CI #101 (40077707121) passes quality/integration/capacity/audit, all Chrome cases, React production Docker embed, original Compose and installation/upgrade/rollback/backup restoration. PR #18 integrated only into codex/react-ui as ae05cbe; main remains unchanged. Evidence is retained under ignored .tools/react-ui-pr-6c and .tools/react-embed.
