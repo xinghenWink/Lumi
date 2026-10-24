@@ -6,9 +6,9 @@
 
 Lumi 把流式聊天、生图与改图、积分兑换和管理后台整合到一个站点。前端嵌入 Go 二进制，配合 PostgreSQL、Redis 和持久文件目录运行，通过 OpenAI 兼容上游调用模型，适合部署自己的 AI 创作服务。
 
-当前可用版本为 **[v0.1.0](https://github.com/xinghenWink/Lumi/releases/tag/v0.1.0)**，定位为首个可运行的基础版本。M0～M7 的初期功能与验收已完成，支持 `linux/amd64` 和 `linux/arm64`；产品仍在 0.x 阶段持续迭代。版本路线为 `0.0.1 → 0.1.0 → 0.1.x / 0.2.0…`，成熟后再发布 1.0.0，见 [版本策略](docs/VERSIONING.md)。
+本源码对应 **[v0.2.0](https://github.com/xinghenWink/Lumi/releases/tag/v0.2.0)**：完整 React 前端、对话式聊天与图像创作、独立管理后台。M0～M7 的初期功能保留，支持 `linux/amd64` 和 `linux/arm64`；正式镜像与附件以 Release 的发布状态为准。产品仍在 0.x 阶段持续迭代，成熟后再发布 1.0.0，见 [版本策略](docs/VERSIONING.md)。
 
-本源码分支已迁移到 React；下方部署包链接仍指向已发布的 v0.1.0。React 重构的发布以最终发布 PR 为准，阶段记录与兼容性见 [迁移计划](docs/REACT_UI_REFACTOR.md)、[兼容清单](docs/REACT_UI_COMPATIBILITY.md) 和 [PR-7 验收](docs/REACT_UI_PR7.md)。
+从 v0.1.0 升级无需新增数据库迁移；账号、积分流水、会话、图片和上游配置继续沿用，升级前备份数据库、文件与密钥。阶段记录、兼容性与发布流程见 [迁移计划](docs/REACT_UI_REFACTOR.md)、[兼容清单](docs/REACT_UI_COMPATIBILITY.md)、[PR-7 验收](docs/REACT_UI_PR7.md) 和 [v0.2.0 发布说明](docs/RELEASE_V0.2.0.md)。
 
 [功能](#功能) · [技术与架构](#技术与架构) · [快速部署](#快速部署) · [首次配置](#首次配置) · [运维](#运维) · [本地开发](#本地开发) · [文档](#文档)
 
@@ -61,7 +61,7 @@ Lumi 提供平台和管理能力，上游推理服务需要单独准备。默认
 
 ```sh
 curl --fail --location \
-  https://github.com/xinghenWink/Lumi/releases/download/v0.1.0/lumi-deploy.tar.gz \
+  https://github.com/xinghenWink/Lumi/releases/download/v0.2.0/lumi-deploy.tar.gz \
   --output lumi-deploy.tar.gz
 sudo install -d -m 700 /opt/lumi
 sudo tar -xzf lumi-deploy.tar.gz -C /opt/lumi
@@ -73,7 +73,7 @@ sudoedit /opt/lumi/.env
 
 ```dotenv
 LUMI_IMAGE=ghcr.io/xinghenwink/lumi
-LUMI_VERSION=v0.1.0
+LUMI_VERSION=v0.2.0
 ADMIN_EMAIL=admin@example.com
 PUBLIC_BASE_URL=https://lumi.example.com
 COOKIE_SECURE=true
