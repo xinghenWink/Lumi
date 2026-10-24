@@ -35,7 +35,7 @@ Markdown reuses the existing parser, sanitizer, Shiki and KaTeX. Memoized stable
 - [x] Final complete legacy browser suite after fixture extraction: 16/16 pass.
 - [x] Final React suite on Chrome desktop and 320/390px mobile/touch emulation: 15/15 pass. Desktop SSE p95 is 19 ms (60 samples), Lighthouse 100, initial script gzip 238,730 bytes, sampled interaction 16 ms and long-task percentage 0. The existing thresholds are unchanged. Light/dark desktop and mobile screenshots have been inspected.
 - [x] Production dependency audit: no known vulnerabilities.
-- [ ] Current-head CI, integration, capacity and Docker/Compose before integration.
+- [x] [CI #95](https://github.com/xinghenWink/Lumi/actions/runs/40057461428): quality, React candidate, Go integration, capacity, Docker/Compose and install/upgrade/rollback/backup restore all pass. PR #13 merged only into `codex/react-ui` as `3ce9f7d`.
 
 The first candidate desktop run found an implicit label included React textarea initial text in the exact label lookup. The edit field now has an explicit label/control ID. A subsequent recovery test used an incorrect export translation label; it now uses the existing translated action name and jointly awaits click/download so a failed selector cannot leave an unhandled promise. Failure traces remain under ignored `.tools/react-ui-pr-3/`. These are fixes, not removed or relaxed checks.
 

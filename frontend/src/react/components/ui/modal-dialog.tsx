@@ -11,6 +11,7 @@ export function ModalDialog({
   description,
   busy = false,
   returnFocus,
+  wide = false,
   children,
 }: {
   open: boolean
@@ -19,6 +20,7 @@ export function ModalDialog({
   description: string
   busy?: boolean
   returnFocus?: RefObject<HTMLElement | null>
+  wide?: boolean
   children: ReactNode
 }) {
   const { t } = useTranslation()
@@ -36,7 +38,7 @@ export function ModalDialog({
         />
         <Dialog.Content
           data-lumi-modal
-          className="fixed top-1/2 left-1/2 z-60 max-h-[calc(100dvh-32px)] w-[calc(100vw-32px)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-auto overscroll-contain rounded-2xl border border-border bg-card p-5 text-foreground shadow-xl outline-none sm:p-6"
+          className={`fixed top-1/2 left-1/2 z-60 max-h-[calc(100dvh-32px)] w-[calc(100vw-32px)] ${wide ? 'max-w-5xl' : 'max-w-lg'} -translate-x-1/2 -translate-y-1/2 overflow-auto overscroll-contain rounded-2xl border border-border bg-card p-5 text-foreground shadow-xl outline-none sm:p-6`}
           onCloseAutoFocus={(event) => {
             if (returnFocus?.current) {
               event.preventDefault()

@@ -40,6 +40,8 @@ export async function createAppI18n(locale: 'zh-CN' | 'en' = 'zh-CN') {
             recentChats: '最近对话',
             newCreation: '开启新创作',
             visionRequired: '请切换到支持图片的聊天模型，或移除参考图后发送。',
+            imageParameters: '生图参数',
+            imageCount: '{count} 张',
           },
         },
       },
@@ -62,6 +64,8 @@ export async function createAppI18n(locale: 'zh-CN' | 'en' = 'zh-CN') {
             newCreation: 'New creation',
             visionRequired:
               'Choose a vision-enabled chat model or remove the references before sending.',
+            imageParameters: 'Image parameters',
+            imageCount: '{count} images',
           },
         },
       },
