@@ -1,5 +1,6 @@
 @import 'tailwindcss' source(none);
 @import './tokens.css';
+@import './markdown.css';
 @source '../';
 
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
@@ -40,6 +41,9 @@
   }
   button:disabled {
     cursor: default;
+  }
+  body:has([data-lumi-modal]) {
+    overflow: hidden;
   }
   @media (prefers-reduced-motion: reduce) {
     *,

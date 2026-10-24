@@ -1,19 +1,17 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { Search } from 'lucide-react'
-import { useState } from 'react'
+import { Pin, Search } from 'lucide-react'
+import { lazy, Suspense, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { chats } from '../../../api/chat'
+import { chats, type Conversation } from '../../../api/chat'
 import { images } from '../../../api/images'
 import { useSession } from '../../features/auth/hooks'
 import { ApiNotice } from './ApiNotice'
 import { Button } from '../ui/button'
+import { ConversationActions } from '../chat/ConversationActions'
+const VirtualHistoryRows = lazy(() => import('./VirtualHistoryRows'))
 
-interface HistoryRow {
-  id: string
-  title: string
-  pinned: boolean
-}
+type HistoryRow = Omit<Conversation, 'busy'> & { busy?: boolean }
 interface HistoryPage {
   items: HistoryRow[]
   next_cursor: string
@@ -23,9 +21,14 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
   const { t } = useTranslation()
   const { user } = useSession()
   const location = useLocation()
-  const image = location.pathname.startsWith('/create')
-  const [search, setSearch] = useState('')
-  const [applied, setApplied] = useState('')
+  const image =
+    location.pathname.startsWith('/create') || location.pathname.startsWith('/me/images')
+  const mode = image ? 'image' : 'chat'
+  const [searches, setSearches] = useState({
+    chat: { search: '', applied: '' },
+    image: { search: '', applied: '' },
+  })
+  const { search, applied } = searches[mode]
   const query = useInfiniteQuery({
     queryKey: ['user', user?.id, 'sidebar-history', image ? 'image' : 'chat', applied],
     initialPageParam: '',
@@ -36,7 +39,34 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
     },
     getNextPageParam: (last) => last.next_cursor || undefined,
   })
-  const rows = query.data?.pages.flatMap((page) => page.items) ?? []
+  const rows = useMemo(() => query.data?.pages.flatMap((page) => page.items) ?? [], [query.data])
+  const scroller = useRef<HTMLDivElement>(null)
+  const rowKeys = useMemo(() => rows.map((row) => row.id), [rows])
+  function historyRow(row: HistoryRow) {
+    return (
+      <div
+        key={row.id}
+        className={
+          'chat-sidebar-row mx-1 flex h-10 items-center gap-1 rounded-lg pl-3 pr-1 text-xs hover:bg-muted ' +
+          (location.pathname.endsWith('/' + row.id)
+            ? 'bg-accent text-primary'
+            : 'text-muted-foreground')
+        }
+      >
+        <Link
+          to={(image ? '/create/' : '/chat/') + row.id}
+          onClick={onNavigate}
+          className="flex h-full min-w-0 flex-1 items-center gap-2"
+        >
+          {row.pinned ? <Pin size={11} className="shrink-0" /> : null}
+          <span className="truncate">
+            {row.title || t(image ? 'images.untitled' : 'chat.untitled')}
+          </span>
+        </Link>
+        {!image ? <ConversationActions row={{ ...row, busy: row.busy ?? false }} /> : null}
+      </div>
+    )
+  }
   return (
     <section className="flex min-h-0 flex-1 flex-col border-t border-border pt-4">
       <div className="mb-2 flex items-center justify-between px-3 text-[11px] font-medium text-muted-foreground">
@@ -53,47 +83,50 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
         ) : null}
       </div>
       <form
-        className="mx-1 mb-3 flex items-center gap-2 rounded-lg border border-transparent px-2.5 focus-within:border-border focus-within:bg-card"
+        className="chat-sidebar-search mx-1 mb-3 flex items-center gap-2 rounded-lg border border-transparent px-2.5 focus-within:border-border focus-within:bg-card"
         onSubmit={(event) => {
           event.preventDefault()
-          setApplied(search.trim())
+          setSearches((state) => ({ ...state, [mode]: { ...state[mode], applied: search.trim() } }))
         }}
       >
         <Search size={14} className="shrink-0 text-muted-foreground" />
         <input
           data-history-search
           type="search"
-          className="h-9 min-w-0 w-full bg-transparent text-xs outline-none"
+          className="h-9 min-w-0 w-full bg-transparent text-base outline-none lg:text-xs"
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) =>
+            setSearches((state) => ({
+              ...state,
+              [mode]: { ...state[mode], search: event.target.value },
+            }))
+          }
+          maxLength={100}
           placeholder={t(image ? 'images.search' : 'chat.search')}
           aria-label={t(image ? 'images.search' : 'chat.search')}
         />
       </form>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <ApiNotice error={query.error} />
         {!query.isPending && !rows.length ? (
           <p className="px-3 py-3 text-xs text-muted-foreground">
             {t(image ? 'images.emptyHistory' : 'chat.empty')}
           </p>
         ) : null}
-        {rows.map((row) => (
-          <Link
-            key={row.id}
-            to={(image ? '/create/' : '/chat/') + row.id}
-            onClick={onNavigate}
-            className={
-              'mx-1 mb-0.5 flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs hover:bg-muted ' +
-              (location.pathname.endsWith('/' + row.id)
-                ? 'bg-accent text-primary'
-                : 'text-muted-foreground')
-            }
-          >
-            <span className="truncate">
-              {row.title || t(image ? 'images.untitled' : 'chat.untitled')}
-            </span>
-          </Link>
-        ))}
+        {rows.length > 30 ? (
+          <Suspense fallback={rows.slice(0, 12).map(historyRow)}>
+            <VirtualHistoryRows
+              keys={rowKeys}
+              scroller={scroller}
+              renderRow={(index) => {
+                const row = rows[index]
+                return row ? historyRow(row) : null
+              }}
+            />
+          </Suspense>
+        ) : (
+          rows.map(historyRow)
+        )}
         {query.hasNextPage ? (
           <Button
             type="button"

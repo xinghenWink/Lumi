@@ -178,10 +178,12 @@ export async function desktopLighthouse(
   email: string,
   password: string,
   info: TestInfo,
+  channel?: 'chrome',
 ) {
   const port = await unusedPort()
   const context = await chromium.launchPersistentContext('', {
     headless: true,
+    ...(channel ? { channel } : {}),
     args: ['--remote-debugging-port=' + port],
     viewport: { width: 1440, height: 900 },
   })

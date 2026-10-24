@@ -1,6 +1,36 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { renderMarkdown } from '../../../features/chat/markdown'
+import { partitionMarkdown, renderMarkdown } from '../../../features/chat/markdown'
+
+const MarkdownBlock = memo(function MarkdownBlock({
+  source,
+  complete,
+}: {
+  source: string
+  complete: boolean
+}) {
+  const { t } = useTranslation()
+  const [html, setHTML] = useState<string | null>(null)
+  useEffect(() => {
+    let live = true
+    void renderMarkdown(source, complete, t('chat.copyCode'))
+      .then((rendered) => {
+        if (live) setHTML(rendered)
+      })
+      .catch(() => {
+        /* Preserve escaped source if the optional renderer cannot load. */
+      })
+    return () => {
+      live = false
+    }
+  }, [source, complete, t])
+  // Only the shared DOMPurify renderer supplies HTML to this sink.
+  return html === null ? (
+    <div className="whitespace-pre-wrap">{source}</div>
+  ) : (
+    <div dangerouslySetInnerHTML={{ __html: html }} />
+  )
+})
 
 export const MarkdownContent = memo(function MarkdownContent({
   content,
@@ -10,21 +40,8 @@ export const MarkdownContent = memo(function MarkdownContent({
   complete?: boolean
 }) {
   const { t } = useTranslation()
-  const [rendered, setRendered] = useState<{ source: string; html: string } | null>(null)
   const container = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    let live = true
-    void renderMarkdown(content, complete, t('chat.copy'))
-      .then((html) => {
-        if (live) setRendered({ source: content, html })
-      })
-      .catch(() => {
-        /* Keep the escaped source visible when an optional renderer cannot load. */
-      })
-    return () => {
-      live = false
-    }
-  }, [content, complete, t])
+  const parts = partitionMarkdown(content, complete)
   async function copy(target: EventTarget | null) {
     if (!(target instanceof Element)) return
     const button = target.closest<HTMLButtonElement>('[data-copy-code]')
@@ -33,20 +50,22 @@ export const MarkdownContent = memo(function MarkdownContent({
     if (code)
       try {
         await navigator.clipboard.writeText(code)
+        button.textContent = t('chat.copied')
       } catch {
-        /* Clipboard permissions remain browser controlled. */
+        button.textContent = t('chat.copyCode')
       }
   }
-  return rendered?.source === content ? (
+  return (
     <div
       ref={container}
-      className="chat-markdown min-w-0 break-words text-sm leading-7 [&_pre]:overflow-x-auto [&_a]:text-primary"
+      className="chat-markdown min-w-0 break-words text-sm leading-7"
       onClick={(event) => {
         void copy(event.target)
       }}
-      dangerouslySetInnerHTML={{ __html: rendered.html }}
-    />
-  ) : (
-    <div className="whitespace-pre-wrap break-words text-sm leading-7">{content}</div>
+    >
+      {parts.map((part) => (
+        <MarkdownBlock key={part.key} source={part.source} complete={part.complete} />
+      ))}
+    </div>
   )
 })
