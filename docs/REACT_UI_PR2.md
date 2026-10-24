@@ -31,8 +31,10 @@ The first browser run found Radix's default modal scroll-lock style injection vi
 - [x] All legacy/shared 50 tests and React/shared 21 tests pass. Added OS appearance, challenge action/disposal/failure and candidate translation-key coverage.
 - [x] Both Vue and React builds pass and retain `backend/web/dist`; React's legacy-module exclusion gate passes.
 - [x] Chrome desktop, 320px and 390px mobile/touch emulation exercise real Go embed, PostgreSQL and Redis. Registration, recovery, HTTP-only refresh cookies, reload, safe destinations, role gates, drawer/menu bounds, keyboard focus, appearance persistence, public pages and browser errors are checked.
-- [ ] Current-head CI, including unchanged full legacy E2E, integration, capacity and Docker/Compose, must pass before integration.
+- [x] Stage-head CI [#94](https://github.com/xinghenWink/Lumi/actions/runs/40022299040) passed all three jobs on `8752e6c00ec1354d5f6e0359884b6908a3846c8b`, including unchanged full legacy E2E, integration, capacity and Docker/Compose, before PR #12 integrated only into `codex/react-ui`.
 
 The browser suite uses a disposable local backend and random test credentials. Registration is enabled through its real admin endpoint with email verification disabled only for the registration fixture, and prior settings are restored. Live SMTP delivery and Cloudflare Siteverify require configured providers; adapter lifecycle tests and existing Go protocol tests do not claim live-provider acceptance. No production setting is accessed or changed.
 
 Local logs and screenshots are preserved under ignored `.tools/react-ui-pr-2/`; CI publishes its browser artifacts. Remaining profile, device, credits, chat/image and admin actions are tracked in the main compatibility matrix and are required before switching the production entry or removing Vue dependencies.
+
+This is the PR-2 stage snapshot. Those later stages have since completed in PRs #13–19; see the [final handoff](REACT_UI_REFACTOR.md#completed-migration-and-review-handoff) and [PR-7 acceptance](REACT_UI_PR7.md#completed-acceptance).
