@@ -134,3 +134,9 @@ Every stage runs typecheck, lint, unit tests, build and relevant browser tests. 
 Exact dependency versions and peer compatibility are resolved in PR-1, pinned without ranges and recorded in DECISIONS plus `pnpm-lock.yaml`. Preserve current Vite 8, TypeScript strict and Tailwind 4 unless a demonstrated incompatibility requires an explicit decision. Prefer existing validators and Markdown libraries to unnecessary additional frameworks.
 
 No SQL migration or OpenAPI change is required by PR-0. Frontend-only milestones mark those template items not applicable and still verify generated types; they do not add empty migrations or alter API fields to fit the visual prototype.
+
+## Completed migration and review handoff
+
+PR-0 through PR-7 are complete in independently accepted PRs #10–19, including PR-6a/#16, PR-6b/#17 and PR-6c/#18. All were integrated only into `codex/react-ui`. The default frontend is React, all original feature routes and meaningful tests are retained, and Vue dependencies were removed only after full acceptance. Final units: 87; canonical Chrome desktop/320/390 cases: 57; independent production Docker embed cases: 3. PR-7 CI #103 passed all jobs. Subsequent fixture follow-up #21 passed all CI #105 jobs, with its separate [readiness analysis and evidence](REACT_UI_EMBED_READINESS.md).
+
+The complete release proposal is [#20](https://github.com/xinghenWink/Lumi/pull/20), from `codex/react-ui-release` to `main`. Its current source commit must pass every CI job before it is marked ready for review; the final CI link and commit are recorded in that PR. Main remains `c28be7fe16ca911f2b9443c27ce887f14f96b5d8`. Backend/OpenAPI/SQL/production Compose have no migration diff, and this task does not merge main, create a version tag, publish an image or deploy.

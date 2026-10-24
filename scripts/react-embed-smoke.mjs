@@ -1,9 +1,10 @@
-import { execFileSync, spawn } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { mkdir, writeFile, readFile, unlink, rmdir } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { postgresReady, redisReady } from './lib/react-embed-readiness.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const suffix = randomBytes(6).toString('hex'),
@@ -14,7 +15,8 @@ const suffix = randomBytes(6).toString('hex'),
   output = join(root, '.tools', 'react-embed', suffix),
   secrets = join(output, 'secrets')
 const owned = [],
-  files = []
+  files = [],
+  secretValues = []
 let networkCreated = false
 const docker = (args) =>
   execFileSync('docker', args, {
@@ -37,9 +39,10 @@ async function secretFile(name, contents, mode = 0o600) {
   files.push(path)
   return path
 }
-async function waitFor(check, description) {
+async function waitFor(check, description, assertAlive) {
   const deadline = Date.now() + 120_000
   while (Date.now() < deadline) {
+    assertAlive?.()
     try {
       if (await check()) return
     } catch {
@@ -74,16 +77,24 @@ try {
     '.',
   ])
   const imageID = docker(['image', 'inspect', tag, '--format', '{{.Id}}'])
+  await writeFile(
+    join(output, 'report.json'),
+    JSON.stringify({ commit: buildCommit, imageID, passed: false }, null, 2) + '\n',
+  )
   docker(['network', 'create', '--label', label + '=' + suffix, network])
   networkCreated = true
   const databasePassword = randomBytes(24).toString('hex'),
     cachePassword = randomBytes(24).toString('hex'),
     password = randomBytes(24).toString('base64url') + 'Aa1',
+    jwtSecret = randomBytes(32).toString('base64url'),
+    encryptionKey = randomBytes(32).toString('base64'),
     email = 'embed-' + suffix + '@lumi.test'
+  secretValues.push(databasePassword, cachePassword, password, jwtSecret, encryptionKey)
   const pgEnv = await secretFile(
       'postgres.env',
       'POSTGRES_USER=lumi\nPOSTGRES_DB=lumi\nPOSTGRES_PASSWORD=' + databasePassword + '\n',
     ),
+    redisEnv = await secretFile('redis.env', 'REDISCLI_AUTH=' + cachePassword + '\n'),
     redisConfig = await secretFile(
       'redis.conf',
       'bind 0.0.0.0\nprotected-mode yes\nrequirepass ' + cachePassword + '\n',
@@ -93,19 +104,16 @@ try {
   start(prefix + '-redis', [
     '--network-alias',
     'redis',
+    '--env-file',
+    redisEnv,
     '--mount',
     'type=bind,src=' + redisConfig + ',dst=/usr/local/etc/redis/redis.conf,readonly',
     'redis:7-alpine',
     'redis-server',
     '/usr/local/etc/redis/redis.conf',
   ])
-  await waitFor(
-    () =>
-      docker(['exec', prefix + '-pg', 'pg_isready', '-U', 'lumi', '-d', 'lumi']).includes(
-        'accepting connections',
-      ),
-    'PostgreSQL',
-  )
+  await waitFor(() => postgresReady(docker, prefix + '-pg'), 'PostgreSQL TCP readiness')
+  await waitFor(() => redisReady(docker, prefix + '-redis'), 'authenticated Redis readiness')
   // Reserve a loopback-only ephemeral port; no production ports or volumes are used.
   const listener = createServer()
   await new Promise((resolve) => listener.listen(0, '127.0.0.1', resolve))
@@ -118,8 +126,8 @@ try {
     [
       'DATABASE_URL=postgres://lumi:' + databasePassword + '@postgres:5432/lumi?sslmode=disable',
       'REDIS_URL=redis://:' + cachePassword + '@redis:6379/0',
-      'JWT_SECRET=' + randomBytes(32).toString('base64url'),
-      'ENCRYPTION_KEY=' + randomBytes(32).toString('base64'),
+      'JWT_SECRET=' + jwtSecret,
+      'ENCRYPTION_KEY=' + encryptionKey,
       'ADMIN_EMAIL=' + email,
       'ADMIN_PASSWORD=' + password,
       'PUBLIC_BASE_URL=' + baseURL,
@@ -129,7 +137,15 @@ try {
     ].join('\n') + '\n',
   )
   start(prefix + '-app', ['--env-file', appEnv, '-p', '127.0.0.1:' + address.port + ':8080', tag])
-  await waitFor(async () => (await fetch(baseURL + '/readyz')).ok, 'production readiness')
+  await waitFor(
+    async () => (await fetch(baseURL + '/readyz')).ok,
+    'production readiness',
+    () => {
+      const state = JSON.parse(docker(['inspect', prefix + '-app', '--format', '{{json .State}}']))
+      if (!state.Running)
+        throw new Error('Production fixture exited before readiness (exit ' + state.ExitCode + ')')
+    },
+  )
   const version = await (await fetch(baseURL + '/api/version')).json()
   if (version.commit !== buildCommit) throw new Error('Embedded version differs from build')
   await writeFile(
@@ -165,6 +181,42 @@ try {
     ) + '\n',
   )
   console.log('PASS: React production Docker embed; evidence: ' + output)
+} catch (error) {
+  const redact = (value) =>
+    secretValues.reduce(
+      (text, secret) =>
+        text.split(secret).join('[redacted]').split(encodeURIComponent(secret)).join('[redacted]'),
+      String(value),
+    )
+  const diagnostics = []
+  for (const name of owned) {
+    try {
+      if (
+        docker(['inspect', name, '--format', '{{index .Config.Labels "' + label + '"}}']) !== suffix
+      )
+        throw new Error('Unowned diagnostic target')
+      const state = JSON.parse(docker(['inspect', name, '--format', '{{json .State}}']))
+      const logs = spawnSync('docker', ['logs', '--tail', '80', name], {
+        cwd: root,
+        encoding: 'utf8',
+      })
+      diagnostics.push({
+        name,
+        status: state.Status,
+        exitCode: state.ExitCode,
+        error: redact(state.Error),
+        logs: redact((logs.stdout ?? '') + (logs.stderr ?? '')),
+      })
+    } catch (failure) {
+      diagnostics.push({ name, error: redact(failure.message) })
+    }
+  }
+  await writeFile(
+    join(output, 'diagnostics.json'),
+    JSON.stringify({ error: redact(error.message), containers: diagnostics }, null, 2) + '\n',
+  )
+  console.error('FAIL: redacted fixture diagnostics saved to ' + output)
+  throw error
 } finally {
   const cleanupErrors = []
   for (const name of owned.reverse()) {
