@@ -19,7 +19,7 @@ Both native browser jobs currently connect a host Go process to Docker-published
 
 - [x] Frozen install, strict typecheck, lint/format, all 87 unit tests, normal production build and generated OpenAPI consistency.
 - [x] Actual delayed PostgreSQL/Redis probe regression passes with explicit ports, 1/1 in 18.4 seconds, zero skipped cases and owned resources cleaned.
-- [ ] Independent production Docker embed remains green with the default probe ports.
+- [x] Independent production Docker embed remains green with the default probe ports: 3/3 in 13.5 seconds on `ffa0f72c9577c9f08f1d5cfb7daac51784e8dd67`, image `sha256:19d4da96b1f48757c3249346c339d5ab9eb0ff725415f82a6f58f5988086bb1b`, report `.tools/react-embed/44a4b5c3e4cd/report.json`; owned resources and credential files cleaned.
 - [ ] Fresh local full Chrome desktop/320/390 run with the richer measurements; retain failed CI evidence.
 - [ ] Linux wrapper reports direct host topology and PostgreSQL durability enabled; both complete 57-case CI suites pass with the unchanged SSE bound and all existing jobs pass. Investigate any remaining failure before integration.
 - [ ] Integrate the accepted small PR only into `codex/react-ui`, then update #20 and require its complete final-commit CI. Keep main unchanged and the release proposal draft until acceptance.
