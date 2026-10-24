@@ -44,7 +44,9 @@ export function CreditLedger({ admin = false, userId }: { admin?: boolean; userI
   )
   const exporting = useMutation({
     mutationFn: () =>
-      download('/api/v1/admin/credit-ledger/export?' + params(), 'lumi-credit-ledger.csv'),
+      download('/api/v1/admin/credit-ledger/export?' + params(), 'lumi-credit-ledger.csv', {
+        responseType: 'blob',
+      }),
   })
   const number = (value: number) => new Intl.NumberFormat(i18n.resolvedLanguage).format(value)
   return (

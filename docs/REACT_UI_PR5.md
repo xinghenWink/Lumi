@@ -31,8 +31,10 @@ The first desktop account run found a race after successful password change: a s
 - [x] Full preference persistence, session cursor loading/current marker, other/current-session revocation, exports, password validation/change/relogin and account deletion. The browser journey exercises two real devices; the original cursor API is reused for additional pages.
 - [x] Identity changes reject late mutations/downloads and clear private caches, drafts, readers and Blob URLs.
 - [x] Frozen installation, strict typecheck, lint/format, unit tests, both builds and relevant legacy/Chrome desktop/320/390px E2E pass: legacy 16/16 and candidate 24/24. Existing performance gates remain unchanged.
-- [ ] Current-head CI, integration, capacity, audit and Docker/Compose pass before integration. OpenAPI and migrations are not applicable without an API change.
+- [x] Current-head CI, integration, capacity, audit and Docker/Compose pass before integration. OpenAPI and migrations are not applicable without an API change.
 
 The final candidate suite passes 24/24 on Chrome desktop and 320/390px mobile/touch emulation. Strict typecheck, lint/format, frozen installation, legacy/shared 50 unit tests, candidate/shared 41 unit tests and the React build pass. Desktop Lighthouse is 100 with initial script gzip 246,830 bytes; SSE p95 is 23/32/33 ms across the three viewports, sampled interactions at most 16 ms and measured long tasks 0. The original thresholds and all legacy assertions remain. Light/dark credit, profile, preferences, chat and image artifacts are retained under ignored `.tools/react-ui-pr-5/` and have been inspected. Mobile evidence is browser emulation.
 
 The initial translation check interpreted a concatenated partial namespace as a static key; ledger dynamic translations now use template interpolation, while the static-key and complete language-catalog tests remain unchanged. No test has been removed or weakened.
+
+CI #97 on `638bdbf` passes all jobs after a same-head failed-job rerun: the first candidate attempt recorded 23/24 passing with SSE p95 108 ms at 320px against the unchanged <100 ms requirement. Its failure artifact remains available. The rerun passes all 24 candidate cases and Docker/Compose; quality, integration, capacity and dependency audit pass. PR #15 merged only into `codex/react-ui` as `99bbf43`; main is unchanged.

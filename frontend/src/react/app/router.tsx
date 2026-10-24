@@ -17,6 +17,10 @@ const SecurityPage = lazy(() => import('../pages/SecurityPage'))
 const ChatPage = lazy(() => import('../pages/ChatPage'))
 const ChatHistoryPage = lazy(() => import('../pages/ChatHistoryPage'))
 const SectionPage = lazy(() => import('../pages/SectionPage'))
+const UsersPage = lazy(() => import('../pages/admin/UsersPage'))
+const UserDetailPage = lazy(() => import('../pages/admin/UserDetailPage'))
+const CreditLedgerPage = lazy(() => import('../pages/admin/CreditLedgerPage'))
+const RedeemCodesPage = lazy(() => import('../pages/admin/RedeemCodesPage'))
 const WorkspaceShell = lazy(() =>
   import('../layouts/WorkspaceShell').then((module) => ({ default: module.WorkspaceShell })),
 )
@@ -84,9 +88,19 @@ const router = createBrowserRouter([
                 .flatMap((group) => group.items)
                 .map(({ path }) => ({
                   path: path === '/admin/settings' ? '/admin/settings/:group?' : path,
-                  element: pending(<SectionPage />),
+                  element: pending(
+                    path === '/admin/users' ? (
+                      <UsersPage />
+                    ) : path === '/admin/credit-ledger' ? (
+                      <CreditLedgerPage />
+                    ) : path === '/admin/redeem-codes' ? (
+                      <RedeemCodesPage />
+                    ) : (
+                      <SectionPage />
+                    ),
+                  ),
                 })),
-              { path: '/admin/users/:id', element: pending(<SectionPage />) },
+              { path: '/admin/users/:id', element: pending(<UserDetailPage />) },
             ],
           },
         ],

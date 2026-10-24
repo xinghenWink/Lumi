@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 import { parseAuth, parseSettings } from '../../src/api/contracts'
 import { parseOperations } from '../../src/api/operations'
 import { observeErrors } from '../browser-errors'

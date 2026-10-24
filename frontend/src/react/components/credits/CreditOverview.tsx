@@ -72,6 +72,7 @@ export function CreditOverview({ userId }: { userId?: string }) {
     void runtime.queryClient.invalidateQueries({ queryKey: ['user', owner, 'credits'] })
     void runtime.queryClient.invalidateQueries({ queryKey: ['user', owner, 'credit-ledger'] })
     void runtime.queryClient.invalidateQueries({ queryKey: ['user', owner, 'credit-usage'] })
+    void runtime.queryClient.invalidateQueries({ queryKey: ['user', owner, 'admin-users'] })
     void runtime.queryClient.invalidateQueries({
       queryKey: ['user', owner, 'redemption-records'],
     })

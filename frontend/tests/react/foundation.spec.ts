@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { observeErrors } from '../browser-errors'
 
 test('candidate loads embedded assets, real version, locale and persistent appearance', async ({

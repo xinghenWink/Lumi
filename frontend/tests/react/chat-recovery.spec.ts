@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { record } from '../../src/api/transport'
 import { parseAuth, parseUser } from '../../src/api/contracts'
 import { parseFile } from '../../src/api/images'

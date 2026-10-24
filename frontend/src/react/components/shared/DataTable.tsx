@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 export interface Column<T> {
   key: string
-  label: string
+  label: ReactNode
   render(row: T): ReactNode
   className?: string
 }

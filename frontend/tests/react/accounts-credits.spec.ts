@@ -1,6 +1,7 @@
+import { journeyHeaders } from './client-headers'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import { expect, test, type Browser, type Page, type TestInfo } from '@playwright/test'
+import { expect, test, type Browser, type Page, type TestInfo } from './test'
 import { record } from '../../src/api/transport'
 import { observeErrors } from '../browser-errors'
 import { fixturePNG } from '../image-fixture'
@@ -51,7 +52,7 @@ async function fixture(page: Page, browser: Browser, baseURL: string | undefined
     deviceScaleFactor: info.project.use.deviceScaleFactor ?? 1,
     isMobile: info.project.use.isMobile ?? false,
     hasTouch: info.project.use.hasTouch ?? false,
-    extraHTTPHeaders: info.project.use.extraHTTPHeaders ?? {},
+    extraHTTPHeaders: journeyHeaders(info),
   })
   return {
     api,
@@ -229,7 +230,7 @@ test('real profile, avatar, preferences, device revocation, exports, password ch
   let deleted = false
   const second = await browser.newContext({
       baseURL: f.baseURL,
-      extraHTTPHeaders: info.project.use.extraHTTPHeaders ?? {},
+      extraHTTPHeaders: journeyHeaders(info),
     }),
     other = await second.newPage()
   observeErrors(other, errors)

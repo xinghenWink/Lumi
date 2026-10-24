@@ -39,6 +39,13 @@ export function usePrivateDownload() {
     controllers.current.add(controller)
     try {
       const response = await authorizedResponse(path, { ...options, signal: controller.signal })
+      if (
+        options.responseType === 'blob' &&
+        !response.headers.get('Content-Type')?.startsWith('text/csv')
+      ) {
+        controller.abort()
+        throw new ApiError('RESPONSE_INVALID')
+      }
       const blob = await response.blob()
       if (
         controller.signal.aborted ||
