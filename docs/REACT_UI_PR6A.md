@@ -33,10 +33,12 @@ The expanded full suite then exposed shared-fixture rate limits. All journeys us
 - [x] Real user CRUD, disable/re-enable/relogin, self controls, forced logout, batch status/delete, user CSV and an uncertain grant retry that changes each target account exactly once.
 - [x] Original code generation/pagination/filter binding/copy/CSV/redemption/used-code deletion rules and add/subtract/set adjustments; extra unknown-response replay for batch generation and adjustment, plus batch code status controls.
 - [x] Inspect desktop/mobile visual evidence and verify no viewport overflow.
-- [ ] Current-head CI quality, integration, capacity, dependency audit, candidate E2E and Docker/Compose before merging only into `codex/react-ui`.
+- [x] Current-head CI quality, integration, capacity, dependency audit, candidate E2E and Docker/Compose before merging only into `codex/react-ui`.
 
 ## Next dependency
 
 The final local candidate suite passes 30/30. Desktop Lighthouse is 100, initial script gzip 247,266 bytes, SSE p95 19/19/21 ms for desktop/320/390px, sampled interactions at most 24 ms and long tasks 0. No performance gate or behavioral assertion changed. Candidate success and failure evidence is retained under ignored `.tools/react-ui-pr-6a/`.
+
+CI #98 (`40066723160`) passes all jobs on `0f01547` on the first CI attempt, including Docker/Compose, upgrade/rollback and backup restore. PR #16 merged only into `codex/react-ui` as `2583feb`; main remains unchanged.
 
 After these gates pass, PR-6b migrates AI services and PR-6c migrates operations/security. PR-7 switches the production entry and removes Vue only after complete candidate functionality, Chrome/SSE/credits/image-editing and Docker embed acceptance, then repeats final validation and proposes a release PR to main without merging it.

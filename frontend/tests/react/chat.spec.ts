@@ -222,13 +222,14 @@ test('React real streaming history stop editing isolation and bounded rendering'
     })
     if (typeof model?.id !== 'string') throw new Error('No model')
     modelID = model.id
-    // Administrative forms remain covered by legacy E2E until PR-6 migrates those pages.
     previousSettings = await api('GET', '/admin/chat-settings')
-    const configured = await api('PUT', '/admin/chat-settings', {
-      ...previousSettings,
-      per_minute: 0,
-      system_prompt: '用中文回答，保留上下文。',
-    })
+    await page.goto('/admin/chat-settings')
+    await page.getByLabel('每用户每分钟请求数', { exact: true }).fill('0')
+    await page.getByLabel('全局 system prompt', { exact: true }).fill('用中文回答，保留上下文。')
+    await page.getByRole('button', { name: '保存', exact: true }).click()
+    await expect(page.getByRole('status')).toContainText('聊天设置已保存')
+    await page.screenshot({ path: info.outputPath('chat-settings.png'), animations: 'disabled' })
+    const configured = await api('GET', '/admin/chat-settings')
     expect(configured?.per_minute).toBe(0)
     expect(configured?.system_prompt).toBe('用中文回答，保留上下文。')
     await page.goto('/chat')

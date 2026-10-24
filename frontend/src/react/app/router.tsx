@@ -21,6 +21,12 @@ const UsersPage = lazy(() => import('../pages/admin/UsersPage'))
 const UserDetailPage = lazy(() => import('../pages/admin/UserDetailPage'))
 const CreditLedgerPage = lazy(() => import('../pages/admin/CreditLedgerPage'))
 const RedeemCodesPage = lazy(() => import('../pages/admin/RedeemCodesPage'))
+const UpstreamsPage = lazy(() => import('../pages/admin/UpstreamsPage'))
+const ModelsPage = lazy(() => import('../pages/admin/ModelsPage'))
+const ChatSettingsPage = lazy(() => import('../pages/admin/ChatSettingsPage'))
+const ImageSettingsPage = lazy(() => import('../pages/admin/ImageSettingsPage'))
+const ImageTasksPage = lazy(() => import('../pages/admin/ImageTasksPage'))
+const PricingPage = lazy(() => import('../pages/admin/PricingPage'))
 const WorkspaceShell = lazy(() =>
   import('../layouts/WorkspaceShell').then((module) => ({ default: module.WorkspaceShell })),
 )
@@ -95,6 +101,18 @@ const router = createBrowserRouter([
                       <CreditLedgerPage />
                     ) : path === '/admin/redeem-codes' ? (
                       <RedeemCodesPage />
+                    ) : path === '/admin/upstreams' ? (
+                      <UpstreamsPage />
+                    ) : path === '/admin/models' ? (
+                      <ModelsPage />
+                    ) : path === '/admin/chat-settings' ? (
+                      <ChatSettingsPage />
+                    ) : path === '/admin/image-settings' ? (
+                      <ImageSettingsPage />
+                    ) : path === '/admin/image-tasks' ? (
+                      <ImageTasksPage />
+                    ) : path === '/admin/pricing' ? (
+                      <PricingPage />
                     ) : (
                       <SectionPage />
                     ),
