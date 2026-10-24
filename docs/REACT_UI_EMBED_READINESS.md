@@ -16,8 +16,8 @@ Do not change application startup, database/Redis configuration, production Comp
 
 ## Acceptance
 
-- [ ] Real-container readiness regression passes; initialization is deliberately delayed, without increasing a production timeout.
-- [ ] Frozen install, strict typecheck, lint/format, all 87 unit tests, normal React production build and generated OpenAPI type consistency.
+- [x] Real-container readiness regression passes; initialization is deliberately delayed, without increasing a production timeout. Local run: 1/1, 17.7 seconds, zero skipped cases and no owned containers left behind.
+- [x] Frozen install, strict typecheck, lint/format, all 87 unit tests, normal React production build and generated OpenAPI type consistency. The new test's initial indentation format failure was fixed and the full lint gate rerun successfully.
 - [ ] Actual default Docker image passes all three authenticated Chrome embed projects; secrets, owned containers and network are cleaned.
 - [ ] Current follow-up CI passes every existing quality, browser and container gate without retries concealing a failure.
 - [ ] Integrate only into `codex/react-ui`, update #20 and require its current-head CI before making it ready for review. Never merge main or publish.
