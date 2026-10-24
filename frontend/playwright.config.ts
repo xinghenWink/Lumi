@@ -10,11 +10,18 @@ process.env.E2E_ENCRYPTION_KEY ??= randomBytes(32).toString('base64')
 
 export default defineConfig({
   testDir: './tests',
-  testIgnore: ['**/embed/**'],
-  testMatch: [
-    /[/\\]tests[/\\](?:accounts|catalog|chat|credits|guest|images|operations)\.spec\.ts$/,
-    /[/\\]tests[/\\]react[/\\](?:admin-settings|admin-users|auth-shell|chat-recovery|foundation|operations-writes)\.spec\.ts$/,
+  // Original entry files import these complete ports; avoid collecting them twice.
+  testIgnore: [
+    '**/embed/**',
+    '**/react/account-settings.spec.ts',
+    '**/react/accounts-credits.spec.ts',
+    '**/react/admin-finance.spec.ts',
+    '**/react/catalog.spec.ts',
+    '**/react/chat.spec.ts',
+    '**/react/images.spec.ts',
+    '**/react/operations.spec.ts',
   ],
+  testMatch: '**/*.spec.ts',
   outputDir: './test-results/e2e',
   workers: 1,
   timeout: 120_000,

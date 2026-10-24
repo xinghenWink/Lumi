@@ -69,3 +69,5 @@ The original browser entry files delegate to their already migrated complete Rea
 The real-hook model test initially did not subscribe to Query's tracked error property. The test probe now consumes the status/error fields used by the production picker, preserving its mixed-mode rejection assertion. No product rule was changed to accommodate the fixture.
 
 The first default-entry full run exposed an incomplete reload assertion in the original account journey: checking the unchanged URL could succeed before refresh finished, then another hard navigation interrupted the in-flight refresh. The journey now also waits for the authenticated chat heading after reload before testing the admin guard. This strengthens session-restoration coverage; authentication handlers, timeouts and role assertions are unchanged. Failure traces are retained for comparison with the required full rerun.
+
+Canonical discovery matches every browser spec by default and excludes only the independent embed suite and the seven implementations already imported by original entries. New unrelated test files remain automatically discovered; the current set is still exactly 57 cases.
