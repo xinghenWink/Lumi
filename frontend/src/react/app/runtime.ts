@@ -6,6 +6,7 @@ import { createSessionStore } from '../stores/session'
 import { createThemeStore } from '../stores/theme'
 import { createChatController } from '../features/chat/controller'
 import { createModelSelectionStore } from '../features/catalog/models'
+import { createImageController } from '../features/images/controller'
 
 export function createAppRuntime(service: SessionService = session) {
   const queryClient = new QueryClient({
@@ -21,6 +22,7 @@ export function createAppRuntime(service: SessionService = session) {
   })
   const sessionState = createSessionStore(service)
   const chat = createChatController(service, queryClient)
+  const image = createImageController(service, queryClient)
   const modelStore = createModelSelectionStore()
   let epoch = service.getSnapshot().epoch
   let identity = service.getSnapshot().user?.id
@@ -40,11 +42,13 @@ export function createAppRuntime(service: SessionService = session) {
     themeStore: createThemeStore(),
     modelStore,
     chat,
+    image,
     queryClient,
     dispose() {
       unsubscribe()
       sessionState.dispose()
       chat.dispose()
+      image.dispose()
       queryClient.clear()
     },
   }

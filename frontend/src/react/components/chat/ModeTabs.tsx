@@ -4,11 +4,12 @@ import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useRuntime } from '../../app/context'
 
-export function ModeTabs({ imageConversation = '' }: { imageConversation?: string }) {
+export function ModeTabs() {
   const { t } = useTranslation()
   const runtime = useRuntime()
   const image = useLocation().pathname.startsWith('/create')
   const lastChat = useStore(runtime.chat.store, (state) => state.lastOpened)
+  const imageConversation = useStore(runtime.image.store, (state) => state.lastOpened)
   return (
     <nav
       aria-label={t('chat.mode')}

@@ -9,7 +9,8 @@ const AuthPage = lazy(() => import('../pages/AuthPage'))
 const ResetPasswordPage = lazy(() => import('../pages/ResetPasswordPage'))
 const LegalPage = lazy(() => import('../pages/LegalPage'))
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
-const WorkspaceHome = lazy(() => import('../pages/WorkspaceHome'))
+const ImagePage = lazy(() => import('../pages/ImagePage'))
+const ImageGalleryPage = lazy(() => import('../pages/ImageGalleryPage'))
 const ChatPage = lazy(() => import('../pages/ChatPage'))
 const ChatHistoryPage = lazy(() => import('../pages/ChatHistoryPage'))
 const SectionPage = lazy(() => import('../pages/SectionPage'))
@@ -60,10 +61,11 @@ const router = createBrowserRouter([
           ...['/chat', '/chat/:id'].map((path) => ({ path, element: pending(<ChatPage />) })),
           ...['/create', '/create/:id'].map((path) => ({
             path,
-            element: pending(<WorkspaceHome />),
+            element: pending(<ImagePage />),
           })),
           { path: '/me/chats', element: pending(<ChatHistoryPage />) },
-          ...['/me', '/me/security', '/me/images', '/me/credits'].map((path) => ({
+          { path: '/me/images', element: pending(<ImageGalleryPage />) },
+          ...['/me', '/me/security', '/me/credits'].map((path) => ({
             path,
             element: pending(<SectionPage />),
           })),

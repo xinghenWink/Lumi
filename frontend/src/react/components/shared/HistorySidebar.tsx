@@ -9,6 +9,7 @@ import { useSession } from '../../features/auth/hooks'
 import { ApiNotice } from './ApiNotice'
 import { Button } from '../ui/button'
 import { ConversationActions } from '../chat/ConversationActions'
+import { ImageConversationActions } from '../images/ImageConversationActions'
 const VirtualHistoryRows = lazy(() => import('./VirtualHistoryRows'))
 
 type HistoryRow = Omit<Conversation, 'busy'> & { busy?: boolean }
@@ -63,7 +64,11 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
             {row.title || t(image ? 'images.untitled' : 'chat.untitled')}
           </span>
         </Link>
-        {!image ? <ConversationActions row={{ ...row, busy: row.busy ?? false }} /> : null}
+        {image ? (
+          <ImageConversationActions row={row} />
+        ) : (
+          <ConversationActions row={{ ...row, busy: row.busy ?? false }} />
+        )}
       </div>
     )
   }
