@@ -16,7 +16,6 @@ const ProfilePage = lazy(() => import('../pages/ProfilePage'))
 const SecurityPage = lazy(() => import('../pages/SecurityPage'))
 const ChatPage = lazy(() => import('../pages/ChatPage'))
 const ChatHistoryPage = lazy(() => import('../pages/ChatHistoryPage'))
-const SectionPage = lazy(() => import('../pages/SectionPage'))
 const UsersPage = lazy(() => import('../pages/admin/UsersPage'))
 const UserDetailPage = lazy(() => import('../pages/admin/UserDetailPage'))
 const CreditLedgerPage = lazy(() => import('../pages/admin/CreditLedgerPage'))
@@ -40,6 +39,24 @@ const WorkspaceShell = lazy(() =>
 const AdminShell = lazy(() =>
   import('../layouts/AdminShell').then((module) => ({ default: module.AdminShell })),
 )
+const adminPages: Record<string, ReactNode> = {
+  '/admin/users': <UsersPage />,
+  '/admin/credit-ledger': <CreditLedgerPage />,
+  '/admin/redeem-codes': <RedeemCodesPage />,
+  '/admin/upstreams': <UpstreamsPage />,
+  '/admin/models': <ModelsPage />,
+  '/admin/chat-settings': <ChatSettingsPage />,
+  '/admin/image-settings': <ImageSettingsPage />,
+  '/admin/image-tasks': <ImageTasksPage />,
+  '/admin/pricing': <PricingPage />,
+  '/admin/dashboard': <DashboardPage />,
+  '/admin/conversations': <ConversationsPage />,
+  '/admin/announcements': <AnnouncementsPage />,
+  '/admin/operations-settings': <OperationsSettingsPage />,
+  '/admin/system': <SystemPage />,
+  '/admin/settings': <SettingsPage />,
+  '/admin/audit': <AuditPage />,
+}
 function LoadingPage() {
   const { t } = useTranslation()
   return (
@@ -101,43 +118,7 @@ const router = createBrowserRouter([
                 .flatMap((group) => group.items)
                 .map(({ path }) => ({
                   path: path === '/admin/settings' ? '/admin/settings/:group?' : path,
-                  element: pending(
-                    path === '/admin/users' ? (
-                      <UsersPage />
-                    ) : path === '/admin/credit-ledger' ? (
-                      <CreditLedgerPage />
-                    ) : path === '/admin/redeem-codes' ? (
-                      <RedeemCodesPage />
-                    ) : path === '/admin/upstreams' ? (
-                      <UpstreamsPage />
-                    ) : path === '/admin/models' ? (
-                      <ModelsPage />
-                    ) : path === '/admin/chat-settings' ? (
-                      <ChatSettingsPage />
-                    ) : path === '/admin/image-settings' ? (
-                      <ImageSettingsPage />
-                    ) : path === '/admin/image-tasks' ? (
-                      <ImageTasksPage />
-                    ) : path === '/admin/pricing' ? (
-                      <PricingPage />
-                    ) : path === '/admin/dashboard' ? (
-                      <DashboardPage />
-                    ) : path === '/admin/conversations' ? (
-                      <ConversationsPage />
-                    ) : path === '/admin/announcements' ? (
-                      <AnnouncementsPage />
-                    ) : path === '/admin/operations-settings' ? (
-                      <OperationsSettingsPage />
-                    ) : path === '/admin/system' ? (
-                      <SystemPage />
-                    ) : path === '/admin/settings' ? (
-                      <SettingsPage />
-                    ) : path === '/admin/audit' ? (
-                      <AuditPage />
-                    ) : (
-                      <SectionPage />
-                    ),
-                  ),
+                  element: pending(adminPages[path] ?? <NotFoundPage />),
                 })),
               { path: '/admin/users/:id', element: pending(<UserDetailPage />) },
             ],

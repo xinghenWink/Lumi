@@ -1,8 +1,8 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
+import { isCancelledError } from '@tanstack/react-query'
 import { chats, type Conversation, type Message } from '../api/chat'
-import { useChatStore } from './chat'
-import { useAuthStore } from './auth'
+import { createAppRuntime, type AppRuntime } from '../react/app/runtime'
+import { createSessionService } from '../api/auth-session'
 const row: Conversation = {
   id: 'c',
   title: 'title',
@@ -24,8 +24,32 @@ const user: Message = {
   created_at: 'now',
 }
 const assistant: Message = { ...user, id: 'a', role: 'assistant', content: '', status: 'streaming' }
-beforeEach(() => setActivePinia(createPinia()))
-afterEach(() => vi.restoreAllMocks())
+
+let runtime: AppRuntime
+const historyKey = ['user', '', 'sidebar-history', 'chat']
+const history = () =>
+  runtime.queryClient.getQueryData<{ items: Conversation[] }>(historyKey)?.items ?? []
+async function loadHistory() {
+  try {
+    await runtime.queryClient.fetchQuery({
+      queryKey: historyKey,
+      queryFn: ({ signal }) => chats.list(new URLSearchParams(), signal),
+    })
+  } catch (error) {
+    if (!isCancelledError(error)) throw error
+  }
+}
+beforeEach(() => {
+  runtime = createAppRuntime(createSessionService())
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
+    window.setTimeout(() => callback(performance.now()), 0),
+  )
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => window.clearTimeout(id))
+})
+afterEach(() => {
+  runtime.dispose()
+  vi.restoreAllMocks()
+})
 describe('chat state isolation and streaming', () => {
   it('keeps a replayable request after a transport failure and reconciles persisted messages', async () => {
     vi.spyOn(chats, 'get').mockResolvedValue(row)
@@ -43,14 +67,14 @@ describe('chat state isolation and streaming', () => {
           conversation: row,
         })
       })
-    const store = useChatStore()
-    store.active = 'c'
+    const store = runtime.chat
+    await store.open('c')
     await store.send('c', { request_id: 'r', model_id: 'm', content: 'question', action: 'send' })
-    expect(store.hasPending).toBe(true)
-    expect(store.messages.at(-1)?.content).toBe('saved')
-    await store.retryPending()
+    expect(!!store.store.getState().pending.c).toBe(true)
+    expect((store.snapshot('c')?.messages ?? []).at(-1)?.content).toBe('saved')
+    await store.retryPending('c')
     expect(send.mock.calls[1]?.[1].request_id).toBe('r')
-    expect(store.hasPending).toBe(false)
+    expect(!!store.store.getState().pending.c).toBe(false)
   })
   it('does not replay an accepted regeneration or duplicate its user turn', async () => {
     vi.spyOn(chats, 'get').mockResolvedValue(row)
@@ -67,7 +91,7 @@ describe('chat state isolation and streaming', () => {
         conversation: row,
       })
     })
-    const store = useChatStore()
+    const store = runtime.chat
     await store.open('c')
     await store.send('c', {
       request_id: 'r2',
@@ -76,8 +100,8 @@ describe('chat state isolation and streaming', () => {
       content: '',
       last_message_id: 'u',
     })
-    expect(store.messages.map((m) => m.id)).toEqual(['u', 'a'])
-    expect(store.messages.at(-1)?.status).toBe('completed')
+    expect((store.snapshot('c')?.messages ?? []).map((m) => m.id)).toEqual(['u', 'a'])
+    expect((store.snapshot('c')?.messages ?? []).at(-1)?.status).toBe('completed')
   })
   it('discards pending loads and drafts when the signed-in account changes', async () => {
     let resolve: ((value: { items: Conversation[]; next_cursor: string }) => void) | undefined
@@ -87,25 +111,14 @@ describe('chat state isolation and streaming', () => {
           resolve = done
         }),
     )
-    const store = useChatStore()
-    store.drafts.new = 'private draft'
-    const pending = store.list()
-    useAuthStore().user = {
-      id: 'other',
-      email: 'other@example.test',
-      nickname: 'Other',
-      role: 'user',
-      status: 'active',
-      locale: 'zh-CN',
-      timezone: 'UTC',
-      created_at: 'now',
-      last_login_at: null,
-      last_login_ip: '',
-    }
+    const store = runtime.chat
+    store.draft('', 'private draft')
+    const pending = loadHistory()
+    runtime.session.clear()
     resolve?.({ items: [row], next_cursor: '' })
     await pending
-    expect(store.conversations).toEqual([])
-    expect(store.drafts.new).toBeUndefined()
+    expect(history()).toEqual([])
+    expect(store.store.getState().drafts.new).toBeUndefined()
   })
   it('clears filtered-out history and ignores stream events arriving after deletion', async () => {
     const get = vi.spyOn(chats, 'get').mockResolvedValue(row)
@@ -123,12 +136,12 @@ describe('chat state isolation and streaming', () => {
           }
         }),
     )
-    const store = useChatStore()
+    const store = runtime.chat
     await store.open('c')
-    store.drafts.c = 'conversation draft'
-    store.drafts.new = 'new draft'
-    store.drafts['image-draft'] = 'image draft'
-    store.conversations = []
+    store.draft('c', 'conversation draft')
+    store.draft('', 'new draft')
+    runtime.image.draft('image-draft', { prompt: 'image draft' })
+    runtime.queryClient.setQueryData(historyKey, { items: [], next_cursor: '' })
     const pending = store.send('c', {
       request_id: 'r',
       model_id: 'm',
@@ -138,14 +151,14 @@ describe('chat state isolation and streaming', () => {
     await store.remove([], true)
     finish?.()
     await pending
-    expect(store.messages).toEqual([])
-    expect(store.conversations).toEqual([])
-    expect(store.lastOpened).toBe('')
-    expect(store.drafts.c).toBeUndefined()
-    expect(store.drafts.new).toBe('new draft')
-    expect(store.drafts['image-draft']).toBe('image draft')
-    expect(store.running.c).toBeUndefined()
-    expect(store.errors.c).toBeUndefined()
+    expect(store.snapshot('c')?.messages ?? []).toEqual([])
+    expect(history()).toEqual([])
+    expect(store.store.getState().lastOpened).toBe('')
+    expect(store.store.getState().drafts.c).toBeUndefined()
+    expect(store.store.getState().drafts.new).toBe('new draft')
+    expect(runtime.image.store.getState().drafts['image-draft']?.prompt).toBe('image draft')
+    expect(store.store.getState().running.c).toBeUndefined()
+    expect(store.store.getState().errors.c).toBeUndefined()
     expect(get).toHaveBeenCalledTimes(1)
   })
   it('ignores history mutations completed after the account session changes', async () => {
@@ -164,15 +177,15 @@ describe('chat state isolation and streaming', () => {
         }),
     )
     const list = vi.spyOn(chats, 'list')
-    const store = useChatStore()
+    const store = runtime.chat
     const changes = Promise.all([store.update(row, 'renamed'), store.remove([], true)])
     store.reset()
-    store.drafts.new = 'next account draft'
+    store.draft('', 'next account draft')
     renamed?.({ ...row, title: 'renamed' })
     removed?.()
     await changes
-    expect(store.conversations).toEqual([])
-    expect(store.drafts.new).toBe('next account draft')
+    expect(history()).toEqual([])
+    expect(store.store.getState().drafts.new).toBe('next account draft')
     expect(list).not.toHaveBeenCalled()
   })
 })

@@ -72,3 +72,9 @@ Build the Docker production image and run the existing complete Compose stack an
 ## PR-0 reference validation
 
 PR-0 only changes documentation and supplied references. Normalize malformed HTML nesting through the same HTML parsing model used by browsers, then format it. Compare rendered original/normalized screenshots and exercise mode switching, model/parameter menus, theme and mobile drawer. Record any visual difference before accepting the repair. Do not add the prototype to production assets.
+
+## Canonical suite after PR-7 cleanup
+
+Normal build/typecheck/lint/test/E2E commands now target React; the candidate aliases target the same commands/configuration. Vitest discovers all shared and React tests exactly once (87 cases), including all 20 ported state cases and the unchanged protocol/financial/SSE assertions. Playwright preserves the original journey entries and adds every accepted candidate regression, yielding 57 cases on Chrome desktop/320/390. Only the independent container suite is excluded from native test discovery; its three cases run against the actual default production image through scripts/react-embed-smoke.mjs.
+
+Keep existing SSE, Lighthouse, 250000-byte gzip, interaction/long-task and virtualized DOM/thumbnail limits. The final CI retains full backend quality/integration/contract/vulnerability/capacity gates and Compose/upgrade/rollback/backup exercises. Main remains unchanged; the last deliverable is a reviewable release proposal.

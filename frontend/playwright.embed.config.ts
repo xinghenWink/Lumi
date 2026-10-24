@@ -1,5 +1,5 @@
 import { defineConfig } from '@playwright/test'
-import candidate from './playwright.react.config'
+import candidate from './playwright.config'
 
 // The driver starts the actual production container; no native server is allowed here.
 const { webServer: nativeServer, ...shared } = candidate
@@ -8,6 +8,8 @@ if (!process.env.E2E_EMBED_URL) throw new Error('Run scripts/react-embed-smoke.m
 export default defineConfig({
   ...shared,
   testDir: './tests/embed',
+  testMatch: '**/*.spec.ts',
+  testIgnore: [],
   outputDir: './test-results/embed',
   use: { ...shared.use, baseURL: process.env.E2E_EMBED_URL },
 })

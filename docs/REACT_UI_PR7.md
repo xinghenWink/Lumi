@@ -51,3 +51,21 @@ Also retain every existing new candidate journey: auth/reset/shell, foundation/l
 3. Inspect desktop/mobile/contrast, composer model placement, image Popover and admin layouts. The prototype remains a reference only.
 4. Build actual default Docker image with exact head metadata; three-project authenticated production embed, environment overrides and asset/resource boundaries. Keep production Compose, installation/upgrade/rollback and backup restoration CI exercises.
 5. All exact-head CI jobs green before the release proposal. Integrate the final milestone only into `codex/react-ui`, then create the complete reviewable release proposal PR against main (or make PR-7 itself the release proposal with the complete integration diff). Attach every PR. Never merge main, tag, publish or deploy.
+
+## Implementation progress
+
+- [x] Entry gate: PR-6c CI #101 passed all jobs on 2b6d0e3; PR #18 integrated only into codex/react-ui as ae05cbe.
+- [x] Plan committed before implementation (41b3657).
+- [x] All original 20 state cases ported to actual React/session/Query/Zustand behavior; three translation contract tests and credit idempotency assertions retained.
+- [x] Default entry/build/typecheck/lint/test now React; 10 direct Vue dependencies and 81 inventoried obsolete files removed. The lockfile only removes 558 lines and adds no package resolution.
+- [x] Strict typecheck, lint/format, frozen install and all 87 deduplicated unit cases pass; normal production build passes its no-Vue-module guard.
+- [x] Canonical discovery lists exactly 57 Chrome cases in 14 source files, preserving all original entries and new regressions.
+- [ ] Full default production-embed Chrome acceptance, unchanged performance bounds and visual inspection.
+- [ ] Actual default production Docker embed and all exact-head CI jobs.
+- [ ] Integration and a reviewable release proposal targeting main, without merging or deployment.
+
+The original browser entry files delegate to their already migrated complete React implementations; these implementations remain required by canonical test discovery. The original signup gift assertion is covered by public registration with exact daily/permanent totals, not replaced with an administrator grant. The usage list retains its explicit viewport assertion as well as the new 30-row count. No test or performance threshold was removed to obtain a pass.
+
+The real-hook model test initially did not subscribe to Query's tracked error property. The test probe now consumes the status/error fields used by the production picker, preserving its mixed-mode rejection assertion. No product rule was changed to accommodate the fixture.
+
+The first default-entry full run exposed an incomplete reload assertion in the original account journey: checking the unchanged URL could succeed before refresh finished, then another hard navigation interrupted the in-flight refresh. The journey now also waits for the authenticated chat heading after reload before testing the admin guard. This strengthens session-restoration coverage; authentication handlers, timeouts and role assertions are unchanged. Failure traces are retained for comparison with the required full rerun.

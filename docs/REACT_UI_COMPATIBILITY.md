@@ -68,3 +68,9 @@ Keep URL query filters, deep-link refresh, browser back/forward, route titles an
 ## Migration tracking
 
 Each implementation PR links its completed rows, changed source paths and exact test evidence. A row is complete only after its React behavior is exercised. CSS-selector changes may use stable test IDs or accessible selectors, but all prior behavioral assertions remain represented. Full React acceptance is required before deleting legacy tests or dependencies; tests are migrated, not discarded.
+
+## Final React default (PR-7)
+
+PR-6c passed complete functions, Chrome desktop/320/390 (51), original Vue browser cases (16), actual React Docker embed (3) and all CI #101 jobs before cleanup. The default entry now uses the same accepted React application; no route, backend business rule, API/OpenAPI/SQL, SSE or financial settlement changed. The framework-independent parsers/types and session adapter remain in use.
+
+Canonical browser discovery preserves the original journey entry points and all newer cases: 57 cases over Chrome desktop and fully emulated 320/390px touch/mobile projects. The original credit journey maps to both public signup/account statistics and administrator finance modules. All 20 original store acceptance cases now use the real React architecture; the combined suite has 87 cases after running the five formerly shared cases only once. See REACT_UI_PR7.md for the exact mapping and final gates.

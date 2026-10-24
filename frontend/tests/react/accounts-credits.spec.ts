@@ -117,6 +117,7 @@ test('real credits, unknown redemption replay, private records, statistics and c
     await expect(f.member.getByTestId('permanent-balance')).toHaveText('10')
     await expect(f.member.getByText('近 30 天还没有积分消耗', { exact: true })).toBeVisible()
     await f.member.getByRole('list', { name: '近 30 天每日积分消耗' }).scrollIntoViewIfNeeded()
+    await expect(f.member.getByRole('list', { name: '近 30 天每日积分消耗' })).toBeInViewport()
     await expect(
       f.member.getByRole('list', { name: '近 30 天每日积分消耗' }).locator('li'),
     ).toHaveCount(30)

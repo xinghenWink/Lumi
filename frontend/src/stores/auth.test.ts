@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
-import { useAuthStore } from './auth'
+import { createSessionService } from '../api/auth-session'
 import { ApiError } from '../api/transport'
 
 const user = {
@@ -27,17 +26,16 @@ const authenticated = () =>
 
 describe('authentication state', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
     localStorage.clear()
   })
   it('coalesces refresh and keeps credentials out of storage', async () => {
     const fetch = vi.fn().mockResolvedValue(authenticated())
     vi.stubGlobal('fetch', fetch)
-    const auth = useAuthStore()
+    const auth = createSessionService()
     await Promise.all([auth.refresh(), auth.refresh()])
     expect(fetch).toHaveBeenCalledTimes(1)
-    expect(auth.user?.email).toBe(user.email)
-    expect(auth.accessToken).toBe('test-token-in-memory')
+    expect(auth.getSnapshot().user?.email).toBe(user.email)
+    expect(auth.getSnapshot().token).toBe('test-token-in-memory')
     expect(localStorage.length).toBe(0)
     const init = fetch.mock.calls[0]?.[1] as RequestInit
     expect(new Headers(init.headers).get('X-Lumi-CSRF')).toBe('1')
@@ -52,10 +50,10 @@ describe('authentication state', () => {
           new Response(JSON.stringify({ code: 'AUTH_REQUIRED' }), { status: 401 }),
         ),
     )
-    const auth = useAuthStore()
+    const auth = createSessionService()
     await auth.bootstrap()
-    expect(auth.initialized).toBe(true)
-    expect(auth.user).toBeNull()
+    expect(auth.getSnapshot().initialized).toBe(true)
+    expect(auth.getSnapshot().user).toBeNull()
     let complete: ((value: Response) => void) | undefined
     vi.stubGlobal(
       'fetch',
@@ -71,8 +69,8 @@ describe('authentication state', () => {
     if (!complete) throw new Error('Refresh did not begin')
     complete(authenticated())
     await pending
-    expect(auth.user).toBeNull()
-    expect(auth.accessToken).toBeNull()
+    expect(auth.getSnapshot().user).toBeNull()
+    expect(auth.getSnapshot().token).toBeNull()
   })
   it('retains the session after a transient refresh failure', async () => {
     const fetch = vi
@@ -80,10 +78,10 @@ describe('authentication state', () => {
       .mockResolvedValueOnce(authenticated())
       .mockResolvedValueOnce(new Response('{}', { status: 503 }))
     vi.stubGlobal('fetch', fetch)
-    const auth = useAuthStore()
+    const auth = createSessionService()
     await auth.login({ email: user.email, password: 'TestOnlyPassword42' })
     await expect(auth.refresh()).rejects.toBeInstanceOf(ApiError)
-    expect(auth.user?.email).toBe(user.email)
+    expect(auth.getSnapshot().user?.email).toBe(user.email)
   })
   it('waits for server logout before discarding local access', async () => {
     const fetch = vi
@@ -91,11 +89,11 @@ describe('authentication state', () => {
       .mockResolvedValueOnce(authenticated())
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
     vi.stubGlobal('fetch', fetch)
-    const auth = useAuthStore()
+    const auth = createSessionService()
     await auth.login({ email: user.email, password: 'TestOnlyPassword42' })
     await auth.logout()
-    expect(auth.user).toBeNull()
-    expect(auth.accessToken).toBeNull()
+    expect(auth.getSnapshot().user).toBeNull()
+    expect(auth.getSnapshot().token).toBeNull()
     expect(fetch).toHaveBeenLastCalledWith(
       '/api/v1/auth/logout',
       expect.objectContaining({ method: 'POST' }),

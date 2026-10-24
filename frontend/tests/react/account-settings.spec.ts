@@ -76,6 +76,9 @@ test('M1 real registration, sessions, administration, settings and audit', async
     ).toBe(false)
     await member.reload()
     await expect(member).toHaveURL(/\/chat$/)
+    await expect(
+      member.getByRole('heading', { name: '今天想创造什么？', exact: true }),
+    ).toBeVisible()
     await member.goto('/admin/users')
     await expect(member).toHaveURL(/\/chat$/)
     await accountMenu(member)
