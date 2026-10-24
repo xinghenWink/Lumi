@@ -32,6 +32,11 @@ test('production Docker Go embed serves authenticated React deep links and stati
   await expect(page.getByRole('heading', { name: '系统信息', exact: true })).toBeVisible()
   await page.goto('/chat')
   await expect(page.getByRole('heading', { name: '今天想创造什么？', exact: true })).toBeVisible()
+  // All projects deliberately reuse one real account, including its saved appearance.
+  if (await page.getByRole('button', { name: '切换浅色主题', exact: true }).isVisible()) {
+    await page.getByRole('button', { name: '切换浅色主题', exact: true }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  }
   await page.getByRole('button', { name: '切换深色主题', exact: true }).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   await page.goto('/create')
