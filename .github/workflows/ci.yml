@@ -61,7 +61,8 @@ jobs:
             printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
           fi
           pnpm --filter @lumi/frontend exec playwright install --with-deps chrome
-      - run: pnpm test:e2e
+      - name: Run full native Chrome acceptance
+        run: node scripts/native-e2e.mjs test:e2e
       - name: Install pinned k6
         run: |
           curl --fail --location --silent --show-error https://github.com/grafana/k6/releases/download/v1.3.0/k6-v1.3.0-linux-amd64.tar.gz -o "$RUNNER_TEMP/k6.tar.gz"
@@ -110,7 +111,11 @@ jobs:
         if: always()
         with:
           name: playwright-results
-          path: frontend/test-results
+          include-hidden-files: true
+          path: |
+            frontend/test-results
+            .tools/native-e2e/*/report.json
+            .tools/native-e2e/*/diagnostics.json
           if-no-files-found: ignore
 
   react-candidate:
@@ -153,12 +158,17 @@ jobs:
             printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
           fi
           pnpm --filter @lumi/frontend exec playwright install --with-deps chrome
-      - run: pnpm test:e2e:react
+      - name: Run full native React Chrome acceptance
+        run: node scripts/native-e2e.mjs test:e2e:react
       - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:
           name: react-playwright-results
-          path: frontend/test-results/e2e
+          include-hidden-files: true
+          path: |
+            frontend/test-results/e2e
+            .tools/native-e2e/*/report.json
+            .tools/native-e2e/*/diagnostics.json
           if-no-files-found: ignore
 
   container:
