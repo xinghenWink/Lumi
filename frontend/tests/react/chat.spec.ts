@@ -1,8 +1,9 @@
+import { journeyHeaders } from './client-headers'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 import { record } from '../../src/api/transport'
 import { defaultCapabilities } from '../../src/api/catalog-contracts'
 import { observeErrors } from '../browser-errors'
@@ -139,7 +140,7 @@ test('React real streaming history stop editing isolation and bounded rendering'
       : {}),
     isMobile: info.project.use.isMobile ?? false,
     hasTouch: info.project.use.hasTouch ?? false,
-    extraHTTPHeaders: info.project.use.extraHTTPHeaders ?? {},
+    extraHTTPHeaders: journeyHeaders(info),
   })
   const member = await memberContext.newPage()
   observeErrors(member, errors)

@@ -57,7 +57,7 @@ export function ModalDialog({
               variant="ghost"
               size="icon"
               className="absolute top-3 right-3"
-              aria-label={t('common.cancel')}
+              aria-label={t('common.close')}
             >
               <X size={18} />
             </Button>

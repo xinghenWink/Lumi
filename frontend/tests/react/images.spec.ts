@@ -1,9 +1,10 @@
+import { journeyHeaders } from './client-headers'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { readFile } from 'node:fs/promises'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 import { record } from '../../src/api/transport'
 import { defaultCapabilities } from '../../src/api/catalog-contracts'
 import { parseTask, parseImageConfiguration } from '../../src/api/images'
@@ -113,7 +114,7 @@ test('React real image generation editing gallery cancellation and administrator
   const memberContext = await browser.newContext({
     baseURL,
     viewport: info.project.use.viewport ?? { width: 1440, height: 900 },
-    extraHTTPHeaders: info.project.use.extraHTTPHeaders ?? {},
+    extraHTTPHeaders: journeyHeaders(info),
     ...(info.project.use.userAgent ? { userAgent: info.project.use.userAgent } : {}),
     deviceScaleFactor: info.project.use.deviceScaleFactor ?? 1,
     isMobile: info.project.use.isMobile ?? false,
