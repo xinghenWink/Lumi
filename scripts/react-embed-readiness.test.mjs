@@ -49,7 +49,7 @@ test(
         password = randomBytes(24).toString('hex')
       await writeFile(
         pgEnv,
-        'POSTGRES_USER=lumi\nPOSTGRES_DB=lumi\nPOSTGRES_PASSWORD=' + password + '\n',
+        'POSTGRES_USER=lumi\nPOSTGRES_DB=lumi\nPGPORT=55432\nPOSTGRES_PASSWORD=' + password + '\n',
         { mode: 0o600 },
       )
       await writeFile(
@@ -60,7 +60,7 @@ test(
       await writeFile(redisEnv, 'REDISCLI_AUTH=' + password + '\n', { mode: 0o600 })
       await writeFile(
         redisConfig,
-        'bind 0.0.0.0\nprotected-mode yes\nrequirepass ' + password + '\n',
+        'bind 0.0.0.0\nport 56379\nprotected-mode yes\nrequirepass ' + password + '\n',
         { mode: 0o644 },
       )
       const pg = start('pg', [
@@ -69,24 +69,29 @@ test(
         '--mount',
         'type=bind,src=' + initSQL + ',dst=/docker-entrypoint-initdb.d/initialize.sql,readonly',
         'postgres:16-alpine',
+        'postgres',
+        '-p',
+        '55432',
       ])
       await wait(() =>
         docker(['logs', pg]).includes('running /docker-entrypoint-initdb.d/initialize.sql'),
       )
       assert.match(
-        docker(['exec', pg, 'pg_isready', '-U', 'lumi', '-d', 'lumi']),
+        docker(['exec', pg, 'pg_isready', '-p', '55432', '-U', 'lumi', '-d', 'lumi']),
         /accepting connections/,
       )
       assert.throws(
-        () => postgresReady(docker, pg),
+        () => postgresReady(docker, pg, 55432),
         'TCP must reject the temporary initialization server',
       )
-      await wait(() => postgresReady(docker, pg))
+      await wait(() => postgresReady(docker, pg, 55432))
       assert.equal(
         docker([
           'exec',
           pg,
           'psql',
+          '-p',
+          '55432',
           '-U',
           'lumi',
           '-d',
@@ -105,12 +110,12 @@ test(
         'redis-server',
         '/usr/local/etc/redis/redis.conf',
       ])
-      await wait(() => redisReady(docker, redis))
+      await wait(() => redisReady(docker, redis, 56379))
       assert.match(
-        docker(['exec', '--env', 'REDISCLI_AUTH=', redis, 'redis-cli', 'ping']),
+        docker(['exec', '--env', 'REDISCLI_AUTH=', redis, 'redis-cli', '-p', '56379', 'ping']),
         /NOAUTH/,
       )
-      assert.equal(redisReady(docker, redis), true)
+      assert.equal(redisReady(docker, redis, 56379), true)
     } finally {
       try {
         for (const name of owned.reverse()) {

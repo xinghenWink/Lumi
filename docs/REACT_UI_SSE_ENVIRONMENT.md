@@ -17,8 +17,9 @@ Both native browser jobs currently connect a host Go process to Docker-published
 
 ## Acceptance
 
-- [ ] Frozen install, strict typecheck, lint/format, all 87 unit tests, normal production build and generated OpenAPI consistency.
-- [ ] Actual delayed PostgreSQL/Redis probe regression and independent production Docker embed remain green.
+- [x] Frozen install, strict typecheck, lint/format, all 87 unit tests, normal production build and generated OpenAPI consistency.
+- [x] Actual delayed PostgreSQL/Redis probe regression passes with explicit ports, 1/1 in 18.4 seconds, zero skipped cases and owned resources cleaned.
+- [ ] Independent production Docker embed remains green with the default probe ports.
 - [ ] Fresh local full Chrome desktop/320/390 run with the richer measurements; retain failed CI evidence.
 - [ ] Linux wrapper reports direct host topology and PostgreSQL durability enabled; both complete 57-case CI suites pass with the unchanged SSE bound and all existing jobs pass. Investigate any remaining failure before integration.
 - [ ] Integrate the accepted small PR only into `codex/react-ui`, then update #20 and require its complete final-commit CI. Keep main unchanged and the release proposal draft until acceptance.

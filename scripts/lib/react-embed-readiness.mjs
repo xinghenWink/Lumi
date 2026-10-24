@@ -1,4 +1,4 @@
-export function postgresReady(docker, name) {
+export function postgresReady(docker, name, port = 5432, database = 'lumi') {
   // Initialization's temporary server accepts Unix sockets before production TCP exists.
   return docker([
     'exec',
@@ -7,16 +7,26 @@ export function postgresReady(docker, name) {
     '-h',
     '127.0.0.1',
     '-p',
-    '5432',
+    String(port),
     '-U',
     'lumi',
     '-d',
-    'lumi',
+    database,
   ]).includes('accepting connections')
 }
 
-export function redisReady(docker, name) {
+export function redisReady(docker, name, port = 6379) {
   return (
-    docker(['exec', name, 'redis-cli', '--no-auth-warning', '-h', '127.0.0.1', 'ping']) === 'PONG'
+    docker([
+      'exec',
+      name,
+      'redis-cli',
+      '--no-auth-warning',
+      '-h',
+      '127.0.0.1',
+      '-p',
+      String(port),
+      'ping',
+    ]) === 'PONG'
   )
 }
