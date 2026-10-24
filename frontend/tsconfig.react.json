@@ -7,6 +7,13 @@
       "@/*": ["./src/react/*"]
     }
   },
-  "include": ["src/react/**/*.ts", "src/react/**/*.tsx", "src/api/**/*.ts", "tests/react/**/*.ts"],
+  "include": [
+    "src/react/**/*.ts",
+    "src/react/**/*.tsx",
+    "src/api/**/*.ts",
+    "tests/react/**/*.ts",
+    "tests/embed/**/*.ts",
+    "playwright.embed.config.ts"
+  ],
   "exclude": ["src/api/session.legacy.ts"]
 }

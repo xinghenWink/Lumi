@@ -403,6 +403,58 @@ test('React real streaming history stop editing isolation and bounded rendering'
     })
     expect(deniedConfig.status()).toBe(403)
     const secondID = randomUUID()
+    // Metadata must never prefetch content; the server enforces and audits explicit reads.
+    const imageConfiguration = await api('GET', '/admin/image-settings')
+    if (!imageConfiguration) throw new Error('Missing content access configuration')
+    let contentReads = 0
+    const observeContent = (request: import('@playwright/test').Request) => {
+      if (request.url().includes('/admin/conversations/') && request.url().includes('/messages'))
+        contentReads++
+    }
+    page.on('request', observeContent)
+    try {
+      await api('PUT', '/admin/image-settings', {
+        ...imageConfiguration,
+        admin_can_view_content: false,
+      })
+      await page.goto('/admin/conversations?user_id=' + auth.user.id)
+      const metadata = page.getByRole('row').filter({ hasText: conversationID })
+      await expect(metadata).toBeVisible()
+      expect(contentReads).toBe(0)
+      await expect(page.getByText('灯塔与海风', { exact: true })).toHaveCount(0)
+      const deniedContent = page.waitForResponse((response) =>
+        response.url().includes('/admin/conversations/' + conversationID + '/messages'),
+      )
+      await metadata
+        .getByRole('button', { name: '查看消息（需开启内容权限）', exact: true })
+        .click()
+      expect((await deniedContent).status()).toBe(403)
+      await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible()
+      await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
+      await page.goto('/admin/image-settings')
+      await page.getByLabel('允许管理员查看提示词、参考图与结果', { exact: true }).check()
+      await page.getByRole('button', { name: '保存修改', exact: true }).click()
+      await expect(page.getByRole('status')).toContainText('生图设置已保存')
+      await page.goto('/admin/conversations?user_id=' + auth.user.id)
+      expect(contentReads).toBe(1)
+      await page
+        .getByRole('row')
+        .filter({ hasText: conversationID })
+        .getByRole('button', { name: '查看消息（需开启内容权限）', exact: true })
+        .click()
+      await expect(page.getByRole('dialog')).toContainText('灯塔与海风')
+      expect(contentReads).toBe(2)
+      await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
+      const audit = await api(
+        'GET',
+        '/admin/audit-logs?action=chat.content_view&target_id=' + conversationID,
+      )
+      expect(audit?.items).toHaveLength(1)
+    } finally {
+      page.off('request', observeContent)
+      const latest = await api('GET', '/admin/image-settings')
+      await api('PUT', '/admin/image-settings', { ...imageConfiguration, version: latest?.version })
+    }
     await api('POST', '/conversations', { id: secondID, model_id: model.id })
     await api('PATCH', '/conversations/' + secondID, {
       title: '第二段-' + suffix,

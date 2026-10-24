@@ -34,7 +34,17 @@ CI retains its current quality, full legacy/candidate suites, capacity/audit, pr
 
 ## Progress
 
-- [ ] All operations/security routes and existing functions migrated.
+- [x] All operations/security routes and existing functions migrated.
 - [ ] Real candidate/legacy, static/unit/performance and visual gates.
 - [ ] Actual React Docker production embed accepted locally and in CI.
 - [ ] Integration complete before PR-7 entry switch and Vue cleanup.
+
+## Implementation and regression evidence
+
+All seven planned lazy pages now use existing API clients, scoped queries, owned mutations and common typed controls. The read-only clients gained optional AbortSignal arguments and the existing audited message endpoint gained a strict frontend parser wrapper; no endpoint or backend rule changed. Audit filter protocol constants are framework independent, with complete translated labels and explicit language compatibility checks.
+
+The original account/settings/SMTP/audit and operations journeys retain their behavior assertions in the candidate suite. New real journeys cover announcement CRUD/cancel/conflicts/dual banners, daily ranges and all financial columns, secret preservation/explicit clearing, maintenance/quota/circuit persistence, confirmed cleanup, expected SMTP-unavailable behavior and redacted audits. The full chat journey now asserts zero metadata prefetches, server denial with content disabled, UI opt-in, explicit audited content and restoration of the previous configuration.
+
+The first focused run exposed an immediate visibility check racing lazy shell mounting; the candidate account helper now selects the mobile drawer by the actual viewport and lets Playwright await the trigger. A later focused run found an incorrectly written audit URL in the new test; it now uses the verified existing `/admin/audit-logs` endpoint. Assertions and original thresholds remain intact. Focused desktop account/operations writes pass; full three-viewport and container gates remain required.
+
+The local Docker runtime was recovered from an inaccessible stale runtime socket by preserving/renaming only its runtime directory. No factory reset, image/volume prune or application data removal was performed. Full suites use fresh owned PG/Redis fixtures after recovery.

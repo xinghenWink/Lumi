@@ -27,6 +27,13 @@ const ChatSettingsPage = lazy(() => import('../pages/admin/ChatSettingsPage'))
 const ImageSettingsPage = lazy(() => import('../pages/admin/ImageSettingsPage'))
 const ImageTasksPage = lazy(() => import('../pages/admin/ImageTasksPage'))
 const PricingPage = lazy(() => import('../pages/admin/PricingPage'))
+const DashboardPage = lazy(() => import('../pages/admin/DashboardPage'))
+const ConversationsPage = lazy(() => import('../pages/admin/ConversationsPage'))
+const AnnouncementsPage = lazy(() => import('../pages/admin/AnnouncementsPage'))
+const OperationsSettingsPage = lazy(() => import('../pages/admin/OperationsSettingsPage'))
+const SystemPage = lazy(() => import('../pages/admin/SystemPage'))
+const SettingsPage = lazy(() => import('../pages/admin/SettingsPage'))
+const AuditPage = lazy(() => import('../pages/admin/AuditPage'))
 const WorkspaceShell = lazy(() =>
   import('../layouts/WorkspaceShell').then((module) => ({ default: module.WorkspaceShell })),
 )
@@ -113,6 +120,20 @@ const router = createBrowserRouter([
                       <ImageTasksPage />
                     ) : path === '/admin/pricing' ? (
                       <PricingPage />
+                    ) : path === '/admin/dashboard' ? (
+                      <DashboardPage />
+                    ) : path === '/admin/conversations' ? (
+                      <ConversationsPage />
+                    ) : path === '/admin/announcements' ? (
+                      <AnnouncementsPage />
+                    ) : path === '/admin/operations-settings' ? (
+                      <OperationsSettingsPage />
+                    ) : path === '/admin/system' ? (
+                      <SystemPage />
+                    ) : path === '/admin/settings' ? (
+                      <SettingsPage />
+                    ) : path === '/admin/audit' ? (
+                      <AuditPage />
                     ) : (
                       <SectionPage />
                     ),

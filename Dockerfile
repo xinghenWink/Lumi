@@ -6,7 +6,12 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY frontend/package.json frontend/package.json
 RUN pnpm install --frozen-lockfile
 COPY frontend frontend
-RUN pnpm build
+ARG FRONTEND_VARIANT=vue
+RUN case "$FRONTEND_VARIANT" in \
+      vue) pnpm build ;; \
+      react) pnpm build:react ;; \
+      *) echo "Unsupported FRONTEND_VARIANT" >&2; exit 1 ;; \
+    esac
 
 FROM --platform=$BUILDPLATFORM golang:1.26.10-alpine AS backend
 WORKDIR /src/backend

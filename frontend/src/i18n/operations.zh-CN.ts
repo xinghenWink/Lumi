@@ -50,6 +50,7 @@ export default {
     siteKey: 'Turnstile Site Key',
     hostname: 'Turnstile 允许的域名',
     secret: 'Turnstile Secret Key（留空保留）',
+    clearSecret: '清除已保存的 Turnstile 密钥（仅停用时可用）',
     secretConfigured: '已配置密钥',
     registerLimit: '每 IP 每 24 小时注册配额（0 不限制）',
     circuitFailures: '熔断前连续失败次数',

@@ -10,7 +10,7 @@ process.env.E2E_ENCRYPTION_KEY ??= randomBytes(32).toString('base64')
 
 export default defineConfig({
   testDir: './tests',
-  testIgnore: '**/react/**',
+  testIgnore: ['**/react/**', '**/embed/**'],
   outputDir: './test-results/legacy',
   workers: 1,
   timeout: 120_000,

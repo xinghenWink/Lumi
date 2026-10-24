@@ -39,16 +39,19 @@ export function CheckField({
   checked,
   onChange,
   disabled = false,
+  role,
 }: {
   label: string
   checked: boolean
   onChange(value: boolean): void
   disabled?: boolean
+  role?: 'switch'
 }) {
   return (
     <label className="flex min-h-10 items-center gap-3 text-sm">
       <input
         type="checkbox"
+        role={role}
         className="size-4 shrink-0 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         checked={checked}
         disabled={disabled}
