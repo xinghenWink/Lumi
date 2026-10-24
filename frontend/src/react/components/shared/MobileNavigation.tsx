@@ -50,7 +50,7 @@ export function MobileNavigation({ admin }: { admin: boolean }) {
           aria-hidden="true"
           className="fixed inset-0 z-40 touch-none bg-black/35 backdrop-blur-[2px]"
         />
-        <Dialog.Content className="fixed inset-y-0 left-0 z-50 w-[268px] max-w-[calc(100vw-20px)] border-r border-border bg-sidebar shadow-xl outline-none">
+        <Dialog.Content className="mobile-sidebar fixed inset-y-0 left-0 z-50 w-[268px] max-w-[calc(100vw-20px)] border-r border-border bg-sidebar shadow-xl outline-none">
           <Dialog.Title className="sr-only">
             {t(admin ? 'nav.admin' : 'nav.workspace')}
           </Dialog.Title>

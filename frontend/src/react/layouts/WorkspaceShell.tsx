@@ -28,7 +28,7 @@ export function ShellLayout({ admin }: { admin: boolean }) {
       >
         {t('app.skipLink')}
       </a>
-      <aside className="hidden h-full w-[260px] shrink-0 border-r border-border lg:block">
+      <aside className="desktop-sidebar hidden h-full w-[260px] shrink-0 border-r border-border lg:block">
         <Sidebar admin={admin} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">

@@ -1,5 +1,5 @@
 import { ArrowLeft, Coins, Image, LayoutGrid, MessageSquare, Plus, Shield } from 'lucide-react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BrandMark } from './BrandMark'
 import { AccountMenu } from './AccountMenu'
@@ -17,6 +17,7 @@ export function Sidebar({
 }) {
   const { t } = useTranslation()
   const { user } = useSession()
+  const image = useLocation().pathname.startsWith('/create')
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     'flex min-h-10 items-center gap-3 rounded-xl px-3 text-xs transition-colors ' +
     (isActive
@@ -44,7 +45,7 @@ export function Sidebar({
         </Link>
       ) : (
         <Link
-          to="/chat"
+          to={image ? '/create' : '/chat'}
           onClick={onNavigate}
           className="mx-1 mb-6 flex h-11 items-center justify-center gap-2 rounded-xl border border-primary/20 bg-accent text-xs font-medium text-primary"
         >

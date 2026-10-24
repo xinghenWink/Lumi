@@ -4,6 +4,8 @@ import { session } from '../features/auth/session-adapter'
 import type { SessionService } from '../../api/auth-session'
 import { createSessionStore } from '../stores/session'
 import { createThemeStore } from '../stores/theme'
+import { createChatController } from '../features/chat/controller'
+import { createModelSelectionStore } from '../features/catalog/models'
 
 export function createAppRuntime(service: SessionService = session) {
   const queryClient = new QueryClient({
@@ -18,6 +20,8 @@ export function createAppRuntime(service: SessionService = session) {
     },
   })
   const sessionState = createSessionStore(service)
+  const chat = createChatController(service, queryClient)
+  const modelStore = createModelSelectionStore()
   let epoch = service.getSnapshot().epoch
   let identity = service.getSnapshot().user?.id
   const unsubscribe = service.subscribe(() => {
@@ -25,6 +29,7 @@ export function createAppRuntime(service: SessionService = session) {
     if (next.epoch !== epoch || next.user?.id !== identity) {
       epoch = next.epoch
       identity = next.user?.id
+      modelStore.getState().reset()
       void queryClient.cancelQueries()
       queryClient.clear()
     }
@@ -33,10 +38,13 @@ export function createAppRuntime(service: SessionService = session) {
     session: service,
     sessionStore: sessionState.store,
     themeStore: createThemeStore(),
+    modelStore,
+    chat,
     queryClient,
     dispose() {
       unsubscribe()
       sessionState.dispose()
+      chat.dispose()
       queryClient.clear()
     },
   }
