@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createAppI18n } from './index'
 import { messages } from '../../i18n/resources'
+import { auditActions, auditTargets } from '../../api/audit-options'
 
 function paths(value: unknown, prefix = ''): string[] {
   if (typeof value !== 'object' || value === null) return [prefix]
@@ -20,13 +21,17 @@ describe('shared translation compatibility', () => {
     for (const [file, source] of Object.entries(sources)) {
       if (file.endsWith('.test.ts') || typeof source !== 'string') continue
       for (const match of source.matchAll(
-        /['"]((?:react|nav|app|auth|common|chat|images|credits|ops|legal|notFound|errors|welcome|admin)\.[A-Za-z][\w.]*)['"]/g,
+        /['"]((?:react|nav|app|auth|common|chat|images|credits|ops|legal|notFound|errors|welcome|admin|settings|audit|catalog)\.[A-Za-z]\w*(?:\.[A-Za-z]\w*)*)['"]/g,
       ))
         if (match[1]) keys.add(match[1])
     }
     for (const locale of ['zh-CN', 'en'] as const) {
       const language = await createAppI18n(locale)
       for (const key of keys) expect(language.exists(key), `${locale}: ${key}`).toBe(true)
+      for (const action of auditActions)
+        expect(language.exists('audit.actions.' + action), `${locale}: ${action}`).toBe(true)
+      for (const target of auditTargets)
+        expect(language.exists('audit.types.' + target), `${locale}: ${target}`).toBe(true)
     }
   })
   it('retains language keys, interpolation and literal email escapes', async () => {

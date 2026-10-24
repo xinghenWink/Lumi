@@ -1,5 +1,6 @@
 import { authorized, authorizedResponse } from './protected'
 import { ApiError, record, noContent, request } from './transport'
+import { parseMessage } from './chat'
 
 export interface Preferences {
   theme: 'light' | 'dark' | 'system'
@@ -193,6 +194,7 @@ export async function downloadResponse(response: Response, filename: string) {
   link.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
+const readOptions = (signal?: AbortSignal) => (signal ? { signal } : {})
 export const operations = {
   preferences: (signal?: AbortSignal) =>
     authorized('/api/v1/me/preferences', parsePreferences, signal ? { signal } : {}),
@@ -229,14 +231,16 @@ export const operations = {
     }),
   deleteSelf: (email: string, password: string) =>
     authorized('/api/v1/me', noContent, { method: 'DELETE', body: { email, password } }),
-  dashboard: (days: number) => authorized('/api/v1/admin/dashboard?days=' + days, parseDashboard),
-  announcements: (admin = false, cursor = '') =>
+  dashboard: (days: number, signal?: AbortSignal) =>
+    authorized('/api/v1/admin/dashboard?days=' + days, parseDashboard, readOptions(signal)),
+  announcements: (admin = false, cursor = '', signal?: AbortSignal) =>
     authorized(
       '/api/v1/' +
         (admin ? 'admin/' : '') +
         'announcements?limit=100&cursor=' +
         encodeURIComponent(cursor),
       (v) => page(v, parseAnnouncement),
+      readOptions(signal),
     ),
   saveAnnouncement: (
     body: Pick<Announcement, 'content' | 'starts_at' | 'ends_at' | 'enabled' | 'version'>,
@@ -251,7 +255,8 @@ export const operations = {
     authorized('/api/v1/admin/announcements/' + encodeURIComponent(id), noContent, {
       method: 'DELETE',
     }),
-  settings: () => authorized('/api/v1/admin/operations-settings', parseOperations),
+  settings: (signal?: AbortSignal) =>
+    authorized('/api/v1/admin/operations-settings', parseOperations, readOptions(signal)),
   saveSettings: (value: OperationsSettings, secret?: string) => {
     const { turnstile_secret_configured: configured, ...body } = value
     void configured
@@ -260,7 +265,8 @@ export const operations = {
       body: { ...body, ...(secret !== undefined ? { turnstile_secret: secret } : {}) },
     })
   },
-  system: () => authorized('/api/v1/admin/system', parseSystem),
+  system: (signal?: AbortSignal) =>
+    authorized('/api/v1/admin/system', parseSystem, readOptions(signal)),
   cleanup: () => authorized('/api/v1/admin/system/cleanup', noContent, { method: 'POST' }),
   testMail: () => authorized('/api/v1/admin/mail/test', noContent, { method: 'POST' }),
   refund: (id: string, note: string) =>
@@ -300,19 +306,31 @@ export const operations = {
     ),
   deleteImages: (ids: string[]) =>
     authorized('/api/v1/me/images/batch-delete', noContent, { method: 'POST', body: { ids } }),
-  chats: (query: URLSearchParams) =>
-    authorized('/api/v1/admin/conversations?' + query, (v) =>
-      page(v, (v) => {
-        const d = record(v)
-        return {
-          id: text(d.id),
-          user_id: text(d.user_id),
-          model_id: d.model_id === null ? null : text(d.model_id),
-          created_at: text(d.created_at),
-          last_message_at: text(d.last_message_at),
-          busy: boolean(d.busy),
-        }
-      }),
+  chats: (query: URLSearchParams, signal?: AbortSignal) =>
+    authorized(
+      '/api/v1/admin/conversations?' + query,
+      (v) =>
+        page(v, (v) => {
+          const d = record(v)
+          return {
+            id: text(d.id),
+            user_id: text(d.user_id),
+            model_id: d.model_id === null ? null : text(d.model_id),
+            created_at: text(d.created_at),
+            last_message_at: text(d.last_message_at),
+            busy: boolean(d.busy),
+          }
+        }),
+      readOptions(signal),
+    ),
+  messages: (id: string, owner: string, cursor = '', signal?: AbortSignal) =>
+    authorized(
+      '/api/v1/admin/conversations/' +
+        encodeURIComponent(id) +
+        '/messages?' +
+        new URLSearchParams({ user_id: owner, limit: '100', cursor }),
+      (value) => page(value, parseMessage),
+      readOptions(signal),
     ),
   forgot: (email: string, locale: string) =>
     request('/api/v1/auth/forgot-password', noContent, { method: 'POST', body: { email, locale } }),

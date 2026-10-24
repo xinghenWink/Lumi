@@ -27,10 +27,12 @@ Focused desktop runs pass: full catalog; versioned chat/image configuration and 
 - [x] Both builds and original 16 legacy browser cases.
 - [x] Full Chrome candidate suite on desktop and 320/390px touch/mobile emulation, with unchanged SSE/script/Lighthouse/DOM/interaction bounds.
 - [x] Inspect desktop/mobile configuration, routing, pricing and task/privacy screenshots.
-- [ ] Current-head CI quality/integration/capacity/audit, candidate E2E and Docker/Compose before integration.
+- [x] Current-head CI quality/integration/capacity/audit, candidate E2E and Docker/Compose before integration.
 
 ## Next dependency
 
 The final local candidate run passes 39/39. Desktop Lighthouse is 100, initial script gzip 248,394 bytes, SSE p95 19/19/19 ms, sampled interactions at most 16 ms and long tasks 0. Both Chrome mobile projects retain the full touch/device emulation and the original performance bounds. Success/failure evidence is retained under ignored `.tools/react-ui-pr-6b/`.
+
+CI #99 (`40069745251`) passes all jobs on `a4a6db6` on the first CI attempt, including quality/integration/capacity/audit, Chrome and Docker/Compose/deployment rehearsal. PR #17 merged only into `codex/react-ui` as `24915ca`; main is unchanged.
 
 PR-6c completes operations/security and every remaining route, then proves full React Docker embed acceptance. PR-7 may only switch the entry and remove Vue after those gates; it repeats final checks and proposes a release PR without merging main.

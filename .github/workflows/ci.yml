@@ -164,13 +164,37 @@ jobs:
   container:
     needs: [quality, react-candidate]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
       - name: Build the application image
         run: docker build --build-arg VERSION=ci --build-arg COMMIT="$GITHUB_SHA" -t lumi:ci .
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chrome for production embed acceptance
+        run: |
+          if test -f /etc/apt/apt-mirrors.txt; then
+            printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
+          fi
+          pnpm --filter @lumi/frontend exec playwright install --with-deps chrome
+      - name: Verify the React production Docker embed
+        run: node scripts/react-embed-smoke.mjs
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: react-container-embed-results
+          path: |
+            frontend/test-results/embed
+            .tools/react-embed/*/report.json
+          if-no-files-found: ignore
       - name: Generate ephemeral container credentials
         shell: bash
         run: |

@@ -14,7 +14,7 @@ export function RuntimeBanner() {
   const announcements = useQuery({
     queryKey: ['user', user?.id, 'announcements'],
     enabled: !!user,
-    queryFn: () => operations.announcements(),
+    queryFn: ({ signal }) => operations.announcements(false, '', signal),
     refetchInterval: 30_000,
   })
   const preferences = useQuery({
@@ -28,7 +28,7 @@ export function RuntimeBanner() {
       runtime.themeStore.getState().setTheme(preferences.data.theme)
   }, [preferences.data, runtime, epoch])
   return announcements.data?.items.length ? (
-    <aside className="shrink-0 border-b border-border bg-accent px-4 py-2 sm:px-6">
+    <aside className="ops-announcements shrink-0 border-b border-border bg-accent px-4 py-2 sm:px-6">
       {announcements.data.items.map((item) => (
         <Suspense
           key={item.id}
