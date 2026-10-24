@@ -60,9 +60,9 @@ Also retain every existing new candidate journey: auth/reset/shell, foundation/l
 - [x] Default entry/build/typecheck/lint/test now React; 10 direct Vue dependencies and 81 inventoried obsolete files removed. The lockfile only removes 558 lines and adds no package resolution.
 - [x] Strict typecheck, lint/format, frozen install and all 87 deduplicated unit cases pass; normal production build passes its no-Vue-module guard.
 - [x] Canonical discovery lists exactly 57 Chrome cases in 14 source files, preserving all original entries and new regressions.
-- [ ] Full default production-embed Chrome acceptance, unchanged performance bounds and visual inspection.
-- [ ] Actual default production Docker embed and all exact-head CI jobs.
-- [ ] Integration and a reviewable release proposal targeting main, without merging or deployment.
+- [x] Full default production-embed Chrome acceptance (57/57), unchanged performance bounds and visual inspection.
+- [x] Actual default production Docker embed (3/3) and all exact-head CI #103 jobs.
+- [x] Integration only into codex/react-ui as 0b80860 (PR #19). The publication boundary remains a reviewable proposal targeting main; no main merge, tag or deployment.
 
 The original browser entry files delegate to their already migrated complete React implementations; these implementations remain required by canonical test discovery. The original signup gift assertion is covered by public registration with exact daily/permanent totals, not replaced with an administrator grant. The usage list retains its explicit viewport assertion as well as the new 30-row count. No test or performance threshold was removed to obtain a pass.
 
@@ -71,3 +71,9 @@ The real-hook model test initially did not subscribe to Query's tracked error pr
 The first default-entry full run exposed an incomplete reload assertion in the original account journey: checking the unchanged URL could succeed before refresh finished, then another hard navigation interrupted the in-flight refresh. The journey now also waits for the authenticated chat heading after reload before testing the admin guard. This strengthens session-restoration coverage; authentication handlers, timeouts and role assertions are unchanged. Failure traces are retained for comparison with the required full rerun.
 
 Canonical discovery matches every browser spec by default and excludes only the independent embed suite and the seven implementations already imported by original entries. New unrelated test files remain automatically discovered; the current set is still exactly 57 cases.
+
+## Completed acceptance
+
+Final clean-database default React Chrome acceptance passes 57/57 (desktop/320/390), after retaining the initial reload-race trace and strengthening its authenticated-readiness assertion. Lighthouse is 100, initial script gzip 249223 bytes, SSE p95 23/28/20 ms, sampled event maximum 16 ms and long tasks 0. All original bounds remain unchanged. Frozen install, strict typecheck, lint/format, generated OpenAPI consistency, all 87 units and default production build pass.
+
+Actual default Docker production embed passes 3/3 on source 6248b1c, image sha256:ecb067ca30152b4677982020f3146c7c171f1855a75114cc9dd22ee07738f10e. Temporary owned resources and credential files are removed. CI #103 (40080515348) passes every job, including both complete canonical Chrome suites, backend quality/integration/contracts/security/capacity, default React Docker embed, original Compose and installation/upgrade/rollback/backup restoration. PR #19 integrates only into codex/react-ui as 0b80860; main remains c28be7f. Evidence is retained under ignored .tools/react-ui-pr-7 and .tools/react-embed/2abc2ac4a999.
