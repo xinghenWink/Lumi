@@ -33,6 +33,7 @@ export default {
     keySaved: '已配置密钥',
     keyMissing: '未配置密钥',
     keyPlaceholder: '输入新的 API Key',
+    clearKey: '清除已保存的渠道密钥（仅停用时可用）',
     chatTimeout: '文本超时（秒）',
     imageTimeout: '生图超时（秒）',
     proxyURL: '代理地址（可选）',

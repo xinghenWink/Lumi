@@ -50,6 +50,7 @@ export default {
     siteKey: 'Turnstile Site Key',
     hostname: 'Allowed Turnstile hostname',
     secret: 'Turnstile Secret Key (blank to keep)',
+    clearSecret: 'Clear the saved Turnstile key (disabled only)',
     secretConfigured: 'Secret configured',
     registerLimit: 'Registration allowance per IP per 24 hours (0 unlimited)',
     circuitFailures: 'Consecutive failures before opening circuit',

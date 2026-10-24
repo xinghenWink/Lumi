@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createI18n } from 'vue-i18n'
+import { createAppI18n } from '../../react/i18n'
 import {
   defaultCapabilities,
   parsePublicModel,
@@ -36,7 +36,7 @@ describe('catalog contracts', () => {
     ).toThrow()
     expect(defaultCapabilities('image').supports_edit).toBe(false)
   })
-  it('compiles matching Chinese and English messages', () => {
+  it('compiles matching Chinese and English messages', async () => {
     function paths(value: unknown, prefix = ''): string[] {
       if (typeof value !== 'object' || value === null) return [prefix]
       return Object.entries(value)
@@ -44,12 +44,12 @@ describe('catalog contracts', () => {
         .sort()
     }
     expect(paths(zh)).toEqual(paths(en))
-    const i18n = createI18n({ legacy: false, locale: 'zh-CN', messages: { 'zh-CN': zh, en } })
+    const i18n = await createAppI18n()
     for (const locale of ['zh-CN', 'en'] as const) {
-      i18n.global.locale.value = locale
+      await i18n.changeLanguage(locale)
       for (const path of paths(zh))
         expect(() =>
-          i18n.global.t(path, { name: 'Lumi', id: 'model', index: 1, count: 2, ms: 100 }),
+          i18n.t(path, { name: 'Lumi', id: 'model', index: 1, count: 2, ms: 100 }),
         ).not.toThrow()
     }
   })
