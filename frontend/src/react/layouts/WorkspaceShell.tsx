@@ -7,6 +7,7 @@ import { ThemeToggle } from '../components/shared/ThemeToggle'
 import { routeTitle } from '../features/accounts/navigation'
 import { usePublicConfig } from '../features/auth/hooks'
 import { RuntimeBanner } from '../components/shared/RuntimeBanner'
+import { DropLayer } from '../components/shared/DropLayer'
 
 export function WorkspaceShell() {
   return <ShellLayout admin={false} />
@@ -48,7 +49,9 @@ export function ShellLayout({ admin }: { admin: boolean }) {
         </header>
         <RuntimeBanner />
         <main id="main-content" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
-          <Outlet />
+          <DropLayer>
+            <Outlet />
+          </DropLayer>
         </main>
       </div>
     </div>

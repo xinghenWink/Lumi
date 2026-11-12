@@ -6,7 +6,9 @@ import { credits } from '../../../api/credits'
 import { ApiError } from '../../../api/transport'
 import { useSession } from '../auth/hooks'
 import { useModels } from '../catalog/models'
+import { referenceCapacity } from '../files/reference-rules'
 import type { ImageDraft } from './controller'
+import { useImageConfig } from './config'
 
 export function resolveImageOptions(
   draft: ImageDraft,
@@ -20,9 +22,7 @@ export function resolveImageOptions(
   )
   const qualities = model?.capabilities.qualities ?? []
   const maxN = Math.min(config?.max_n ?? 0, model?.capabilities.max_n ?? 0)
-  const maxReferences = model?.capabilities.supports_edit
-    ? Math.min(config?.max_references ?? 0, model.capabilities.max_reference_images)
-    : 0
+  const maxReferences = referenceCapacity(config, model)
   const savedSize = config?.ratio_sizes[preferences?.image_ratio ?? '']
   const size = sizes.includes(draft.size)
     ? draft.size
@@ -44,11 +44,7 @@ export function resolveImageOptions(
 export function useImageOptions(draft: ImageDraft) {
   const { user } = useSession()
   const models = useModels('image')
-  const config = useQuery({
-    queryKey: ['user', user?.id, 'image-options'],
-    enabled: !!user,
-    queryFn: ({ signal }) => images.options(false, signal),
-  })
+  const config = useImageConfig()
   const preferences = useQuery({
     queryKey: ['user', user?.id, 'preferences'],
     enabled: !!user,

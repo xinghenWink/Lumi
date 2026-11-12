@@ -5,11 +5,10 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { images, type ImageFile } from '../../api/images'
 import { operations } from '../../api/operations'
-import { ApiError } from '../../api/transport'
 import { useRuntime } from '../app/context'
 import { useSession } from '../features/auth/hooks'
 import { useModels } from '../features/catalog/models'
-import { emptyImageDraft } from '../features/images/controller'
+import { addExistingReference } from '../features/images/references'
 import { useImageActions } from '../features/images/actions'
 import { ImageFilters } from '../components/images/ImageFilters'
 import { GalleryGrid } from '../components/images/GalleryGrid'
@@ -63,32 +62,7 @@ function GalleryResults({ filter }: { filter: string }) {
   const download = useMutation({ mutationFn: () => actions.downloadBatch(selected) })
   const edit = useMutation({
     mutationFn: async (file: ImageFile) => {
-      const owner = runtime.session.getSnapshot().user?.id,
-        epoch = runtime.session.snapshot().epoch
-      const model = models.selected?.capabilities.supports_edit
-        ? models.selected
-        : models.items.find((model) => model.capabilities.supports_edit)
-      const config = await images.options()
-      if (!model) throw new ApiError('IMAGE_REFERENCE_INVALID')
-      if (file.size > config.max_upload_bytes) throw new ApiError('FILE_TOO_LARGE')
-      if (
-        owner !== runtime.session.getSnapshot().user?.id ||
-        epoch !== runtime.session.snapshot().epoch
-      )
-        return
-      const draft = runtime.image.store.getState().drafts.new ?? emptyImageDraft
-      if (runtime.image.store.getState().pending.new) throw new ApiError('INVALID_INPUT')
-      const references = draft.references.includes(file.id)
-        ? draft.references
-        : [...draft.references, file.id]
-      if (
-        references.length > Math.min(config.max_references, model.capabilities.max_reference_images)
-      )
-        throw new ApiError('IMAGE_REFERENCE_INVALID')
-      models.select(model.id)
-      runtime.queryClient.setQueryData(['user', owner, 'file', file.id], file)
-      runtime.image.draft('', { references })
-      await navigate('/create')
+      if (await addExistingReference(runtime, models, file, '')) await navigate('/create')
     },
   })
   const busy = removal.isPending || download.isPending || edit.isPending

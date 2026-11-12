@@ -7,7 +7,8 @@ import { images, type ImageFile, type ImageTask } from '../../api/images'
 import { ApiError } from '../../api/transport'
 import { useRuntime } from '../app/context'
 import { useModels } from '../features/catalog/models'
-import { emptyImageDraft, imageSubmissionScope } from '../features/images/controller'
+import { imageSubmissionScope } from '../features/images/controller'
+import { addExistingReference } from '../features/images/references'
 import { ModeTabs } from '../components/chat/ModeTabs'
 import { ImageComposer } from '../components/images/ImageComposer'
 import { ImageConversationActions } from '../components/images/ImageConversationActions'
@@ -36,30 +37,7 @@ export default function ImagePage() {
       const owner = runtime.session.getSnapshot().user?.id,
         epoch = runtime.session.snapshot().epoch
       if (value.kind === 'edit') {
-        const candidate = models.selected?.capabilities.supports_edit
-          ? models.selected
-          : models.items.find((model) => model.capabilities.supports_edit)
-        const configuration = await images.options()
-        if (!candidate || !configuration) throw new ApiError('IMAGE_REFERENCE_INVALID')
-        if (value.file.size > configuration.max_upload_bytes) throw new ApiError('FILE_TOO_LARGE')
-        if (
-          owner !== runtime.session.getSnapshot().user?.id ||
-          epoch !== runtime.session.snapshot().epoch ||
-          id !== image.store.getState().active
-        )
-          return
-        const draft = image.store.getState().drafts[id || 'new'] ?? emptyImageDraft
-        if (draft.references.includes(value.file.id)) return
-        if (
-          draft.references.length >=
-          Math.min(configuration.max_references, candidate.capabilities.max_reference_images)
-        )
-          throw new ApiError('IMAGE_REFERENCE_INVALID')
-        if (image.store.getState().pending[imageSubmissionScope(image.store.getState(), id)])
-          throw new ApiError('INVALID_INPUT')
-        models.select(candidate.id)
-        runtime.queryClient.setQueryData(['user', owner, 'file', value.file.id], value.file)
-        image.draft(id, { references: [...draft.references, value.file.id] })
+        await addExistingReference(runtime, models, value.file, id, { requireActive: true })
       } else {
         const results = await Promise.allSettled(
           value.task.reference_file_ids.map((reference) => images.file(reference)),
