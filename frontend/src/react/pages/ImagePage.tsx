@@ -9,6 +9,7 @@ import { useRuntime } from '../app/context'
 import { useModels } from '../features/catalog/models'
 import { imageSubmissionScope } from '../features/images/controller'
 import { addExistingReference } from '../features/images/references'
+import { useMediaQuery } from '../lib/media'
 import { ModeTabs } from '../components/chat/ModeTabs'
 import { ImageComposer } from '../components/images/ImageComposer'
 import { ImageConversationActions } from '../components/images/ImageConversationActions'
@@ -20,6 +21,13 @@ const ImageTaskList = lazy(() =>
   })),
 )
 
+const suggestions = [
+  'react.imageSuggestions.landscape',
+  'react.imageSuggestions.product',
+  'react.imageSuggestions.portrait',
+  'react.imageSuggestions.illustration',
+] as const
+
 export default function ImagePage() {
   const { id = '' } = useParams(),
     runtime = useRuntime(),
@@ -27,6 +35,8 @@ export default function ImagePage() {
   const image = runtime.image,
     models = useModels('image'),
     data = useQuery(image.options(id))
+  // Desktop is a studio with a persistent parameter panel; smaller screens dock the composer.
+  const wide = useMediaQuery('(min-width: 1024px)')
   const available = models.query.data?.items,
     modelID = data.data?.conversation.model_id
   const older = useMutation({ mutationFn: () => image.loadOlder(id) })
@@ -84,50 +94,88 @@ export default function ImagePage() {
   const changed = useCallback(() => {
     void refetch()
   }, [refetch])
+  function suggest(prompt: string) {
+    image.draft(id, { prompt })
+    requestAnimationFrame(() => {
+      const field = document.querySelector<HTMLTextAreaElement>('.image-composer textarea')
+      field?.focus()
+      field?.setSelectionRange(prompt.length, prompt.length)
+    })
+  }
+  const composer = !id || !data.isError
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-4 sm:px-8">
-        <ModeTabs />
-        {data.data ? (
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-xs text-muted-foreground">
-              {data.data.conversation.title || t('images.untitled')}
-            </span>
-            <ImageConversationActions row={data.data.conversation} />
+    <div className="flex min-h-0 flex-1 overflow-hidden">
+      {wide && composer ? (
+        <aside className="flex w-[320px] shrink-0 flex-col border-r border-border bg-sidebar/45 xl:w-[360px]">
+          <ImageComposer key={id || 'new'} conversationId={id} layout="panel" />
+        </aside>
+      ) : null}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-3 sm:px-6">
+          <ModeTabs />
+          {data.data ? (
+            <div className="flex min-w-0 items-center gap-1">
+              <span className="truncate text-xs text-muted-foreground">
+                {data.data.conversation.title || t('images.untitled')}
+              </span>
+              <ImageConversationActions row={data.data.conversation} />
+            </div>
+          ) : null}
+        </div>
+        {action.error || older.error ? (
+          <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
+            <ApiNotice error={action.error || older.error} />
           </div>
         ) : null}
+        {id && data.isPending ? (
+          <PageStatus />
+        ) : id && data.isError ? (
+          <PageStatus error={data.error} retry={changed} />
+        ) : data.data?.tasks.length ? (
+          <Suspense fallback={<PageStatus />}>
+            <ImageTaskList
+              key={id}
+              tasks={data.data.tasks}
+              older={!!data.data.nextCursor}
+              loading={older.isPending}
+              onOlder={() => older.mutateAsync().catch(() => undefined)}
+              onCancel={cancel}
+              onReuse={reuse}
+              onEdit={edit}
+              onChanged={changed}
+            />
+          </Suspense>
+        ) : (
+          <section className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-5 py-8 text-center">
+            <span className="mb-5 grid size-12 place-items-center rounded-2xl bg-accent text-primary animate-rise-in">
+              <Sparkles size={24} strokeWidth={1.6} />
+            </span>
+            <h1 className="text-[28px] leading-tight font-semibold tracking-tight text-balance sm:text-[32px]">
+              {t('images.title')}
+            </h1>
+            <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+              {t(wide ? 'react.imageEmptyHint' : 'images.description')}
+            </p>
+            {composer ? (
+              <div className="mt-8 grid w-full max-w-xl gap-2 sm:grid-cols-2">
+                {suggestions.map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className="rounded-xl border border-border bg-card px-3.5 py-3 text-left text-xs leading-5 text-muted-foreground shadow-xs transition-[border-color,color] hover:border-input hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    onClick={() => suggest(t(key))}
+                  >
+                    {t(key)}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        )}
+        {!wide && composer ? (
+          <ImageComposer key={id || 'new'} conversationId={id} layout="dock" />
+        ) : null}
       </div>
-      <ApiNotice error={action.error || older.error} />
-      {id && data.isPending ? (
-        <PageStatus />
-      ) : id && data.isError ? (
-        <PageStatus error={data.error} retry={changed} />
-      ) : data.data?.tasks.length ? (
-        <Suspense fallback={<PageStatus />}>
-          <ImageTaskList
-            key={id}
-            tasks={data.data.tasks}
-            older={!!data.data.nextCursor}
-            loading={older.isPending}
-            onOlder={() => older.mutateAsync().catch(() => undefined)}
-            onCancel={cancel}
-            onReuse={reuse}
-            onEdit={edit}
-            onChanged={changed}
-          />
-        </Suspense>
-      ) : (
-        <section className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-5 py-8 text-center">
-          <span className="mb-2 grid size-14 place-items-center rounded-2xl bg-accent text-primary">
-            <Sparkles size={28} strokeWidth={1.5} />
-          </span>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('images.title')}</h1>
-          <p className="max-w-md text-sm leading-7 text-muted-foreground">
-            {t('images.description')}
-          </p>
-        </section>
-      )}
-      {!id || !data.isError ? <ImageComposer key={id || 'new'} conversationId={id} /> : null}
     </div>
   )
 }

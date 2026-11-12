@@ -334,15 +334,26 @@ test('React real image generation editing gallery cancellation and administrator
       .getByRole('link', { name: '生图', exact: true })
       .click()
     await expect(prompt).toHaveValue('image-only draft')
-    await member.getByRole('button', { name: '生图参数', exact: true }).click()
-    await expect(member.getByLabel('质量', { exact: true })).toHaveValue('medium')
-    expect(await member.getByLabel('质量', { exact: true }).locator('option').count()).toBe(1)
-    await member.getByLabel('比例', { exact: true }).selectOption('3:2')
-    await expect(member.getByLabel('尺寸', { exact: true })).toHaveValue('1536x1024')
-    await member.getByLabel('尺寸', { exact: true }).selectOption('1024x1024')
-    await expect(member.getByLabel('比例', { exact: true })).toHaveValue('')
-    await member.getByLabel('张数', { exact: true }).selectOption('2')
-    const parameters = member.getByRole('dialog', { name: '生图参数', exact: true })
+    // Desktop keeps parameters visible in the studio panel; smaller screens open a sheet.
+    const mobile = info.project.name.includes('mobile')
+    const parameters = member.getByRole(mobile ? 'dialog' : 'region', {
+      name: '生图参数',
+      exact: true,
+    })
+    if (mobile) await member.getByRole('button', { name: '生图参数', exact: true }).click()
+    await expect(parameters.getByRole('radio', { name: '精细', exact: true })).toBeChecked()
+    expect(
+      await parameters
+        .getByRole('radiogroup', { name: '质量', exact: true })
+        .getByRole('radio')
+        .count(),
+    ).toBe(1)
+    await parameters.getByRole('radio', { name: '3:2', exact: true }).check()
+    await expect(parameters.getByLabel('尺寸', { exact: true })).toHaveValue('1536x1024')
+    await parameters.getByLabel('尺寸', { exact: true }).selectOption('1024x1024')
+    await expect(parameters.getByRole('radio', { name: '按尺寸', exact: true })).toBeChecked()
+    await parameters.getByRole('radio', { name: '2 张', exact: true }).check()
+    await parameters.scrollIntoViewIfNeeded()
     expect(
       await parameters.evaluate((element) => {
         const box = element.getBoundingClientRect()
@@ -470,8 +481,8 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(dialog).not.toBeVisible()
     await expect(member.locator('.image-references img')).toHaveCount(1)
     await expect(prompt).toBeFocused()
-    await member.getByRole('button', { name: '生图参数', exact: true }).click()
-    await member.getByLabel('张数', { exact: true }).selectOption('1')
+    if (mobile) await member.getByRole('button', { name: '生图参数', exact: true }).click()
+    await parameters.getByRole('radio', { name: '1 张', exact: true }).check()
     await member.keyboard.press('Escape')
     await prompt.fill('edit reference')
     await send.click()
