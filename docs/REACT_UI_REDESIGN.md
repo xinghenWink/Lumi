@@ -131,8 +131,8 @@ All other specs, CSS hooks, accessible names, test IDs and performance threshold
 - [x] Frozen install, strict typecheck, ESLint with zero warnings, Prettier, 99 unit tests and the production build all pass.
 - [x] No new dependency, API, OpenAPI or SQL change; CSP-compatible.
 - [x] i18n keys exist in zh-CN and English, enforced by the parity test, which now also covers the React namespace.
-- [ ] Real Go-embedded Chrome E2E: chat, chat recovery, auth shell and images on desktop, 390 and 320.
-- [ ] Full suite on a fresh database, including the Lighthouse ≥ 90 and initial-script gzip ≤ 250000 gates.
+- [x] Real Go-embedded Chrome E2E: chat, chat recovery, auth shell and images on desktop, 390 and 320.
+- [x] Full suite on a fresh database, including the Lighthouse ≥ 90 and initial-script gzip ≤ 250000 gates: 57/57 passed in 10.4 minutes (desktop, 390, 320). Lighthouse 100, initial script 244,193 B gzip, SSE p95 29/37/27 ms, browser long tasks 0, CLS 0.0001.
 - [ ] Manual check at 1440, 768, 390 and 320 px in both themes:
   - real OS drag-and-drop, including a drop outside the composer and onto a non-vision model;
   - clipboard paste;
