@@ -19,20 +19,20 @@ export function CreditBadge({ onNavigate }: { onNavigate?: (() => void) | undefi
     <Link
       to="/me/credits"
       onClick={onNavigate}
-      className="mb-3 flex min-h-16 items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5"
+      className="group mb-2 flex min-h-14 items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2 shadow-xs transition-colors hover:border-input"
     >
-      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-300">
+      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-primary">
         <Coins size={16} />
       </span>
       <span className="min-w-0 flex-1">
-        <strong className="block text-xs font-semibold">
+        <strong className="block text-xs font-semibold tabular-nums">
           {query.data
             ? new Intl.NumberFormat(i18n.resolvedLanguage).format(query.data.total)
             : t(query.isError ? 'common.retry' : 'common.loading')}{' '}
           <span className="font-normal text-muted-foreground">{t('credits.unit')}</span>
         </strong>
         {query.data ? (
-          <span className="block truncate text-[10px] text-muted-foreground">
+          <span className="block truncate text-2xs text-muted-foreground tabular-nums">
             {t('credits.split', {
               daily: query.data.daily_balance,
               permanent: query.data.permanent_balance,
@@ -40,7 +40,10 @@ export function CreditBadge({ onNavigate }: { onNavigate?: (() => void) | undefi
           </span>
         ) : null}
       </span>
-      <ChevronRight size={14} className="shrink-0 text-muted-foreground" />
+      <ChevronRight
+        size={14}
+        className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+      />
     </Link>
   )
 }

@@ -19,7 +19,13 @@ export function PageStatus({ error, retry }: { error?: unknown; retry?: () => vo
           ) : null}
         </>
       ) : (
-        <p className="py-10 text-center text-sm text-muted-foreground">{t('common.loading')}</p>
+        <p className="flex items-center justify-center gap-2 py-10 text-center text-sm text-muted-foreground">
+          <span
+            aria-hidden="true"
+            className="size-4 animate-spin rounded-full border-2 border-input border-t-primary"
+          />
+          {t('common.loading')}
+        </p>
       )}
     </div>
   )

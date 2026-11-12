@@ -11,9 +11,9 @@ export function ApiNotice({ error }: { error: unknown }) {
   return (
     <div
       role="alert"
-      className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive"
+      className="flex items-start gap-2.5 rounded-xl border border-destructive/20 bg-destructive/[0.06] px-3.5 py-3 text-sm leading-6 text-destructive animate-fade-in"
     >
-      <AlertCircle size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+      <AlertCircle size={17} className="mt-[3px] shrink-0" aria-hidden="true" />
       <div>
         {t(key)}
         {api?.retryAfter ? (

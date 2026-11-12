@@ -16,12 +16,12 @@ export function DataTable<T extends { id: string }>({
     <div className="min-w-0 overflow-x-auto overscroll-x-contain">
       <table className="w-full text-left text-xs">
         <thead>
-          <tr className="border-b border-border bg-muted/50">
+          <tr className="border-b border-border bg-muted/40">
             {columns.map((column) => (
               <th
                 key={column.key}
                 scope="col"
-                className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground"
+                className="whitespace-nowrap px-4 py-2.5 text-xs font-medium text-muted-foreground"
               >
                 {column.label}
               </th>
@@ -30,7 +30,10 @@ export function DataTable<T extends { id: string }>({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+            <tr
+              key={row.id}
+              className="border-b border-border transition-colors last:border-0 hover:bg-muted/35"
+            >
               {columns.map((column) => (
                 <td
                   key={column.key}
