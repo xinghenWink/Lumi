@@ -1,17 +1,47 @@
 import { memo, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Copy, Download, Info, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { Copy, Download, Info, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { images, terminal, type ImageFile, type ImageTask } from '../../../api/images'
 import { ApiError } from '../../../api/transport'
 import { useImageActions } from '../../features/images/actions'
+import { elapsedSeconds, statusTone, taskAspect } from '../../features/images/presentation'
 import { useTime } from '../../features/accounts/time'
+import { useNow } from '../../lib/ticker'
+import { cn } from '../../lib/utils'
 import { ApiNotice } from '../shared/ApiNotice'
 import { ModalDialog } from '../ui/modal-dialog'
 import { Button } from '../ui/button'
 import { ProtectedImage } from './ProtectedImage'
 import { ImagePreview } from './ImagePreview'
 import { ReferenceChips } from './ReferenceChips'
+
+const tones = {
+  active: 'bg-accent text-primary',
+  success: 'bg-success/10 text-success',
+  warning: 'bg-warning/10 text-warning',
+  danger: 'bg-destructive/10 text-destructive',
+  muted: 'bg-muted text-muted-foreground',
+} as const
+
+const grids: Record<number, string> = {
+  1: 'max-w-md grid-cols-1',
+  2: 'max-w-3xl grid-cols-2',
+  3: 'max-w-4xl grid-cols-2 sm:grid-cols-3',
+  4: 'max-w-4xl grid-cols-2 xl:grid-cols-4',
+}
+
+function Elapsed({ task }: { task: ImageTask }) {
+  const { t } = useTranslation()
+  const live = !terminal(task.status)
+  const now = useNow(live)
+  if (!live && !task.started_at) return null
+  return (
+    <span className="tabular-nums">
+      {t('react.elapsed', { seconds: elapsedSeconds(task, now) })}
+    </span>
+  )
+}
 
 export const ImageTaskCard = memo(function ImageTaskCard({
   task,
@@ -35,6 +65,8 @@ export const ImageTaskCard = memo(function ImageTaskCard({
     [details, setDetails] = useState(false),
     [deleting, setDeleting] = useState<string | null>(null)
   const files = task.items.flatMap((item) => (item.file ? [item.file] : []))
+  const tone = statusTone(task.status)
+  const done = terminal(task.status)
   const parameters = [
     task.model_name,
     t('images.' + task.quality),
@@ -58,98 +90,105 @@ export const ImageTaskCard = memo(function ImageTaskCard({
       await onCancel?.(task)
     },
   })
+  const action =
+    'size-7 rounded-lg text-foreground hover:bg-foreground/10 focus-visible:outline-offset-0'
   return (
-    <article className="image-task py-5" data-task-id={task.id}>
-      <div className="mb-5 ml-auto w-fit max-w-[92%] rounded-2xl rounded-tr-sm bg-accent px-4 py-3 text-sm leading-7">
-        <p className="whitespace-pre-wrap break-words">
-          {task.content_visible ? task.prompt : t('images.hidden')}
-        </p>
-        <p className="mt-2 text-[10px] leading-5 text-muted-foreground">{parameters}</p>
+    <article
+      className="image-task border-b border-border py-6 last:border-0"
+      data-task-id={task.id}
+    >
+      <header className="mb-4 flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm leading-6 break-words whitespace-pre-wrap">
+            {task.content_visible ? task.prompt : t('images.hidden')}
+          </p>
+          <p className="mt-1 text-2xs text-muted-foreground">{parameters}</p>
+        </div>
         {task.content_visible && task.reference_file_ids.length ? (
-          <ReferenceChips ids={task.reference_file_ids} className="image-task-references" />
+          <ReferenceChips ids={task.reference_file_ids} />
         ) : null}
-      </div>
-      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        <span className="image-status rounded-md bg-muted px-2 py-1 text-foreground" role="status">
-          {t('images.' + task.status)}
+      </header>
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-medium',
+            tones[tone],
+          )}
+        >
+          <span
+            aria-hidden="true"
+            className={cn('size-1.5 rounded-full bg-current', tone === 'active' && 'animate-pulse')}
+          />
+          <span className="image-status" role="status">
+            {t('images.' + task.status)}
+          </span>
         </span>
         {task.status === 'queued' ? (
           <span>{t('images.queue', { position: task.queue_position })}</span>
         ) : null}
-        <span>
-          {t(terminal(task.status) ? 'images.actual' : 'images.reserved', {
-            cost: terminal(task.status) ? task.actual_cost : task.total_cost,
+        <Elapsed task={task} />
+        <span className="tabular-nums">
+          {t(done ? 'images.actual' : 'images.reserved', {
+            cost: done ? task.actual_cost : task.total_cost,
           })}
         </span>
         {task.refunded_cost ? (
-          <span>{t('images.refund', { cost: task.refunded_cost })}</span>
-        ) : null}
-        {!admin && !terminal(task.status) && onCancel ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={task.cancel_requested || cancellation.isPending}
-            onClick={() => cancellation.mutate()}
-          >
-            {t(task.cancel_requested ? 'images.cancelRequested' : 'images.cancel')}
-          </Button>
+          <span className="tabular-nums">{t('images.refund', { cost: task.refunded_cost })}</span>
         ) : null}
       </div>
       {task.content_visible ? (
-        <div
-          className={`grid gap-3 ${task.n === 1 ? 'max-w-lg grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}
-        >
+        <div className={cn('grid gap-2.5', grids[Math.min(4, Math.max(1, task.n))])}>
           {task.items.map((item) => (
             <div
               key={item.position}
-              className="overflow-hidden rounded-xl border border-border bg-card"
+              className="group relative grid place-items-center overflow-hidden rounded-2xl border border-border bg-muted"
+              style={{ aspectRatio: taskAspect(task, item.file) }}
             >
               {item.file ? (
                 <>
-                  <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-muted">
-                    <ProtectedImage
-                      file={item.file}
-                      alt={t('images.result', { index: item.position + 1 })}
-                      className="size-full object-contain"
-                    />
-                    <button
-                      type="button"
-                      className="absolute inset-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-                      aria-label={t('images.preview') + ' ' + (item.position + 1)}
-                      onClick={() =>
-                        setPreview(files.findIndex((file) => file.id === item.file?.id))
-                      }
-                    />
-                  </div>
-                  <div className="image-result-actions flex items-center justify-end gap-1 p-1.5">
+                  <ProtectedImage
+                    file={item.file}
+                    alt={t('images.result', { index: item.position + 1 })}
+                    className="size-full object-cover animate-fade-in"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-0 cursor-zoom-in focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                    aria-label={t('images.preview') + ' ' + (item.position + 1)}
+                    onClick={() => setPreview(files.findIndex((file) => file.id === item.file?.id))}
+                  />
+                  <div className="image-result-actions reveal-on-hover absolute top-2 right-2 flex items-center gap-0.5 rounded-xl bg-background/85 p-0.5 shadow-sm backdrop-blur">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8"
+                      className={action}
                       aria-label={t('images.download')}
+                      title={t('images.download')}
                       onClick={() => {
                         if (item.file) void actions.download(item.file)
                       }}
                     >
-                      <Download size={15} />
+                      <Download size={14} />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8"
+                      className={action}
                       aria-label={t('images.copy')}
+                      title={t('images.copy')}
                       onClick={() => {
                         if (item.file) void actions.copy(item.file)
                       }}
                     >
-                      <Copy size={15} />
+                      <Copy size={14} />
                     </Button>
                     {!admin && onEdit ? (
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="size-8"
+                        className={action}
                         aria-label={t('images.edit')}
+                        title={t('images.edit')}
                         onClick={() => {
                           if (item.file) onEdit(item.file)
                         }}
@@ -160,30 +199,26 @@ export const ImageTaskCard = memo(function ImageTaskCard({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8"
+                      className={action}
                       aria-label={t('images.delete')}
+                      title={t('images.delete')}
                       onClick={() => {
                         removal.reset()
                         setDeleting(item.file?.id ?? null)
                       }}
                     >
-                      <Trash2 size={15} />
+                      <Trash2 size={14} />
                     </Button>
                   </div>
                 </>
+              ) : item.status === 'pending' ? (
+                <span className="lumi-shimmer absolute inset-0">
+                  <span className="sr-only">{t('images.pending')}</span>
+                </span>
               ) : (
-                <div
-                  role="status"
-                  className={`grid aspect-[4/3] place-items-center bg-muted px-4 text-xs text-muted-foreground ${item.status === 'pending' ? 'animate-pulse' : ''}`}
-                >
-                  {t(
-                    item.status === 'pending'
-                      ? 'images.pending'
-                      : item.status === 'succeeded'
-                        ? 'images.fileMissing'
-                        : 'images.failed',
-                  )}
-                </div>
+                <span className="px-3 text-center text-xs text-muted-foreground">
+                  {t(item.status === 'succeeded' ? 'images.fileMissing' : 'images.failed')}
+                </span>
               )}
             </div>
           ))}
@@ -209,15 +244,34 @@ export const ImageTaskCard = memo(function ImageTaskCard({
           )}
         </div>
       ) : null}
-      <ApiNotice error={task.error_code ? new ApiError(task.error_code) : null} />
-      <ApiNotice error={actions.error || cancellation.error} />
+      {task.error_code ? (
+        <div className="mt-3">
+          <ApiNotice error={new ApiError(task.error_code)} />
+        </div>
+      ) : null}
+      {actions.error || cancellation.error ? (
+        <div className="mt-3">
+          <ApiNotice error={actions.error || cancellation.error} />
+        </div>
+      ) : null}
       {actions.copied ? (
         <p role="status" className="mt-2 text-xs text-muted-foreground">
           {t('images.copied')}
         </p>
       ) : null}
-      <div className="mt-3 flex gap-1">
-        {!admin && terminal(task.status) && onReuse ? (
+      <div className="mt-3 -ml-2 flex flex-wrap gap-0.5">
+        {!admin && !done && onCancel ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={task.cancel_requested || cancellation.isPending}
+            onClick={() => cancellation.mutate()}
+          >
+            <X size={13} />
+            {t(task.cancel_requested ? 'images.cancelRequested' : 'images.cancel')}
+          </Button>
+        ) : null}
+        {!admin && done && onReuse ? (
           <Button variant="ghost" size="sm" onClick={() => onReuse(task)}>
             <RotateCcw size={13} />
             {t('images.regenerate')}
@@ -261,7 +315,7 @@ export const ImageTaskCard = memo(function ImageTaskCard({
             </div>
           ))}
         </dl>
-        <p className="mt-4 text-xs">
+        <p className="mt-4 text-xs tabular-nums">
           {t('images.actual', { cost: task.actual_cost })} ·{' '}
           {t('images.refund', { cost: task.refunded_cost })}
         </p>
@@ -286,7 +340,7 @@ export const ImageTaskCard = memo(function ImageTaskCard({
         busy={removal.isPending}
       >
         <ApiNotice error={removal.error} />
-        <div className="flex justify-end gap-2">
+        <div className="mt-4 flex justify-end gap-2">
           <Button variant="outline" disabled={removal.isPending} onClick={() => setDeleting(null)}>
             {t('common.cancel')}
           </Button>

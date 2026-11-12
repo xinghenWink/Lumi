@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
+import { useStore } from 'zustand'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -40,6 +41,10 @@ export default function ImagePage() {
   const available = models.query.data?.items,
     modelID = data.data?.conversation.model_id
   const older = useMutation({ mutationFn: () => image.loadOlder(id) })
+  const submitting = useStore(
+    image.store,
+    (state) => !!state.sending[imageSubmissionScope(state, id)],
+  )
   const action = useMutation({
     mutationFn: async (
       value: { kind: 'edit'; file: ImageFile } | { kind: 'reuse'; task: ImageTask },
@@ -138,6 +143,7 @@ export default function ImagePage() {
               tasks={data.data.tasks}
               older={!!data.data.nextCursor}
               loading={older.isPending}
+              submitting={submitting}
               onOlder={() => older.mutateAsync().catch(() => undefined)}
               onCancel={cancel}
               onReuse={reuse}

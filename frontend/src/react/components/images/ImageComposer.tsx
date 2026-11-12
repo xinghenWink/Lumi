@@ -38,11 +38,9 @@ const ImageLibrary = lazy(() =>
 export function ImageComposer({
   conversationId,
   layout = 'dock',
-  onSubmitted,
 }: {
   conversationId: string
   layout?: 'panel' | 'dock'
-  onSubmitted?: () => void
 }) {
   const runtime = useRuntime(),
     { t } = useTranslation(),
@@ -143,10 +141,7 @@ export function ImageComposer({
       }
     }
     const result = await runtime.image.submit(conversationId, body)
-    if (result) {
-      onSubmitted?.()
-      await navigate('/create/' + result, { replace: true })
-    }
+    if (result) await navigate('/create/' + result, { replace: true })
   }
   const summary = options.quality
     ? [

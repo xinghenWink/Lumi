@@ -486,7 +486,7 @@ test('React real image generation editing gallery cancellation and administrator
     await member.keyboard.press('Escape')
     await prompt.fill('edit reference')
     await send.click()
-    await expect(member.locator('.image-task').last().locator('.image-status')).toHaveText(
+    await expect(member.locator('.image-task').first().locator('.image-status')).toHaveText(
       '已完成',
       { timeout: 20_000 },
     )
@@ -504,6 +504,28 @@ test('React real image generation editing gallery cancellation and administrator
     await dialog.locator('.image-library-item').first().click()
     await expect(member.locator('.image-references img')).toHaveCount(1)
     await member.getByRole('button', { name: '移除参考图', exact: true }).click()
+    // Files dropped anywhere in the workspace, or pasted outside a text field, become references.
+    const transfer = await member.evaluateHandle((encoded) => {
+      const bytes = Uint8Array.from(atob(encoded), (value) => value.charCodeAt(0))
+      const data = new DataTransfer()
+      data.items.add(new File([bytes], 'dropped.png', { type: 'image/png' }))
+      return data
+    }, png.toString('base64'))
+    await member.locator('main').dispatchEvent('dragenter', { dataTransfer: transfer })
+    await expect(member.getByText('松开以添加图片', { exact: true })).toBeVisible()
+    await member.locator('main').dispatchEvent('drop', { dataTransfer: transfer })
+    await expect(member.getByText('松开以添加图片', { exact: true })).toHaveCount(0)
+    await expect(member.locator('.image-references img')).toHaveCount(1)
+    await member.getByRole('button', { name: '移除参考图', exact: true }).click()
+    await expect(member.locator('.image-references img')).toHaveCount(0)
+    await member.evaluate((data) => {
+      document.body.dispatchEvent(
+        new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
+      )
+    }, transfer)
+    await expect(member.locator('.image-references img')).toHaveCount(1)
+    await member.getByRole('button', { name: '移除参考图', exact: true }).click()
+    await transfer.dispose()
     const beforeBackground = calls
     let disconnected = false,
       pollRequests = 0
@@ -527,7 +549,7 @@ test('React real image generation editing gallery cancellation and administrator
       .getByRole('link', { name: '生图', exact: true })
       .click()
     await expect(member).toHaveURL(conversationURL)
-    await expect(member.locator('.image-task').last().locator('.image-status')).toHaveText(
+    await expect(member.locator('.image-task').first().locator('.image-status')).toHaveText(
       '已完成',
       { timeout: 20_000 },
     )
@@ -537,7 +559,7 @@ test('React real image generation editing gallery cancellation and administrator
     await member.unroute('**/api/v1/image-tasks/*/events')
     await prompt.fill('cancel')
     await send.click()
-    const cancelTask = member.locator('.image-task').last()
+    const cancelTask = member.locator('.image-task').first()
     await expect(cancelTask.locator('.image-status')).toHaveText('生成中', { timeout: 15_000 })
     await cancelTask.getByRole('button', { name: '取消任务', exact: true }).click()
     await expect(cancelTask.locator('.image-status')).toHaveText('已取消', { timeout: 15_000 })
@@ -545,11 +567,11 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(cancelTask).toContainText('已退 10 积分')
     await prompt.fill('reject')
     await send.click()
-    await expect(member.locator('.image-task').last().locator('.image-status')).toHaveText(
+    await expect(member.locator('.image-task').first().locator('.image-status')).toHaveText(
       '生成失败',
       { timeout: 20_000 },
     )
-    await expect(member.locator('.image-task').last()).toContainText('已退 10 积分')
+    await expect(member.locator('.image-task').first()).toContainText('已退 10 积分')
     const adminView = await api('GET', '/admin/image-tasks/' + firstID)
     expect(adminView.content_visible).toBe(false)
     expect(adminView.prompt).toBe('')

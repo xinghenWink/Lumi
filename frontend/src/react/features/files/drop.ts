@@ -63,8 +63,7 @@ export function createDropRegistry() {
       const target = current()
       if (!files.length || !target?.enabled) return
       // Pasting into another field keeps that field's own behavior.
-      const active = document.activeElement
-      if (active instanceof Element && active.matches(editable)) return
+      if (event.target instanceof Element && event.target.closest(editable)) return
       event.preventDefault()
       target.onFiles(files)
     }
