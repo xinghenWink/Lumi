@@ -21,6 +21,14 @@ function Appearance({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.dataset.theme = current
     document.documentElement.lang = i18n.resolvedLanguage ?? 'zh-CN'
+    // Browser chrome follows the in-app theme rather than only the OS preference.
+    const background = getComputedStyle(document.documentElement)
+      .getPropertyValue('--background')
+      .trim()
+    if (background)
+      document
+        .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
+        .forEach((meta) => meta.setAttribute('content', background))
   }, [current, i18n.resolvedLanguage])
   return children
 }

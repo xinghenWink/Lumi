@@ -1,31 +1,53 @@
+/*
+ * Warm minimal palette. Existing token names are kept so admin pages and shared
+ * primitives recolor without structural edits; see docs/REACT_UI_REDESIGN.md.
+ */
 :root {
   color-scheme: light;
-  --background: #fafbfe;
-  --foreground: #252537;
+  --background: #faf9f7;
+  --foreground: #1f1e1c;
   --card: #ffffff;
-  --sidebar: #f7f7fa;
-  --muted: #f4f3fa;
-  --muted-foreground: #6e7186;
-  --border: #e9e9f0;
-  --primary: #6f58ee;
+  --sidebar: #f4f2ee;
+  --muted: #efece6;
+  --muted-foreground: #6b655c;
+  --border: #e5e1d9;
+  --input: #d9d4ca;
+  --primary: #a64a29;
   --primary-foreground: #ffffff;
-  --accent: #f0edff;
-  --ring: #6f58ee;
-  --destructive: #bb3444;
+  --accent: #f7ebe4;
+  --ring: #a64a29;
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --success: #2f6f3e;
+  --warning: #8a5a00;
+  --bubble: #f1eee8;
+  --overlay: rgb(20 18 16 / 0.45);
+  --scrim: rgb(18 17 15 / 0.94);
+  --shadow-color: rgb(31 30 28 / 0.06);
+  --shadow-color-strong: rgb(31 30 28 / 0.16);
 }
 
 [data-theme='dark'] {
   color-scheme: dark;
-  --background: #14141c;
-  --foreground: #f0eef8;
-  --card: #1d1d27;
-  --sidebar: #191922;
-  --muted: #282833;
-  --muted-foreground: #b1b0c4;
-  --border: #32313e;
-  --primary: #9886ff;
-  --primary-foreground: #14141c;
-  --accent: #312948;
-  --ring: #9886ff;
-  --destructive: #f39aa5;
+  --background: #1b1a18;
+  --foreground: #ecebe7;
+  --card: #232220;
+  --sidebar: #171614;
+  --muted: #2c2a27;
+  --muted-foreground: #a6a199;
+  --border: #383530;
+  --input: #45413b;
+  --primary: #e48b67;
+  --primary-foreground: #1b1a18;
+  --accent: #3b2a22;
+  --ring: #e48b67;
+  --destructive: #f29a8e;
+  --destructive-foreground: #1b1a18;
+  --success: #7fc28f;
+  --warning: #e0b25c;
+  --bubble: #2a2825;
+  --overlay: rgb(0 0 0 / 0.6);
+  --scrim: rgb(18 17 15 / 0.94);
+  --shadow-color: rgb(0 0 0 / 0.35);
+  --shadow-color-strong: rgb(0 0 0 / 0.55);
 }
