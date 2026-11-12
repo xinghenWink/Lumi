@@ -43,7 +43,7 @@ No database/OpenAPI changes are expected for this migration; generated-contract 
 
 The existing Playwright desktop/mobile projects only set viewport dimensions. Extend their context helpers too: manual `browser.newContext()` calls currently copy selected fields and must preserve mobile emulation. Browser emulation is labeled as such; it is not evidence from a physical Android device.
 
-Keep the existing pageerror/console observer and screenshots. Add assertions for modal focus trapping/restoration, Escape, outside dismissal, visible labels, reduced motion, scroll containment and no horizontal overflow. For image options, tests open the new popover before selecting values. Use accessible selectors or stable IDs instead of retaining obsolete CSS solely to satisfy locators.
+Keep the existing pageerror/console observer and screenshots. Add assertions for modal focus trapping/restoration, Escape, outside dismissal, visible labels, reduced motion, scroll containment and no horizontal overflow. For image options, desktop tests use the always-visible parameter region and mobile tests open the parameter sheet before choosing radios or the size select. Use accessible selectors or stable IDs instead of retaining obsolete CSS solely to satisfy locators.
 
 ## Feature regressions
 
