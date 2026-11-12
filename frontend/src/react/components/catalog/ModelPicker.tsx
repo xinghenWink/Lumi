@@ -75,7 +75,7 @@ export function ModelPicker({ kind, disabled = false }: { kind: ModelKind; disab
                     {model.display_name}
                   </strong>
                   {model.description ? (
-                    <span className="mt-1 block text-[11px] leading-5 text-muted-foreground">
+                    <span className="mt-1 block text-2xs leading-5 text-muted-foreground">
                       {model.description}
                     </span>
                   ) : null}

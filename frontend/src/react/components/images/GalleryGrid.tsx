@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { Copy, Download, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { GalleryItem, ImageFile } from '../../../api/images'
+import { cn } from '../../lib/utils'
 import { Button } from '../ui/button'
 import { ProtectedImage } from './ProtectedImage'
 
@@ -34,6 +35,8 @@ export function GalleryGrid({
   onMore(): void
 }) {
   'use no memo'
+  const action =
+    'size-7 rounded-lg text-foreground hover:bg-foreground/10 focus-visible:outline-offset-0'
   const { t } = useTranslation(),
     scroller = useRef<HTMLDivElement>(null)
   const [columns, setColumns] = useState(1)
@@ -77,43 +80,42 @@ export function GalleryGrid({
             {items.slice(row.index * columns, (row.index + 1) * columns).map((item, offset) => (
               <article
                 key={item.file.id}
-                className="image-gallery-card overflow-hidden rounded-xl border border-border bg-card"
+                className={cn(
+                  'image-gallery-card group overflow-hidden rounded-2xl border bg-card shadow-xs transition-[border-color,box-shadow] hover:shadow-md',
+                  selected.includes(item.file.id)
+                    ? 'border-primary/60 ring-2 ring-primary/15'
+                    : 'border-border',
+                )}
               >
                 <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-muted">
                   <ProtectedImage
                     file={item.file}
                     alt={item.prompt}
-                    className="size-full object-cover"
+                    className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                   />
                   <button
                     type="button"
-                    className="absolute inset-0 rounded-t-xl focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                    className="absolute inset-0 cursor-zoom-in focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                     aria-label={t('images.preview')}
                     onClick={() => onPreview(row.index * columns + offset)}
                   />
-                  <label className="absolute top-2 left-2 flex items-center gap-2 rounded-lg bg-card/95 px-2 py-1 text-xs shadow-sm">
+                  <label className="absolute top-2 left-2 flex cursor-pointer items-center gap-1.5 rounded-lg bg-background/85 px-2 py-1 text-xs shadow-sm backdrop-blur">
                     <input
                       type="checkbox"
+                      className="size-3.5 accent-primary"
                       checked={selected.includes(item.file.id)}
                       disabled={busy}
                       onChange={(event) => onSelect(item.file.id, event.target.checked)}
                     />
                     {t('ops.select')}
                   </label>
-                </div>
-                <div className="p-3">
-                  <p className="line-clamp-2 min-h-10 break-words text-xs leading-5">
-                    {item.prompt}
-                  </p>
-                  <p className="mt-2 text-[10px] text-muted-foreground">
-                    {t('images.' + item.quality)} · {item.file.width} × {item.file.height}
-                  </p>
-                  <div className="mt-2 flex justify-end gap-1">
+                  <div className="reveal-on-hover absolute top-2 right-2 flex items-center gap-0.5 rounded-xl bg-background/85 p-0.5 shadow-sm backdrop-blur">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8"
+                      className={action}
                       aria-label={t('images.download')}
+                      title={t('images.download')}
                       onClick={() => onDownload(item.file)}
                     >
                       <Download size={14} />
@@ -121,8 +123,9 @@ export function GalleryGrid({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8"
+                      className={action}
                       aria-label={t('images.copy')}
+                      title={t('images.copy')}
                       onClick={() => onCopy(item.file)}
                     >
                       <Copy size={14} />
@@ -130,22 +133,32 @@ export function GalleryGrid({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8"
+                      className={action}
                       aria-label={t('images.edit')}
+                      title={t('images.edit')}
                       onClick={() => onEdit(item.file)}
                     >
-                      <Plus size={14} />
+                      <Plus size={15} />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8"
+                      className={action}
                       aria-label={t('images.delete')}
+                      title={t('images.delete')}
                       onClick={() => onDelete(item.file)}
                     >
                       <Trash2 size={14} />
                     </Button>
                   </div>
+                </div>
+                <div className="px-3.5 pt-3 pb-3.5">
+                  <p className="line-clamp-2 min-h-10 text-xs leading-5 break-words">
+                    {item.prompt}
+                  </p>
+                  <p className="mt-1.5 text-2xs text-muted-foreground tabular-nums">
+                    {t('images.' + item.quality)} · {item.file.width} × {item.file.height}
+                  </p>
                 </div>
               </article>
             ))}
@@ -158,7 +171,13 @@ export function GalleryGrid({
         </p>
       ) : null}
       {hasMore ? (
-        <Button variant="outline" className="my-3" disabled={loading} onClick={onMore}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mx-auto my-4 flex"
+          disabled={loading}
+          onClick={onMore}
+        >
           {t('images.more')}
         </Button>
       ) : null}

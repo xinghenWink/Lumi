@@ -102,9 +102,11 @@ function GalleryResults({ filter }: { filter: string }) {
         </Button>
       </div>
       {!query.isPending && !items.length ? (
-        <div className="grid flex-1 place-content-center gap-4 py-10 text-center text-muted-foreground">
-          <ImageIcon size={36} strokeWidth={1.3} className="mx-auto" />
-          <h2 className="text-base text-foreground">{t('images.emptyGallery')}</h2>
+        <div className="grid flex-1 place-content-center gap-3 py-10 text-center text-muted-foreground">
+          <span className="mx-auto mb-1 grid size-12 place-items-center rounded-2xl bg-accent text-primary">
+            <ImageIcon size={22} strokeWidth={1.6} />
+          </span>
+          <h2 className="text-base font-medium text-foreground">{t('images.emptyGallery')}</h2>
           <p className="text-sm">{t('images.galleryHint')}</p>
         </div>
       ) : (
@@ -181,10 +183,10 @@ export default function ImageGalleryPage() {
     { user } = useSession()
   const [filter, setFilter] = useState('limit=40')
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 sm:p-8">
+    <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden px-4 pt-6 sm:px-8">
       <header className="mb-5 shrink-0">
-        <h1 className="text-2xl font-semibold tracking-tight">{t('images.gallery')}</h1>
-        <p className="mt-2 text-xs text-muted-foreground">{t('images.galleryHint')}</p>
+        <h1 className="text-[22px] font-semibold tracking-tight">{t('images.gallery')}</h1>
+        <p className="mt-1.5 text-xs text-muted-foreground">{t('images.galleryHint')}</p>
       </header>
       <ImageFilters onApply={(query) => setFilter(query.toString())} />
       <GalleryResults key={(user?.id ?? '') + ':' + filter} filter={filter} />

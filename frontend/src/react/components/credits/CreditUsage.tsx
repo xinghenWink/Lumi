@@ -42,7 +42,7 @@ export function CreditUsage() {
               <span className="text-xs text-muted-foreground">{t('credits.successfulImages')}</span>
               <div className="mt-3 flex flex-wrap gap-3">
                 {(['low', 'medium', 'high'] as const).map((quality) => (
-                  <span key={quality} className="text-[10px] text-muted-foreground">
+                  <span key={quality} className="text-2xs text-muted-foreground">
                     {t('credits.' + quality)}
                     <strong className="ml-1.5 text-sm text-foreground">
                       {number(query.data?.images_by_quality[quality] ?? 0)}
@@ -72,7 +72,7 @@ export function CreditUsage() {
                 </li>
               ))}
             </ol>
-            <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
+            <div className="mt-2 flex justify-between text-2xs text-muted-foreground">
               <span>{query.data.days[0]?.date}</span>
               <span>{query.data.days.at(-1)?.date}</span>
             </div>
@@ -80,7 +80,7 @@ export function CreditUsage() {
           {!query.data.days.some((day) => day.consumed > 0) ? (
             <p className="mt-4 text-xs text-muted-foreground">{t('credits.noUsage')}</p>
           ) : null}
-          <p className="mt-4 text-[10px] leading-5 text-muted-foreground">
+          <p className="mt-4 text-2xs leading-5 text-muted-foreground">
             {t('credits.usageHint')} {t('credits.timezone', { zone: query.data.timezone })}
           </p>
         </>

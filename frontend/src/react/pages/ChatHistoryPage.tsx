@@ -45,7 +45,7 @@ export default function ChatHistoryPage() {
     <section className="chat-history mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 sm:p-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t('chat.history')}</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight">{t('chat.history')}</h1>
           <p className="mt-2 text-sm leading-7 text-muted-foreground">{t('chat.historyHint')}</p>
         </div>
         <Button asChild>
@@ -149,7 +149,7 @@ export default function ChatHistoryPage() {
                     {row.pinned ? <Pin size={13} className="shrink-0 text-primary" /> : null}
                     <span className="truncate">{row.title || t('chat.untitled')}</span>
                   </strong>
-                  <span className="mt-1.5 block text-[11px] text-muted-foreground">
+                  <span className="mt-1.5 block text-2xs text-muted-foreground">
                     {time(row.last_message_at)}
                   </span>
                 </Link>

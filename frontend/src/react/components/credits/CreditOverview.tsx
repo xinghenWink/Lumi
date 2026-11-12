@@ -126,13 +126,13 @@ export function CreditOverview({ userId }: { userId?: string }) {
                 >
                   {number(value)}
                 </strong>
-                <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
+                <p className="mt-1 text-2xs leading-5 text-muted-foreground">
                   {t('credits.' + key + 'Hint')}
                 </p>
               </div>
             ))}
           </div>
-          <p className="mt-4 text-[10px] leading-5 text-muted-foreground">
+          <p className="mt-4 text-2xs leading-5 text-muted-foreground">
             {t('credits.resetAt', { time: time(query.data.next_reset_at) })}
             <br />
             {t('credits.timezone', { zone: query.data.timezone })}

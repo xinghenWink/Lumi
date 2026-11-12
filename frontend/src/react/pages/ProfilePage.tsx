@@ -116,7 +116,7 @@ function ProfileForm({ user }: { user: User }) {
     <div className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
       <div className="mx-auto max-w-3xl space-y-5">
         <header className="mb-6">
-          <h1 className="text-2xl font-semibold tracking-tight">{t('profile.title')}</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight">{t('profile.title')}</h1>
           <p className="mt-2 text-xs leading-6 text-muted-foreground">{t('profile.description')}</p>
         </header>
         <Panel title={t('profile.basics')}>
@@ -147,7 +147,7 @@ function ProfileForm({ user }: { user: User }) {
               >
                 {t('images.avatar')}
               </Button>
-              <p className="mt-2 text-[10px] leading-5 text-muted-foreground">
+              <p className="mt-2 text-2xs leading-5 text-muted-foreground">
                 {t('images.avatarHint')}
               </p>
             </div>

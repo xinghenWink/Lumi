@@ -94,7 +94,7 @@ function SecurityForm({ user }: { user: User }) {
   return (
     <div className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
       <div className="mx-auto max-w-3xl space-y-5">
-        <h1 className="mb-6 text-2xl font-semibold tracking-tight">{t('nav.security')}</h1>
+        <h1 className="mb-6 text-[22px] font-semibold tracking-tight">{t('nav.security')}</h1>
         <Panel title={t('ops.preferences')}>
           <ApiNotice error={preferences.error || save.error} />
           {values ? (
@@ -229,7 +229,7 @@ function SecurityForm({ user }: { user: User }) {
                 <div className="min-w-0">
                   <strong className="text-sm">{device.device}</strong>
                   {device.id === currentID ? (
-                    <span className="ml-2 rounded-md bg-accent px-2 py-1 text-[10px] text-primary">
+                    <span className="ml-2 rounded-md bg-accent px-2 py-1 text-2xs text-primary">
                       {t('ops.currentDevice')}
                     </span>
                   ) : null}

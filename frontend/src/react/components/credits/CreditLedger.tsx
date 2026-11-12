@@ -118,7 +118,7 @@ export function CreditLedger({ admin = false, userId }: { admin?: boolean; userI
         <Button type="submit" variant="outline" disabled={query.isFetching}>
           {t('common.search')}
         </Button>
-        <span className="text-[10px] text-muted-foreground">{t('common.filterUTC')}</span>
+        <span className="text-2xs text-muted-foreground">{t('common.filterUTC')}</span>
       </form>
       <ApiNotice error={query.error || exporting.error} />
       <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -207,7 +207,7 @@ export function CreditLedger({ admin = false, userId }: { admin?: boolean; userI
                     {row.note || t('common.none')}
                     {row.ref_id ? (
                       <code
-                        className="block break-all text-[10px] text-muted-foreground"
+                        className="block break-all text-2xs text-muted-foreground"
                         title={t('credits.reference')}
                       >
                         {row.ref_id}
