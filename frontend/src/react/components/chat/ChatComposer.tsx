@@ -139,7 +139,7 @@ export const ChatComposer = memo(function ChatComposer({
       className={cn(
         'chat-composer-wrap mx-auto w-full shrink-0',
         hero
-          ? 'max-w-2xl'
+          ? 'max-w-2xl px-4'
           : 'max-w-3xl px-3 pt-1 pb-[max(12px,env(safe-area-inset-bottom))] sm:px-6 sm:pb-4',
       )}
     >

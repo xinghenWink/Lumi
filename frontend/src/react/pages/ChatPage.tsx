@@ -2,12 +2,12 @@ import { lazy, Suspense, useCallback, useEffect, useId, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useStore } from 'zustand'
-import { Sparkles } from 'lucide-react'
+import { RotateCw, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Message } from '../../api/chat'
-import { lastMessage } from '../../features/chat/messages'
 import { useRuntime } from '../app/context'
 import { useModels } from '../features/catalog/models'
+import { useChatTurnActions } from '../features/chat/actions'
 import { ChatComposer } from '../components/chat/ChatComposer'
 import { ModeTabs } from '../components/chat/ModeTabs'
 import { ConversationActions } from '../components/chat/ConversationActions'
@@ -15,6 +15,7 @@ import { ApiNotice } from '../components/shared/ApiNotice'
 import { PageStatus } from '../components/shared/PageStatus'
 import { ModalDialog } from '../components/ui/modal-dialog'
 import { Button } from '../components/ui/button'
+import { textareaClass } from '../components/ui/field'
 const MessageList = lazy(() =>
   import('../components/chat/MessageList').then((module) => ({ default: module.MessageList })),
 )
@@ -37,6 +38,7 @@ export default function ChatPage() {
     [edited, setEdited] = useState('')
   const busy = running || !!data.data?.conversation.busy
   const older = useMutation({ mutationFn: () => chat.loadOlder(id) })
+  const { regenerate, resend } = useChatTurnActions(id, selected)
   useEffect(() => {
     void chat.open(id)
   }, [chat, id])
@@ -48,38 +50,25 @@ export default function ChatPage() {
     setEditing(message)
     setEdited(message.content)
   }, [])
-  const regenerate = useCallback(() => {
-    const snapshot = chat.snapshot(id)
-    const last = snapshot && lastMessage(snapshot.messages, 'user')
-    if (id && last && selected)
-      void chat.send(id, {
-        request_id: crypto.randomUUID(),
-        model_id: selected,
-        action: 'regenerate',
-        content: '',
-        last_message_id: last.id,
-      })
-  }, [chat, id, selected])
   async function loadOlder() {
     await older.mutateAsync().catch(() => undefined)
   }
   function editSend() {
-    if (!editing || !id || !selected || !edited.trim() || busy) return
+    if (!editing || busy || !edited.trim()) return
+    const message = editing
     setEditing(null)
-    void chat.send(id, {
-      request_id: crypto.randomUUID(),
-      model_id: selected,
-      action: 'edit',
-      content: edited,
-      last_message_id: editing.id,
-    })
+    resend(message, edited)
   }
+  const messages = data.data?.messages.length ?? 0
+  const loading = !!id && data.isPending
+  // The welcome layout keeps the composer at the same tree position so typing state survives.
+  const hero = !loading && !data.isError && !messages && !busy && !pending
   return (
-    <div className="chat-page flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-4 sm:px-8">
+    <div className="chat-page relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-3 sm:px-6">
         <ModeTabs />
         {data.data ? (
-          <div className="chat-current-title flex min-w-0 items-center gap-2">
+          <div className="chat-current-title flex min-w-0 items-center gap-1">
             <span className="truncate text-xs text-muted-foreground">
               {data.data.conversation.title || t('chat.untitled')}
             </span>
@@ -88,7 +77,7 @@ export default function ChatPage() {
         ) : null}
       </div>
       <ApiNotice error={older.error} />
-      {id && data.isPending ? (
+      {loading ? (
         <PageStatus />
       ) : id && data.isError ? (
         <PageStatus
@@ -97,7 +86,7 @@ export default function ChatPage() {
             void data.refetch()
           }}
         />
-      ) : data.data?.messages.length ? (
+      ) : messages && data.data ? (
         <Suspense fallback={<PageStatus />}>
           <MessageList
             key={id}
@@ -111,36 +100,46 @@ export default function ChatPage() {
           />
         </Suspense>
       ) : (
-        <section className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-5 py-8 text-center">
-          <span className="mb-2 grid size-14 place-items-center rounded-2xl bg-accent text-primary">
-            <Sparkles size={28} strokeWidth={1.5} />
+        <section className="flex min-h-0 flex-1 flex-col items-center justify-end px-5 pb-8 text-center">
+          <span className="mb-5 grid size-12 place-items-center rounded-2xl bg-accent text-primary animate-rise-in">
+            <Sparkles size={24} strokeWidth={1.6} />
           </span>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('react.title')}</h1>
-          <p className="max-w-md text-sm leading-7 text-muted-foreground">
+          <h1 className="text-[28px] leading-tight font-semibold tracking-tight text-balance sm:text-[32px]">
+            {t('react.title')}
+          </h1>
+          <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
             {t('chat.description')}
           </p>
         </section>
       )}
       {error ? (
-        <div className="chat-stream-error mx-auto w-full max-w-4xl px-4">
+        <div className="chat-stream-error mx-auto flex w-full max-w-3xl flex-col gap-2 px-4 sm:px-6">
           <ApiNotice error={error} />
           {pending && !running ? (
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="sm"
+              className="self-start"
               onClick={() => {
                 void chat.retryPending(id)
               }}
             >
+              <RotateCw size={13} />
               {t('chat.retry')}
             </Button>
           ) : null}
         </div>
       ) : null}
       {!id || !data.isError ? (
-        <ChatComposer key={id || 'new'} conversationId={id} busy={busy} />
+        <ChatComposer
+          key={id || 'new'}
+          conversationId={id}
+          busy={busy}
+          variant={hero ? 'hero' : 'dock'}
+        />
       ) : null}
+      {hero ? <div aria-hidden="true" className="min-h-6 flex-[1.4]" /> : null}
       <ModalDialog
         open={!!editing}
         onOpenChange={(value) => {
@@ -156,8 +155,10 @@ export default function ChatPage() {
             editSend()
           }}
         >
-          <div className="flex flex-col gap-2 text-sm">
-            <label htmlFor={editField}>{t('chat.input')}</label>
+          <div className="flex flex-col gap-1.5 text-sm">
+            <label htmlFor={editField} className="text-xs font-medium">
+              {t('chat.input')}
+            </label>
             <textarea
               id={editField}
               value={edited}
@@ -165,7 +166,22 @@ export default function ChatPage() {
               rows={6}
               maxLength={64000}
               required
-              className="w-full rounded-xl border border-border bg-background p-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
+              autoFocus
+              onFocus={(event) => {
+                const end = event.currentTarget.value.length
+                event.currentTarget.setSelectionRange(end, end)
+              }}
+              onKeyDown={(event) => {
+                if (
+                  event.key === 'Enter' &&
+                  (event.metaKey || event.ctrlKey) &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault()
+                  editSend()
+                }
+              }}
+              className={textareaClass + ' resize-none leading-7'}
             />
           </div>
           <div className="flex justify-end gap-2">

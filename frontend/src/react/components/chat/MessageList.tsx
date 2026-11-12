@@ -98,7 +98,7 @@ export function MessageList({
     <div className="chat-message-region relative flex min-h-0 flex-1 flex-col">
       <div
         ref={scroller}
-        className="chat-message-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-8"
+        className="chat-message-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6"
         aria-label={t('chat.messages')}
         tabIndex={0}
         onScroll={(event) => {
@@ -107,7 +107,7 @@ export function MessageList({
           setFollowing(follow.current)
         }}
       >
-        <div ref={body} className="chat-message-body mx-auto w-full max-w-3xl pb-5">
+        <div ref={body} className="chat-message-body mx-auto w-full max-w-3xl pt-2 pb-6">
           {hasOlder ? (
             <div className="flex justify-center py-3">
               <Button
@@ -154,7 +154,7 @@ export function MessageList({
           type="button"
           variant="outline"
           size="sm"
-          className="absolute right-4 bottom-4 shadow-sm"
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-card/95 shadow-md backdrop-blur animate-rise-in"
           onClick={() => {
             follow.current = true
             setFollowing(true)
