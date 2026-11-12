@@ -65,6 +65,8 @@ export const ImageTaskCard = memo(function ImageTaskCard({
     [details, setDetails] = useState(false),
     [deleting, setDeleting] = useState<string | null>(null)
   const files = task.items.flatMap((item) => (item.file ? [item.file] : []))
+  // One ratio per task keeps result tiles in a row the same height, including failed slots.
+  const aspect = taskAspect(task, files[0])
   const tone = statusTone(task.status)
   const done = terminal(task.status)
   const parameters = [
@@ -142,7 +144,7 @@ export const ImageTaskCard = memo(function ImageTaskCard({
             <div
               key={item.position}
               className="group relative grid place-items-center overflow-hidden rounded-2xl border border-border bg-muted"
-              style={{ aspectRatio: taskAspect(task, item.file) }}
+              style={{ aspectRatio: aspect }}
             >
               {item.file ? (
                 <>
