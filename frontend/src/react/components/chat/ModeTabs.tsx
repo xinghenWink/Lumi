@@ -13,7 +13,7 @@ export function ModeTabs() {
   return (
     <nav
       aria-label={t('chat.mode')}
-      className="flex shrink-0 gap-1 rounded-xl bg-muted p-1 text-xs"
+      className="flex shrink-0 gap-0.5 rounded-full border border-border bg-muted/60 p-0.5 text-xs"
     >
       {[
         { to: lastChat ? '/chat/' + lastChat : '/chat', key: 'chat.chatMode', icon: MessageSquare },
@@ -22,17 +22,25 @@ export function ModeTabs() {
           key: 'chat.imageMode',
           icon: Sparkles,
         },
-      ].map(({ to, key, icon: Icon }) => (
-        <Link
-          key={key}
-          to={to}
-          aria-current={image === (key === 'chat.imageMode') ? 'page' : undefined}
-          className={`flex items-center gap-2 rounded-lg px-3 py-2 ${image === (key === 'chat.imageMode') ? 'bg-card font-medium text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-        >
-          <Icon size={14} />
-          {t(key)}
-        </Link>
-      ))}
+      ].map(({ to, key, icon: Icon }) => {
+        const active = image === (key === 'chat.imageMode')
+        return (
+          <Link
+            key={key}
+            to={to}
+            aria-current={active ? 'page' : undefined}
+            className={
+              'flex h-8 items-center gap-1.5 rounded-full px-3.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring ' +
+              (active
+                ? 'bg-card font-medium text-foreground shadow-xs [&_svg]:text-primary'
+                : 'text-muted-foreground hover:text-foreground')
+            }
+          >
+            <Icon size={14} />
+            {t(key)}
+          </Link>
+        )
+      })}
     </nav>
   )
 }

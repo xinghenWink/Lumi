@@ -20,10 +20,13 @@ export function PublicShell() {
   })
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:p-3">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-60 focus:rounded-lg focus:bg-card focus:p-3 focus:shadow-md"
+      >
         {t('app.skipLink')}
       </a>
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-border px-4 sm:px-8">
+      <header className="flex h-14 shrink-0 items-center justify-between px-4 sm:px-8">
         <Link to="/" aria-label={t('app.name')}>
           <BrandMark />
         </Link>
@@ -45,12 +48,12 @@ export function PublicShell() {
       <main id="main-content" className="flex flex-1 flex-col">
         <Outlet />
       </main>
-      <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 px-4 py-5 text-center text-xs text-muted-foreground">
+      <footer className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 px-4 py-6 text-center text-xs text-muted-foreground">
         {config.data?.site.footer ? <span>{config.data.site.footer}</span> : null}
-        <Link to="/terms" className="hover:text-primary">
+        <Link to="/terms" className="transition-colors hover:text-foreground">
           {t('auth.terms')}
         </Link>
-        <Link to="/privacy" className="hover:text-primary">
+        <Link to="/privacy" className="transition-colors hover:text-foreground">
           {t('auth.privacy')}
         </Link>
         <span aria-live="polite">

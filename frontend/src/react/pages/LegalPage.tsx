@@ -17,7 +17,9 @@ export default function LegalPage() {
       </div>
       {sections.map((section) => (
         <section key={section}>
-          <h2 className="mb-3 text-lg font-semibold">{t(`legal.${section}Title`)}</h2>
+          <h2 className="mb-2 text-base font-semibold tracking-tight">
+            {t(`legal.${section}Title`)}
+          </h2>
           <p className="whitespace-pre-line text-sm leading-8 text-muted-foreground">
             {t(`legal.${section}`)}
           </p>
@@ -26,7 +28,7 @@ export default function LegalPage() {
           ) : null}
         </section>
       ))}
-      <Link to="/login" className="text-sm text-primary">
+      <Link to="/login" className="text-sm text-primary hover:underline">
         {t('common.back')}
       </Link>
     </article>

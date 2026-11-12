@@ -46,8 +46,8 @@ export default function ResetPasswordPage() {
   }
   return (
     <section className="mx-auto my-auto w-full max-w-lg px-4 py-12">
-      <div className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-6 sm:p-8">
-        <h1 className="text-2xl font-semibold">
+      <div className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-6 shadow-md sm:p-8">
+        <h1 className="text-[22px] font-semibold tracking-tight">
           {t(resetting ? 'ops.resetTitle' : 'ops.forgotTitle')}
         </h1>
         <ApiNotice error={error} />
@@ -63,7 +63,7 @@ export default function ResetPasswordPage() {
               void submit(event)
             }}
           >
-            <label className="flex flex-col gap-2 text-sm font-medium">
+            <label className="flex flex-col gap-1.5 text-xs font-medium">
               {t(resetting ? 'ops.newPassword' : 'auth.email')}
               <Input
                 type={resetting ? 'password' : 'email'}
@@ -86,7 +86,7 @@ export default function ResetPasswordPage() {
             </Button>
           </form>
         )}
-        <Link className="text-sm text-primary" to="/login">
+        <Link className="text-sm text-primary hover:underline" to="/login">
           {t('ops.backLogin')}
         </Link>
       </div>

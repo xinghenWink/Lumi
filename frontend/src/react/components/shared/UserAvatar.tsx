@@ -15,7 +15,7 @@ export function UserAvatar({ className = '' }: { className?: string }) {
   return (
     <span
       className={cn(
-        'grid size-9 shrink-0 place-items-center overflow-hidden rounded-full bg-accent text-sm font-semibold text-primary',
+        'grid size-8 shrink-0 place-items-center overflow-hidden rounded-full bg-accent text-[13px] font-semibold text-primary',
         className,
       )}
     >

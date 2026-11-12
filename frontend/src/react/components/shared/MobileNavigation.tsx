@@ -48,9 +48,9 @@ export function MobileNavigation({ admin }: { admin: boolean }) {
         {/* Static CSS preserves the existing self-only style-element policy. */}
         <div
           aria-hidden="true"
-          className="fixed inset-0 z-40 touch-none bg-black/35 backdrop-blur-[2px]"
+          className="fixed inset-0 z-40 touch-none bg-overlay backdrop-blur-[2px] animate-fade-in"
         />
-        <Dialog.Content className="mobile-sidebar fixed inset-y-0 left-0 z-50 w-[268px] max-w-[calc(100vw-20px)] border-r border-border bg-sidebar shadow-xl outline-none">
+        <Dialog.Content className="mobile-sidebar fixed inset-y-0 left-0 z-50 w-[280px] max-w-[calc(100vw-20px)] border-r border-border bg-sidebar shadow-lg outline-none animate-drawer-in">
           <Dialog.Title className="sr-only">
             {t(admin ? 'nav.admin' : 'nav.workspace')}
           </Dialog.Title>
@@ -60,7 +60,7 @@ export function MobileNavigation({ admin }: { admin: boolean }) {
               type="button"
               variant="ghost"
               size="icon"
-              className="absolute top-3 right-2 z-10"
+              className="absolute top-4 right-2 z-10 size-9"
               aria-label={t('nav.closeMenu')}
             >
               <X size={18} />

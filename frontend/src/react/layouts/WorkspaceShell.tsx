@@ -24,21 +24,24 @@ export function ShellLayout({ admin }: { admin: boolean }) {
     <div className="flex h-dvh overflow-hidden bg-background text-foreground">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:z-60 focus:bg-card focus:p-3"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-60 focus:rounded-lg focus:bg-card focus:p-3 focus:shadow-md"
       >
         {t('app.skipLink')}
       </a>
-      <aside className="desktop-sidebar hidden h-full w-[260px] shrink-0 border-r border-border lg:block">
+      <aside className="desktop-sidebar hidden h-full w-[264px] shrink-0 border-r border-border lg:block">
         <Sidebar admin={admin} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-3 sm:px-6">
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border/70 px-3 sm:px-5">
           <MobileNavigation key={location.key} admin={admin} />
-          <Link to="/chat" className="hidden text-xs text-muted-foreground sm:block">
+          <Link
+            to="/chat"
+            className="hidden text-xs text-muted-foreground transition-colors hover:text-foreground sm:block"
+          >
             {config.data?.site.name || t('app.name')}
           </Link>
-          <span className="hidden text-xs text-muted-foreground sm:block" aria-hidden="true">
-            ›
+          <span className="hidden text-xs text-input sm:block" aria-hidden="true">
+            /
           </span>
           <span className="min-w-0 flex-1 truncate text-xs font-medium">{t(title)}</span>
           <ThemeToggle />

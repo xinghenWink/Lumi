@@ -126,12 +126,15 @@ function AuthForm({ registering }: { registering: boolean }) {
       setBusy(false)
     }
   }
-  const field = 'flex flex-col gap-2 text-sm font-medium'
+  const field = 'flex flex-col gap-1.5 text-xs font-medium'
   const redirect = params.get('redirect')
   const suffix = redirect ? '?redirect=' + encodeURIComponent(redirect) : ''
   return (
     <>
-      <nav className="mb-7 flex gap-1 rounded-xl bg-muted p-1" aria-label={t('auth.setupNote')}>
+      <nav
+        className="mb-6 flex gap-0.5 rounded-full border border-border bg-muted/60 p-0.5"
+        aria-label={t('auth.setupNote')}
+      >
         {(
           [
             ['/login', 'auth.login'],
@@ -142,7 +145,7 @@ function AuthForm({ registering }: { registering: boolean }) {
             key={path}
             to={path + suffix}
             className={({ isActive }) =>
-              `flex-1 rounded-lg px-3 py-2 text-center text-sm ${isActive ? 'bg-card font-medium text-primary shadow-sm' : 'text-muted-foreground'}`
+              `flex-1 rounded-full px-3 py-1.5 text-center text-sm transition-colors ${isActive ? 'bg-card font-medium text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}`
             }
           >
             {t(label)}
@@ -306,7 +309,7 @@ function AuthForm({ registering }: { registering: boolean }) {
               {notice}
             </p>
           ) : null}
-          <Button type="submit" className="h-11 w-full" disabled={busy || sending}>
+          <Button type="submit" size="lg" className="mt-1 w-full" disabled={busy || sending}>
             {t(busy ? 'auth.submitting' : registering ? 'auth.create' : 'auth.enter')}
           </Button>
         </form>
@@ -320,37 +323,44 @@ export default function AuthPage() {
   const registering = location.pathname === '/register'
   const { t } = useTranslation()
   return (
-    <div className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-16 px-4 py-8 sm:px-8 sm:py-14 lg:grid-cols-2">
-      <aside className="hidden flex-col gap-7 pr-8 lg:flex">
-        <span className="grid size-16 place-items-center rounded-2xl bg-accent text-primary">
-          <Sparkles size={34} strokeWidth={1.4} />
+    <div className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-12 px-4 py-8 sm:px-8 sm:py-12 lg:grid-cols-[1fr_400px] lg:gap-20">
+      <aside className="hidden flex-col gap-6 lg:flex">
+        <span className="grid size-12 place-items-center rounded-2xl bg-accent text-primary">
+          <Sparkles size={24} strokeWidth={1.6} />
         </span>
-        <h2 className="text-4xl font-semibold leading-snug tracking-tight">
+        <h2 className="max-w-md text-[40px] leading-[1.2] font-semibold tracking-tight text-balance">
           {t('auth.heroTitle')}
         </h2>
-        <p className="text-sm leading-8 text-muted-foreground">{t('auth.heroDescription')}</p>
-        {(
-          [
-            [MessageSquare, 'auth.heroChat', 'auth.heroChatDescription'],
-            [Sparkles, 'auth.heroImage', 'auth.heroImageDescription'],
-          ] as const
-        ).map(([Icon, title, description]) => (
-          <div key={title} className="flex items-start gap-3">
-            <span className="mt-1 text-primary">
-              <Icon size={20} />
-            </span>
-            <div>
-              <strong className="text-sm">{t(title)}</strong>
-              <p className="mt-1 text-xs leading-6 text-muted-foreground">{t(description)}</p>
+        <p className="max-w-md text-[15px] leading-7 text-muted-foreground">
+          {t('auth.heroDescription')}
+        </p>
+        <div className="mt-2 grid max-w-md gap-3">
+          {(
+            [
+              [MessageSquare, 'auth.heroChat', 'auth.heroChatDescription'],
+              [Sparkles, 'auth.heroImage', 'auth.heroImageDescription'],
+            ] as const
+          ).map(([Icon, title, description]) => (
+            <div
+              key={title}
+              className="flex items-start gap-3 rounded-xl border border-border bg-card/60 p-4"
+            >
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-primary">
+                <Icon size={16} />
+              </span>
+              <div>
+                <strong className="text-sm font-medium">{t(title)}</strong>
+                <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{t(description)}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </aside>
-      <section className="mx-auto w-full max-w-[400px] rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-8">
-        <h1 className="text-2xl font-semibold tracking-tight">
+      <section className="mx-auto w-full max-w-[400px] rounded-2xl border border-border bg-card p-6 shadow-md animate-rise-in sm:p-8">
+        <h1 className="text-[22px] font-semibold tracking-tight">
           {t(registering ? 'auth.registerTitle' : 'auth.loginTitle')}
         </h1>
-        <p className="mt-2 mb-7 text-sm leading-6 text-muted-foreground">
+        <p className="mt-1.5 mb-6 text-sm leading-6 text-muted-foreground">
           {t(registering ? 'auth.registerDescription' : 'auth.loginDescription')}
         </p>
         <AuthForm key={location.pathname} registering={registering} />
