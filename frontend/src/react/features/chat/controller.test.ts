@@ -209,6 +209,22 @@ describe('React chat controller compatibility', () => {
     expect(chat.store.getState().drafts).toEqual({ new: 'next account' })
   })
 
+  it('does not report a cancelled conversation load as a chat failure', async () => {
+    vi.mocked(chats.get).mockImplementationOnce(
+      (_id, signal) =>
+        new Promise((_resolve, reject) =>
+          signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError'))),
+        ),
+    )
+    const opening = chat.open('c')
+    await client.cancelQueries({ queryKey: chat.options('c').queryKey })
+    await opening
+    expect(chat.store.getState().errors).toEqual({})
+    await chat.open('c')
+    expect(chat.snapshot('c')?.messages).toHaveLength(2)
+    expect(chat.store.getState().errors).toEqual({})
+  })
+
   it('keeps a new reader frame when an obsolete reader finally completes', async () => {
     const old = deferred<undefined>(),
       current = deferred<undefined>()
