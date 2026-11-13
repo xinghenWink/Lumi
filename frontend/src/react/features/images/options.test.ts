@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { defaultCapabilities, type PublicModel } from '../../../api/catalog-contracts'
 import type { ImageConfiguration } from '../../../api/images'
+import type { Preferences } from '../../../api/operations'
 import { emptyImageDraft } from './controller'
 import { resolveImageOptions } from './options'
 const config: ImageConfiguration = {
@@ -65,5 +66,24 @@ describe('server-derived image options', () => {
         capabilities: { ...model.capabilities, supports_edit: false },
       }).maxReferences,
     ).toBe(0)
+  })
+  it('maps a ratio-only draft to its configured size and ignores unavailable ratios', () => {
+    const both = { ...model, capabilities: { ...model.capabilities, sizes: ['small', 'large'] } }
+    const preferences: Preferences = {
+      theme: 'system',
+      instructions: '',
+      image_quality: 'high',
+      image_ratio: '1:1',
+      image_count: 1,
+    }
+    expect(
+      resolveImageOptions({ ...emptyImageDraft, ratio: '2:1' }, config, both, preferences),
+    ).toMatchObject({ size: 'large', ratio: '2:1' })
+    expect(
+      resolveImageOptions({ ...emptyImageDraft, ratio: '16:9' }, config, both, preferences),
+    ).toMatchObject({ size: 'small', ratio: '1:1' })
+    expect(
+      resolveImageOptions({ ...emptyImageDraft, ratio: '2:1', size: 'small' }, config, both),
+    ).toMatchObject({ size: 'small', ratio: '' })
   })
 })

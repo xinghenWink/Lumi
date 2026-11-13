@@ -24,11 +24,12 @@ export function resolveImageOptions(
   const maxN = Math.min(config?.max_n ?? 0, model?.capabilities.max_n ?? 0)
   const maxReferences = referenceCapacity(config, model)
   const savedSize = config?.ratio_sizes[preferences?.image_ratio ?? '']
+  // A draft may name only a ratio (a chat illustration); the configured mapping then picks its size.
+  const ratioSize = draft.size ? undefined : ratios.find(([ratio]) => ratio === draft.ratio)?.[1]
   const size = sizes.includes(draft.size)
     ? draft.size
-    : savedSize && sizes.includes(savedSize)
-      ? savedSize
-      : (sizes[0] ?? '')
+    : (ratioSize ??
+      (savedSize && sizes.includes(savedSize) ? savedSize : (sizes[0] ?? '')))
   const quality = qualities.includes(draft.quality as ImageInput['quality'])
     ? draft.quality
     : (qualities.find((quality) => quality === preferences?.image_quality) ?? qualities[0] ?? '')

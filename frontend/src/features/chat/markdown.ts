@@ -42,6 +42,77 @@ export function partitionMarkdown(text: string, final: boolean): MarkdownPart[] 
   if (current) parts.push({ key: start, source: current, complete: final })
   return parts
 }
+/** A model-suggested illustration: an image description the reader may choose to generate. */
+export interface Illustration {
+  prompt: string
+  ratio: string
+}
+/** Visible illustration text; without `action` the card offers no generate button. */
+export interface IllustrationLabels {
+  label: string
+  pending: string
+  action?: string
+}
+const illustrationName = '<AsyncImage'
+const illustrationAttribute = String.raw`\s+[A-Za-z][\w-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|\{[^{}]*\}|[^\s"'=<>\x60/{}]+))?`
+const illustrationTag = new RegExp(
+  String.raw`^<AsyncImage\b((?:${illustrationAttribute})*)\s*\/?>`,
+)
+const illustrationValue =
+  /([A-Za-z][\w-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|\{\s*(?:"([^"]*)"|'([^']*)'|([^{}]*?))\s*\}|([^\s"'=<>`/{}]+))/g
+const illustrationRatios = new Set(['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16'])
+// Some upstream models emit JSX-style <AsyncImage query="…" aspectRatio="16:9"/> placeholders.
+export function parseIllustration(attributes: string): Illustration {
+  const values = new Map<string, string>()
+  for (const match of attributes.matchAll(illustrationValue))
+    values.set(
+      (match[1] ?? '').toLowerCase(),
+      match[2] ?? match[3] ?? match[4] ?? match[5] ?? match[6] ?? match[7] ?? '',
+    )
+  const prompt = (values.get('query') ?? values.get('prompt') ?? values.get('alt') ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 2000)
+  const ratio = (values.get('aspectratio') ?? '').replace(/\s+/g, '').replace('/', ':')
+  return { prompt, ratio: /^\d{1,2}:\d{1,2}$/.test(ratio) ? ratio : '' }
+}
+function illustrationHTML(
+  escape: (value: string) => string,
+  item: Illustration | null,
+  labels: IllustrationLabels | undefined,
+): string {
+  if (item && !item.prompt) return ''
+  const ratio = item?.ratio ?? ''
+  const label = item ? (labels?.label ?? '') : (labels?.pending ?? '')
+  const caption = label && ratio ? label + ' · ' + ratio : label
+  const icon =
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="3"></rect><circle cx="9" cy="10" r="1.6"></circle><path d="m5 17.5 4.5-4.5 3.5 3.5 2.5-2.5 3.5 3.5"></path></svg>'
+  return (
+    '<span class="chat-illustration' +
+    (item ? '' : ' chat-illustration-pending') +
+    '" role="group"' +
+    (caption ? ' aria-label="' + escape(caption) + '"' : '') +
+    (illustrationRatios.has(ratio) ? ' data-ratio="' + ratio + '"' : '') +
+    '><span class="chat-illustration-frame' +
+    (item ? '' : ' lumi-shimmer') +
+    '" aria-hidden="true">' +
+    icon +
+    '</span><span class="chat-illustration-body">' +
+    (caption ? '<span class="chat-illustration-label">' + escape(caption) + '</span>' : '') +
+    (item ? '<span class="chat-illustration-prompt">' + escape(item.prompt) + '</span>' : '') +
+    '</span>' +
+    (item && labels?.action
+      ? '<button type="button" class="chat-illustration-action" data-illustration-prompt="' +
+        escape(item.prompt) +
+        '" data-illustration-ratio="' +
+        escape(ratio) +
+        '">' +
+        escape(labels.action) +
+        '</button>'
+      : '') +
+    '</span>'
+  )
+}
 let highlighter: Promise<HighlighterCore> | undefined
 let mathLoader: Promise<typeof import('katex')> | undefined
 const supported = new Set([
@@ -120,8 +191,42 @@ export async function renderMarkdown(
   source: string,
   complete: boolean,
   copyLabel: string,
+  illustration?: IllustrationLabels,
 ): Promise<string> {
   const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
+  // Raw HTML stays disabled; only the AsyncImage placeholder becomes a controlled illustration card.
+  md.inline.ruler.before('autolink', 'lumi_illustration', (state, silent) => {
+    if (state.src.charCodeAt(state.pos) !== 0x3c) return false
+    const rest = state.src.slice(state.pos, state.posMax)
+    const match = illustrationTag.exec(rest)
+    if (match) {
+      if (!silent) {
+        const item = parseIllustration(match[1] ?? '')
+        const token = state.push('lumi_illustration', '', 0)
+        token.attrSet('prompt', item.prompt)
+        token.attrSet('ratio', item.ratio)
+      }
+      state.pos += match[0].length
+      return true
+    }
+    // While streaming, an unfinished tag shows a placeholder instead of flashing raw markup.
+    if (complete || !(rest.startsWith(illustrationName) || illustrationName.startsWith(rest)))
+      return false
+    if (!silent) state.push('lumi_illustration_pending', '', 0)
+    state.pos = state.posMax
+    return true
+  })
+  md.renderer.rules.lumi_illustration = (tokens, index) =>
+    illustrationHTML(
+      md.utils.escapeHtml,
+      {
+        prompt: String(tokens[index]?.attrGet('prompt') ?? ''),
+        ratio: String(tokens[index]?.attrGet('ratio') ?? ''),
+      },
+      illustration,
+    )
+  md.renderer.rules.lumi_illustration_pending = () =>
+    illustrationHTML(md.utils.escapeHtml, null, illustration)
   // Capture raw TeX before Markdown interprets its backslashes, braces or underscores.
   md.inline.ruler.before('escape', 'lumi_math', (state, silent) => {
     const start = state.pos
@@ -232,6 +337,12 @@ export async function renderMarkdown(
   return DOMPurify.sanitize(md.renderer.render(blocks, md.options, {}), {
     USE_PROFILES: { html: true, mathMl: true, svg: true },
     FORBID_TAGS: ['img', 'iframe', 'object', 'embed', 'style', 'form', 'input'],
-    ADD_ATTR: ['data-copy-code', 'rel'],
+    ADD_ATTR: [
+      'data-copy-code',
+      'rel',
+      'data-illustration-prompt',
+      'data-illustration-ratio',
+      'data-ratio',
+    ],
   })
 }

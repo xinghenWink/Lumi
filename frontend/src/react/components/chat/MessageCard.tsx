@@ -1,7 +1,10 @@
 import { Check, Copy, Pencil, RefreshCw, Sparkles } from 'lucide-react'
-import { lazy, memo, Suspense, useEffect, useState } from 'react'
+import { lazy, memo, Suspense, useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { Message } from '../../../api/chat'
+import type { Illustration } from '../../../features/chat/markdown'
+import { useRuntime } from '../../app/context'
 import { cn } from '../../lib/utils'
 import { Button } from '../ui/button'
 
@@ -44,6 +47,16 @@ export const MessageCard = memo(function MessageCard({
 }) {
   const { t, i18n } = useTranslation()
   const [copied, setCopied] = useState(false)
+  const runtime = useRuntime(),
+    navigate = useNavigate()
+  // A suggested illustration opens the studio with its prompt; generating stays the user's choice.
+  const illustrate = useCallback(
+    ({ prompt, ratio }: Illustration) => {
+      runtime.image.draft('', { prompt, ratio, size: '' })
+      void navigate('/create')
+    },
+    [runtime, navigate],
+  )
   const user = message.role === 'user'
   const streaming = message.status === 'streaming'
   useEffect(() => {
@@ -156,7 +169,11 @@ export const MessageCard = memo(function MessageCard({
                   <p className="text-message break-words whitespace-pre-wrap">{message.content}</p>
                 }
               >
-                <Markdown content={message.content} complete={!streaming} />
+                <Markdown
+                  content={message.content}
+                  complete={!streaming}
+                  onIllustration={illustrate}
+                />
               </Suspense>
             ) : streaming ? (
               <Typing />

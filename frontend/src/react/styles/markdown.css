@@ -140,3 +140,87 @@
   color: var(--shiki-dark) !important;
   background-color: var(--shiki-dark-bg) !important;
 }
+/* Model-suggested illustration (AsyncImage placeholder): a ratio-shaped frame, its prompt and an optional action. */
+.chat-markdown .chat-illustration {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 12px;
+  margin: 2px 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+}
+.chat-illustration-frame {
+  display: grid;
+  place-items: center;
+  height: 48px;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  background-color: var(--accent);
+  color: var(--primary);
+}
+.chat-illustration[data-ratio='3:2'] .chat-illustration-frame {
+  aspect-ratio: 3 / 2;
+}
+.chat-illustration[data-ratio='2:3'] .chat-illustration-frame {
+  aspect-ratio: 2 / 3;
+}
+.chat-illustration[data-ratio='4:3'] .chat-illustration-frame {
+  aspect-ratio: 4 / 3;
+}
+.chat-illustration[data-ratio='3:4'] .chat-illustration-frame {
+  aspect-ratio: 3 / 4;
+}
+.chat-illustration[data-ratio='16:9'] .chat-illustration-frame {
+  aspect-ratio: 16 / 9;
+}
+.chat-illustration[data-ratio='9:16'] .chat-illustration-frame {
+  aspect-ratio: 9 / 16;
+}
+.chat-illustration-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.chat-illustration-label {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 18px;
+}
+.chat-illustration-prompt {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 13px;
+  line-height: 20px;
+}
+.chat-illustration-action {
+  grid-column: 2;
+  justify-self: start;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 12px;
+  font-weight: 560;
+  transition: opacity 150ms;
+}
+.chat-illustration-action:hover {
+  opacity: 0.9;
+}
+.chat-illustration-action:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+@media (min-width: 640px) {
+  .chat-markdown .chat-illustration:has(.chat-illustration-action) {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .chat-illustration-action {
+    grid-column: auto;
+  }
+}
