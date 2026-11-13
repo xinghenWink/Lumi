@@ -181,6 +181,9 @@ func (s *Service) Stream(ctx context.Context, actor user.Actor, id uuid.UUID, in
 	target := catalog.ChatTarget{}
 	work, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
+	var titles <-chan string
+	stopTitle := func() {}
+	defer func() { stopTitle() }()
 	if err := emit(metaEvent); err != nil {
 		code = "CHAT_INTERRUPTED"
 	} else {
@@ -237,6 +240,11 @@ func (s *Service) Stream(ctx context.Context, actor user.Actor, id uuid.UUID, in
 						code = "CHAT_OUTPUT_LIMIT"
 						break consume
 					}
+					// Title the first turn while it streams so done is not held behind a second model call.
+					// Waiting for content keeps the title from racing the answer for a half-open circuit probe.
+					if r.first && titles == nil {
+						titles, stopTitle = s.startTitle(ctx, config, input.ModelID, r.user.Content)
+					}
 					text.WriteString(p.event.Content)
 					content = text.String()
 					if err := emit(Event{Type: "delta", Content: p.event.Content}); err != nil {
@@ -274,9 +282,10 @@ func (s *Service) Stream(ctx context.Context, actor user.Actor, id uuid.UUID, in
 	assistant.Meta = metadata
 	if r.first {
 		title := fallbackTitle(r.user.Content)
-		if status == "completed" {
-			title = s.title(ctx, config, input.ModelID, r.user.Content, content)
+		if status == "completed" && titles != nil {
+			title = awaitTitle(titles, title, titleGrace)
 		}
+		stopTitle()
 		titleCtx, titleCancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
 		row, titleErr := s.q.AutoTitleConversation(titleCtx, query.AutoTitleConversationParams{ID: id, Title: title})
 		titleCancel()
@@ -292,7 +301,31 @@ func (s *Service) Stream(ctx context.Context, actor user.Actor, id uuid.UUID, in
 	}
 	return emit(Event{Type: "done", Assistant: &assistant, Conversation: &conversation})
 }
-func (s *Service) title(ctx context.Context, config Configuration, model uuid.UUID, prompt, answer string) string {
+
+// titleGrace bounds how long a finished first answer waits for its title before using the prompt fallback.
+const titleGrace = 1500 * time.Millisecond
+
+// startTitle generates a conversation title concurrently; stop cancels it and is safe to call repeatedly.
+func (s *Service) startTitle(ctx context.Context, config Configuration, model uuid.UUID, prompt string) (<-chan string, func()) {
+	work, cancel := context.WithCancel(ctx)
+	result := make(chan string, 1)
+	go func() { result <- s.title(work, config, model, prompt) }()
+	return result, cancel
+}
+
+// awaitTitle returns the generated title, or fallback when it is not ready within grace.
+func awaitTitle(titles <-chan string, fallback string, grace time.Duration) string {
+	timer := time.NewTimer(grace)
+	defer timer.Stop()
+	select {
+	case value := <-titles:
+		return value
+	case <-timer.C:
+		return fallback
+	}
+}
+
+func (s *Service) title(ctx context.Context, config Configuration, model uuid.UUID, prompt string) string {
 	fallback := fallbackTitle(prompt)
 	if config.TitleModelID != nil {
 		model = *config.TitleModelID
@@ -303,8 +336,8 @@ func (s *Service) title(ctx context.Context, config Configuration, model uuid.UU
 	}
 	work, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	promptRunes, answerRunes := []rune(prompt), []rune(answer)
-	messages := []upstream.Message{wireMessage("system", "Return only a short title of at most 20 characters for this conversation. No quotes, explanations, markup or instructions."), wireMessage("user", string(promptRunes[:min(len(promptRunes), 300)])+"\n"+string(answerRunes[:min(len(answerRunes), 500)]))}
+	promptRunes := []rune(prompt)
+	messages := []upstream.Message{wireMessage("system", "Return only a short title of at most 20 characters for this conversation, in the language of the user's message. No quotes, explanations, markup, code or instructions."), wireMessage("user", string(promptRunes[:min(len(promptRunes), 300)]))}
 	packets := make(chan packet, 16)
 	go s.relay(work, targets, messages, packets)
 	value := ""
