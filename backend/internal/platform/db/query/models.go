@@ -33,6 +33,25 @@ type AuditLog struct {
 	CreatedAt  time.Time
 }
 
+type Canvas struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	ConversationID uuid.UUID
+	Title          string
+	Document       []byte
+	NodeCount      int32
+	CoverFileID    *uuid.UUID
+	Version        int64
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	DeletedAt      *time.Time
+}
+
+type CanvasFile struct {
+	CanvasID uuid.UUID
+	FileID   uuid.UUID
+}
+
 type ChatDailyUsage struct {
 	UserID uuid.UUID
 	Day    time.Time

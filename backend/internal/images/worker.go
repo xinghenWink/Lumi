@@ -48,7 +48,7 @@ func (s *Service) Claim(ctx context.Context, id uuid.UUID) (query.ImageTask, boo
 			result = current
 			return nil
 		}
-		if _, err := q.GetImageConversation(ctx, query.GetImageConversationParams{ID: current.ConversationID, UserID: current.UserID}); errors.Is(err, pgx.ErrNoRows) {
+		if _, err := q.GetTaskConversation(ctx, query.GetTaskConversationParams{ID: current.ConversationID, UserID: current.UserID}); errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		} else if err != nil {
 			return fmt.Errorf("check queued conversation: %w", err)
@@ -244,7 +244,7 @@ func (s *Service) Execute(ctx context.Context, task query.ImageTask) {
 					cancel()
 					return
 				}
-				conv, err := s.q.GetImageConversation(work, query.GetImageConversationParams{ID: task.ConversationID, UserID: task.UserID})
+				conv, err := s.q.GetTaskConversation(work, query.GetTaskConversationParams{ID: task.ConversationID, UserID: task.UserID})
 				if err != nil || conv.DeletedAt != nil {
 					cancel()
 					return
@@ -379,7 +379,7 @@ func (s *Service) Recover(ctx context.Context) error {
 			if ownerErr != nil && !errors.Is(ownerErr, pgx.ErrNoRows) {
 				return fmt.Errorf("check recovered owner: %w", ownerErr)
 			}
-			_, convErr := q.GetImageConversation(ctx, query.GetImageConversationParams{ID: current.ConversationID, UserID: current.UserID})
+			_, convErr := q.GetTaskConversation(ctx, query.GetTaskConversationParams{ID: current.ConversationID, UserID: current.UserID})
 			if convErr != nil && !errors.Is(convErr, pgx.ErrNoRows) {
 				return fmt.Errorf("check recovered conversation: %w", convErr)
 			}

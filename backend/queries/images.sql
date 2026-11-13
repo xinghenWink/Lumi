@@ -38,7 +38,8 @@ UPDATE users SET avatar_file_id=$2,updated_at=now() WHERE id=$1 AND deleted_at I
 UPDATE files f SET deleted_at=now() WHERE f.deleted_at IS NULL
 AND (NOT EXISTS(SELECT 1 FROM users u WHERE u.id=f.user_id)
  OR (f.kind='generated' AND sqlc.arg(retention_days)::integer>0 AND f.created_at<now()-make_interval(days=>sqlc.arg(retention_days)::integer))
- OR (f.kind='upload' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE f.id=ANY(t.reference_file_ids)))
+ OR (f.kind='upload' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE f.id=ANY(t.reference_file_ids))
+  AND NOT EXISTS(SELECT 1 FROM canvas_files cf JOIN canvases c ON c.id=cf.canvas_id WHERE cf.file_id=f.id AND c.deleted_at IS NULL))
  OR (f.kind='avatar' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM users u WHERE u.avatar_file_id=f.id)))
 AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE t.status IN ('queued','running') AND f.id=ANY(t.reference_file_ids));
 -- name: RedactPurgedImageOwners :exec
@@ -49,6 +50,11 @@ INSERT INTO conversations(id,user_id,type,model_id) VALUES($1,$2,'image',$3) ON 
 SELECT * FROM conversations WHERE id=$1 AND user_id=$2 AND type='image' AND deleted_at IS NULL;
 -- name: LockImageConversation :one
 SELECT * FROM conversations WHERE id=$1 AND user_id=$2 AND type='image' AND deleted_at IS NULL FOR UPDATE;
+-- name: GetTaskConversation :one
+-- Image tasks belong to an image conversation or to the hidden conversation of a canvas.
+SELECT * FROM conversations WHERE id=$1 AND user_id=$2 AND type IN ('image','canvas') AND deleted_at IS NULL;
+-- name: LockTaskConversation :one
+SELECT * FROM conversations WHERE id=$1 AND user_id=$2 AND type IN ('image','canvas') AND deleted_at IS NULL FOR UPDATE;
 -- name: ListImageConversations :many
 SELECT * FROM conversations WHERE user_id=$1 AND type='image' AND deleted_at IS NULL AND title ILIKE sqlc.arg(search)::text ESCAPE '\'
 AND (sqlc.narg(before_time)::timestamptz IS NULL OR (pinned,last_message_at,id)<(sqlc.arg(before_pinned)::boolean,sqlc.narg(before_time)::timestamptz,sqlc.narg(before_id)::uuid))
@@ -56,7 +62,7 @@ ORDER BY pinned DESC,last_message_at DESC,id DESC LIMIT sqlc.arg(page_limit);
 -- name: UpdateImageConversation :one
 UPDATE conversations SET title=$3,pinned=$4,title_auto=false,version=version+1 WHERE id=$1 AND user_id=$2 AND type='image' AND deleted_at IS NULL AND version=$5 RETURNING *;
 -- name: TouchImageConversation :exec
-UPDATE conversations SET last_message_at=now(),model_id=$3,title=CASE WHEN title_auto THEN $4 ELSE title END,title_auto=false,version=version+1 WHERE id=$1 AND user_id=$2 AND type='image';
+UPDATE conversations SET last_message_at=now(),model_id=$3,title=CASE WHEN title_auto THEN $4 ELSE title END,title_auto=false,version=version+1 WHERE id=$1 AND user_id=$2 AND type IN ('image','canvas');
 -- name: RemoveImageConversation :execrows
 UPDATE conversations SET deleted_at=now(),version=version+1 WHERE id=$1 AND user_id=$2 AND type='image' AND deleted_at IS NULL;
 -- name: ImageTaskByKey :one

@@ -132,7 +132,7 @@ func (s *Service) Submit(ctx context.Context, actor user.Actor, key string, inpu
 		if err := validateInput(input, cfg, model); err != nil {
 			return err
 		}
-		if _, err := q.LockImageConversation(ctx, query.LockImageConversationParams{ID: input.ConversationID, UserID: actor.ID}); err != nil {
+		if _, err := q.LockTaskConversation(ctx, query.LockTaskConversationParams{ID: input.ConversationID, UserID: actor.ID}); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return problem.New("IMAGE_CONVERSATION_NOT_FOUND", 404)
 			}
@@ -364,7 +364,7 @@ func (s *Service) List(ctx context.Context, actor user.Actor, f Filter, admin bo
 		}
 	}
 	if f.Conversation != nil && !admin {
-		if _, err := s.q.GetImageConversation(ctx, query.GetImageConversationParams{ID: *f.Conversation, UserID: actor.ID}); err != nil {
+		if _, err := s.q.GetTaskConversation(ctx, query.GetTaskConversationParams{ID: *f.Conversation, UserID: actor.ID}); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return result, problem.New("IMAGE_CONVERSATION_NOT_FOUND", 404)
 			}

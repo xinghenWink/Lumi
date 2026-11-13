@@ -211,7 +211,8 @@ const expireImageFiles = `-- name: ExpireImageFiles :execrows
 UPDATE files f SET deleted_at=now() WHERE f.deleted_at IS NULL
 AND (NOT EXISTS(SELECT 1 FROM users u WHERE u.id=f.user_id)
  OR (f.kind='generated' AND $1::integer>0 AND f.created_at<now()-make_interval(days=>$1::integer))
- OR (f.kind='upload' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE f.id=ANY(t.reference_file_ids)))
+ OR (f.kind='upload' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE f.id=ANY(t.reference_file_ids))
+  AND NOT EXISTS(SELECT 1 FROM canvas_files cf JOIN canvases c ON c.id=cf.canvas_id WHERE cf.file_id=f.id AND c.deleted_at IS NULL))
  OR (f.kind='avatar' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM users u WHERE u.avatar_file_id=f.id)))
 AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE t.status IN ('queued','running') AND f.id=ANY(t.reference_file_ids))
 `
@@ -552,6 +553,38 @@ func (q *Queries) GetImageTask(ctx context.Context, id uuid.UUID) (ImageTask, er
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
+const getTaskConversation = `-- name: GetTaskConversation :one
+SELECT id, user_id, type, title, model_id, pinned, title_auto, last_message_at, deleted_at, active_run_id, lease_until, cancel_requested, created_at, version FROM conversations WHERE id=$1 AND user_id=$2 AND type IN ('image','canvas') AND deleted_at IS NULL
+`
+
+type GetTaskConversationParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+// Image tasks belong to an image conversation or to the hidden conversation of a canvas.
+func (q *Queries) GetTaskConversation(ctx context.Context, arg GetTaskConversationParams) (Conversation, error) {
+	row := q.db.QueryRow(ctx, getTaskConversation, arg.ID, arg.UserID)
+	var i Conversation
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Type,
+		&i.Title,
+		&i.ModelID,
+		&i.Pinned,
+		&i.TitleAuto,
+		&i.LastMessageAt,
+		&i.DeletedAt,
+		&i.ActiveRunID,
+		&i.LeaseUntil,
+		&i.CancelRequested,
+		&i.CreatedAt,
 		&i.Version,
 	)
 	return i, err
@@ -1356,6 +1389,37 @@ func (q *Queries) LockImageTask(ctx context.Context, id uuid.UUID) (ImageTask, e
 	return i, err
 }
 
+const lockTaskConversation = `-- name: LockTaskConversation :one
+SELECT id, user_id, type, title, model_id, pinned, title_auto, last_message_at, deleted_at, active_run_id, lease_until, cancel_requested, created_at, version FROM conversations WHERE id=$1 AND user_id=$2 AND type IN ('image','canvas') AND deleted_at IS NULL FOR UPDATE
+`
+
+type LockTaskConversationParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) LockTaskConversation(ctx context.Context, arg LockTaskConversationParams) (Conversation, error) {
+	row := q.db.QueryRow(ctx, lockTaskConversation, arg.ID, arg.UserID)
+	var i Conversation
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Type,
+		&i.Title,
+		&i.ModelID,
+		&i.Pinned,
+		&i.TitleAuto,
+		&i.LastMessageAt,
+		&i.DeletedAt,
+		&i.ActiveRunID,
+		&i.LeaseUntil,
+		&i.CancelRequested,
+		&i.CreatedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
 const markImageFilePurged = `-- name: MarkImageFilePurged :exec
 UPDATE files SET purged_at=now() WHERE id=$1 AND deleted_at IS NOT NULL
 `
@@ -1579,7 +1643,7 @@ func (q *Queries) StartImageTask(ctx context.Context, arg StartImageTaskParams) 
 }
 
 const touchImageConversation = `-- name: TouchImageConversation :exec
-UPDATE conversations SET last_message_at=now(),model_id=$3,title=CASE WHEN title_auto THEN $4 ELSE title END,title_auto=false,version=version+1 WHERE id=$1 AND user_id=$2 AND type='image'
+UPDATE conversations SET last_message_at=now(),model_id=$3,title=CASE WHEN title_auto THEN $4 ELSE title END,title_auto=false,version=version+1 WHERE id=$1 AND user_id=$2 AND type IN ('image','canvas')
 `
 
 type TouchImageConversationParams struct {
