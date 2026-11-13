@@ -96,7 +96,7 @@ flowchart TD
 
 Since ADR-128 the visual language is the warm minimal system in [REACT_UI_REDESIGN.md](REACT_UI_REDESIGN.md): warm off-white and charcoal surfaces, one clay accent, system fonts, a 264px desktop sidebar, a 56px header and a 768px conversation column. Implement both light and dark tokens, system preference, reduced motion and visible keyboard focus. No remote fonts are necessary.
 
-Both creation modes remain conversations. History switches with the mode; drafts and last-opened conversations are independent. Composer toolbars contain mode and model selection. Image quality, ratio, size and count are always visible in the studio panel at 1024px and wider, and open in a bottom-sheet dialog on smaller screens; both show a real server quote. There is no canvas editor or frontend settlement calculation.
+Both creation modes remain conversations. History switches with the mode; drafts and last-opened conversations are independent. Composer toolbars contain mode and model selection. Image quality, ratio, size and count are always visible in the studio panel at 1024px and wider, and open in a bottom-sheet dialog on smaller screens; both show a real server quote. There is no frontend settlement calculation. The original refactor shipped no canvas editor; ADR-131 later added the infinite canvas as separate lazily loaded routes that reuse the image task pipeline and server quotes (see [M8_PLAN.md](M8_PLAN.md)).
 
 The sidebar account popover is anchored, collision-aware and no wider than the available sidebar/viewport. Mobile navigation uses a focus-managed drawer, closes on navigation and supports Escape. The final 320px and 390px layouts must be remeasured; the supplied mobile concept image has visible cropping and is not acceptance evidence.
 
