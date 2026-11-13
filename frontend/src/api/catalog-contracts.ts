@@ -66,7 +66,7 @@ export function parseCapabilities(value: unknown): Capabilities {
     sizes: list(data, 'sizes', parseText),
     max_n: integer(data, 'max_n', 0, 10),
     supports_edit: bool(data, 'supports_edit'),
-    max_reference_images: integer(data, 'max_reference_images', 0, 4),
+    max_reference_images: integer(data, 'max_reference_images', 0, 2147483647),
     response_format: choice(data, 'response_format', ['', 'b64_json', 'url'] as const),
   }
 }

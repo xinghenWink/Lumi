@@ -6940,7 +6940,6 @@ components:
         max_reference_images:
           type: integer
           minimum: 0
-          maximum: 4
         response_format:
           type: string
           enum:
@@ -7672,7 +7671,6 @@ components:
           type: integer
           format: int64
           minimum: 0
-          maximum: 4
         max_upload_bytes:
           type: integer
           format: int64
@@ -7767,7 +7765,6 @@ components:
           items:
             type: string
             format: uuid
-          maxItems: 4
       required:
         - conversation_id
         - model_id

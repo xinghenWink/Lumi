@@ -41,7 +41,7 @@ func validCapabilities(kind string, c Capabilities) bool {
 	if kind == "chat" {
 		return c.MaxContextTokens >= 1 && c.MaxContextTokens <= 1000000
 	}
-	if kind != "image" || len(c.Qualities) < 1 || len(c.Qualities) > 3 || len(c.Sizes) < 1 || len(c.Sizes) > 20 || c.MaxN < 1 || c.MaxN > 10 || c.MaxReferenceImages < 0 || c.MaxReferenceImages > 4 || (c.SupportsEdit && c.MaxReferenceImages == 0) || (c.ResponseFormat != "b64_json" && c.ResponseFormat != "url") {
+	if kind != "image" || len(c.Qualities) < 1 || len(c.Qualities) > 3 || len(c.Sizes) < 1 || len(c.Sizes) > 20 || c.MaxN < 1 || c.MaxN > 10 || c.MaxReferenceImages < 0 || (c.SupportsEdit && c.MaxReferenceImages == 0) || (c.ResponseFormat != "b64_json" && c.ResponseFormat != "url") {
 		return false
 	}
 	seen := map[string]bool{}

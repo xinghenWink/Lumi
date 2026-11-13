@@ -331,7 +331,7 @@ func (c *Client) FetchImage(ctx context.Context, raw string) (data []byte, resul
 	return data, nil
 }
 func (c *Client) EditImages(ctx context.Context, input EditRequest) (results []ImageResult, result error) {
-	if !validImage(input.ImageRequest) || len(input.References) < 1 || len(input.References) > 4 {
+	if !validImage(input.ImageRequest) || len(input.References) < 1 {
 		return nil, &Failure{Code: "UPSTREAM_REQUEST_INVALID"}
 	}
 	for _, reference := range input.References {

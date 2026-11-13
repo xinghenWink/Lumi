@@ -9,7 +9,7 @@ import { useOwnedMutation } from '../../features/accounts/owned-mutation'
 import { parseRatioMapping } from '../../features/admin/options'
 import { invalidateCatalog } from '../../features/admin/catalog'
 import { AdminPage } from '../../components/admin/AdminPage'
-import { CheckField, NumberField } from '../../components/admin/AdminFields'
+import { CheckField, NumberField, unboundedCount } from '../../components/admin/AdminFields'
 import { Panel } from '../../components/shared/Panel'
 import { PageStatus } from '../../components/shared/PageStatus'
 import { ApiNotice } from '../../components/shared/ApiNotice'
@@ -18,7 +18,7 @@ import { Button } from '../../components/ui/button'
 
 const fields = [
   ['max_n', 1, 4],
-  ['max_references', 0, 4],
+  ['max_references', 0, unboundedCount],
   ['max_upload_bytes', 1024, 10485760],
   ['per_user_concurrency', 1, 20],
   ['global_concurrency', 1, 20],

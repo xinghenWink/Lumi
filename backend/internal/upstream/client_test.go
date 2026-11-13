@@ -53,7 +53,12 @@ func TestAdapterModelsStreamsAndImages(t *testing.T) {
 	for _, format := range []string{"multipart", "json"} {
 		t.Run(format, func(t *testing.T) {
 			client := adapter(t, mock.Configuration{APIKey: "fixture-key"}, format, time.Second)
-			results, err := client.EditImages(t.Context(), upstream.EditRequest{ImageRequest: input, References: []upstream.Reference{{MIME: "image/png", Data: []byte("reference")}}})
+			// Administrators may allow more than four references; the adapter forwards them all.
+			references := make([]upstream.Reference, 6)
+			for i := range references {
+				references[i] = upstream.Reference{MIME: "image/png", Data: []byte("reference")}
+			}
+			results, err := client.EditImages(t.Context(), upstream.EditRequest{ImageRequest: input, References: references})
 			if err != nil || len(results) != 2 {
 				t.Fatalf("edit results=%v error=%v", results, err)
 			}

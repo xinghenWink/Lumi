@@ -51,7 +51,7 @@ func validSize(size string) bool {
 	return true
 }
 func validateConfiguration(c Configuration) error {
-	if c.MaxN < 1 || c.MaxN > 4 || c.MaxReferences < 0 || c.MaxReferences > 4 || c.MaxUploadBytes < 1024 || c.MaxUploadBytes > 10<<20 || c.PerUserConcurrency < 1 || c.PerUserConcurrency > 20 || c.GlobalConcurrency < 1 || c.GlobalConcurrency > 20 || c.TimeoutSeconds < 5 || c.TimeoutSeconds > 600 || c.QueueTimeoutSeconds < 60 || c.QueueTimeoutSeconds > 86400 || c.RetentionDays < 0 || c.RetentionDays > 3650 || len(c.Sizes) < 1 || len(c.Sizes) > 20 || len(c.RatioSizes) > 7 || c.RatioSizes == nil {
+	if c.MaxN < 1 || c.MaxN > 4 || c.MaxReferences < 0 || c.MaxUploadBytes < 1024 || c.MaxUploadBytes > 10<<20 || c.PerUserConcurrency < 1 || c.PerUserConcurrency > 20 || c.GlobalConcurrency < 1 || c.GlobalConcurrency > 20 || c.TimeoutSeconds < 5 || c.TimeoutSeconds > 600 || c.QueueTimeoutSeconds < 60 || c.QueueTimeoutSeconds > 86400 || c.RetentionDays < 0 || c.RetentionDays > 3650 || len(c.Sizes) < 1 || len(c.Sizes) > 20 || len(c.RatioSizes) > 7 || c.RatioSizes == nil {
 		return problem.Invalid()
 	}
 	seen := map[string]bool{}
