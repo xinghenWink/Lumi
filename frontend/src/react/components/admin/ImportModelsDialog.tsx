@@ -30,10 +30,11 @@ function ImportForm({
   const { user } = useSession(),
     { t } = useTranslation()
   const [candidates, setCandidates] = useState(() =>
-    discovery.models.map((row, index) => ({
+    // The display name starts as the upstream model ID and stays editable after selection.
+    discovery.models.map((row) => ({
       id: row.id,
       selected: false,
-      name: t('catalog.defaultAlias', { index: index + 1 }),
+      name: row.id.slice(0, 80),
       type: 'chat' as ModelKind,
     })),
   )

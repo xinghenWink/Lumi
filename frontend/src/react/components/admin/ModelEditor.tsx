@@ -19,7 +19,8 @@ import { Field, selectClass, textareaClass } from '../ui/field'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { ApiNotice } from '../shared/ApiNotice'
-import { CheckField, NumberField } from './AdminFields'
+import { CheckField, NumberField, unboundedCount } from './AdminFields'
+import { SizePicker } from './SizePicker'
 
 export function ModelEditor({
   model,
@@ -49,7 +50,6 @@ export function ModelEditor({
           routes: [],
         },
   )
-  const [sizes, setSizes] = useState(form.capabilities.sizes.join('\n'))
   const channels = useInfiniteQuery({
     queryKey: ['user', user?.id, 'admin-upstreams', 'choices'],
     enabled: !!user,
@@ -83,13 +83,7 @@ export function ModelEditor({
         display_name: form.display_name.trim(),
         capabilities: {
           ...form.capabilities,
-          sizes:
-            form.type === 'image'
-              ? sizes
-                  .split(/[\n,]+/)
-                  .map((value) => value.trim())
-                  .filter(Boolean)
-              : [],
+          sizes: form.type === 'image' ? form.capabilities.sizes : [],
         },
         routes: form.routes.map((route) => ({
           ...route,
@@ -140,7 +134,6 @@ export function ModelEditor({
                   const type = event.target.value === 'image' ? 'image' : 'chat',
                     capabilities = defaultCapabilities(type)
                   setForm({ ...form, type, capabilities })
-                  setSizes(capabilities.sizes.join('\n'))
                 }}
               >
                 <option value="chat">{t('catalog.chat')}</option>
@@ -236,16 +229,10 @@ export function ModelEditor({
                     ))}
                   </div>
                 </fieldset>
-                <Field id={id + '-sizes'} label={t('catalog.sizes')} hint={t('catalog.sizesHint')}>
-                  <textarea
-                    id={id + '-sizes'}
-                    className={textareaClass}
-                    rows={3}
-                    required
-                    value={sizes}
-                    onChange={(event) => setSizes(event.target.value)}
-                  />
-                </Field>
+                <SizePicker
+                  value={form.capabilities.sizes}
+                  onChange={(sizes) => changeCaps({ sizes })}
+                />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <NumberField
                     label={t('catalog.maxN')}
@@ -279,7 +266,7 @@ export function ModelEditor({
                   label={t('catalog.maxReferences')}
                   value={form.capabilities.max_reference_images}
                   min={form.capabilities.supports_edit ? 1 : 0}
-                  max={4}
+                  max={unboundedCount}
                   onChange={(max_reference_images) => changeCaps({ max_reference_images })}
                 />
               </>
