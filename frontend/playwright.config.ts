@@ -15,6 +15,7 @@ export default defineConfig({
     '**/embed/**',
     '**/react/account-settings.spec.ts',
     '**/react/accounts-credits.spec.ts',
+    '**/react/canvas.spec.ts',
     '**/react/admin-finance.spec.ts',
     '**/react/catalog.spec.ts',
     '**/react/chat.spec.ts',
