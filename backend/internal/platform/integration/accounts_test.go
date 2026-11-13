@@ -26,6 +26,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"
+	"github.com/xinghenWink/Lumi/backend/internal/canvas"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
 	"github.com/xinghenWink/Lumi/backend/internal/chat"
 	"github.com/xinghenWink/Lumi/backend/internal/credits"
@@ -170,6 +171,7 @@ func newAccountFixture(t *testing.T) *fixture {
 		}
 	})
 	services.Images = images.New(pool, billing, services.Catalog, services.Files, cache, nil)
+	services.Canvas = canvas.New(pool, services.Files)
 	services.Chat.SetFiles(services.Files)
 	engine, err := router.New(slog.New(slog.NewJSONHandler(io.Discard, nil)), handler.Health{Postgres: pool.Ping, Redis: cache.Ping}, handler.Version{}, fstest.MapFS{}, account.Routes(services, account.Security{Origins: []string{"https://lumi.test"}, CookieSecure: true}, slog.New(slog.NewJSONHandler(io.Discard, nil))))
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"
+	"github.com/xinghenWink/Lumi/backend/internal/canvas"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
 	"github.com/xinghenWink/Lumi/backend/internal/chat"
 	"github.com/xinghenWink/Lumi/backend/internal/config"
@@ -64,5 +65,5 @@ func configureAccounts(ctx context.Context, cfg config.Config, pool, interactive
 	if err := models.Bootstrap(ctx, cfg.UpstreamBaseURL, cfg.UpstreamAPIKey); err != nil {
 		return nil, fmt.Errorf("bootstrap upstream: %w", err)
 	}
-	return &account.Services{Operations: operations.New(pool), Mailer: sender, PublicBaseURL: cfg.PublicBaseURL, Version: version, Commit: commit, BuildTime: buildTime, Auth: auth.New(interactive, passwords, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: models, Chat: conversations, Files: files, Images: images.New(pool, billing, models, files, cache, logger)}, nil
+	return &account.Services{Operations: operations.New(pool), Mailer: sender, PublicBaseURL: cfg.PublicBaseURL, Version: version, Commit: commit, BuildTime: buildTime, Auth: auth.New(interactive, passwords, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: models, Chat: conversations, Files: files, Images: images.New(pool, billing, models, files, cache, logger), Canvas: canvas.New(pool, files)}, nil
 }

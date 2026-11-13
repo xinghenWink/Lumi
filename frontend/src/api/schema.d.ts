@@ -1519,6 +1519,58 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/canvases': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * listCanvases
+     * @description Owner-scoped canvases, most recently updated first. Each item carries a signed cover thumbnail when its first placed image is still available.
+     */
+    get: operations['listCanvases']
+    put?: never
+    /**
+     * createCanvas
+     * @description Creates an empty canvas with a client-generated ID and its hidden canvas conversation. Replaying the same ID returns the existing canvas; at most 200 canvases per user (CANVAS_LIMIT).
+     */
+    post: operations['createCanvas']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/canvases/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * getCanvas
+     * @description Returns the document plus signed metadata for every referenced file that still exists. Files missing from `files` were deleted or expired.
+     */
+    get: operations['getCanvas']
+    /**
+     * saveCanvas
+     * @description Replaces the whole document when `version` matches (otherwise 409 CANVAS_CONFLICT). The request body may be up to 1.5 MiB and the stored document up to 1 MiB. Referenced files must belong to the caller and referenced tasks must belong to this canvas conversation.
+     */
+    put: operations['saveCanvas']
+    post?: never
+    /**
+     * deleteCanvas
+     * @description Hides the canvas and its conversation; queued or running tasks of that conversation are canceled and refunded by the image worker. Generated images stay in the gallery.
+     */
+    delete: operations['deleteCanvas']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/metrics': {
     parameters: {
       query?: never
@@ -2504,7 +2556,10 @@ export interface components {
       version: number
     }
     ImageTaskInput: {
-      /** Format: uuid */
+      /**
+       * Format: uuid
+       * @description An image conversation ID or the conversation_id of an owned canvas.
+       */
       conversation_id: string
       /** Format: uuid */
       model_id: string
@@ -2610,6 +2665,118 @@ export interface components {
     }
     ImageTaskEvent: {
       task?: components['schemas']['ImageTask']
+    }
+    CanvasViewport: {
+      x: number
+      y: number
+      zoom: number
+    }
+    /** @description A placed file (ready), one slot of a running task (pending) or a slot whose generation failed. */
+    CanvasImageContent: {
+      /** @enum {string} */
+      state: 'ready' | 'pending' | 'failed'
+      /** Format: uuid */
+      file_id: string | null
+      /** Format: uuid */
+      task_id: string | null
+      position: number | null
+      error_code: string
+    }
+    CanvasTextContent: {
+      content: string
+    }
+    /** @description Last chosen generation parameters; empty strings and a null model fall back to the current defaults. */
+    CanvasGeneratorContent: {
+      prompt: string
+      /** Format: uuid */
+      model_id: string | null
+      /** @enum {string} */
+      quality: '' | 'low' | 'medium' | 'high'
+      size: string
+      ratio: string
+      n: number
+    }
+    /** @description Exactly the content object matching `kind` is present; group nodes carry none. Nodes paint in array order with group frames beneath. */
+    CanvasNode: {
+      /** Format: uuid */
+      id: string
+      /** @enum {string} */
+      kind: 'image' | 'text' | 'generator' | 'group'
+      x: number
+      y: number
+      w: number
+      h: number
+      title: string
+      /** Format: uuid */
+      group_id: string | null
+      image?: components['schemas']['CanvasImageContent']
+      text?: components['schemas']['CanvasTextContent']
+      generator?: components['schemas']['CanvasGeneratorContent']
+    }
+    /** @description Inputs flow from image, text or group nodes into a generator; a generator points at the images it produced. */
+    CanvasEdge: {
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      from: string
+      /** Format: uuid */
+      to: string
+    }
+    CanvasDocument: {
+      /** @constant */
+      schema: 1
+      viewport: components['schemas']['CanvasViewport']
+      nodes: components['schemas']['CanvasNode'][]
+      edges: components['schemas']['CanvasEdge'][]
+    }
+    Canvas: {
+      /** Format: uuid */
+      id: string
+      title: string
+      /**
+       * Format: uuid
+       * @description Hidden canvas conversation used as ImageTaskInput.conversation_id.
+       */
+      conversation_id: string
+      document: components['schemas']['CanvasDocument']
+      files: components['schemas']['ImageFile'][]
+      /** Format: int64 */
+      node_count: number
+      /** Format: int64 */
+      version: number
+      /** Format: date-time */
+      created_at: string
+      /** Format: date-time */
+      updated_at: string
+    }
+    CanvasSummary: {
+      /** Format: uuid */
+      id: string
+      title: string
+      /** Format: int64 */
+      node_count: number
+      cover: components['schemas']['ImageFile'] | null
+      /** Format: int64 */
+      version: number
+      /** Format: date-time */
+      created_at: string
+      /** Format: date-time */
+      updated_at: string
+    }
+    CanvasPage: {
+      items: components['schemas']['CanvasSummary'][]
+      next_cursor: string
+    }
+    CanvasCreateInput: {
+      /** Format: uuid */
+      id: string
+      title?: string
+    }
+    CanvasSaveInput: {
+      title: string
+      document: components['schemas']['CanvasDocument']
+      /** Format: int64 */
+      version: number
     }
   }
   responses: {
@@ -7390,6 +7557,136 @@ export interface operations {
           'application/json': components['schemas']['Error']
         }
       }
+    }
+  }
+  listCanvases: {
+    parameters: {
+      query?: {
+        cursor?: string
+        limit?: number
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CanvasPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  createCanvas: {
+    parameters: {
+      query?: never
+      header: {
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CanvasCreateInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Canvas']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getCanvas: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Canvas']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  saveCanvas: {
+    parameters: {
+      query?: never
+      header: {
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CanvasSaveInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Canvas']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  deleteCanvas: {
+    parameters: {
+      query?: never
+      header: {
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      default: components['responses']['APIError']
     }
   }
   m6_get__metrics: {

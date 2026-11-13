@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"
+	"github.com/xinghenWink/Lumi/backend/internal/canvas"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
 	"github.com/xinghenWink/Lumi/backend/internal/chat"
 	"github.com/xinghenWink/Lumi/backend/internal/credits"
@@ -50,6 +51,7 @@ type Services struct {
 	Chat          *chat.Service
 	Images        *images.Service
 	Files         *media.Store
+	Canvas        *canvas.Service
 }
 type Security struct {
 	Origins        []string
@@ -102,6 +104,7 @@ func Routes(services *Services, security Security, logger *slog.Logger) func(*gi
 		h.chatRoutes(protected, admin)
 		h.imageRoutes(protected, admin)
 		h.m6Routes(protected, admin)
+		h.canvasRoutes(protected)
 		engine.GET("/metrics", h.available, h.authenticate, h.adminOnly, h.metrics)
 		return nil
 	}
@@ -530,10 +533,15 @@ func (h *Handler) fail(c *gin.Context, err error) {
 }
 
 func decode(c *gin.Context, target any) error {
+	return decodeLimit(c, target, 64*1024)
+}
+
+// decodeLimit reads one strict JSON value; only canvas documents use a larger limit.
+func decodeLimit(c *gin.Context, target any, limit int64) error {
 	if contentType := strings.Split(c.GetHeader("Content-Type"), ";")[0]; strings.TrimSpace(contentType) != "application/json" {
 		return problem.Invalid()
 	}
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64*1024)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
 	decoder := json.NewDecoder(c.Request.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
