@@ -28,8 +28,7 @@ export function resolveImageOptions(
   const ratioSize = draft.size ? undefined : ratios.find(([ratio]) => ratio === draft.ratio)?.[1]
   const size = sizes.includes(draft.size)
     ? draft.size
-    : (ratioSize ??
-      (savedSize && sizes.includes(savedSize) ? savedSize : (sizes[0] ?? '')))
+    : (ratioSize ?? (savedSize && sizes.includes(savedSize) ? savedSize : (sizes[0] ?? '')))
   const quality = qualities.includes(draft.quality as ImageInput['quality'])
     ? draft.quality
     : (qualities.find((quality) => quality === preferences?.image_quality) ?? qualities[0] ?? '')
@@ -42,9 +41,15 @@ export function resolveImageOptions(
   const n = maxN > 0 ? Math.max(1, Math.min(draft.n || preferences?.image_count || 1, maxN)) : 0
   return { sizes, ratios, qualities, maxN, maxReferences, size, quality, ratio, n }
 }
-export function useImageOptions(draft: ImageDraft) {
+/**
+ * Effective parameters and live quotes for a draft. A canvas generator passes its own
+ * model ID; otherwise the shared model selection applies.
+ */
+export function useImageOptions(draft: ImageDraft, modelId?: string) {
   const { user } = useSession()
   const models = useModels('image')
+  const model =
+    (modelId ? models.items.find((item) => item.id === modelId) : undefined) ?? models.selected
   const config = useImageConfig()
   const preferences = useQuery({
     queryKey: ['user', user?.id, 'preferences'],
@@ -57,7 +62,7 @@ export function useImageOptions(draft: ImageDraft) {
     queryFn: ({ signal }) => credits.account(undefined, signal),
     staleTime: 0,
   })
-  const values = resolveImageOptions(draft, config.data, models.selected, preferences.data)
+  const values = resolveImageOptions(draft, config.data, model, preferences.data)
   const operation = draft.references.length ? 'edit' : 'generate'
   const quotes = useQueries({
     queries: values.qualities.map((quality) => ({
@@ -65,17 +70,17 @@ export function useImageOptions(draft: ImageDraft) {
         'user',
         user?.id,
         'image-quote',
-        models.selected?.id,
+        model?.id,
         operation,
         quality,
         values.size,
         values.n,
       ],
-      enabled: !!user && !!models.selected && !!values.size && values.n > 0,
+      enabled: !!user && !!model && !!values.size && values.n > 0,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         images.quote(
           {
-            model_id: models.selected?.id ?? '',
+            model_id: model?.id ?? '',
             operation,
             quality,
             size: values.size,
@@ -102,6 +107,7 @@ export function useImageOptions(draft: ImageDraft) {
     priced,
     quote,
     models,
+    model,
     config,
     account,
     preferences,

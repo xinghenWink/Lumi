@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  cascade,
   addNodes,
   aspectResize,
   bringToFront,
@@ -110,5 +111,19 @@ describe('canvas commands', () => {
     const copiedImage = doc.nodes.find((node) => node.id === pasted[1])
     expect(copiedImage).toMatchObject({ x: 40, y: 40, group_id: pasted[0] })
     expect(copiedImage?.image).toMatchObject({ file_id: ids.file, task_id: null, position: null })
+  })
+})
+
+describe('cascade', () => {
+  it('offsets inserts that would stack on an existing center', () => {
+    const doc = { ...emptyDocument(), nodes: [textNode({ x: 0, y: 0, w: 100, h: 100 })] }
+    expect(cascade(doc, { x: 0, y: 0, w: 100, h: 100 })).toMatchObject({ x: 32, y: 32 })
+    expect(cascade(doc, { x: -50, y: -50, w: 200, h: 200 })).toMatchObject({ x: -18, y: -18 })
+    expect(cascade(doc, { x: 300, y: 0, w: 100, h: 100 })).toMatchObject({ x: 300, y: 0 })
+    const stacked = {
+      ...doc,
+      nodes: [...doc.nodes, textNode({ x: 32, y: 32, w: 100, h: 100 })],
+    }
+    expect(cascade(stacked, { x: 0, y: 0, w: 100, h: 100 })).toMatchObject({ x: 64, y: 64 })
   })
 })

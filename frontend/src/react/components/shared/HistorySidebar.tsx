@@ -11,6 +11,8 @@ import { Button } from '../ui/button'
 import { ConversationActions } from '../chat/ConversationActions'
 import { ImageConversationActions } from '../images/ImageConversationActions'
 const VirtualHistoryRows = lazy(() => import('./VirtualHistoryRows'))
+// Canvas history carries its own lazily loaded copy, so it stays out of the shell bundle.
+const CanvasHistory = lazy(() => import('../canvas/CanvasHistory'))
 
 type HistoryRow = Omit<Conversation, 'busy'> & { busy?: boolean }
 interface HistoryPage {
@@ -24,6 +26,7 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
   const location = useLocation()
   const image =
     location.pathname.startsWith('/create') || location.pathname.startsWith('/me/images')
+  const canvas = location.pathname === '/canvas' || location.pathname.startsWith('/canvas/')
   const mode = image ? 'image' : 'chat'
   const [searches, setSearches] = useState({
     chat: { search: '', applied: '' },
@@ -33,7 +36,7 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
   const query = useInfiniteQuery({
     queryKey: ['user', user?.id, 'sidebar-history', image ? 'image' : 'chat', applied],
     initialPageParam: '',
-    enabled: !!user,
+    enabled: !!user && !canvas,
     queryFn: async ({ pageParam, signal }): Promise<HistoryPage> => {
       const params = new URLSearchParams({ search: applied, limit: '50', cursor: pageParam })
       return image ? images.conversations(params, signal) : chats.list(params, signal)
@@ -72,6 +75,14 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
       </div>
     )
   }
+  if (canvas)
+    return (
+      <section className="flex min-h-0 flex-1 flex-col border-t border-border pt-3">
+        <Suspense fallback={null}>
+          <CanvasHistory onNavigate={onNavigate} />
+        </Suspense>
+      </section>
+    )
   return (
     <section className="flex min-h-0 flex-1 flex-col border-t border-border pt-3">
       <div className="mb-1.5 flex items-center justify-between px-2.5 text-2xs font-medium text-muted-foreground">

@@ -252,3 +252,22 @@ export function insertFragment(
     },
   }
 }
+
+const CASCADE = 32
+
+/**
+ * Shifts a new node down and right while its center lands on another node's center,
+ * so repeated inserts at the same spot stay visible instead of stacking exactly.
+ */
+export function cascade<T extends Rect>(doc: CanvasDocument, rect: T): T {
+  const centers = doc.nodes.map((node) => ({ x: node.x + node.w / 2, y: node.y + node.h / 2 }))
+  let next = rect
+  for (let step = 0; step < 50; step++) {
+    const cx = next.x + next.w / 2,
+      cy = next.y + next.h / 2
+    if (!centers.some((center) => Math.abs(center.x - cx) < 8 && Math.abs(center.y - cy) < 8))
+      return next
+    next = { ...next, x: next.x + CASCADE, y: next.y + CASCADE }
+  }
+  return next
+}

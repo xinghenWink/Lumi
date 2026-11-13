@@ -119,3 +119,11 @@ export function generatorFromSelection(
     },
   }
 }
+
+/** Width / height of a size such as "1024x1536", falling back to the ratio or a square. */
+export function aspectOf(size: string, ratio: string) {
+  const [w, h] = size.split('x').map(Number)
+  if (w && h) return w / h
+  const [a, b] = ratio.split(':').map(Number)
+  return a && b ? a / b : 1
+}

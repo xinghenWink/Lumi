@@ -8,7 +8,8 @@ export interface DropTarget {
   enabled: boolean
   title: string
   hint: string
-  onFiles(files: File[]): void
+  /** Drops carry the pointer position in client pixels; pastes have none. */
+  onFiles(files: File[], point?: { x: number; y: number }): void
 }
 interface DropState {
   depth: number
@@ -55,7 +56,8 @@ export function createDropRegistry() {
       event.preventDefault()
       reset()
       const target = current()
-      if (target?.enabled && !modalOpen()) target.onFiles(filesFrom(event.dataTransfer?.files))
+      if (target?.enabled && !modalOpen())
+        target.onFiles(filesFrom(event.dataTransfer?.files), { x: event.clientX, y: event.clientY })
     }
     const paste = (event: ClipboardEvent) => {
       if (event.defaultPrevented || modalOpen()) return

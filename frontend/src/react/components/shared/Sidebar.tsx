@@ -1,4 +1,13 @@
-import { ArrowLeft, Coins, Image, LayoutGrid, MessageSquare, Plus, Shield } from 'lucide-react'
+import {
+  ArrowLeft,
+  Coins,
+  Image,
+  LayoutGrid,
+  MessageSquare,
+  Plus,
+  Shield,
+  Workflow,
+} from 'lucide-react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BrandMark } from './BrandMark'
@@ -23,10 +32,16 @@ export function Sidebar({
 }) {
   const { t } = useTranslation()
   const { user } = useSession()
-  const image = useLocation().pathname.startsWith('/create')
+  const path = useLocation().pathname
+  const fresh = path.startsWith('/create')
+    ? '/create'
+    : path.startsWith('/canvas')
+      ? '/canvas/new'
+      : '/chat'
   const links = [
     { to: '/chat', key: 'nav.chat', icon: MessageSquare },
     { to: '/create', key: 'nav.image', icon: Image },
+    { to: '/canvas', key: 'nav.canvas', icon: Workflow },
     { to: '/me/images', key: 'nav.gallery', icon: LayoutGrid },
     { to: '/me/credits', key: 'nav.credits', icon: Coins },
   ]
@@ -50,7 +65,7 @@ export function Sidebar({
         </Link>
       ) : (
         <Link
-          to={image ? '/create' : '/chat'}
+          to={fresh}
           onClick={onNavigate}
           className="mb-4 flex h-10 items-center gap-2 rounded-xl border border-input bg-card px-3 text-[13px] font-medium shadow-xs transition-[border-color,box-shadow] hover:border-primary/40 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >

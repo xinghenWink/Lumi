@@ -84,6 +84,7 @@ export default {
     workspace: '创作空间',
     chat: '对话',
     image: '生图',
+    canvas: '画布',
     comingSoon: '即将开放',
     account: '个人资料',
     admin: '管理后台',

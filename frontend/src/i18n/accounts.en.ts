@@ -84,6 +84,7 @@ export default {
     workspace: 'Creative space',
     chat: 'Chat',
     image: 'Images',
+    canvas: 'Canvas',
     comingSoon: 'Coming soon',
     account: 'Your profile',
     admin: 'Administration',
