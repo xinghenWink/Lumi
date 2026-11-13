@@ -58,7 +58,9 @@ describe('safe incremental markdown', () => {
     expect(element.querySelector('b,img,script')).toBeNull()
     const action = element.querySelector<HTMLButtonElement>('button[data-illustration-prompt]')
     expect(action?.textContent).toBe('Create')
-    expect(action?.dataset.illustrationPrompt).toBe('two &quot;linked&quot; particles <b>glowing</b>')
+    expect(action?.dataset.illustrationPrompt).toBe(
+      'two &quot;linked&quot; particles <b>glowing</b>',
+    )
     expect(action?.dataset.illustrationRatio).toBe('16:9')
     const passive = await renderMarkdown('<AsyncImage query="sky"/>', true, 'Copy', {
       label: 'Illustration',

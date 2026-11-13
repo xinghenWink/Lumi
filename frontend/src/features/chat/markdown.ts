@@ -55,9 +55,7 @@ export interface IllustrationLabels {
 }
 const illustrationName = '<AsyncImage'
 const illustrationAttribute = String.raw`\s+[A-Za-z][\w-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|\{[^{}]*\}|[^\s"'=<>\x60/{}]+))?`
-const illustrationTag = new RegExp(
-  String.raw`^<AsyncImage\b((?:${illustrationAttribute})*)\s*\/?>`,
-)
+const illustrationTag = new RegExp(String.raw`^<AsyncImage\b((?:${illustrationAttribute})*)\s*\/?>`)
 const illustrationValue =
   /([A-Za-z][\w-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|\{\s*(?:"([^"]*)"|'([^']*)'|([^{}]*?))\s*\}|([^\s"'=<>`/{}]+))/g
 const illustrationRatios = new Set(['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16'])

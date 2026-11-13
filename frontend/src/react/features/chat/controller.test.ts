@@ -213,7 +213,9 @@ describe('React chat controller compatibility', () => {
     vi.mocked(chats.get).mockImplementationOnce(
       (_id, signal) =>
         new Promise((_resolve, reject) =>
-          signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError'))),
+          signal?.addEventListener('abort', () =>
+            reject(new DOMException('Aborted', 'AbortError')),
+          ),
         ),
     )
     const opening = chat.open('c')
