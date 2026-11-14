@@ -372,12 +372,11 @@ test('canvas journey composes, generates from references, persists and edits', a
     const parameters = inspector.getByRole('button', { name: '参数', exact: true })
     const summary = inspector.getByTestId('canvas-image-parameter-summary')
     await expect(summary).toHaveText('1:1 · 1K · 1 张')
-    const parameterButtonBox = await box(parameters)
-    const summaryBox = await box(summary)
-    expect(summaryBox.x).toBeGreaterThan(parameterButtonBox.x + parameterButtonBox.width)
-    expect(
-      Math.abs(summaryBox.y + summaryBox.height / 2 - center(parameterButtonBox).y),
-    ).toBeLessThan(2)
+    await expect(async () => {
+      const [parameterButtonBox, summaryBox] = await Promise.all([box(parameters), box(summary)])
+      expect(summaryBox.x).toBeGreaterThan(parameterButtonBox.x + parameterButtonBox.width)
+      expect(Math.abs(center(summaryBox).y - center(parameterButtonBox).y)).toBeLessThan(2)
+    }).toPass({ timeout: 5_000 })
     const imageParameters = page.getByRole('dialog', { name: '生图参数', exact: true })
     const editorBox = await box(inspector)
     await parameters.click()
