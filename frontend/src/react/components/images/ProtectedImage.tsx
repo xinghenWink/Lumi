@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { images, type ImageFile } from '../../../api/images'
 import { useSession } from '../../features/auth/hooks'
@@ -9,11 +9,13 @@ export function ProtectedImage({
   original = false,
   alt,
   className = '',
+  fallback,
 }: {
   file: ImageFile
   original?: boolean
   alt: string
   className?: string
+  fallback?: ReactNode
 }) {
   const { t } = useTranslation()
   const { user } = useSession()
@@ -52,6 +54,8 @@ export function ProtectedImage({
       decoding="async"
       className={className}
     />
+  ) : fallback !== undefined ? (
+    fallback
   ) : result?.source === source && result.failed ? (
     <span role="status" className="flex flex-col items-center gap-2 text-xs text-muted-foreground">
       {t('images.loadFailed')}

@@ -8,7 +8,7 @@ RUN pnpm install --frozen-lockfile
 COPY frontend frontend
 RUN pnpm build
 
-FROM --platform=$BUILDPLATFORM golang:1.26.10-alpine AS backend
+FROM --platform=$BUILDPLATFORM golang:1.26.11-alpine AS backend
 WORKDIR /src/backend
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download

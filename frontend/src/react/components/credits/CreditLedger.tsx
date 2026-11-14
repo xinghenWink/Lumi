@@ -12,7 +12,8 @@ import { DataTable } from '../shared/DataTable'
 import { ApiNotice } from '../shared/ApiNotice'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import { Field, selectClass } from '../ui/field'
+import { Field } from '../ui/field'
+import { NativeSelect, NativeSelectOption } from '../ui/native-select'
 const types = [
   'signup_bonus',
   'daily_grant',
@@ -83,19 +84,19 @@ export function CreditLedger({ admin = false, userId }: { admin?: boolean; userI
           </Field>
         ) : null}
         <Field id={id + '-type'} label={t('credits.type')}>
-          <select
+          <NativeSelect
             id={id + '-type'}
-            className={selectClass}
+            className="h-10 rounded-lg"
             value={filters.type}
             onChange={(event) => setFilters({ ...filters, type: event.target.value })}
           >
-            <option value="">{t('credits.allTypes')}</option>
+            <NativeSelectOption value="">{t('credits.allTypes')}</NativeSelectOption>
             {types.map((type) => (
-              <option key={type} value={type}>
+              <NativeSelectOption key={type} value={type}>
                 {t(`credits.types.${type}`)}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
+          </NativeSelect>
         </Field>
         <Field id={id + '-from'} label={t('common.from')}>
           <Input
@@ -118,7 +119,7 @@ export function CreditLedger({ admin = false, userId }: { admin?: boolean; userI
         <Button type="submit" variant="outline" disabled={query.isFetching}>
           {t('common.search')}
         </Button>
-        <span className="text-[10px] text-muted-foreground">{t('common.filterUTC')}</span>
+        <span className="text-2xs text-muted-foreground">{t('common.filterUTC')}</span>
       </form>
       <ApiNotice error={query.error || exporting.error} />
       <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -207,7 +208,7 @@ export function CreditLedger({ admin = false, userId }: { admin?: boolean; userI
                     {row.note || t('common.none')}
                     {row.ref_id ? (
                       <code
-                        className="block break-all text-[10px] text-muted-foreground"
+                        className="block break-all text-2xs text-muted-foreground"
                         title={t('credits.reference')}
                       >
                         {row.ref_id}

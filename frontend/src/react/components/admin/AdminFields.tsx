@@ -2,6 +2,9 @@ import { useId } from 'react'
 import { Field } from '../ui/field'
 import { Input } from '../ui/input'
 
+/** Largest value a PostgreSQL integer column accepts; used where administrators set no product cap. */
+export const unboundedCount = 2_147_483_647
+
 export function NumberField({
   label,
   value,

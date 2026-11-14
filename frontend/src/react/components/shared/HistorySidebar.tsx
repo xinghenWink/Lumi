@@ -7,10 +7,17 @@ import { chats, type Conversation } from '../../../api/chat'
 import { images } from '../../../api/images'
 import { useSession } from '../../features/auth/hooks'
 import { ApiNotice } from './ApiNotice'
+import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { ConversationActions } from '../chat/ConversationActions'
-import { ImageConversationActions } from '../images/ImageConversationActions'
+const ImageConversationActions = lazy(() =>
+  import('../images/ImageConversationActions').then((module) => ({
+    default: module.ImageConversationActions,
+  })),
+)
 const VirtualHistoryRows = lazy(() => import('./VirtualHistoryRows'))
+// Canvas history carries its own lazily loaded copy, so it stays out of the shell bundle.
+const CanvasHistory = lazy(() => import('../canvas/CanvasHistory'))
 
 type HistoryRow = Omit<Conversation, 'busy'> & { busy?: boolean }
 interface HistoryPage {
@@ -24,6 +31,7 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
   const location = useLocation()
   const image =
     location.pathname.startsWith('/create') || location.pathname.startsWith('/me/images')
+  const canvas = location.pathname === '/canvas' || location.pathname.startsWith('/canvas/')
   const mode = image ? 'image' : 'chat'
   const [searches, setSearches] = useState({
     chat: { search: '', applied: '' },
@@ -33,7 +41,7 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
   const query = useInfiniteQuery({
     queryKey: ['user', user?.id, 'sidebar-history', image ? 'image' : 'chat', applied],
     initialPageParam: '',
-    enabled: !!user,
+    enabled: !!user && !canvas,
     queryFn: async ({ pageParam, signal }): Promise<HistoryPage> => {
       const params = new URLSearchParams({ search: applied, limit: '50', cursor: pageParam })
       return image ? images.conversations(params, signal) : chats.list(params, signal)
@@ -48,10 +56,10 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
       <div
         key={row.id}
         className={
-          'chat-sidebar-row mx-1 flex h-10 items-center gap-1 rounded-lg pl-3 pr-1 text-xs hover:bg-muted ' +
+          'chat-sidebar-row group/row flex h-9 items-center gap-1 rounded-lg pr-1 pl-2.5 text-[13px] transition-colors ' +
           (location.pathname.endsWith('/' + row.id)
-            ? 'bg-accent text-primary'
-            : 'text-muted-foreground')
+            ? 'bg-card font-medium text-foreground shadow-xs'
+            : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground')
         }
       >
         <Link
@@ -59,28 +67,38 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
           onClick={onNavigate}
           className="flex h-full min-w-0 flex-1 items-center gap-2"
         >
-          {row.pinned ? <Pin size={11} className="shrink-0" /> : null}
+          {row.pinned ? <Pin size={11} className="shrink-0 text-primary" /> : null}
           <span className="truncate">
             {row.title || t(image ? 'images.untitled' : 'chat.untitled')}
           </span>
         </Link>
         {image ? (
-          <ImageConversationActions row={row} />
+          <Suspense fallback={null}>
+            <ImageConversationActions row={row} />
+          </Suspense>
         ) : (
           <ConversationActions row={{ ...row, busy: row.busy ?? false }} />
         )}
       </div>
     )
   }
+  if (canvas)
+    return (
+      <section className="flex min-h-0 flex-1 flex-col border-t border-border pt-3">
+        <Suspense fallback={null}>
+          <CanvasHistory onNavigate={onNavigate} />
+        </Suspense>
+      </section>
+    )
   return (
-    <section className="flex min-h-0 flex-1 flex-col border-t border-border pt-4">
-      <div className="mb-2 flex items-center justify-between px-3 text-[11px] font-medium text-muted-foreground">
+    <section className="flex min-h-0 flex-1 flex-col border-t border-border pt-3">
+      <div className="mb-1.5 flex items-center justify-between px-2.5 text-2xs font-medium text-muted-foreground">
         <span>{t(image ? 'images.history' : 'react.recentChats')}</span>
         {!image ? (
           <Link
             to="/me/chats"
             onClick={onNavigate}
-            className="rounded px-1 hover:text-primary"
+            className="rounded px-1 transition-colors hover:text-foreground"
             aria-label={t('nav.chatHistory')}
           >
             ···
@@ -88,17 +106,17 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
         ) : null}
       </div>
       <form
-        className="chat-sidebar-search mx-1 mb-3 flex items-center gap-2 rounded-lg border border-transparent px-2.5 focus-within:border-border focus-within:bg-card"
+        className="chat-sidebar-search mb-2 flex items-center gap-2 rounded-lg border border-transparent bg-muted/60 px-2.5 transition-colors focus-within:border-input focus-within:bg-card"
         onSubmit={(event) => {
           event.preventDefault()
           setSearches((state) => ({ ...state, [mode]: { ...state[mode], applied: search.trim() } }))
         }}
       >
         <Search size={14} className="shrink-0 text-muted-foreground" />
-        <input
+        <Input
           data-history-search
           type="search"
-          className="h-9 min-w-0 w-full bg-transparent text-base outline-none lg:text-xs"
+          className="h-8 min-w-0 w-full rounded-none border-0 bg-transparent p-0 text-base shadow-none outline-none focus:ring-0 placeholder:text-muted-foreground lg:text-xs"
           value={search}
           onChange={(event) =>
             setSearches((state) => ({
@@ -114,7 +132,7 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <ApiNotice error={query.error} />
         {!query.isPending && !rows.length ? (
-          <p className="px-3 py-3 text-xs text-muted-foreground">
+          <p className="px-2.5 py-3 text-xs text-muted-foreground">
             {t(image ? 'images.emptyHistory' : 'chat.empty')}
           </p>
         ) : null}

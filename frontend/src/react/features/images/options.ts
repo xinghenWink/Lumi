@@ -6,7 +6,9 @@ import { credits } from '../../../api/credits'
 import { ApiError } from '../../../api/transport'
 import { useSession } from '../auth/hooks'
 import { useModels } from '../catalog/models'
+import { referenceCapacity } from '../files/reference-rules'
 import type { ImageDraft } from './controller'
+import { useImageConfig } from './config'
 
 export function resolveImageOptions(
   draft: ImageDraft,
@@ -14,41 +16,92 @@ export function resolveImageOptions(
   model?: PublicModel,
   preferences?: Preferences,
 ) {
-  const sizes = config?.sizes.filter((size) => model?.capabilities.sizes.includes(size)) ?? []
-  const ratios = Object.entries(config?.ratio_sizes ?? {}).filter(([, size]) =>
-    sizes.includes(size),
+  const disabledResolutions = new Set(config?.disabled_resolutions)
+  const disabledRatios = new Set<string>(config?.disabled_ratios)
+  const presets = config?.resolution_presets ?? []
+  const modelSizes = model?.capabilities.sizes ?? []
+  const inherits = model?.capabilities.use_size_presets
+  const variants = presets.filter(
+    (preset) =>
+      !disabledRatios.has(preset.ratio) &&
+      !disabledResolutions.has(preset.resolution) &&
+      (inherits || modelSizes.includes(preset.size)),
   )
+  const enabledSizes = new Set(variants.map((preset) => preset.size))
+  const presetSizes = new Set(presets.map((preset) => preset.size))
+  const explicitSizes = inherits
+    ? []
+    : (config?.sizes.filter(
+        (size) => modelSizes.includes(size) && (!presetSizes.has(size) || enabledSizes.has(size)),
+      ) ?? [])
+  const sizes = [...new Set([...explicitSizes, ...enabledSizes])]
+  const ratioOptions = new Map<string, string[]>()
+  for (const preset of variants) {
+    const options = ratioOptions.get(preset.ratio) ?? []
+    options.push(preset.size)
+    ratioOptions.set(preset.ratio, options)
+  }
+  for (const [ratio, size] of Object.entries(config?.ratio_sizes ?? {})) {
+    if (inherits || !explicitSizes.includes(size) || disabledRatios.has(ratio)) continue
+    // Keep custom mappings with the same ratio. Older approximate mappings remain valid over the API.
+    const [w = 0, h = 0] = size.split('x').map(Number)
+    const [a = 0, b = 0] = ratio.split(':').map(Number)
+    if (presets.length && (!w || !h || Math.abs(w * b - h * a) > Math.max(a, b))) continue
+    const options = ratioOptions.get(ratio) ?? []
+    if (!options.includes(size)) options.push(size)
+    ratioOptions.set(ratio, options)
+  }
+  const ratios = [...ratioOptions.keys()]
   const qualities = model?.capabilities.qualities ?? []
   const maxN = Math.min(config?.max_n ?? 0, model?.capabilities.max_n ?? 0)
-  const maxReferences = model?.capabilities.supports_edit
-    ? Math.min(config?.max_references ?? 0, model.capabilities.max_reference_images)
-    : 0
-  const savedSize = config?.ratio_sizes[preferences?.image_ratio ?? '']
-  const size = sizes.includes(draft.size)
-    ? draft.size
-    : savedSize && sizes.includes(savedSize)
-      ? savedSize
-      : (sizes[0] ?? '')
+  const maxReferences = referenceCapacity(config, model)
+  const hasDraftSize = sizes.includes(draft.size)
+  const preferredRatio = preferences?.image_ratio ?? ''
+  const ratio =
+    draft.ratio &&
+    ratioOptions.has(draft.ratio) &&
+    (!hasDraftSize || ratioOptions.get(draft.ratio)?.includes(draft.size))
+      ? draft.ratio
+      : !hasDraftSize && ratioOptions.has(preferredRatio)
+        ? preferredRatio
+        : !hasDraftSize && variants.length
+          ? (ratios[0] ?? '')
+          : ''
+  const ratioSizes = ratioOptions.get(ratio) ?? []
+  const size = hasDraftSize ? draft.size : (ratioSizes[0] ?? sizes[0] ?? '')
   const quality = qualities.includes(draft.quality as ImageInput['quality'])
     ? draft.quality
     : (qualities.find((quality) => quality === preferences?.image_quality) ?? qualities[0] ?? '')
-  const ratio = ratios.some(([ratio, mapped]) => ratio === draft.ratio && mapped === size)
-    ? draft.ratio
-    : !draft.size &&
-        ratios.some(([ratio, mapped]) => ratio === preferences?.image_ratio && mapped === size)
-      ? (preferences?.image_ratio ?? '')
-      : ''
   const n = maxN > 0 ? Math.max(1, Math.min(draft.n || preferences?.image_count || 1, maxN)) : 0
-  return { sizes, ratios, qualities, maxN, maxReferences, size, quality, ratio, n }
+  const resolution = variants.find(
+    (preset) => preset.ratio === ratio && preset.size === size,
+  )?.resolution
+  return {
+    sizes,
+    ratios,
+    ratioOptions,
+    ratioSizes,
+    variants,
+    resolution,
+    qualities,
+    maxN,
+    maxReferences,
+    size,
+    quality,
+    ratio,
+    n,
+  }
 }
-export function useImageOptions(draft: ImageDraft) {
+/**
+ * Effective parameters and live quotes for a draft. A canvas generator passes its own
+ * model ID; otherwise the shared model selection applies.
+ */
+export function useImageOptions(draft: ImageDraft, modelId?: string) {
   const { user } = useSession()
   const models = useModels('image')
-  const config = useQuery({
-    queryKey: ['user', user?.id, 'image-options'],
-    enabled: !!user,
-    queryFn: ({ signal }) => images.options(false, signal),
-  })
+  const model =
+    (modelId ? models.items.find((item) => item.id === modelId) : undefined) ?? models.selected
+  const config = useImageConfig()
   const preferences = useQuery({
     queryKey: ['user', user?.id, 'preferences'],
     enabled: !!user,
@@ -60,7 +113,7 @@ export function useImageOptions(draft: ImageDraft) {
     queryFn: ({ signal }) => credits.account(undefined, signal),
     staleTime: 0,
   })
-  const values = resolveImageOptions(draft, config.data, models.selected, preferences.data)
+  const values = resolveImageOptions(draft, config.data, model, preferences.data)
   const operation = draft.references.length ? 'edit' : 'generate'
   const quotes = useQueries({
     queries: values.qualities.map((quality) => ({
@@ -68,17 +121,17 @@ export function useImageOptions(draft: ImageDraft) {
         'user',
         user?.id,
         'image-quote',
-        models.selected?.id,
+        model?.id,
         operation,
         quality,
         values.size,
         values.n,
       ],
-      enabled: !!user && !!models.selected && !!values.size && values.n > 0,
+      enabled: !!user && !!model && !!values.size && values.n > 0,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         images.quote(
           {
-            model_id: models.selected?.id ?? '',
+            model_id: model?.id ?? '',
             operation,
             quality,
             size: values.size,
@@ -105,6 +158,7 @@ export function useImageOptions(draft: ImageDraft) {
     priced,
     quote,
     models,
+    model,
     config,
     account,
     preferences,

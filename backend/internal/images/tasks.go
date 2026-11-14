@@ -37,10 +37,7 @@ func checkOwner(ctx context.Context, q *query.Queries, actor user.Actor) error {
 	return nil
 }
 func validateInput(input Input, c Configuration, model catalog.PublicModel) error {
-	if input.ConversationID == uuid.Nil || input.ModelID == uuid.Nil || strings.TrimSpace(input.Prompt) == "" || len(input.Prompt) > 64000 || !utf8.ValidString(input.Prompt) || strings.ContainsRune(input.Prompt, 0) || input.Count < 1 || input.Count > c.MaxN || input.Count > model.Capabilities.MaxN || !slices.Contains(model.Capabilities.Qualities, input.Quality) || !slices.Contains(model.Capabilities.Sizes, input.Size) || !slices.Contains(c.Sizes, input.Size) {
-		return problem.Invalid()
-	}
-	if input.Ratio != "" && (c.RatioSizes[input.Ratio] != input.Size || input.Size == "auto") {
+	if input.ConversationID == uuid.Nil || input.ModelID == uuid.Nil || strings.TrimSpace(input.Prompt) == "" || len(input.Prompt) > 64000 || !utf8.ValidString(input.Prompt) || strings.ContainsRune(input.Prompt, 0) || input.Count < 1 || input.Count > c.MaxN || input.Count > model.Capabilities.MaxN || !slices.Contains(model.Capabilities.Qualities, input.Quality) || !c.allowsSize(input.Size, input.Ratio, model.Capabilities.Sizes, model.Capabilities.UseSizePresets) {
 		return problem.Invalid()
 	}
 	if len(input.ReferenceFileIDs) > int(c.MaxReferences) || len(input.ReferenceFileIDs) > int(model.Capabilities.MaxReferenceImages) || (len(input.ReferenceFileIDs) > 0 && !model.Capabilities.SupportsEdit) {
@@ -61,6 +58,22 @@ func shortTitle(text string) string {
 	return string(runes[:min(20, len(runes))])
 }
 func (s *Service) Submit(ctx context.Context, actor user.Actor, key string, input Input) (Task, error) {
+	return s.submit(ctx, actor, key, input, func(*query.Queries) (Input, error) {
+		return input, nil
+	}, nil)
+}
+
+// SubmitForCanvas resolves saved inputs and attaches result slots in the image
+// submission transaction. The immutable request identifies retries.
+func (s *Service) SubmitForCanvas(ctx context.Context, actor user.Actor, key string, request any,
+	resolve func(*query.Queries) (Input, error), attach func(*query.Queries, query.ImageTask) error,
+) (Task, error) {
+	return s.submit(ctx, actor, key, request, resolve, attach)
+}
+
+func (s *Service) submit(ctx context.Context, actor user.Actor, key string, request any,
+	resolve func(*query.Queries) (Input, error), attach func(*query.Queries, query.ImageTask) error,
+) (Task, error) {
 	// Long submission transactions must leave pool capacity for authentication and chat.
 	// This bounds preparation only; accepted tasks retain the configured worker concurrency.
 	select {
@@ -73,25 +86,10 @@ func (s *Service) Submit(ctx context.Context, actor user.Actor, key string, inpu
 	if settingsErr != nil {
 		return Task{}, fmt.Errorf("read content settings: %w", settingsErr)
 	}
-	for _, record := range settings {
-		if record.Key == "operations" {
-			var cfg struct {
-				Words []string `json:"sensitive_words"`
-			}
-			if err := json.Unmarshal(record.Value, &cfg); err != nil {
-				return Task{}, fmt.Errorf("decode content settings: %w", err)
-			}
-			for _, word := range cfg.Words {
-				if strings.Contains(strings.ToLower(input.Prompt), strings.ToLower(word)) {
-					return Task{}, problem.New("CONTENT_BLOCKED", 400)
-				}
-			}
-		}
-	}
 	if !credits.ValidKey(key) {
 		return Task{}, problem.New("IDEMPOTENCY_KEY_INVALID", 400)
 	}
-	encoded, err := json.Marshal(input)
+	encoded, err := json.Marshal(request)
 	if err != nil {
 		return Task{}, fmt.Errorf("encode image request: %w", err)
 	}
@@ -99,7 +97,6 @@ func (s *Service) Submit(ctx context.Context, actor user.Actor, key string, inpu
 	hash := hex.EncodeToString(digest[:])
 	var task query.ImageTask
 	replay := false
-	input.ReferenceFileIDs = append([]uuid.UUID{}, input.ReferenceFileIDs...)
 	err = db.Transaction(ctx, s.pool, func(q *query.Queries) error {
 		if err := checkOwner(ctx, q, actor); err != nil {
 			return err
@@ -115,6 +112,28 @@ func (s *Service) Submit(ctx context.Context, actor user.Actor, key string, inpu
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("read original image request: %w", err)
+		}
+		input, err := resolve(q)
+		if err != nil {
+			return err
+		}
+		input.ReferenceFileIDs = append([]uuid.UUID{}, input.ReferenceFileIDs...)
+		for _, record := range settings {
+			if record.Key != "operations" {
+				continue
+			}
+			var cfg struct {
+				Words []string `json:"sensitive_words"`
+			}
+			if err := json.Unmarshal(record.Value, &cfg); err != nil {
+				return fmt.Errorf("decode content settings: %w", err)
+			}
+			prompt := strings.ToLower(input.Prompt)
+			for _, word := range cfg.Words {
+				if strings.Contains(prompt, strings.ToLower(word)) {
+					return problem.New("CONTENT_BLOCKED", 400)
+				}
+			}
 		}
 		cfgRow, err := q.GetImageSettings(ctx)
 		if err != nil {
@@ -132,11 +151,15 @@ func (s *Service) Submit(ctx context.Context, actor user.Actor, key string, inpu
 		if err := validateInput(input, cfg, model); err != nil {
 			return err
 		}
-		if _, err := q.LockImageConversation(ctx, query.LockImageConversationParams{ID: input.ConversationID, UserID: actor.ID}); err != nil {
+		conversation, err := q.LockTaskConversation(ctx, query.LockTaskConversationParams{ID: input.ConversationID, UserID: actor.ID})
+		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return problem.New("IMAGE_CONVERSATION_NOT_FOUND", 404)
 			}
 			return fmt.Errorf("lock image conversation: %w", err)
+		}
+		if (conversation.Type == "canvas") != (attach != nil) {
+			return problem.New("IMAGE_CONVERSATION_NOT_FOUND", 404)
 		}
 		refs, err := q.GetImageReferenceFiles(ctx, query.GetImageReferenceFilesParams{UserID: actor.ID, Ids: input.ReferenceFileIDs})
 		if err != nil {
@@ -198,6 +221,9 @@ func (s *Service) Submit(ctx context.Context, actor user.Actor, key string, inpu
 		}
 		if err := q.TouchImageConversation(ctx, query.TouchImageConversationParams{ID: input.ConversationID, UserID: actor.ID, ModelID: &input.ModelID, Title: shortTitle(input.Prompt)}); err != nil {
 			return fmt.Errorf("touch image conversation: %w", err)
+		}
+		if attach != nil {
+			return attach(q, task)
 		}
 		return nil
 	})
@@ -364,7 +390,7 @@ func (s *Service) List(ctx context.Context, actor user.Actor, f Filter, admin bo
 		}
 	}
 	if f.Conversation != nil && !admin {
-		if _, err := s.q.GetImageConversation(ctx, query.GetImageConversationParams{ID: *f.Conversation, UserID: actor.ID}); err != nil {
+		if _, err := s.q.GetTaskConversation(ctx, query.GetTaskConversationParams{ID: *f.Conversation, UserID: actor.ID}); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return result, problem.New("IMAGE_CONVERSATION_NOT_FOUND", 404)
 			}

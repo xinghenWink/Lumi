@@ -6,24 +6,27 @@
 
 Lumi 把流式聊天、生图与改图、积分兑换和管理后台整合到一个站点。前端嵌入 Go 二进制，配合 PostgreSQL、Redis 和持久文件目录运行，通过 OpenAI 兼容上游调用模型，适合部署自己的 AI 创作服务。
 
-本源码对应 **[v0.2.0](https://github.com/xinghenWink/Lumi/releases/tag/v0.2.0)**：完整 React 前端、对话式聊天与图像创作、独立管理后台。M0～M7 的初期功能保留，支持 `linux/amd64` 和 `linux/arm64`；正式镜像与附件以 Release 的发布状态为准。产品仍在 0.x 阶段持续迭代，成熟后再发布 1.0.0，见 [版本策略](docs/VERSIONING.md)。
+本源码对应 **[v0.3.0](https://github.com/xinghenWink/Lumi/releases/tag/v0.3.0)**。本版本加入无限画布和生图分辨率预设，采用 shadcn/ui 与 AI Elements，并支持助手回复引用和账号语言切换。正式镜像支持 `linux/amd64` 和 `linux/arm64`。产品仍在 0.x 阶段，见 [版本策略](docs/VERSIONING.md)。
 
-从 v0.1.0 升级无需新增数据库迁移；账号、积分流水、会话、图片和上游配置继续沿用，升级前备份数据库、文件与密钥。阶段记录、兼容性与发布流程见 [迁移计划](docs/REACT_UI_REFACTOR.md)、[兼容清单](docs/REACT_UI_COMPATIBILITY.md)、[PR-7 验收](docs/REACT_UI_PR7.md) 和 [v0.2.0 发布说明](docs/RELEASE_V0.2.0.md)。
+从 v0.2.0 升级时，应用会自动执行前向迁移 00009 至 00013。升级前备份数据库、图片和密钥，停用旧应用后再启动新版。升级步骤见 [部署手册](docs/DEPLOYMENT.md#升级回滚)。
 
 [功能](#功能) · [技术与架构](#技术与架构) · [快速部署](#快速部署) · [首次配置](#首次配置) · [运维](#运维) · [本地开发](#本地开发) · [文档](#文档)
 
 ## 功能
 
-| 模块       | 能力                                                                                                                          |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| AI 对话    | SSE 流式输出、停止与重试、Markdown / 公式 / 代码高亮、上下文控制、自定义指令、历史与导出、断线续传；图片理解按模型能力启用。  |
-| 图像创作   | 文生图、参考图改图、质量 / 尺寸 / 比例 / 数量选择、异步任务、进度与取消、历史图库、已有图片加入编辑、签名下载及 WebP 缩略图。 |
-| 积分与兑换 | 每日 / 永久双桶积分、注册与每日赠送、质量定价和倍率、扣费快照、失败退款、兑换码批量生成与 CSV 导出、流水及使用统计。          |
-| 账号       | 邮箱注册与验证码、登录、忘记密码、会话与设备管理、个人偏好、账号删除、Turnstile 和 IP 注册配额。                              |
-| 管理后台   | 用户与余额管理、上游渠道与模型路由、连接测试与模型发现、熔断、任务、定价、看板、公告、邮件与系统设置、审计日志。              |
-| 使用体验   | 中文优先的国际化、浅色 / 深色主题、响应式布局，聊天与生图分别保存会话和草稿。                                                 |
+| 模块       | 能力                                                                                                                            |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| AI 对话    | SSE 流式输出、停止与重试、Markdown / 公式 / 代码高亮、上下文控制、自定义指令、历史与导出、断线续传；图片理解按模型能力启用。    |
+| 图像创作   | 文生图、参考图改图、质量 / 尺寸 / 比例 / 数量选择、异步任务、进度与取消、历史图库、已有图片加入编辑、签名下载及 WebP 缩略图。   |
+| 无限画布   | 无限平移缩放，图片 / 文本 / 生成 / 分组节点，连线把参考图和文字送入生成，拖放上传、复制粘贴、小地图、撤销重做，服务端自动保存。 |
+| 积分与兑换 | 每日 / 永久双桶积分、注册与每日赠送、质量定价和倍率、扣费快照、失败退款、兑换码批量生成与 CSV 导出、流水及使用统计。            |
+| 账号       | 邮箱注册与验证码、登录、忘记密码、会话与设备管理、个人偏好、账号删除、Turnstile 和 IP 注册配额。                                |
+| 管理后台   | 用户与余额管理、上游渠道与模型路由、连接测试与模型发现、熔断、任务、定价、看板、公告、邮件与系统设置、审计日志。                |
+| 使用体验   | 中文优先的国际化、浅色 / 深色主题、响应式布局，聊天与生图分别保存会话和草稿。                                                   |
 
 聊天免费，生图按积分计费。每日积分先消费、永久积分后消费；生图以创建任务时的价格结算，部分失败退还失败张数对应的积分。每日赠送不累计，跨日退款进入永久桶。
+
+登录后可在工作区或管理后台右上角的主题按钮左侧切换简体中文和 English。语言选择保存在账号资料中，也可在个人资料中修改。
 
 当前版本不包含在线支付、对外 API Key、团队空间、RAG、工具调用、原生 App、蒙版重绘或上游账号池。模型实际能力取决于接入的上游，已验证参数及限制见 [上游实测契约](docs/UPSTREAM_CONTRACT.md)。
 
@@ -31,7 +34,7 @@ Lumi 把流式聊天、生图与改图、积分兑换和管理后台整合到一
 
 | 层         | 技术                                                                                                                                      |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| 后端       | Go 1.26.10、Gin、pgx、sqlc、goose；JWT / Argon2id、SSE、OpenAPI 3.1。                                                                     |
+| 后端       | Go 1.26.11、Gin、pgx、sqlc、goose；JWT / Argon2id、SSE、OpenAPI 3.1。                                                                     |
 | 前端       | React、TypeScript strict、Vite 8、Tailwind CSS 4、shadcn/ui / Radix、lucide-react、React Router、TanStack Query、Zustand、react-i18next。 |
 | 数据与任务 | PostgreSQL 16 保存账号、会话、任务与账务；Redis 7 处理队列、限流和流式续传；图片保存在持久目录。                                          |
 | 部署       | 单个非 root 应用镜像、Docker Compose、Caddy / Nginx HTTPS 反代；GitHub Actions 发布到 GHCR。                                              |
@@ -61,7 +64,7 @@ Lumi 提供平台和管理能力，上游推理服务需要单独准备。默认
 
 ```sh
 curl --fail --location \
-  https://github.com/xinghenWink/Lumi/releases/download/v0.2.0/lumi-deploy.tar.gz \
+  https://github.com/xinghenWink/Lumi/releases/download/v0.3.0/lumi-deploy.tar.gz \
   --output lumi-deploy.tar.gz
 sudo install -d -m 700 /opt/lumi
 sudo tar -xzf lumi-deploy.tar.gz -C /opt/lumi
@@ -73,7 +76,7 @@ sudoedit /opt/lumi/.env
 
 ```dotenv
 LUMI_IMAGE=ghcr.io/xinghenwink/lumi
-LUMI_VERSION=v0.2.0
+LUMI_VERSION=v0.3.0
 ADMIN_EMAIL=admin@example.com
 PUBLIC_BASE_URL=https://lumi.example.com
 COOKIE_SECURE=true
@@ -145,12 +148,12 @@ BACKUP_KEEP=7 bash backup.sh
 
 ## 本地开发
 
-需要 Go **1.26.10**、Node **22.19+（22.x）**、pnpm **10.27.0**、Docker 和 Compose。Make 命令以 Linux / macOS / WSL 为主；Go 版本与 CI / 发布保持一致。
+需要 Go **1.26.11**、Node **22.19+（22.x）**、pnpm **10.27.0**、Docker 和 Compose。Make 命令以 Linux / macOS / WSL 为主；Go 版本与 CI / 发布保持一致。
 
 ```sh
 git clone https://github.com/xinghenWink/Lumi.git
 cd Lumi
-export GOTOOLCHAIN=go1.26.10
+export GOTOOLCHAIN=go1.26.11
 corepack enable
 corepack prepare pnpm@10.27.0 --activate
 make install
@@ -205,7 +208,7 @@ docs/                需求、OpenAPI、技术决策及里程碑验收
 | [部署、备份与发布](docs/DEPLOYMENT.md)                              | 首次部署、HTTPS / 代理、管理员救援、升级回滚、备份恢复、发布门槛。 |
 | [离线镜像核验](docs/OFFLINE_IMAGE_VERIFICATION.md)                  | 官方 amd64 归档及 Docker 存储后端的身份验证。                      |
 | [上游实测契约](docs/UPSTREAM_CONTRACT.md)                           | 已验证的请求格式、质量 / 尺寸 / 数量与供应商差异。                 |
-| [OpenAPI](docs/openapi.yaml)                                        | 平台账号、聊天、生图、积分与后台接口契约。                         |
+| [OpenAPI](docs/openapi.yaml)                                        | 平台账号、聊天、生图、画布、积分与后台接口契约。                   |
 | [技术决策](docs/DECISIONS.md)                                       | 实现选择、依赖及运行边界。                                         |
 | [安全检查](docs/SECURITY_REVIEW.md)                                 | 认证、授权、CSRF、上传、SSRF、日志和备份检查。                     |
 | [需求](docs/REQUIREMENTS.md) / [开发计划](docs/DEVELOPMENT_PLAN.md) | 产品范围、业务规则和里程碑。                                       |

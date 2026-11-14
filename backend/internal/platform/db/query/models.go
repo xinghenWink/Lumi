@@ -33,6 +33,47 @@ type AuditLog struct {
 	CreatedAt  time.Time
 }
 
+type Canvas struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	ConversationID uuid.UUID
+	Title          string
+	Document       []byte
+	NodeCount      int32
+	CoverFileID    *uuid.UUID
+	Version        int64
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	DeletedAt      *time.Time
+}
+
+type CanvasFile struct {
+	CanvasID uuid.UUID
+	FileID   uuid.UUID
+}
+
+type CanvasTextItem struct {
+	RunID      uuid.UUID
+	Position   int32
+	Status     string
+	Content    string
+	ErrorCode  string
+	LeaseUntil *time.Time
+}
+
+type CanvasTextRun struct {
+	ID               uuid.UUID
+	CanvasID         uuid.UUID
+	UserID           uuid.UUID
+	IdempotencyKey   string
+	RequestHash      string
+	ModelID          uuid.UUID
+	Prompt           string
+	ReferenceFileIds []uuid.UUID
+	Reasoning        string
+	CreatedAt        time.Time
+}
+
 type ChatDailyUsage struct {
 	UserID uuid.UUID
 	Day    time.Time
@@ -154,6 +195,8 @@ type ImageSetting struct {
 	RetentionDays       int32
 	AdminCanViewContent bool
 	Version             int64
+	DisabledRatios      []string
+	DisabledResolutions []string
 }
 
 type ImageTask struct {

@@ -48,6 +48,8 @@ test('real versioned chat and image settings preserve drafts on conflicts and re
       version: updated.version + 1,
     })
     await page.goto('/admin/image-settings')
+    const ratioMapping = page.getByLabel('比例映射（每行 比例=尺寸）', { exact: true })
+    await page.locator('details').filter({ has: ratioMapping }).locator('summary').click()
     const size = image.sizes[0]
     if (!size) throw new Error('Missing actual image size')
     await page

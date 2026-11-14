@@ -61,6 +61,7 @@ export function routeTitle(path: string): string {
     .find((item) => path === item.path || path.startsWith(item.path + '/'))
   if (admin) return admin.key
   if (path.startsWith('/create')) return 'nav.image'
+  if (path === '/canvas' || path.startsWith('/canvas/')) return 'nav.canvas'
   if (path.startsWith('/me/images')) return 'nav.gallery'
   if (path.startsWith('/me/chats')) return 'nav.chatHistory'
   if (path.startsWith('/me/credits')) return 'nav.credits'

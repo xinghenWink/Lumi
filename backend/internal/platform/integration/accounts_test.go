@@ -26,6 +26,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
 	"github.com/xinghenWink/Lumi/backend/internal/auth"
+	"github.com/xinghenWink/Lumi/backend/internal/canvas"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
 	"github.com/xinghenWink/Lumi/backend/internal/chat"
 	"github.com/xinghenWink/Lumi/backend/internal/credits"
@@ -84,6 +85,15 @@ type reply struct {
 
 func newAccountFixture(t *testing.T) *fixture {
 	t.Helper()
+	return accountFixtureWithMigrations(t, migrations.Up)
+}
+
+func accountFixtureWithMigrations(t *testing.T, migrate func(context.Context, *pgxpool.Pool) error) *fixture {
+	return accountFixture(t, migrate, true)
+}
+
+func accountFixture(t *testing.T, migrate func(context.Context, *pgxpool.Pool) error, prepare bool) *fixture {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
 	t.Cleanup(cancel)
 	postgres, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ContainerRequest: testcontainers.ContainerRequest{Image: "postgres:16-alpine", ExposedPorts: []string{"5432/tcp"}, Env: map[string]string{"POSTGRES_USER": "lumi", "POSTGRES_PASSWORD": "integration-only", "POSTGRES_DB": "lumi"}, WaitingFor: wait.ForLog("database system is ready to accept connections").WithOccurrence(2)}, Started: true})
@@ -100,10 +110,14 @@ func newAccountFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	if err := migrations.Up(ctx, pool); err != nil {
+	if err := migrate(ctx, pool); err != nil {
 		t.Fatalf("account migrations: %v", err)
 	}
-	interactive, err := db.OpenInteractive(ctx, pool.Config().ConnString())
+	openInteractive := db.OpenInteractive
+	if !prepare {
+		openInteractive = db.Open
+	}
+	interactive, err := openInteractive(ctx, pool.Config().ConnString())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,6 +184,7 @@ func newAccountFixture(t *testing.T) *fixture {
 		}
 	})
 	services.Images = images.New(pool, billing, services.Catalog, services.Files, cache, nil)
+	services.Canvas = canvas.New(pool, services.Files)
 	services.Chat.SetFiles(services.Files)
 	engine, err := router.New(slog.New(slog.NewJSONHandler(io.Discard, nil)), handler.Health{Postgres: pool.Ping, Redis: cache.Ping}, handler.Version{}, fstest.MapFS{}, account.Routes(services, account.Security{Origins: []string{"https://lumi.test"}, CookieSecure: true}, slog.New(slog.NewJSONHandler(io.Discard, nil))))
 	if err != nil {

@@ -42,20 +42,20 @@ export function ImageLibrary({
       wide
     >
       <ApiNotice error={query.error} />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-2.5">
         {files.map((file) => (
           <div
             key={file.id}
-            className="relative aspect-square overflow-hidden rounded-xl border border-border bg-muted"
+            className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-muted transition-shadow hover:shadow-md"
           >
             <ProtectedImage
               file={file}
               alt={t('images.references')}
-              className="size-full object-cover"
+              className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
             />
             <button
               type="button"
-              className="image-library-item absolute inset-0 rounded-xl focus-visible:outline-2 focus-visible:outline-ring"
+              className="image-library-item absolute inset-0 rounded-xl ring-primary/70 transition hover:ring-2 hover:ring-inset focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
               aria-label={t('images.choose') + ' ' + time(file.created_at)}
               onClick={() => {
                 onChoose(file)

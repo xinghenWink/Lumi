@@ -34,19 +34,22 @@ func New(pool *pgxpool.Pool, billing *credits.Service, models *catalog.Service, 
 }
 
 type Configuration struct {
-	MaxN                int32             `json:"max_n"`
-	MaxReferences       int32             `json:"max_references"`
-	MaxUploadBytes      int64             `json:"max_upload_bytes"`
-	Sizes               []string          `json:"sizes"`
-	RatioSizes          map[string]string `json:"ratio_sizes"`
-	PerUserConcurrency  int32             `json:"per_user_concurrency"`
-	GlobalConcurrency   int32             `json:"global_concurrency"`
-	TimeoutSeconds      int32             `json:"timeout_seconds"`
-	QueueTimeoutSeconds int32             `json:"queue_timeout_seconds"`
-	SplitRequests       bool              `json:"split_requests"`
-	RetentionDays       int32             `json:"retention_days"`
-	AdminCanViewContent bool              `json:"admin_can_view_content"`
-	Version             int64             `json:"version"`
+	MaxN                int32              `json:"max_n"`
+	MaxReferences       int32              `json:"max_references"`
+	MaxUploadBytes      int64              `json:"max_upload_bytes"`
+	Sizes               []string           `json:"sizes"`
+	RatioSizes          map[string]string  `json:"ratio_sizes"`
+	ResolutionPresets   []ResolutionPreset `json:"resolution_presets,omitempty"`
+	DisabledRatios      []string           `json:"disabled_ratios"`
+	DisabledResolutions []string           `json:"disabled_resolutions"`
+	PerUserConcurrency  int32              `json:"per_user_concurrency"`
+	GlobalConcurrency   int32              `json:"global_concurrency"`
+	TimeoutSeconds      int32              `json:"timeout_seconds"`
+	QueueTimeoutSeconds int32              `json:"queue_timeout_seconds"`
+	SplitRequests       bool               `json:"split_requests"`
+	RetentionDays       int32              `json:"retention_days"`
+	AdminCanViewContent bool               `json:"admin_can_view_content"`
+	Version             int64              `json:"version"`
 }
 type Input struct {
 	ConversationID   uuid.UUID   `json:"conversation_id"`

@@ -9,6 +9,8 @@ sql:
         out: internal/platform/db/query
         sql_package: pgx/v5
         emit_empty_slices: true
+        rename:
+          canvase: Canvas
         overrides:
           - db_type: pg_catalog.int8
             nullable: true

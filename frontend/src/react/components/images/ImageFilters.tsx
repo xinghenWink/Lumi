@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
+import { selectClass } from '../ui/field'
 import { Input } from '../ui/input'
 
 export function ImageFilters({
@@ -13,8 +14,7 @@ export function ImageFilters({
   const { t } = useTranslation(),
     id = useId()
   const [values, setValues] = useState({ state: '', quality: '', from: '', until: '', user: '' })
-  const field =
-    'min-w-0 rounded-lg border border-border bg-card p-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm'
+  const field = selectClass + ' h-9'
   return (
     <form
       className="grid shrink-0 grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap"
@@ -36,7 +36,7 @@ export function ImageFilters({
       {admin ? (
         <label
           htmlFor={id + '-user'}
-          className="flex min-w-0 flex-col gap-2 text-xs text-muted-foreground"
+          className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground"
         >
           {t('images.user')}
           <Input
@@ -50,7 +50,7 @@ export function ImageFilters({
       ) : null}
       <label
         htmlFor={id + '-quality'}
-        className="flex min-w-0 flex-col gap-2 text-xs text-muted-foreground"
+        className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground"
       >
         {t('images.quality')}
         <select
@@ -70,7 +70,7 @@ export function ImageFilters({
       </label>
       <label
         htmlFor={id + '-state'}
-        className="flex min-w-0 flex-col gap-2 text-xs text-muted-foreground"
+        className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground"
       >
         {t('images.status')}
         <select
@@ -90,7 +90,7 @@ export function ImageFilters({
       </label>
       <label
         htmlFor={id + '-from'}
-        className="flex min-w-0 flex-col gap-2 text-xs text-muted-foreground"
+        className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground"
       >
         {t('images.from')}
         <input
@@ -104,7 +104,7 @@ export function ImageFilters({
       </label>
       <label
         htmlFor={id + '-until'}
-        className="flex min-w-0 flex-col gap-2 text-xs text-muted-foreground"
+        className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground"
       >
         {t('images.until')}
         <input
@@ -116,7 +116,7 @@ export function ImageFilters({
           onChange={(event) => setValues({ ...values, until: event.target.value })}
         />
       </label>
-      <Button type="submit" variant="outline">
+      <Button type="submit" variant="outline" className="h-9">
         {t('images.filter')}
       </Button>
     </form>

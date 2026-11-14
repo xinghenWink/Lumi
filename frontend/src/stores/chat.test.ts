@@ -140,7 +140,8 @@ describe('chat state isolation and streaming', () => {
     await store.open('c')
     store.draft('c', 'conversation draft')
     store.draft('', 'new draft')
-    runtime.image.draft('image-draft', { prompt: 'image draft' })
+    const image = await runtime.loadImage()
+    image.draft('image-draft', { prompt: 'image draft' })
     runtime.queryClient.setQueryData(historyKey, { items: [], next_cursor: '' })
     const pending = store.send('c', {
       request_id: 'r',
@@ -156,7 +157,7 @@ describe('chat state isolation and streaming', () => {
     expect(store.store.getState().lastOpened).toBe('')
     expect(store.store.getState().drafts.c).toBeUndefined()
     expect(store.store.getState().drafts.new).toBe('new draft')
-    expect(runtime.image.store.getState().drafts['image-draft']?.prompt).toBe('image draft')
+    expect(image.store.getState().drafts['image-draft']?.prompt).toBe('image draft')
     expect(store.store.getState().running.c).toBeUndefined()
     expect(store.store.getState().errors.c).toBeUndefined()
     expect(get).toHaveBeenCalledTimes(1)

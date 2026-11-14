@@ -8,6 +8,7 @@ export type ImageTask = S['ImageTask']
 export type ImageInput = S['ImageTaskInput']
 export type ImageConversation = S['ImageConversation']
 export type ImageConfiguration = S['ImageConfiguration']
+export type ImageResolutionPreset = S['ImageResolutionPreset']
 export type GalleryItem = S['ImageGalleryItem']
 export type ImagePage<T> = { items: T[]; next_cursor: string }
 const str = (v: unknown): string => {
@@ -77,6 +78,32 @@ export function parseImageConfiguration(v: unknown): ImageConfiguration {
     max_upload_bytes: num(d.max_upload_bytes),
     sizes: list(d.sizes, str),
     ratio_sizes: Object.fromEntries(Object.entries(ratios).map(([k, v]) => [k, str(v)])),
+    ...(d.resolution_presets === undefined
+      ? {}
+      : {
+          resolution_presets: list(d.resolution_presets, (item) => {
+            const preset = record(item)
+            return {
+              ratio: choice(preset.ratio, ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16']),
+              resolution: choice(preset.resolution, ['1k', '2k', '4k']),
+              size: str(preset.size),
+            }
+          }),
+        }),
+    ...(d.disabled_ratios === undefined
+      ? {}
+      : {
+          disabled_ratios: list(d.disabled_ratios, (item) =>
+            choice(item, ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16']),
+          ),
+        }),
+    ...(d.disabled_resolutions === undefined
+      ? {}
+      : {
+          disabled_resolutions: list(d.disabled_resolutions, (item) =>
+            choice(item, ['1k', '2k', '4k']),
+          ),
+        }),
     per_user_concurrency: num(d.per_user_concurrency),
     global_concurrency: num(d.global_concurrency),
     timeout_seconds: num(d.timeout_seconds),
@@ -199,8 +226,14 @@ export const images = {
       parseImageConfiguration,
       signalOptions(signal),
     ),
-  saveOptions: (body: ImageConfiguration) =>
-    authorized(root + '/admin/image-settings', parseImageConfiguration, { method: 'PUT', body }),
+  saveOptions: (settings: ImageConfiguration) => {
+    const body = { ...settings }
+    delete body.resolution_presets
+    return authorized(root + '/admin/image-settings', parseImageConfiguration, {
+      method: 'PUT',
+      body,
+    })
+  },
   conversations: (q: URLSearchParams, signal?: AbortSignal) =>
     authorized(
       root + '/image-conversations?' + q,

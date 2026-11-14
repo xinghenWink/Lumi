@@ -211,7 +211,8 @@ const expireImageFiles = `-- name: ExpireImageFiles :execrows
 UPDATE files f SET deleted_at=now() WHERE f.deleted_at IS NULL
 AND (NOT EXISTS(SELECT 1 FROM users u WHERE u.id=f.user_id)
  OR (f.kind='generated' AND $1::integer>0 AND f.created_at<now()-make_interval(days=>$1::integer))
- OR (f.kind='upload' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE f.id=ANY(t.reference_file_ids)))
+ OR (f.kind='upload' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE f.id=ANY(t.reference_file_ids))
+  AND NOT EXISTS(SELECT 1 FROM canvas_files cf JOIN canvases c ON c.id=cf.canvas_id WHERE cf.file_id=f.id AND c.deleted_at IS NULL))
  OR (f.kind='avatar' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM users u WHERE u.avatar_file_id=f.id)))
 AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE t.status IN ('queued','running') AND f.id=ANY(t.reference_file_ids))
 `
@@ -484,7 +485,7 @@ func (q *Queries) GetImageReferenceFiles(ctx context.Context, arg GetImageRefere
 }
 
 const getImageSettings = `-- name: GetImageSettings :one
-SELECT singleton, max_n, max_references, max_upload_bytes, sizes, ratio_sizes, per_user_concurrency, global_concurrency, timeout_seconds, queue_timeout_seconds, split_requests, retention_days, admin_can_view_content, version FROM image_settings WHERE singleton=true
+SELECT singleton, max_n, max_references, max_upload_bytes, sizes, ratio_sizes, per_user_concurrency, global_concurrency, timeout_seconds, queue_timeout_seconds, split_requests, retention_days, admin_can_view_content, version, disabled_ratios, disabled_resolutions FROM image_settings WHERE singleton=true
 `
 
 func (q *Queries) GetImageSettings(ctx context.Context) (ImageSetting, error) {
@@ -505,6 +506,8 @@ func (q *Queries) GetImageSettings(ctx context.Context) (ImageSetting, error) {
 		&i.RetentionDays,
 		&i.AdminCanViewContent,
 		&i.Version,
+		&i.DisabledRatios,
+		&i.DisabledResolutions,
 	)
 	return i, err
 }
@@ -552,6 +555,38 @@ func (q *Queries) GetImageTask(ctx context.Context, id uuid.UUID) (ImageTask, er
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
+const getTaskConversation = `-- name: GetTaskConversation :one
+SELECT id, user_id, type, title, model_id, pinned, title_auto, last_message_at, deleted_at, active_run_id, lease_until, cancel_requested, created_at, version FROM conversations WHERE id=$1 AND user_id=$2 AND type IN ('image','canvas') AND deleted_at IS NULL
+`
+
+type GetTaskConversationParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+// Image tasks belong to an image conversation or to the hidden conversation of a canvas.
+func (q *Queries) GetTaskConversation(ctx context.Context, arg GetTaskConversationParams) (Conversation, error) {
+	row := q.db.QueryRow(ctx, getTaskConversation, arg.ID, arg.UserID)
+	var i Conversation
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Type,
+		&i.Title,
+		&i.ModelID,
+		&i.Pinned,
+		&i.TitleAuto,
+		&i.LastMessageAt,
+		&i.DeletedAt,
+		&i.ActiveRunID,
+		&i.LeaseUntil,
+		&i.CancelRequested,
+		&i.CreatedAt,
 		&i.Version,
 	)
 	return i, err
@@ -1356,6 +1391,37 @@ func (q *Queries) LockImageTask(ctx context.Context, id uuid.UUID) (ImageTask, e
 	return i, err
 }
 
+const lockTaskConversation = `-- name: LockTaskConversation :one
+SELECT id, user_id, type, title, model_id, pinned, title_auto, last_message_at, deleted_at, active_run_id, lease_until, cancel_requested, created_at, version FROM conversations WHERE id=$1 AND user_id=$2 AND type IN ('image','canvas') AND deleted_at IS NULL FOR UPDATE
+`
+
+type LockTaskConversationParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) LockTaskConversation(ctx context.Context, arg LockTaskConversationParams) (Conversation, error) {
+	row := q.db.QueryRow(ctx, lockTaskConversation, arg.ID, arg.UserID)
+	var i Conversation
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Type,
+		&i.Title,
+		&i.ModelID,
+		&i.Pinned,
+		&i.TitleAuto,
+		&i.LastMessageAt,
+		&i.DeletedAt,
+		&i.ActiveRunID,
+		&i.LeaseUntil,
+		&i.CancelRequested,
+		&i.CreatedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
 const markImageFilePurged = `-- name: MarkImageFilePurged :exec
 UPDATE files SET purged_at=now() WHERE id=$1 AND deleted_at IS NOT NULL
 `
@@ -1433,7 +1499,7 @@ func (q *Queries) RemoveImageConversation(ctx context.Context, arg RemoveImageCo
 }
 
 const saveImageSettings = `-- name: SaveImageSettings :one
-UPDATE image_settings SET max_n=$1,max_references=$2,max_upload_bytes=$3,sizes=$4,ratio_sizes=$5,per_user_concurrency=$6,global_concurrency=$7,timeout_seconds=$8,queue_timeout_seconds=$9,split_requests=$10,retention_days=$11,admin_can_view_content=$12,version=version+1 WHERE singleton=true AND version=$13 RETURNING singleton, max_n, max_references, max_upload_bytes, sizes, ratio_sizes, per_user_concurrency, global_concurrency, timeout_seconds, queue_timeout_seconds, split_requests, retention_days, admin_can_view_content, version
+UPDATE image_settings SET max_n=$1,max_references=$2,max_upload_bytes=$3,sizes=$4,ratio_sizes=$5,per_user_concurrency=$6,global_concurrency=$7,timeout_seconds=$8,queue_timeout_seconds=$9,split_requests=$10,retention_days=$11,admin_can_view_content=$12,disabled_ratios=COALESCE($13::text[],disabled_ratios),disabled_resolutions=COALESCE($14::text[],disabled_resolutions),version=version+1 WHERE singleton=true AND version=$15 RETURNING singleton, max_n, max_references, max_upload_bytes, sizes, ratio_sizes, per_user_concurrency, global_concurrency, timeout_seconds, queue_timeout_seconds, split_requests, retention_days, admin_can_view_content, version, disabled_ratios, disabled_resolutions
 `
 
 type SaveImageSettingsParams struct {
@@ -1449,6 +1515,8 @@ type SaveImageSettingsParams struct {
 	SplitRequests       bool
 	RetentionDays       int32
 	AdminCanViewContent bool
+	DisabledRatios      []string
+	DisabledResolutions []string
 	Version             int64
 }
 
@@ -1466,6 +1534,8 @@ func (q *Queries) SaveImageSettings(ctx context.Context, arg SaveImageSettingsPa
 		arg.SplitRequests,
 		arg.RetentionDays,
 		arg.AdminCanViewContent,
+		arg.DisabledRatios,
+		arg.DisabledResolutions,
 		arg.Version,
 	)
 	var i ImageSetting
@@ -1484,6 +1554,8 @@ func (q *Queries) SaveImageSettings(ctx context.Context, arg SaveImageSettingsPa
 		&i.RetentionDays,
 		&i.AdminCanViewContent,
 		&i.Version,
+		&i.DisabledRatios,
+		&i.DisabledResolutions,
 	)
 	return i, err
 }
@@ -1579,7 +1651,7 @@ func (q *Queries) StartImageTask(ctx context.Context, arg StartImageTaskParams) 
 }
 
 const touchImageConversation = `-- name: TouchImageConversation :exec
-UPDATE conversations SET last_message_at=now(),model_id=$3,title=CASE WHEN title_auto THEN $4 ELSE title END,title_auto=false,version=version+1 WHERE id=$1 AND user_id=$2 AND type='image'
+UPDATE conversations SET last_message_at=now(),model_id=$3,title=CASE WHEN title_auto THEN $4 ELSE title END,title_auto=false,version=version+1 WHERE id=$1 AND user_id=$2 AND type IN ('image','canvas')
 `
 
 type TouchImageConversationParams struct {

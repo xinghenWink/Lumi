@@ -1,11 +1,11 @@
 openapi: 3.1.0
 info:
   title: Lumi API
-  version: 0.6.0
+  version: 0.9.0
   description: >-
     Accounts, credits, upstream configuration and owner-isolated chat. Mutations require Origin and
     X-Lumi-CSRF: 1. Chat POST streams use meta, delta, error, done and ping SSE events. Reuse request_id
-    only with identical input; live duplicates replay the owner-scoped Redis stream (five-minute TTL). Image tasks charge and settle atomically, run independently of HTTP, and expose only owner-scoped signed files.
+    only with identical input; live duplicates replay the owner-scoped Redis stream (five-minute TTL). Image tasks charge and settle atomically, run independently of HTTP, and expose only owner-scoped signed files. Canvases store one versioned document per board and generate through image tasks in their hidden canvas conversation.
     Public production deployments require HTTPS and Secure refresh cookies; HTTP is allowed only for loopback deployment checks.
 servers:
   - url: /
@@ -286,6 +286,7 @@ paths:
     patch:
       operationId: updateMe
       summary: updateMe
+      description: Updates the supplied profile fields. The workspace language switcher sends only `locale` to save the account's interface language.
       security:
         - bearerAuth: []
       parameters:
@@ -4853,6 +4854,269 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ManualRefundInput'
+  /api/v1/canvases:
+    get:
+      operationId: listCanvases
+      summary: listCanvases
+      description: Owner-scoped canvases, most recently updated first. Each item carries a signed cover thumbnail when its first placed image is still available.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanvasPage'
+        default:
+          $ref: '#/components/responses/APIError'
+    post:
+      operationId: createCanvas
+      summary: createCanvas
+      description: Creates an empty canvas with a client-generated ID and its hidden canvas conversation. Replaying the same ID returns the existing canvas; at most 200 canvases per user (CANVAS_LIMIT).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Canvas'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanvasCreateInput'
+  /api/v1/canvases/{id}/text-runs:
+    post:
+      operationId: submitCanvasText
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: header, name: Idempotency-Key, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanvasTextRunInput'
+      responses:
+        '202':
+          description: A durable text run and its saved canvas slots
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [canvas, task]
+                properties:
+                  canvas:
+                    $ref: '#/components/schemas/Canvas'
+                  task:
+                    $ref: '#/components/schemas/CanvasTextRun'
+        '409':
+          description: Version conflict or reused idempotency key
+  /api/v1/canvases/{id}/text-runs/{run}:
+    get:
+      operationId: getCanvasTextRun
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: run, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Text candidates and their statuses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanvasTextRun'
+        '404':
+          description: Canvas or run unavailable to this owner
+  /api/v1/canvases/{id}/text-runs/{run}/cancel:
+    post:
+      operationId: cancelCanvasTextRun
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: run, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Remaining candidates canceled, completed candidates retained
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanvasTextRun'
+  /api/v1/canvases/{id}/runs:
+    post:
+      operationId: runCanvasNode
+      summary: Generate images from a saved canvas node
+      description: Resolves input edges from the specified canvas version. The task, charge and result slots are committed together. Replaying the same request with the same key returns the original task and the current canvas.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanvasRunInput'
+      responses:
+        '202':
+          description: Accepted or replayed image task and saved canvas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanvasRun'
+        '400':
+          description: Invalid parameters, prompt or connected inputs
+        '401':
+          description: Authentication required
+        '404':
+          description: Canvas or reference file is unavailable
+        '409':
+          description: Stale canvas version, reused key, or canvas and billing limits
+        '429':
+          description: Too many requests
+  /api/v1/canvases/{id}:
+    get:
+      operationId: getCanvas
+      summary: getCanvas
+      description: Returns the document plus signed metadata for every referenced file that still exists. Files missing from `files` were deleted or expired.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Canvas'
+        default:
+          $ref: '#/components/responses/APIError'
+    put:
+      operationId: saveCanvas
+      summary: saveCanvas
+      description: Replaces the whole document when `version` matches (otherwise 409 CANVAS_CONFLICT). The request body may be up to 1.5 MiB and the stored document up to 1 MiB. Referenced files must belong to the caller and referenced tasks must belong to this canvas conversation.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Canvas'
+        default:
+          $ref: '#/components/responses/APIError'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanvasSaveInput'
+    delete:
+      operationId: deleteCanvas
+      summary: deleteCanvas
+      description: Hides the canvas and its conversation; queued or running tasks of that conversation are canceled and refunded by the image worker. Generated images stay in the gallery.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '204':
+          description: Success
+        default:
+          $ref: '#/components/responses/APIError'
   /metrics:
     get:
       summary: Administrator-authenticated Prometheus metrics
@@ -6911,6 +7175,12 @@ components:
       type: object
       additionalProperties: false
       properties:
+        reasoning_effort:
+          type: boolean
+          description: Chat model accepts explicit reasoning effort.
+        use_size_presets:
+          type: boolean
+          description: Image model inherits the site's enabled ratio and resolution presets. Otherwise its explicit sizes are used.
         vision:
           type: boolean
         stream:
@@ -6940,7 +7210,6 @@ components:
         max_reference_images:
           type: integer
           minimum: 0
-          maximum: 4
         response_format:
           type: string
           enum:
@@ -7351,7 +7620,39 @@ components:
           type: string
         usage:
           $ref: '#/components/schemas/ChatUsage'
+        sources:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/ChatSource'
       required: []
+    ChatSource:
+      type: object
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: Absolute HTTP or HTTPS URL provided in an upstream citation.
+        title:
+          type: string
+          maxLength: 256
+        ref:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9_.:#-]{0,127}$'
+        start_index:
+          type: integer
+          minimum: 0
+          maximum: 2097151
+          description: Optional upstream character offset into the unmodified reply.
+        end_index:
+          type: integer
+          minimum: 0
+          maximum: 2097151
+          description: Optional upstream character offset into the unmodified reply.
+      required:
+        - url
     ChatMessage:
       type: object
       additionalProperties: false
@@ -7672,7 +7973,6 @@ components:
           type: integer
           format: int64
           minimum: 0
-          maximum: 4
         max_upload_bytes:
           type: integer
           format: int64
@@ -7684,8 +7984,29 @@ components:
             type: string
         ratio_sizes:
           type: object
+          description: Optional legacy or custom one-to-one mappings, available with explicitly sized models.
           additionalProperties:
             type: string
+        resolution_presets:
+          type: array
+          readOnly: true
+          description: Site preset catalog. Disabled choices remain in the catalog so administrators can re-enable them.
+          items:
+            $ref: '#/components/schemas/ImageResolutionPreset'
+        disabled_ratios:
+          type: array
+          items:
+            type: string
+            enum: ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16']
+          uniqueItems: true
+          maxItems: 6
+        disabled_resolutions:
+          type: array
+          items:
+            type: string
+            enum: [1k, 2k, 4k]
+          uniqueItems: true
+          maxItems: 2
         per_user_concurrency:
           type: integer
           format: int64
@@ -7733,6 +8054,20 @@ components:
         - retention_days
         - admin_can_view_content
         - version
+    ImageResolutionPreset:
+      type: object
+      additionalProperties: false
+      properties:
+        ratio:
+          type: string
+          enum: ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16']
+        resolution:
+          type: string
+          enum: [1k, 2k, 4k]
+        size:
+          type: string
+          description: Exact width and height sent to the provider, in pixels.
+      required: [ratio, resolution, size]
     ImageTaskInput:
       type: object
       additionalProperties: false
@@ -7740,6 +8075,7 @@ components:
         conversation_id:
           type: string
           format: uuid
+          description: An image conversation ID. Canvas runs use POST /api/v1/canvases/{id}/runs.
         model_id:
           type: string
           format: uuid
@@ -7767,7 +8103,6 @@ components:
           items:
             type: string
             format: uuid
-          maxItems: 4
       required:
         - conversation_id
         - model_id
@@ -8045,6 +8380,437 @@ components:
         task:
           $ref: '#/components/schemas/ImageTask'
       required: []
+    CanvasViewport:
+      type: object
+      additionalProperties: false
+      properties:
+        x:
+          type: number
+          minimum: -1000000
+          maximum: 1000000
+        'y':
+          type: number
+          minimum: -1000000
+          maximum: 1000000
+        zoom:
+          type: number
+          minimum: 0.05
+          maximum: 4
+      required:
+        - x
+        - 'y'
+        - zoom
+    CanvasImageContent:
+      type: object
+      additionalProperties: false
+      description: An empty image, a placed file, or a pending or failed task slot.
+      properties:
+        state:
+          type: string
+          enum:
+            - empty
+            - ready
+            - pending
+            - failed
+        file_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        task_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        position:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 9
+        error_code:
+          type: string
+          maxLength: 64
+          pattern: '^[A-Z0-9_]*$'
+      required:
+        - state
+        - file_id
+        - task_id
+        - position
+        - error_code
+    CanvasTextContent:
+      type: object
+      additionalProperties: false
+      properties:
+        content:
+          type: string
+          maxLength: 8000
+        run_id: { type: string, format: uuid }
+        position: { type: integer, minimum: 0, maximum: 2 }
+        state: { type: string, enum: [pending, ready, failed] }
+        error_code: { type: string }
+      required:
+        - content
+    CanvasMention:
+      type: object
+      additionalProperties: false
+      required: [node_id, token]
+      properties:
+        node_id: { type: string, format: uuid }
+        token: { type: string }
+    CanvasTextSettings:
+      type: object
+      additionalProperties: false
+      required: [prompt, model_id, reasoning, n]
+      properties:
+        prompt: { type: string, maxLength: 8000 }
+        model_id: { type: [string, 'null'], format: uuid }
+        reasoning: { type: string, enum: ['', low, medium, high] }
+        'n': { type: integer, minimum: 1, maximum: 3 }
+        mentions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanvasMention'
+    CanvasTextRunInput:
+      type: object
+      additionalProperties: false
+      required: [version, node_id, model_id, reasoning, n]
+      properties:
+        version: { type: integer, minimum: 1 }
+        node_id: { type: string, format: uuid }
+        model_id: { type: string, format: uuid }
+        reasoning: { type: string, enum: ['', low, medium, high] }
+        'n': { type: integer, minimum: 1, maximum: 3 }
+    CanvasTextRun:
+      type: object
+      required: [id, items]
+      properties:
+        id: { type: string, format: uuid }
+        items:
+          type: array
+          items:
+            type: object
+            required: [position, status, content, error_code]
+            properties:
+              position: { type: integer, minimum: 0, maximum: 2 }
+              status: { type: string, enum: [queued, running, succeeded, failed, canceled] }
+              content: { type: string, maxLength: 8000 }
+              error_code: { type: string }
+    CanvasGeneratorContent:
+      type: object
+      additionalProperties: false
+      description: Last chosen generation parameters; empty strings and a null model fall back to the current defaults.
+      properties:
+        prompt:
+          type: string
+          maxLength: 8000
+        mentions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanvasMention'
+        model_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        quality:
+          type: string
+          enum:
+            - ''
+            - low
+            - medium
+            - high
+        size:
+          type: string
+          maxLength: 11
+        ratio:
+          type: string
+          maxLength: 7
+        'n':
+          type: integer
+          minimum: 1
+          maximum: 10
+      required:
+        - prompt
+        - model_id
+        - quality
+        - size
+        - ratio
+        - 'n'
+    CanvasNode:
+      type: object
+      additionalProperties: false
+      description: Text and generator nodes carry their matching content. Images may also store generation settings for in-place runs. Group frames paint beneath other nodes.
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+            - image
+            - text
+            - generator
+            - group
+        x:
+          type: number
+          minimum: -1000000
+          maximum: 1000000
+        'y':
+          type: number
+          minimum: -1000000
+          maximum: 1000000
+        w:
+          type: number
+          minimum: 24
+          maximum: 20000
+        h:
+          type: number
+          minimum: 24
+          maximum: 20000
+        title:
+          type: string
+          maxLength: 100
+        group_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        image:
+          $ref: '#/components/schemas/CanvasImageContent'
+        text:
+          $ref: '#/components/schemas/CanvasTextContent'
+        generator:
+          $ref: '#/components/schemas/CanvasGeneratorContent'
+        text_settings:
+          $ref: '#/components/schemas/CanvasTextSettings'
+      required:
+        - id
+        - kind
+        - x
+        - 'y'
+        - w
+        - h
+        - title
+        - group_id
+    CanvasEdge:
+      type: object
+      additionalProperties: false
+      description: Input edges connect text, images or groups to a text, generator or image node. Result edges connect a text, generator or image node to a compatible output.
+      properties:
+        id:
+          type: string
+          format: uuid
+        from:
+          type: string
+          format: uuid
+        to:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+            - input
+            - result
+      required:
+        - id
+        - from
+        - to
+        - kind
+    CanvasDocument:
+      type: object
+      additionalProperties: false
+      properties:
+        schema:
+          type: integer
+          const: 2
+        viewport:
+          $ref: '#/components/schemas/CanvasViewport'
+        nodes:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/CanvasNode'
+        edges:
+          type: array
+          maxItems: 1000
+          items:
+            $ref: '#/components/schemas/CanvasEdge'
+      required:
+        - schema
+        - viewport
+        - nodes
+        - edges
+    CanvasRunInput:
+      type: object
+      additionalProperties: false
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        node_id:
+          type: string
+          format: uuid
+        model_id:
+          type: string
+          format: uuid
+        quality:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+        size:
+          type: string
+        ratio:
+          type: string
+        'n':
+          type: integer
+          minimum: 1
+          maximum: 10
+      required:
+        - version
+        - node_id
+        - model_id
+        - quality
+        - size
+        - ratio
+        - 'n'
+    CanvasRun:
+      type: object
+      additionalProperties: false
+      properties:
+        canvas:
+          $ref: '#/components/schemas/Canvas'
+        task:
+          $ref: '#/components/schemas/ImageTask'
+      required:
+        - canvas
+        - task
+    Canvas:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 100
+        conversation_id:
+          type: string
+          format: uuid
+          description: Hidden canvas conversation used to filter the owner's image task history.
+        document:
+          $ref: '#/components/schemas/CanvasDocument'
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageFile'
+        node_count:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 500
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - conversation_id
+        - document
+        - files
+        - node_count
+        - version
+        - created_at
+        - updated_at
+    CanvasSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 100
+        node_count:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 500
+        cover:
+          anyOf:
+            - $ref: '#/components/schemas/ImageFile'
+            - type: 'null'
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - node_count
+        - cover
+        - version
+        - created_at
+        - updated_at
+    CanvasPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanvasSummary'
+        next_cursor:
+          type: string
+      required:
+        - items
+        - next_cursor
+    CanvasCreateInput:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 100
+      required:
+        - id
+    CanvasSaveInput:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          maxLength: 100
+        document:
+          $ref: '#/components/schemas/CanvasDocument'
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+      required:
+        - title
+        - document
+        - version
   securitySchemes:
     bearerAuth:
       type: http

@@ -11,6 +11,8 @@ const LegalPage = lazy(() => import('../pages/LegalPage'))
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
 const ImagePage = lazy(() => import('../pages/ImagePage'))
 const ImageGalleryPage = lazy(() => import('../pages/ImageGalleryPage'))
+const CanvasListPage = lazy(() => import('../pages/CanvasListPage'))
+const CanvasPage = lazy(() => import('../pages/CanvasPage'))
 const CreditsPage = lazy(() => import('../pages/CreditsPage'))
 const ProfilePage = lazy(() => import('../pages/ProfilePage'))
 const SecurityPage = lazy(() => import('../pages/SecurityPage'))
@@ -92,6 +94,7 @@ const router = createBrowserRouter([
   {
     element: <SessionBoundary />,
     children: [
+      { path: '/canvas/:id', element: pending(<CanvasPage />) },
       {
         element: pending(<WorkspaceShell />),
         children: [
@@ -100,6 +103,7 @@ const router = createBrowserRouter([
             path,
             element: pending(<ImagePage />),
           })),
+          { path: '/canvas', element: pending(<CanvasListPage />) },
           { path: '/me/chats', element: pending(<ChatHistoryPage />) },
           { path: '/me/images', element: pending(<ImageGalleryPage />) },
           { path: '/me', element: pending(<ProfilePage />) },

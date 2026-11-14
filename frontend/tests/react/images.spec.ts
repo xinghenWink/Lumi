@@ -213,7 +213,7 @@ test('React real image generation editing gallery cancellation and administrator
       capabilities: {
         ...defaultCapabilities('image'),
         qualities: ['low', 'medium', 'high'],
-        sizes: ['1024x1024', '1536x1024', 'auto'],
+        sizes: ['1024x1024', '1536x1024', '2016x1344', 'auto'],
         max_n: 4,
         supports_edit: true,
         max_reference_images: 4,
@@ -334,15 +334,37 @@ test('React real image generation editing gallery cancellation and administrator
       .getByRole('link', { name: '生图', exact: true })
       .click()
     await expect(prompt).toHaveValue('image-only draft')
-    await member.getByRole('button', { name: '生图参数', exact: true }).click()
-    await expect(member.getByLabel('质量', { exact: true })).toHaveValue('medium')
-    expect(await member.getByLabel('质量', { exact: true }).locator('option').count()).toBe(1)
-    await member.getByLabel('比例', { exact: true }).selectOption('3:2')
-    await expect(member.getByLabel('尺寸', { exact: true })).toHaveValue('1536x1024')
-    await member.getByLabel('尺寸', { exact: true }).selectOption('1024x1024')
-    await expect(member.getByLabel('比例', { exact: true })).toHaveValue('')
-    await member.getByLabel('张数', { exact: true }).selectOption('2')
-    const parameters = member.getByRole('dialog', { name: '生图参数', exact: true })
+    // Desktop keeps parameters visible in the studio panel; smaller screens open a sheet.
+    const mobile = info.project.name.includes('mobile')
+    if (!mobile) {
+      await expect(send).toHaveText('开始生成')
+      await expect(send.locator('svg')).toHaveCount(0)
+    }
+    const parameters = member.getByRole(mobile ? 'dialog' : 'region', {
+      name: '生图参数',
+      exact: true,
+    })
+    if (mobile) await member.getByRole('button', { name: '生图参数', exact: true }).click()
+    await expect(parameters.getByRole('radio', { name: '精细', exact: true })).toBeChecked()
+    expect(
+      await parameters
+        .getByRole('radiogroup', { name: '质量', exact: true })
+        .getByRole('radio')
+        .count(),
+    ).toBe(1)
+    await parameters.getByRole('radio', { name: '3:2', exact: true }).check()
+    const resolution = parameters.getByLabel('分辨率', { exact: true })
+    await expect(resolution).toHaveValue('1536x1024')
+    await resolution.selectOption({ label: '2K · 2016 × 1344' })
+    await expect(parameters.getByRole('radio', { name: '3:2', exact: true })).toBeChecked()
+    await expect(resolution).toHaveValue('2016x1344')
+    await parameters.getByRole('radio', { name: '按尺寸', exact: true }).check()
+    await parameters.getByLabel('尺寸', { exact: true }).selectOption('1024x1024')
+    await expect(parameters.getByRole('radio', { name: '按尺寸', exact: true })).toBeChecked()
+    await parameters.getByRole('radio', { name: '3:2', exact: true }).check()
+    await resolution.selectOption({ label: '2K · 2016 × 1344' })
+    await parameters.getByRole('radio', { name: '2 张', exact: true }).check()
+    await parameters.scrollIntoViewIfNeeded()
     expect(
       await parameters.evaluate((element) => {
         const box = element.getBoundingClientRect()
@@ -423,6 +445,7 @@ test('React real image generation editing gallery cancellation and administrator
     const firstID = await task.getAttribute('data-task-id')
     if (!firstID) throw new Error('Missing task ID')
     const persisted = parseTask(await api('GET', '/image-tasks/' + firstID, undefined, memberToken))
+    expect(persisted).toMatchObject({ ratio: '3:2', size: '2016x1344' })
     const original = persisted.items[0]?.file
     if (!original) throw new Error('Missing image file')
     expect(original.width).toBe(900)
@@ -453,6 +476,20 @@ test('React real image generation editing gallery cancellation and administrator
     expect(await member.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     )
+    const topActions = task.getByTestId('image-task-top-actions')
+    const detailsButton = topActions.getByRole('button', { name: '任务详情', exact: true })
+    await detailsButton.click()
+    const taskDetails = member.getByRole('dialog', { name: '任务详情', exact: true })
+    await expect(taskDetails.getByText(firstID, { exact: true })).toBeVisible()
+    await member.keyboard.press('Escape')
+    await expect(taskDetails).toBeHidden()
+    await expect(detailsButton).toBeFocused()
+    await topActions.getByRole('button', { name: '使用相同参数', exact: true }).click()
+    await expect(prompt).toHaveValue('partial')
+    expect(calls).toBe(1)
+    if (mobile) await member.getByRole('button', { name: '生图参数', exact: true }).click()
+    await expect(parameters.getByLabel('分辨率', { exact: true })).toHaveValue('2016x1344')
+    await member.keyboard.press('Escape')
     await member.screenshot({ path: info.outputPath('images-light.png'), animations: 'disabled' })
     await member.getByRole('button', { name: '切换深色主题', exact: true }).click()
     await member.screenshot({ path: info.outputPath('images-dark.png'), animations: 'disabled' })
@@ -470,29 +507,72 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(dialog).not.toBeVisible()
     await expect(member.locator('.image-references img')).toHaveCount(1)
     await expect(prompt).toBeFocused()
-    await member.getByRole('button', { name: '生图参数', exact: true }).click()
-    await member.getByLabel('张数', { exact: true }).selectOption('1')
+    if (mobile) await member.getByRole('button', { name: '生图参数', exact: true }).click()
+    await parameters.getByRole('radio', { name: '1 张', exact: true }).check()
     await member.keyboard.press('Escape')
     await prompt.fill('edit reference')
     await send.click()
-    await expect(member.locator('.image-task').last().locator('.image-status')).toHaveText(
+    await expect(member.locator('.image-task').first().locator('.image-status')).toHaveText(
       '已完成',
       { timeout: 20_000 },
     )
     expect(edits).toBe(1)
     expect(reusedReference).toBe(true)
-    // Uploaded references use real multipart validation; library choices reuse existing IDs.
-    await member
-      .locator('input[type=file]')
-      .setInputFiles({ name: 'reference.png', mimeType: 'image/png', buffer: png })
-    await expect(member.locator('.image-references img')).toHaveCount(1)
-    await member.getByRole('button', { name: '移除参考图', exact: true }).click()
+    // A library image and a fresh upload share one row of square thumbnails.
+    const references = member.locator('.image-references')
     await member.getByRole('button', { name: '从已有图片选择', exact: true }).click()
     dialog = member.getByRole('dialog')
     await expect(dialog.locator('.image-library-item').first()).toBeVisible()
     await dialog.locator('.image-library-item').first().click()
+    await expect(references.getByRole('img')).toHaveCount(1)
+    await member
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'reference.png', mimeType: 'image/png', buffer: png })
+    await expect(references.getByRole('img')).toHaveCount(2)
+    const [first, second] = await references
+      .locator('div[data-slot="attachment"]')
+      .evaluateAll((tiles) =>
+        tiles.map((tile) => {
+          if (!(tile instanceof HTMLElement)) throw new Error('Expected an HTML attachment')
+          return {
+            x: tile.offsetLeft,
+            y: tile.offsetTop,
+            width: tile.offsetWidth,
+            height: tile.offsetHeight,
+          }
+        }),
+      )
+    if (!first || !second) throw new Error('Missing reference thumbnails')
+    expect(first).toMatchObject({ width: 64, height: 64 })
+    expect(second).toMatchObject({ width: 64, height: 64 })
+    expect(second.x).toBeGreaterThan(first.x)
+    expect(second.y).toBe(first.y)
+    const removeReference = references.getByRole('button', { name: '移除参考图', exact: true })
+    await expect(removeReference).toHaveCount(2)
+    await removeReference.first().click()
+    await removeReference.click()
+    // Files dropped anywhere in the workspace, or pasted outside a text field, become references.
+    const transfer = await member.evaluateHandle((encoded) => {
+      const bytes = Uint8Array.from(atob(encoded), (value) => value.charCodeAt(0))
+      const data = new DataTransfer()
+      data.items.add(new File([bytes], 'dropped.png', { type: 'image/png' }))
+      return data
+    }, png.toString('base64'))
+    await member.locator('main').dispatchEvent('dragenter', { dataTransfer: transfer })
+    await expect(member.getByText('松开以添加图片', { exact: true })).toBeVisible()
+    await member.locator('main').dispatchEvent('drop', { dataTransfer: transfer })
+    await expect(member.getByText('松开以添加图片', { exact: true })).toHaveCount(0)
     await expect(member.locator('.image-references img')).toHaveCount(1)
     await member.getByRole('button', { name: '移除参考图', exact: true }).click()
+    await expect(member.locator('.image-references img')).toHaveCount(0)
+    await member.evaluate((data) => {
+      document.body.dispatchEvent(
+        new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
+      )
+    }, transfer)
+    await expect(member.locator('.image-references img')).toHaveCount(1)
+    await member.getByRole('button', { name: '移除参考图', exact: true }).click()
+    await transfer.dispose()
     const beforeBackground = calls
     let disconnected = false,
       pollRequests = 0
@@ -516,7 +596,7 @@ test('React real image generation editing gallery cancellation and administrator
       .getByRole('link', { name: '生图', exact: true })
       .click()
     await expect(member).toHaveURL(conversationURL)
-    await expect(member.locator('.image-task').last().locator('.image-status')).toHaveText(
+    await expect(member.locator('.image-task').first().locator('.image-status')).toHaveText(
       '已完成',
       { timeout: 20_000 },
     )
@@ -526,7 +606,7 @@ test('React real image generation editing gallery cancellation and administrator
     await member.unroute('**/api/v1/image-tasks/*/events')
     await prompt.fill('cancel')
     await send.click()
-    const cancelTask = member.locator('.image-task').last()
+    const cancelTask = member.locator('.image-task').first()
     await expect(cancelTask.locator('.image-status')).toHaveText('生成中', { timeout: 15_000 })
     await cancelTask.getByRole('button', { name: '取消任务', exact: true }).click()
     await expect(cancelTask.locator('.image-status')).toHaveText('已取消', { timeout: 15_000 })
@@ -534,11 +614,11 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(cancelTask).toContainText('已退 10 积分')
     await prompt.fill('reject')
     await send.click()
-    await expect(member.locator('.image-task').last().locator('.image-status')).toHaveText(
+    await expect(member.locator('.image-task').first().locator('.image-status')).toHaveText(
       '生成失败',
       { timeout: 20_000 },
     )
-    await expect(member.locator('.image-task').last()).toContainText('已退 10 积分')
+    await expect(member.locator('.image-task').first()).toContainText('已退 10 积分')
     const adminView = await api('GET', '/admin/image-tasks/' + firstID)
     expect(adminView.content_visible).toBe(false)
     expect(adminView.prompt).toBe('')
@@ -564,9 +644,18 @@ test('React real image generation editing gallery cancellation and administrator
     })
     await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
     await page.goto('/admin/image-settings')
+    await page.getByRole('switch', { name: '4K', exact: true }).uncheck()
+    await page.getByRole('switch', { name: '9:16', exact: true }).uncheck()
     await page.getByLabel('允许管理员查看提示词、参考图与结果', { exact: true }).check()
     await page.getByRole('button', { name: '保存修改', exact: true }).click()
     await expect(page.getByRole('status')).toContainText('生图设置已保存')
+    await page.reload()
+    await expect(page.getByRole('switch', { name: '4K', exact: true })).not.toBeChecked()
+    await expect(page.getByRole('switch', { name: '9:16', exact: true })).not.toBeChecked()
+    expect(parseImageConfiguration(await api('GET', '/admin/image-settings'))).toMatchObject({
+      disabled_resolutions: ['4k'],
+      disabled_ratios: ['9:16'],
+    })
     await page.screenshot({ path: info.outputPath('image-settings.png'), animations: 'disabled' })
     await page.goto('/admin/image-tasks')
     await page.getByLabel('用户 ID', { exact: true }).fill(String(memberUser.id))

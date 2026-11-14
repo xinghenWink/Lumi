@@ -172,7 +172,10 @@ export interface paths {
     delete: operations['m6_delete__api_v1_me']
     options?: never
     head?: never
-    /** updateMe */
+    /**
+     * updateMe
+     * @description Updates the supplied profile fields. The workspace language switcher sends only `locale` to save the account's interface language.
+     */
     patch: operations['updateMe']
     trace?: never
   }
@@ -1519,6 +1522,126 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/canvases': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * listCanvases
+     * @description Owner-scoped canvases, most recently updated first. Each item carries a signed cover thumbnail when its first placed image is still available.
+     */
+    get: operations['listCanvases']
+    put?: never
+    /**
+     * createCanvas
+     * @description Creates an empty canvas with a client-generated ID and its hidden canvas conversation. Replaying the same ID returns the existing canvas; at most 200 canvases per user (CANVAS_LIMIT).
+     */
+    post: operations['createCanvas']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/canvases/{id}/text-runs': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['submitCanvasText']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/canvases/{id}/text-runs/{run}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['getCanvasTextRun']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/canvases/{id}/text-runs/{run}/cancel': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['cancelCanvasTextRun']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/canvases/{id}/runs': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Generate images from a saved canvas node
+     * @description Resolves input edges from the specified canvas version. The task, charge and result slots are committed together. Replaying the same request with the same key returns the original task and the current canvas.
+     */
+    post: operations['runCanvasNode']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/canvases/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * getCanvas
+     * @description Returns the document plus signed metadata for every referenced file that still exists. Files missing from `files` were deleted or expired.
+     */
+    get: operations['getCanvas']
+    /**
+     * saveCanvas
+     * @description Replaces the whole document when `version` matches (otherwise 409 CANVAS_CONFLICT). The request body may be up to 1.5 MiB and the stored document up to 1 MiB. Referenced files must belong to the caller and referenced tasks must belong to this canvas conversation.
+     */
+    put: operations['saveCanvas']
+    post?: never
+    /**
+     * deleteCanvas
+     * @description Hides the canvas and its conversation; queued or running tasks of that conversation are canceled and refunded by the image worker. Generated images stay in the gallery.
+     */
+    delete: operations['deleteCanvas']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/metrics': {
     parameters: {
       query?: never
@@ -2234,6 +2357,10 @@ export interface components {
       next_cursor: string
     }
     ModelCapabilities: {
+      /** @description Chat model accepts explicit reasoning effort. */
+      reasoning_effort?: boolean
+      /** @description Image model inherits the site's enabled ratio and resolution presets. Otherwise its explicit sizes are used. */
+      use_size_presets?: boolean
       vision: boolean
       stream: boolean
       max_context_tokens: number
@@ -2368,6 +2495,20 @@ export interface components {
       latency_ms?: number
       error_code?: string
       usage?: components['schemas']['ChatUsage']
+      sources?: components['schemas']['ChatSource'][]
+    }
+    ChatSource: {
+      /**
+       * Format: uri
+       * @description Absolute HTTP or HTTPS URL provided in an upstream citation.
+       */
+      url: string
+      title?: string
+      ref?: string
+      /** @description Optional upstream character offset into the unmodified reply. */
+      start_index?: number
+      /** @description Optional upstream character offset into the unmodified reply. */
+      end_index?: number
     }
     ChatMessage: {
       /** Format: uuid */
@@ -2485,9 +2626,14 @@ export interface components {
       /** Format: int64 */
       max_upload_bytes: number
       sizes: string[]
+      /** @description Optional legacy or custom one-to-one mappings, available with explicitly sized models. */
       ratio_sizes: {
         [key: string]: string
       }
+      /** @description Site preset catalog. Disabled choices remain in the catalog so administrators can re-enable them. */
+      readonly resolution_presets?: components['schemas']['ImageResolutionPreset'][]
+      disabled_ratios?: ('1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16')[]
+      disabled_resolutions?: ('1k' | '2k' | '4k')[]
       /** Format: int64 */
       per_user_concurrency: number
       /** Format: int64 */
@@ -2503,8 +2649,19 @@ export interface components {
       /** Format: int64 */
       version: number
     }
+    ImageResolutionPreset: {
+      /** @enum {string} */
+      ratio: '1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16'
+      /** @enum {string} */
+      resolution: '1k' | '2k' | '4k'
+      /** @description Exact width and height sent to the provider, in pixels. */
+      size: string
+    }
     ImageTaskInput: {
-      /** Format: uuid */
+      /**
+       * Format: uuid
+       * @description An image conversation ID. Canvas runs use POST /api/v1/canvases/{id}/runs.
+       */
       conversation_id: string
       /** Format: uuid */
       model_id: string
@@ -2610,6 +2767,179 @@ export interface components {
     }
     ImageTaskEvent: {
       task?: components['schemas']['ImageTask']
+    }
+    CanvasViewport: {
+      x: number
+      y: number
+      zoom: number
+    }
+    /** @description An empty image, a placed file, or a pending or failed task slot. */
+    CanvasImageContent: {
+      /** @enum {string} */
+      state: 'empty' | 'ready' | 'pending' | 'failed'
+      /** Format: uuid */
+      file_id: string | null
+      /** Format: uuid */
+      task_id: string | null
+      position: number | null
+      error_code: string
+    }
+    CanvasTextContent: {
+      content: string
+      /** Format: uuid */
+      run_id?: string
+      position?: number
+      /** @enum {string} */
+      state?: 'pending' | 'ready' | 'failed'
+      error_code?: string
+    }
+    CanvasMention: {
+      /** Format: uuid */
+      node_id: string
+      token: string
+    }
+    CanvasTextSettings: {
+      prompt: string
+      /** Format: uuid */
+      model_id: string | null
+      /** @enum {string} */
+      reasoning: '' | 'low' | 'medium' | 'high'
+      n: number
+      mentions?: components['schemas']['CanvasMention'][]
+    }
+    CanvasTextRunInput: {
+      version: number
+      /** Format: uuid */
+      node_id: string
+      /** Format: uuid */
+      model_id: string
+      /** @enum {string} */
+      reasoning: '' | 'low' | 'medium' | 'high'
+      n: number
+    }
+    CanvasTextRun: {
+      /** Format: uuid */
+      id: string
+      items: {
+        position: number
+        /** @enum {string} */
+        status: 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled'
+        content: string
+        error_code: string
+      }[]
+    }
+    /** @description Last chosen generation parameters; empty strings and a null model fall back to the current defaults. */
+    CanvasGeneratorContent: {
+      prompt: string
+      mentions?: components['schemas']['CanvasMention'][]
+      /** Format: uuid */
+      model_id: string | null
+      /** @enum {string} */
+      quality: '' | 'low' | 'medium' | 'high'
+      size: string
+      ratio: string
+      n: number
+    }
+    /** @description Text and generator nodes carry their matching content. Images may also store generation settings for in-place runs. Group frames paint beneath other nodes. */
+    CanvasNode: {
+      /** Format: uuid */
+      id: string
+      /** @enum {string} */
+      kind: 'image' | 'text' | 'generator' | 'group'
+      x: number
+      y: number
+      w: number
+      h: number
+      title: string
+      /** Format: uuid */
+      group_id: string | null
+      image?: components['schemas']['CanvasImageContent']
+      text?: components['schemas']['CanvasTextContent']
+      generator?: components['schemas']['CanvasGeneratorContent']
+      text_settings?: components['schemas']['CanvasTextSettings']
+    }
+    /** @description Input edges connect text, images or groups to a text, generator or image node. Result edges connect a text, generator or image node to a compatible output. */
+    CanvasEdge: {
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      from: string
+      /** Format: uuid */
+      to: string
+      /** @enum {string} */
+      kind: 'input' | 'result'
+    }
+    CanvasDocument: {
+      /** @constant */
+      schema: 2
+      viewport: components['schemas']['CanvasViewport']
+      nodes: components['schemas']['CanvasNode'][]
+      edges: components['schemas']['CanvasEdge'][]
+    }
+    CanvasRunInput: {
+      version: number
+      /** Format: uuid */
+      node_id: string
+      /** Format: uuid */
+      model_id: string
+      /** @enum {string} */
+      quality: 'low' | 'medium' | 'high'
+      size: string
+      ratio: string
+      n: number
+    }
+    CanvasRun: {
+      canvas: components['schemas']['Canvas']
+      task: components['schemas']['ImageTask']
+    }
+    Canvas: {
+      /** Format: uuid */
+      id: string
+      title: string
+      /**
+       * Format: uuid
+       * @description Hidden canvas conversation used to filter the owner's image task history.
+       */
+      conversation_id: string
+      document: components['schemas']['CanvasDocument']
+      files: components['schemas']['ImageFile'][]
+      /** Format: int64 */
+      node_count: number
+      /** Format: int64 */
+      version: number
+      /** Format: date-time */
+      created_at: string
+      /** Format: date-time */
+      updated_at: string
+    }
+    CanvasSummary: {
+      /** Format: uuid */
+      id: string
+      title: string
+      /** Format: int64 */
+      node_count: number
+      cover: components['schemas']['ImageFile'] | null
+      /** Format: int64 */
+      version: number
+      /** Format: date-time */
+      created_at: string
+      /** Format: date-time */
+      updated_at: string
+    }
+    CanvasPage: {
+      items: components['schemas']['CanvasSummary'][]
+      next_cursor: string
+    }
+    CanvasCreateInput: {
+      /** Format: uuid */
+      id: string
+      title?: string
+    }
+    CanvasSaveInput: {
+      title: string
+      document: components['schemas']['CanvasDocument']
+      /** Format: int64 */
+      version: number
     }
   }
   responses: {
@@ -7390,6 +7720,290 @@ export interface operations {
           'application/json': components['schemas']['Error']
         }
       }
+    }
+  }
+  listCanvases: {
+    parameters: {
+      query?: {
+        cursor?: string
+        limit?: number
+        search?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CanvasPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  createCanvas: {
+    parameters: {
+      query?: never
+      header: {
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CanvasCreateInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Canvas']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  submitCanvasText: {
+    parameters: {
+      query?: never
+      header: {
+        'Idempotency-Key': string
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CanvasTextRunInput']
+      }
+    }
+    responses: {
+      /** @description A durable text run and its saved canvas slots */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            canvas: components['schemas']['Canvas']
+            task: components['schemas']['CanvasTextRun']
+          }
+        }
+      }
+      /** @description Version conflict or reused idempotency key */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  getCanvasTextRun: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+        run: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Text candidates and their statuses */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CanvasTextRun']
+        }
+      }
+      /** @description Canvas or run unavailable to this owner */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  cancelCanvasTextRun: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+        run: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Remaining candidates canceled, completed candidates retained */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CanvasTextRun']
+        }
+      }
+    }
+  }
+  runCanvasNode: {
+    parameters: {
+      query?: never
+      header: {
+        'Idempotency-Key': string
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CanvasRunInput']
+      }
+    }
+    responses: {
+      /** @description Accepted or replayed image task and saved canvas */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CanvasRun']
+        }
+      }
+      /** @description Invalid parameters, prompt or connected inputs */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Canvas or reference file is unavailable */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Stale canvas version, reused key, or canvas and billing limits */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Too many requests */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  getCanvas: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Canvas']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  saveCanvas: {
+    parameters: {
+      query?: never
+      header: {
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CanvasSaveInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Canvas']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  deleteCanvas: {
+    parameters: {
+      query?: never
+      header: {
+        Origin: string
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Success */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      default: components['responses']['APIError']
     }
   }
   m6_get__metrics: {

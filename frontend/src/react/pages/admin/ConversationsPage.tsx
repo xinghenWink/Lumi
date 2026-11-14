@@ -68,10 +68,17 @@ function MessageDetail({ row, onClose }: { row: ChatMetadata; onClose(): void })
               </header>
               <Suspense
                 fallback={
-                  <p className="whitespace-pre-wrap break-words text-sm">{message.content}</p>
+                  <p className="whitespace-pre-wrap break-words text-sm">
+                    {message.role === 'assistant' ? t('common.loading') : message.content}
+                  </p>
                 }
               >
-                <Markdown content={message.content} />
+                <Markdown
+                  content={message.content}
+                  assistant={message.role === 'assistant'}
+                  complete={message.status !== 'streaming'}
+                  sources={message.meta.sources}
+                />
               </Suspense>
             </article>
           ))}

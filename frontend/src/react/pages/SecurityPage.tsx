@@ -13,8 +13,10 @@ import { Panel } from '../components/shared/Panel'
 import { ApiNotice } from '../components/shared/ApiNotice'
 import { ModalDialog } from '../components/ui/modal-dialog'
 import { Button } from '../components/ui/button'
+import { Textarea } from '../components/ui/textarea'
 import { Input } from '../components/ui/input'
-import { Field, selectClass, textareaClass } from '../components/ui/field'
+import { Field, FieldGroup } from '../components/ui/field'
+import { NativeSelect, NativeSelectOption } from '../components/ui/native-select'
 
 function SecurityForm({ user }: { user: User }) {
   // Preference enums/bounds follow OpenAPI; the composer derives model capabilities separately.
@@ -94,112 +96,113 @@ function SecurityForm({ user }: { user: User }) {
   return (
     <div className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
       <div className="mx-auto max-w-3xl space-y-5">
-        <h1 className="mb-6 text-2xl font-semibold tracking-tight">{t('nav.security')}</h1>
+        <h1 className="mb-6 text-[22px] font-semibold tracking-tight">{t('nav.security')}</h1>
         <Panel title={t('ops.preferences')}>
           <ApiNotice error={preferences.error || save.error} />
           {values ? (
             <form
-              className="grid gap-4"
               onSubmit={(event) => {
                 event.preventDefault()
                 setSaved(false)
                 save.mutate()
               }}
             >
-              <Field id={id + '-theme'} label={t('ops.theme')}>
-                <select
-                  id={id + '-theme'}
-                  className={selectClass}
-                  value={values.theme}
-                  disabled={save.isPending}
-                  onChange={(event) => {
-                    const theme = event.target.value
-                    if (theme === 'light' || theme === 'dark' || theme === 'system')
-                      setDraft({ ...draft, theme })
-                  }}
-                >
-                  {['light', 'dark', 'system'].map((theme) => (
-                    <option key={theme} value={theme}>
-                      {t('ops.' + theme)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field
-                id={id + '-instructions'}
-                label={t('ops.instructions')}
-                hint={t('ops.instructionsHint')}
-              >
-                <textarea
-                  id={id + '-instructions'}
-                  rows={5}
-                  maxLength={4000}
-                  className={textareaClass}
-                  value={values.instructions}
-                  disabled={save.isPending}
-                  onChange={(event) => setDraft({ ...draft, instructions: event.target.value })}
-                />
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <Field id={id + '-quality'} label={t('ops.imageQuality')}>
-                  <select
-                    id={id + '-quality'}
-                    className={selectClass}
-                    value={values.image_quality}
+              <FieldGroup>
+                <Field id={id + '-theme'} label={t('ops.theme')}>
+                  <NativeSelect
+                    id={id + '-theme'}
+                    className="h-10 rounded-lg"
+                    value={values.theme}
                     disabled={save.isPending}
                     onChange={(event) => {
-                      const quality = event.target.value
-                      if (quality === 'low' || quality === 'medium' || quality === 'high')
-                        setDraft({ ...draft, image_quality: quality })
+                      const theme = event.target.value
+                      if (theme === 'light' || theme === 'dark' || theme === 'system')
+                        setDraft({ ...draft, theme })
                     }}
                   >
-                    {['low', 'medium', 'high'].map((quality) => (
-                      <option key={quality} value={quality}>
-                        {t('images.' + quality)}
-                      </option>
+                    {['light', 'dark', 'system'].map((theme) => (
+                      <NativeSelectOption key={theme} value={theme}>
+                        {t('ops.' + theme)}
+                      </NativeSelectOption>
                     ))}
-                  </select>
+                  </NativeSelect>
                 </Field>
-                <Field id={id + '-ratio'} label={t('ops.imageRatio')}>
-                  <select
-                    id={id + '-ratio'}
-                    className={selectClass}
-                    value={values.image_ratio}
+                <Field
+                  id={id + '-instructions'}
+                  label={t('ops.instructions')}
+                  hint={t('ops.instructionsHint')}
+                >
+                  <Textarea
+                    id={id + '-instructions'}
+                    rows={5}
+                    maxLength={4000}
+                    aria-describedby={id + '-instructions-hint'}
+                    value={values.instructions}
                     disabled={save.isPending}
-                    onChange={(event) => setDraft({ ...draft, image_ratio: event.target.value })}
-                  >
-                    {['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16'].map((ratio) => (
-                      <option key={ratio} value={ratio}>
-                        {ratio}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field id={id + '-count'} label={t('ops.imageCount')}>
-                  <Input
-                    id={id + '-count'}
-                    type="number"
-                    min={1}
-                    max={4}
-                    required
-                    value={values.image_count}
-                    disabled={save.isPending}
-                    onChange={(event) =>
-                      setDraft({ ...draft, image_count: Number(event.target.value) })
-                    }
+                    onChange={(event) => setDraft({ ...draft, instructions: event.target.value })}
                   />
                 </Field>
-              </div>
-              {saved ? (
-                <p role="status" className="text-xs text-primary">
-                  {t('common.saved')}
-                </p>
-              ) : null}
-              <div>
-                <Button type="submit" disabled={save.isPending}>
-                  {t('common.save')}
-                </Button>
-              </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Field id={id + '-quality'} label={t('ops.imageQuality')}>
+                    <NativeSelect
+                      id={id + '-quality'}
+                      className="h-10 rounded-lg"
+                      value={values.image_quality}
+                      disabled={save.isPending}
+                      onChange={(event) => {
+                        const quality = event.target.value
+                        if (quality === 'low' || quality === 'medium' || quality === 'high')
+                          setDraft({ ...draft, image_quality: quality })
+                      }}
+                    >
+                      {['low', 'medium', 'high'].map((quality) => (
+                        <NativeSelectOption key={quality} value={quality}>
+                          {t('images.' + quality)}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </Field>
+                  <Field id={id + '-ratio'} label={t('ops.imageRatio')}>
+                    <NativeSelect
+                      id={id + '-ratio'}
+                      className="h-10 rounded-lg"
+                      value={values.image_ratio}
+                      disabled={save.isPending}
+                      onChange={(event) => setDraft({ ...draft, image_ratio: event.target.value })}
+                    >
+                      {['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16'].map((ratio) => (
+                        <NativeSelectOption key={ratio} value={ratio}>
+                          {ratio}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </Field>
+                  <Field id={id + '-count'} label={t('ops.imageCount')}>
+                    <Input
+                      id={id + '-count'}
+                      type="number"
+                      min={1}
+                      max={4}
+                      required
+                      value={values.image_count}
+                      disabled={save.isPending}
+                      onChange={(event) =>
+                        setDraft({ ...draft, image_count: Number(event.target.value) })
+                      }
+                    />
+                  </Field>
+                </div>
+                {saved ? (
+                  <p role="status" className="text-xs text-primary">
+                    {t('common.saved')}
+                  </p>
+                ) : null}
+                <div>
+                  <Button type="submit" disabled={save.isPending}>
+                    {t('common.save')}
+                  </Button>
+                </div>
+              </FieldGroup>
             </form>
           ) : preferences.isError ? (
             <Button
@@ -229,7 +232,7 @@ function SecurityForm({ user }: { user: User }) {
                 <div className="min-w-0">
                   <strong className="text-sm">{device.device}</strong>
                   {device.id === currentID ? (
-                    <span className="ml-2 rounded-md bg-accent px-2 py-1 text-[10px] text-primary">
+                    <span className="ml-2 rounded-md bg-accent px-2 py-1 text-2xs text-primary">
                       {t('ops.currentDevice')}
                     </span>
                   ) : null}
@@ -340,56 +343,57 @@ function SecurityForm({ user }: { user: User }) {
           returnFocus={deleteTrigger}
         >
           <form
-            className="grid gap-4"
             onSubmit={(event) => {
               event.preventDefault()
               remove.mutate()
             }}
           >
-            <Field id={id + '-email'} label={t('ops.confirmEmail')}>
-              <Input
-                id={id + '-email'}
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                disabled={remove.isPending}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </Field>
-            <Field id={id + '-password'} label={t('ops.password')}>
-              <Input
-                id={id + '-password'}
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                maxLength={128}
-                disabled={remove.isPending}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            </Field>
-            <ApiNotice error={remove.error} />
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={remove.isPending}
-                onClick={() => {
-                  setDeleting(false)
-                  setPassword('')
-                }}
-              >
-                {t('common.cancel')}
-              </Button>
-              <Button
-                type="submit"
-                variant="destructive"
-                disabled={remove.isPending || email !== user.email || !password}
-              >
-                {t('ops.confirm')}
-              </Button>
-            </div>
+            <FieldGroup>
+              <Field id={id + '-email'} label={t('ops.confirmEmail')}>
+                <Input
+                  id={id + '-email'}
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  disabled={remove.isPending}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              </Field>
+              <Field id={id + '-password'} label={t('ops.password')}>
+                <Input
+                  id={id + '-password'}
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  maxLength={128}
+                  disabled={remove.isPending}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </Field>
+              <ApiNotice error={remove.error} />
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={remove.isPending}
+                  onClick={() => {
+                    setDeleting(false)
+                    setPassword('')
+                  }}
+                >
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  disabled={remove.isPending || email !== user.email || !password}
+                >
+                  {t('ops.confirm')}
+                </Button>
+              </div>
+            </FieldGroup>
           </form>
         </ModalDialog>
       </div>

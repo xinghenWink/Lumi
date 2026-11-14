@@ -4,6 +4,7 @@ import { ApiError, record, noContent } from './transport'
 type S = components['schemas']
 export type Conversation = S['ChatConversation']
 export type Message = S['ChatMessage']
+export type ChatSource = S['ChatSource']
 export type ChatConfiguration = S['ChatConfiguration']
 export type SendInput = S['ChatSendInput']
 export interface ChatPage<T> {
@@ -15,6 +16,23 @@ export type ChatEvent =
   | { type: 'delta'; content: string }
   | { type: 'error'; code: string; assistant?: Message }
   | { type: 'ping' }
+export function publicSourceURL(value: unknown): string | undefined {
+  if (
+    typeof value !== 'string' ||
+    value.length > 2048 ||
+    !/^https?:\/\//.test(value) ||
+    /[\\\s\p{Cc}]/u.test(value)
+  )
+    return undefined
+  try {
+    const url = new URL(value)
+    return url.hostname && !url.username && !url.password && url.href.length <= 2048
+      ? url.href
+      : undefined
+  } catch {
+    return undefined
+  }
+}
 function str(value: unknown): string {
   if (typeof value !== 'string') throw new ApiError('RESPONSE_INVALID')
   return value
@@ -68,6 +86,33 @@ export function parseMessage(value: unknown): Message {
   if (meta.error_code !== undefined) result.meta.error_code = str(meta.error_code)
   if (meta.finish_reason !== undefined) result.meta.finish_reason = str(meta.finish_reason)
   if (meta.latency_ms !== undefined) result.meta.latency_ms = int(meta.latency_ms)
+  if (Array.isArray(meta.sources)) {
+    const sources: ChatSource[] = []
+    for (const value of meta.sources.slice(0, 20)) {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
+      const source = value as Record<string, unknown>
+      const url = publicSourceURL(source.url)
+      if (!url) continue
+      const item: ChatSource = { url }
+      if (typeof source.title === 'string') item.title = source.title.slice(0, 256)
+      if (typeof source.ref === 'string' && /^[A-Za-z0-9][A-Za-z0-9_.:#-]{0,127}$/.test(source.ref))
+        item.ref = source.ref
+      if (
+        typeof source.start_index === 'number' &&
+        typeof source.end_index === 'number' &&
+        Number.isInteger(source.start_index) &&
+        Number.isInteger(source.end_index) &&
+        source.start_index >= 0 &&
+        source.end_index >= source.start_index &&
+        source.end_index < 2 ** 21
+      ) {
+        item.start_index = source.start_index
+        item.end_index = source.end_index
+      }
+      sources.push(item)
+    }
+    if (sources.length) result.meta.sources = sources
+  }
   if (meta.usage !== undefined) {
     const u = record(meta.usage)
     result.meta.usage = {

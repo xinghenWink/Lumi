@@ -75,7 +75,26 @@ test('real vision, IME, protected blobs, reload and cursor replay survive a brow
     delta('Start ' + prompt + ' ')
     releases.set(prompt, () => {
       if (response.destroyed || response.writableEnded) return
-      delta('End')
+      delta('End <Cite ref="turn42search1"/>')
+      response.write(
+        'data: ' +
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  annotations: [
+                    {
+                      type: 'url_citation',
+                      ref: 'turn42search1',
+                      url_citation: { url: 'https://example.com/replay', title: 'Replay source' },
+                    },
+                  ],
+                },
+              },
+            ],
+          }) +
+          '\n\n',
+      )
       done()
     })
   })
@@ -205,9 +224,17 @@ test('real vision, IME, protected blobs, reload and cursor replay survive a brow
         response.request().method() === 'POST' &&
         new URL(response.url()).pathname === '/api/v1/files',
     )
-    await page
-      .getByLabel('添加图片', { exact: true })
-      .setInputFiles({ name: 'reference.png', mimeType: 'image/png', buffer: fixturePNG() })
+    const fileChooser = page.waitForEvent('filechooser')
+    const attach = page.getByRole('button', { name: '添加图片', exact: true })
+    await attach.focus()
+    await attach.press('Enter')
+    await (
+      await fileChooser
+    ).setFiles({
+      name: 'reference.png',
+      mimeType: 'image/png',
+      buffer: fixturePNG(),
+    })
     const uploaded = await upload
     expect(uploaded.ok()).toBe(true)
     const file = parseFile(await uploaded.json())
@@ -279,7 +306,11 @@ test('real vision, IME, protected blobs, reload and cursor replay survive a brow
     expect(calls.get('刷新恢复')).toBe(1)
     releases.get('刷新恢复')?.()
     await expect(answer.getByRole('button', { name: '重新生成', exact: true })).toBeEnabled()
-    await expect(answer.locator('.chat-markdown')).toHaveText('Start 刷新恢复 End')
+    await expect(answer.locator('.chat-markdown')).toContainText('Start 刷新恢复 End')
+    await expect(answer.getByRole('link', { name: 'Replay source' })).toHaveAttribute(
+      'href',
+      'https://example.com/replay',
+    )
     // Fail only the browser reader after real SSE data arrives; replay still reaches the real backend.
     await page.evaluate(() => {
       const native = window.fetch.bind(window)
@@ -330,7 +361,11 @@ test('real vision, IME, protected blobs, reload and cursor replay survive a brow
     expect((await resumed).headers()['last-event-id']).toMatch(/^\d+-\d+$/)
     releases.get('断线恢复')?.()
     await expect(answer.getByRole('button', { name: '重新生成', exact: true })).toBeEnabled()
-    await expect(answer.locator('.chat-markdown')).toHaveText('Start 断线恢复 End')
+    await expect(answer.locator('.chat-markdown')).toContainText('Start 断线恢复 End')
+    await expect(answer.getByRole('link', { name: 'Replay source' })).toHaveAttribute(
+      'href',
+      'https://example.com/replay',
+    )
     expect(calls.get('断线恢复')).toBe(1)
     for (const format of ['JSON', 'Markdown']) {
       await page.locator('.chat-current-title').getByRole('button').click()

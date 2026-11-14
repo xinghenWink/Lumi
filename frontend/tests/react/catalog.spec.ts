@@ -174,9 +174,12 @@ test('React real channel configuration import routing and safe model selection',
     // Keep the menu above the model selector inside the bottom composer.
     await picker.scrollIntoViewIfNeeded()
     const triggerBox = await picker.boundingBox()
-    await picker.click()
+    await picker.focus()
+    await member.keyboard.press('ArrowDown')
     const menu = member.getByRole('menu', { name: '可用模型', exact: true })
-    await expect(menu.getByRole('menuitem', { name: chatName, exact: true })).toBeVisible()
+    const selectedModel = menu.getByRole('menuitemradio', { name: chatName, exact: true })
+    await expect(selectedModel).toBeVisible()
+    await expect(selectedModel).toHaveAttribute('aria-checked', 'true')
     const menuBox = await menu.boundingBox()
     expect(menuBox && triggerBox && menuBox.y + menuBox.height <= triggerBox.y + 2).toBeTruthy()
     await noOverflow(member)
@@ -185,6 +188,7 @@ test('React real channel configuration import routing and safe model selection',
       animations: 'disabled',
     })
     await member.keyboard.press('Escape')
+    await expect(picker).toBeFocused()
     await member.getByRole('button', { name: '切换深色主题', exact: true }).click()
     await picker.click()
     await member.screenshot({

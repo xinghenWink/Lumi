@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
 export interface Column<T> {
   key: string
   label: ReactNode
@@ -13,36 +14,39 @@ export function DataTable<T extends { id: string }>({
   columns: Column<T>[]
 }) {
   return (
-    <div className="min-w-0 overflow-x-auto overscroll-x-contain">
-      <table className="w-full text-left text-xs">
-        <thead>
-          <tr className="border-b border-border bg-muted/50">
-            {columns.map((column) => (
-              <th
-                key={column.key}
-                scope="col"
-                className="whitespace-nowrap px-4 py-3 font-medium text-muted-foreground"
-              >
-                {column.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-              {columns.map((column) => (
-                <td
-                  key={column.key}
-                  className={'px-4 py-3 align-top leading-6 ' + (column.className ?? '')}
-                >
-                  {column.render(row)}
-                </td>
-              ))}
-            </tr>
+    <Table className="w-full text-left text-xs">
+      <TableHeader>
+        <TableRow className="border-b border-border bg-muted/40">
+          {columns.map((column) => (
+            <TableHead
+              key={column.key}
+              scope="col"
+              className="h-auto whitespace-nowrap px-4 py-2.5 text-xs font-medium text-muted-foreground"
+            >
+              {column.label}
+            </TableHead>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow
+            key={row.id}
+            className="border-b border-border transition-colors last:border-0 hover:bg-muted/35"
+          >
+            {columns.map((column) => (
+              <TableCell
+                key={column.key}
+                className={
+                  'whitespace-normal px-4 py-3 align-top leading-6 ' + (column.className ?? '')
+                }
+              >
+                {column.render(row)}
+              </TableCell>
+            ))}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   )
 }

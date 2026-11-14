@@ -35,7 +35,10 @@ func TestChatPersistenceIsolationRetryStopAndLimits(t *testing.T) {
 			http.Error(w, "invalid", 400)
 			return
 		}
-		if input.Model == "bad" {
+		// First-turn titles run while the answer streams; every route answers them so they never
+		// shift the answer routes' circuit failure counts that later assertions depend on.
+		titleRequest := len(input.Messages) > 0 && strings.HasPrefix(input.Messages[0].Content, "Return only")
+		if input.Model == "bad" && !titleRequest {
 			bad.Add(1)
 			w.WriteHeader(429)
 			return
@@ -47,7 +50,7 @@ func TestChatPersistenceIsolationRetryStopAndLimits(t *testing.T) {
 		}
 		prompt := input.Messages[len(input.Messages)-1].Content
 		value := "Hello"
-		if strings.HasPrefix(input.Messages[0].Content, "Return only") {
+		if titleRequest {
 			value = "真实聊天"
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -104,6 +107,9 @@ func TestChatPersistenceIsolationRetryStopAndLimits(t *testing.T) {
 	}
 	if len(events) < 3 || events[0].Type != "meta" || events[len(events)-1].Type != "done" {
 		t.Fatal("missing stream lifecycle")
+	}
+	if final := events[len(events)-1].Conversation; final == nil || final.Title != "真实聊天" || final.Busy {
+		t.Fatalf("first turn did not finish with its generated title: %+v", final)
 	}
 	messages, err := service.Messages(f.ctx, actor.ID, id, "", 100)
 	if err != nil || len(messages.Items) != 2 || messages.Items[0].Content != "Hello" || messages.Items[0].Status != "completed" || messages.Items[0].Meta.Usage.TotalTokens != 12 {

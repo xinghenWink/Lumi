@@ -1,4 +1,4 @@
-import { queryOptions, type QueryClient } from '@tanstack/react-query'
+import { isCancelledError, queryOptions, type QueryClient } from '@tanstack/react-query'
 import { createStore } from 'zustand/vanilla'
 import { chats, type Conversation, type Message, type SendInput } from '../../../api/chat'
 import type { SessionService } from '../../../api/auth-session'
@@ -130,7 +130,8 @@ export function createChatController(session: SessionService, client: QueryClien
       const data = await client.fetchQuery(options(id))
       resume(id, data)
     } catch (error) {
-      if (valid(owner, id)) failure(id, error)
+      // A remount (e.g. StrictMode or route suspense) cancels the shared fetch; the page refetches it.
+      if (valid(owner, id) && !isCancelledError(error)) failure(id, error)
     }
   }
   function draft(id: string, text: string) {

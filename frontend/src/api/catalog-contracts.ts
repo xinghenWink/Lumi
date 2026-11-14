@@ -59,6 +59,12 @@ export function parseCapabilities(value: unknown): Capabilities {
     return value
   })
   return {
+    ...(data.reasoning_effort === undefined
+      ? {}
+      : { reasoning_effort: bool(data, 'reasoning_effort') }),
+    ...(data.use_size_presets === undefined
+      ? {}
+      : { use_size_presets: bool(data, 'use_size_presets') }),
     vision: bool(data, 'vision'),
     stream: bool(data, 'stream'),
     max_context_tokens: integer(data, 'max_context_tokens', 0, 1000000),
@@ -66,7 +72,7 @@ export function parseCapabilities(value: unknown): Capabilities {
     sizes: list(data, 'sizes', parseText),
     max_n: integer(data, 'max_n', 0, 10),
     supports_edit: bool(data, 'supports_edit'),
-    max_reference_images: integer(data, 'max_reference_images', 0, 4),
+    max_reference_images: integer(data, 'max_reference_images', 0, 2147483647),
     response_format: choice(data, 'response_format', ['', 'b64_json', 'url'] as const),
   }
 }

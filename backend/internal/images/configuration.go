@@ -25,6 +25,9 @@ func configView(row query.ImageSetting) (Configuration, error) {
 	if err := json.Unmarshal(row.RatioSizes, &result.RatioSizes); err != nil {
 		return result, fmt.Errorf("decode image ratios: %w", err)
 	}
+	result.ResolutionPresets = defaultResolutionPresets()
+	result.DisabledRatios = append([]string{}, row.DisabledRatios...)
+	result.DisabledResolutions = append([]string{}, row.DisabledResolutions...)
 	return result, nil
 }
 func (s *Service) Configuration(ctx context.Context) (Configuration, error) {
@@ -51,10 +54,13 @@ func validSize(size string) bool {
 	return true
 }
 func validateConfiguration(c Configuration) error {
-	if c.MaxN < 1 || c.MaxN > 4 || c.MaxReferences < 0 || c.MaxReferences > 4 || c.MaxUploadBytes < 1024 || c.MaxUploadBytes > 10<<20 || c.PerUserConcurrency < 1 || c.PerUserConcurrency > 20 || c.GlobalConcurrency < 1 || c.GlobalConcurrency > 20 || c.TimeoutSeconds < 5 || c.TimeoutSeconds > 600 || c.QueueTimeoutSeconds < 60 || c.QueueTimeoutSeconds > 86400 || c.RetentionDays < 0 || c.RetentionDays > 3650 || len(c.Sizes) < 1 || len(c.Sizes) > 20 || len(c.RatioSizes) > 7 || c.RatioSizes == nil {
+	if c.MaxN < 1 || c.MaxN > 4 || c.MaxReferences < 0 || c.MaxUploadBytes < 1024 || c.MaxUploadBytes > 10<<20 || c.PerUserConcurrency < 1 || c.PerUserConcurrency > 20 || c.GlobalConcurrency < 1 || c.GlobalConcurrency > 20 || c.TimeoutSeconds < 5 || c.TimeoutSeconds > 600 || c.QueueTimeoutSeconds < 60 || c.QueueTimeoutSeconds > 86400 || c.RetentionDays < 0 || c.RetentionDays > 3650 || len(c.Sizes) < 1 || len(c.Sizes) > 20 || len(c.RatioSizes) > 7 || c.RatioSizes == nil {
 		return problem.Invalid()
 	}
 	seen := map[string]bool{}
+	if !validDisabled(c.DisabledRatios, presetRatios()) || !validDisabled(c.DisabledResolutions, presetResolutions()) {
+		return problem.Invalid()
+	}
 	for _, size := range c.Sizes {
 		if !validSize(size) || seen[size] {
 			return problem.Invalid()
@@ -62,7 +68,7 @@ func validateConfiguration(c Configuration) error {
 		seen[size] = true
 	}
 	for ratio, size := range c.RatioSizes {
-		if !slices.Contains([]string{"1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16"}, ratio) || size == "auto" || !seen[size] {
+		if !slices.Contains(presetRatios(), ratio) || size == "auto" || !seen[size] {
 			return problem.Invalid()
 		}
 	}
@@ -89,7 +95,14 @@ func (s *Service) SaveConfiguration(ctx context.Context, actor user.Actor, input
 		if err != nil {
 			return fmt.Errorf("read changed image settings: %w", err)
 		}
-		row, err := q.SaveImageSettings(ctx, query.SaveImageSettingsParams{MaxN: input.MaxN, MaxReferences: input.MaxReferences, MaxUploadBytes: input.MaxUploadBytes, Sizes: sizes, RatioSizes: ratios, PerUserConcurrency: input.PerUserConcurrency, GlobalConcurrency: input.GlobalConcurrency, TimeoutSeconds: input.TimeoutSeconds, QueueTimeoutSeconds: input.QueueTimeoutSeconds, SplitRequests: input.SplitRequests, RetentionDays: input.RetentionDays, AdminCanViewContent: input.AdminCanViewContent, Version: input.Version})
+		row, err := q.SaveImageSettings(ctx, query.SaveImageSettingsParams{
+			MaxN: input.MaxN, MaxReferences: input.MaxReferences, MaxUploadBytes: input.MaxUploadBytes,
+			Sizes: sizes, RatioSizes: ratios, DisabledRatios: input.DisabledRatios, DisabledResolutions: input.DisabledResolutions,
+			PerUserConcurrency: input.PerUserConcurrency, GlobalConcurrency: input.GlobalConcurrency,
+			TimeoutSeconds: input.TimeoutSeconds, QueueTimeoutSeconds: input.QueueTimeoutSeconds,
+			SplitRequests: input.SplitRequests, RetentionDays: input.RetentionDays,
+			AdminCanViewContent: input.AdminCanViewContent, Version: input.Version,
+		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return problem.New("CONFIGURATION_CONFLICT", 409)
 		}
