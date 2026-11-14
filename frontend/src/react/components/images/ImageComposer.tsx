@@ -235,6 +235,7 @@ export function ImageComposer({
       items={upload.items}
       previews={upload.previews}
       disabled={locked}
+      compact
       className="image-references"
       onRemove={(value) =>
         patch({ references: draft.references.filter((reference) => reference !== value) })

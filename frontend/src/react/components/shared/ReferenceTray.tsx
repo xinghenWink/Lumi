@@ -21,11 +21,13 @@ function Committed({
   preview,
   disabled,
   onRemove,
+  className,
 }: {
   id: string
   preview: string | undefined
   disabled: boolean
   onRemove: ((id: string) => void) | undefined
+  className: string
 }) {
   const { t, i18n } = useTranslation()
   const { user } = useSession()
@@ -35,7 +37,7 @@ function Committed({
     queryFn: ({ signal }) => images.file(id, signal),
   })
   return (
-    <Attachment className={chip}>
+    <Attachment className={className}>
       <AttachmentMedia className="relative size-full rounded-none">
         {preview ? (
           <img src={preview} alt={t('images.references')} className="size-full object-cover" />
@@ -76,16 +78,18 @@ function Local({
   item,
   onRetry,
   onCancel,
+  className,
 }: {
   item: UploadItem
   onRetry(key: string): void
   onCancel(key: string): void
+  className: string
 }) {
   const { t, i18n } = useTranslation()
   const failed = item.status === 'error'
   const message = failed ? errorText(t, i18n, item.error) : t('react.uploading')
   return (
-    <Attachment className={cn(chip, failed && 'border-destructive/60')} title={message}>
+    <Attachment className={cn(className, failed && 'border-destructive/60')} title={message}>
       <AttachmentMedia className="relative size-full rounded-none">
         <img
           src={item.url}
@@ -129,6 +133,7 @@ export function ReferenceTray({
   items = [],
   previews,
   disabled = false,
+  compact = false,
   onRemove,
   onRetry,
   onCancel,
@@ -139,6 +144,7 @@ export function ReferenceTray({
   items?: readonly UploadItem[]
   previews?: ReadonlyMap<string, string>
   disabled?: boolean
+  compact?: boolean
   onRemove?: (id: string) => void
   onRetry?: (key: string) => void
   onCancel?: (key: string) => void
@@ -146,6 +152,7 @@ export function ReferenceTray({
   children?: ReactNode
 }) {
   if (!ids.length && !items.length && !children) return null
+  const chipClass = cn(chip, compact && 'min-w-0 has-data-[slot=attachment-media]:p-0')
   return (
     <div className={cn('flex flex-wrap gap-2', className)}>
       {ids.map((id) => (
@@ -154,6 +161,7 @@ export function ReferenceTray({
           id={id}
           preview={previews?.get(id)}
           disabled={disabled}
+          className={chipClass}
           onRemove={onRemove}
         />
       ))}
@@ -161,6 +169,7 @@ export function ReferenceTray({
         <Local
           key={item.key}
           item={item}
+          className={chipClass}
           onRetry={(key) => onRetry?.(key)}
           onCancel={(key) => onCancel?.(key)}
         />

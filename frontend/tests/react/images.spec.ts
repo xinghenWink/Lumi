@@ -514,18 +514,36 @@ test('React real image generation editing gallery cancellation and administrator
     )
     expect(edits).toBe(1)
     expect(reusedReference).toBe(true)
-    // Uploaded references use real multipart validation; library choices reuse existing IDs.
-    await member
-      .locator('input[type=file]')
-      .setInputFiles({ name: 'reference.png', mimeType: 'image/png', buffer: png })
-    await expect(member.locator('.image-references img')).toHaveCount(1)
-    await member.getByRole('button', { name: '移除参考图', exact: true }).click()
+    // A library image and a fresh upload share one row of square thumbnails.
+    const references = member.locator('.image-references')
     await member.getByRole('button', { name: '从已有图片选择', exact: true }).click()
     dialog = member.getByRole('dialog')
     await expect(dialog.locator('.image-library-item').first()).toBeVisible()
     await dialog.locator('.image-library-item').first().click()
-    await expect(member.locator('.image-references img')).toHaveCount(1)
-    await member.getByRole('button', { name: '移除参考图', exact: true }).click()
+    await expect(references.getByRole('img')).toHaveCount(1)
+    await member
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'reference.png', mimeType: 'image/png', buffer: png })
+    await expect(references.getByRole('img')).toHaveCount(2)
+    const [first, second] = await references
+      .locator('div[data-slot="attachment"]')
+      .evaluateAll((tiles) =>
+        tiles.map((tile) => ({
+          x: tile.offsetLeft,
+          y: tile.offsetTop,
+          width: tile.offsetWidth,
+          height: tile.offsetHeight,
+        })),
+      )
+    if (!first || !second) throw new Error('Missing reference thumbnails')
+    expect(first).toMatchObject({ width: 64, height: 64 })
+    expect(second).toMatchObject({ width: 64, height: 64 })
+    expect(second.x).toBeGreaterThan(first.x)
+    expect(second.y).toBe(first.y)
+    const removeReference = references.getByRole('button', { name: '移除参考图', exact: true })
+    await expect(removeReference).toHaveCount(2)
+    await removeReference.first().click()
+    await removeReference.click()
     // Files dropped anywhere in the workspace, or pasted outside a text field, become references.
     const transfer = await member.evaluateHandle((encoded) => {
       const bytes = Uint8Array.from(atob(encoded), (value) => value.charCodeAt(0))
