@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { ApiNotice } from './ApiNotice'
+import { Skeleton } from '../ui/skeleton'
 import { Button } from '../ui/button'
 
 export function PageStatus({ error, retry }: { error?: unknown; retry?: () => void }) {
@@ -20,10 +21,7 @@ export function PageStatus({ error, retry }: { error?: unknown; retry?: () => vo
         </>
       ) : (
         <p className="flex items-center justify-center gap-2 py-10 text-center text-sm text-muted-foreground">
-          <span
-            aria-hidden="true"
-            className="size-4 animate-spin rounded-full border-2 border-input border-t-primary"
-          />
+          <Skeleton aria-hidden="true" className="size-4 rounded-full bg-primary/25" />
           {t('common.loading')}
         </p>
       )}

@@ -1,8 +1,11 @@
+import { lazy, Suspense } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { images } from '../../../api/images'
 import { useSession } from '../../features/auth/hooks'
-import { cn } from '../../lib/utils'
-import { ProtectedImage } from '../images/ProtectedImage'
+import { Avatar, AvatarFallback } from '../ui/avatar'
+const ProtectedImage = lazy(() =>
+  import('../images/ProtectedImage').then((module) => ({ default: module.ProtectedImage })),
+)
 
 export function UserAvatar({ className = '' }: { className?: string }) {
   const { user } = useSession()
@@ -12,22 +15,26 @@ export function UserAvatar({ className = '' }: { className?: string }) {
     enabled: !!user && !!id,
     queryFn: ({ signal }) => images.file(id ?? '', signal),
   })
+
+  const fallback = (
+    <AvatarFallback className="bg-accent text-[13px] font-semibold text-primary">
+      {Array.from(user?.nickname || user?.email || '')[0]?.toUpperCase()}
+    </AvatarFallback>
+  )
   return (
-    <span
-      className={cn(
-        'grid size-8 shrink-0 place-items-center overflow-hidden rounded-full bg-accent text-[13px] font-semibold text-primary',
-        className,
-      )}
-    >
+    <Avatar className={className}>
       {query.data ? (
-        <ProtectedImage
-          file={query.data}
-          alt={user?.nickname ?? ''}
-          className="size-full object-cover"
-        />
+        <Suspense fallback={fallback}>
+          <ProtectedImage
+            file={query.data}
+            alt={user?.nickname ?? ''}
+            className="size-full object-cover"
+            fallback={fallback}
+          />
+        </Suspense>
       ) : (
-        Array.from(user?.nickname || user?.email || '')[0]?.toUpperCase()
+        fallback
       )}
-    </span>
+    </Avatar>
   )
 }

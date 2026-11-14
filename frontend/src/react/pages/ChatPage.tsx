@@ -65,7 +65,10 @@ export default function ChatPage() {
   // The welcome layout keeps the composer at the same tree position so typing state survives.
   const hero = !loading && !data.isError && !messages && !busy && !pending
   return (
-    <div className="chat-page relative flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div
+      className="chat-page relative flex min-h-0 flex-1 flex-col overflow-hidden"
+      data-hero={hero || undefined}
+    >
       <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-3 sm:px-6">
         <ModeTabs />
         {data.data ? (
@@ -101,8 +104,8 @@ export default function ChatPage() {
           />
         </Suspense>
       ) : (
-        <section className="flex min-h-0 flex-1 flex-col items-center justify-end px-5 pb-8 text-center">
-          <div className="mb-5 animate-rise-in">
+        <section className="flex flex-1 flex-col items-center justify-end px-5 pt-4 pb-4 text-center sm:pb-8">
+          <div className="mb-3 animate-rise-in sm:mb-5">
             <BrandMark compact markClassName="size-12" />
           </div>
           <h1 className="text-[28px] leading-tight font-semibold tracking-tight text-balance sm:text-[32px]">
@@ -140,7 +143,7 @@ export default function ChatPage() {
           variant={hero ? 'hero' : 'dock'}
         />
       ) : null}
-      {hero ? <div aria-hidden="true" className="min-h-6 flex-[1.4]" /> : null}
+      {hero ? <div aria-hidden="true" className="min-h-3 flex-[1.4] sm:min-h-6" /> : null}
       <ModalDialog
         open={!!editing}
         onOpenChange={(value) => {

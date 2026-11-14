@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { cn } from '../../lib/utils'
 export function Panel({
   title,
@@ -12,21 +13,26 @@ export function Panel({
   children: ReactNode
 }) {
   return (
-    <section
+    <Card
+      as="section"
       className={cn(
-        'min-w-0 rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-6',
+        'min-w-0 gap-0 rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-6',
         className,
       )}
     >
       {title || description ? (
-        <header className="mb-5">
-          {title ? <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2> : null}
-          {description ? (
-            <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{description}</p>
+        <CardHeader className="mb-5 gap-0 p-0">
+          {title ? (
+            <CardTitle as="h2" className="text-[15px] font-semibold tracking-tight">
+              {title}
+            </CardTitle>
           ) : null}
-        </header>
+          {description ? (
+            <CardDescription className="mt-1.5 text-xs leading-5">{description}</CardDescription>
+          ) : null}
+        </CardHeader>
       ) : null}
-      {children}
-    </section>
+      <CardContent className="min-w-0 p-0">{children}</CardContent>
+    </Card>
   )
 }

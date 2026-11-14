@@ -12,7 +12,8 @@ import { DataTable } from '../shared/DataTable'
 import { ApiNotice } from '../shared/ApiNotice'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import { Field, selectClass } from '../ui/field'
+import { Field } from '../ui/field'
+import { NativeSelect, NativeSelectOption } from '../ui/native-select'
 const types = [
   'signup_bonus',
   'daily_grant',
@@ -83,19 +84,19 @@ export function CreditLedger({ admin = false, userId }: { admin?: boolean; userI
           </Field>
         ) : null}
         <Field id={id + '-type'} label={t('credits.type')}>
-          <select
+          <NativeSelect
             id={id + '-type'}
-            className={selectClass}
+            className="h-10 rounded-lg"
             value={filters.type}
             onChange={(event) => setFilters({ ...filters, type: event.target.value })}
           >
-            <option value="">{t('credits.allTypes')}</option>
+            <NativeSelectOption value="">{t('credits.allTypes')}</NativeSelectOption>
             {types.map((type) => (
-              <option key={type} value={type}>
+              <NativeSelectOption key={type} value={type}>
                 {t(`credits.types.${type}`)}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
+          </NativeSelect>
         </Field>
         <Field id={id + '-from'} label={t('common.from')}>
           <Input

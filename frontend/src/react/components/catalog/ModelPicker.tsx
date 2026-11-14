@@ -1,5 +1,11 @@
-import * as Dropdown from '@radix-ui/react-dropdown-menu'
-import { Boxes, Check, ChevronDown } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu'
+import { Boxes, ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ModelKind } from '../../../api/catalog-contracts'
 import { useModels } from '../../features/catalog/models'
@@ -28,8 +34,8 @@ export function ModelPicker({ kind, disabled = false }: { kind: ModelKind; disab
           {t('catalog.noAvailableHint')}
         </p>
       ) : null}
-      <Dropdown.Root modal={false}>
-        <Dropdown.Trigger asChild>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
           <Button
             type="button"
             variant="ghost"
@@ -50,22 +56,25 @@ export function ModelPicker({ kind, disabled = false }: { kind: ModelKind; disab
             </span>
             <ChevronDown size={13} className="shrink-0" />
           </Button>
-        </Dropdown.Trigger>
-        <Dropdown.Portal>
-          <Dropdown.Content
-            side="top"
-            align="start"
-            sideOffset={10}
-            collisionPadding={12}
-            aria-label={t('catalog.availableModels')}
-            aria-labelledby={undefined}
-            className="z-70 max-h-[min(420px,var(--radix-dropdown-menu-content-available-height))] w-[320px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-xl border border-border bg-card p-1.5 text-foreground shadow-xl"
-          >
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          side="top"
+          align="start"
+          sideOffset={10}
+          collisionPadding={12}
+          aria-label={t('catalog.availableModels')}
+          aria-labelledby={undefined}
+          className="z-70 max-h-[min(420px,var(--radix-dropdown-menu-content-available-height))] w-[320px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-xl border border-border bg-card p-1.5 text-foreground shadow-xl"
+        >
+          <DropdownMenuRadioGroup value={selected?.id ?? ''} onValueChange={select}>
             {items.map((model) => (
-              <Dropdown.Item
+              <DropdownMenuRadioItem
                 key={model.id}
-                onSelect={() => select(model.id)}
-                className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-3 outline-none focus:bg-accent"
+                value={model.id}
+                textValue={model.display_name}
+                aria-label={model.display_name}
+                aria-description={model.description || undefined}
+                className="min-h-10 cursor-pointer items-center gap-2 rounded-lg py-2 pr-3 pl-8"
               >
                 <span className="shrink-0 text-primary" aria-hidden="true">
                   {model.icon || <Boxes size={17} />}
@@ -80,14 +89,11 @@ export function ModelPicker({ kind, disabled = false }: { kind: ModelKind; disab
                     </span>
                   ) : null}
                 </span>
-                {model.id === selected?.id ? (
-                  <Check size={16} className="shrink-0 text-primary" />
-                ) : null}
-              </Dropdown.Item>
+              </DropdownMenuRadioItem>
             ))}
-          </Dropdown.Content>
-        </Dropdown.Portal>
-      </Dropdown.Root>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }

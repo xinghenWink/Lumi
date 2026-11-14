@@ -113,6 +113,15 @@
   --shadow-sm: 0 1px 2px var(--shadow-color), 0 2px 8px var(--shadow-color);
   --shadow-md: 0 2px 4px var(--shadow-color), 0 8px 24px var(--shadow-color);
   --shadow-lg: 0 4px 12px var(--shadow-color), 0 24px 48px var(--shadow-color-strong);
+  --color-sidebar-ring: var(--ring);
+  --color-sidebar-accent: var(--muted);
+  --color-sidebar-accent-foreground: var(--foreground);
+  --color-sidebar-foreground: var(--foreground);
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--foreground);
+  --color-card-foreground: var(--foreground);
+  --color-accent-foreground: var(--foreground);
+  --radius: 0.875rem;
 }
 
 @layer base {
@@ -200,4 +209,8 @@
       opacity: 1;
     }
   }
+}
+
+.chat-page[data-hero] {
+  overflow-y: auto;
 }

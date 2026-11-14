@@ -3,7 +3,6 @@ import { ApiError } from '../../../api/transport'
 import type { AppRuntime } from '../../app/runtime'
 import type { useModels } from '../catalog/models'
 import { pickEditModel, referenceCapacity, referenceProblem } from '../files/reference-rules'
-import { emptyImageDraft, imageSubmissionScope } from './controller'
 
 /**
  * Adds an already stored image (a result, a gallery item or a library pick) to an
@@ -19,11 +18,14 @@ export async function addExistingReference(
   conversationId: string,
   { requireActive = false }: { requireActive?: boolean } = {},
 ): Promise<boolean> {
-  const image = runtime.image
   const owner = runtime.session.getSnapshot().user?.id,
     epoch = runtime.session.snapshot().epoch
   const candidate = pickEditModel(models.selected, models.items)
-  const configuration = await images.options()
+  const [configuration, image, { emptyImageDraft, imageSubmissionScope }] = await Promise.all([
+    images.options(),
+    runtime.loadImage(),
+    import('./controller'),
+  ])
   if (!candidate) throw new ApiError('IMAGE_REFERENCE_INVALID')
   if (file.size > configuration.max_upload_bytes) throw new ApiError('FILE_TOO_LARGE')
   if (

@@ -4,8 +4,11 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { Message } from '../../../api/chat'
 import type { Illustration } from '../../../features/chat/markdown'
+import { ApiNotice } from '../shared/ApiNotice'
 import { useRuntime } from '../../app/context'
 import { cn } from '../../lib/utils'
+import { Message as MessageLayout, MessageContent, MessageFooter } from '../ui/message'
+import { Bubble, BubbleContent } from '../ui/bubble'
 import { Button } from '../ui/button'
 
 const Markdown = lazy(() =>
@@ -47,13 +50,22 @@ export const MessageCard = memo(function MessageCard({
 }) {
   const { t, i18n } = useTranslation()
   const [copied, setCopied] = useState(false)
+  const [illustrationError, setIllustrationError] = useState<unknown>()
   const runtime = useRuntime(),
     navigate = useNavigate()
   // A suggested illustration opens the studio with its prompt; generating stays the user's choice.
   const illustrate = useCallback(
     ({ prompt, ratio }: Illustration) => {
-      runtime.image.draft('', { prompt, ratio, size: '' })
-      void navigate('/create')
+      const epoch = runtime.session.snapshot().epoch
+      setIllustrationError(undefined)
+      void runtime
+        .loadImage()
+        .then((controller) => {
+          if (runtime.session.snapshot().epoch !== epoch) return
+          controller.draft('', { prompt, ratio, size: '' })
+          return navigate('/create')
+        })
+        .catch(setIllustrationError)
     },
     [runtime, navigate],
   )
@@ -131,82 +143,88 @@ export const MessageCard = memo(function MessageCard({
       className={cn(
         'chat-message group mx-auto flex w-full max-w-3xl py-3',
         'chat-message-' + message.role,
-        user ? 'flex-col items-end' : 'gap-3.5',
       )}
       data-message-id={message.id}
     >
-      {user ? (
-        <>
-          <span className="sr-only">{t('chat.you')}</span>
-          <div className="max-w-[85%] rounded-3xl rounded-br-lg bg-bubble px-4 py-2.5">
-            <p className="chat-user-text text-message break-words whitespace-pre-wrap">
-              {message.content}
-            </p>
-          </div>
-          {message.reference_file_ids?.length ? (
-            <Suspense>
-              <References ids={message.reference_file_ids} />
-            </Suspense>
-          ) : null}
-          {actions}
-        </>
-      ) : (
-        <>
-          <span
-            aria-hidden="true"
-            className={cn(
-              'mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-accent text-primary',
-              streaming && 'animate-pulse',
-            )}
-          >
-            <Sparkles size={15} strokeWidth={1.8} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <span className="sr-only">{t('chat.assistant')}</span>
-            {message.content ? (
-              <Suspense
-                fallback={
-                  <p className="text-message break-words whitespace-pre-wrap">{message.content}</p>
-                }
-              >
-                <Markdown
-                  content={message.content}
-                  complete={!streaming}
-                  onIllustration={illustrate}
-                />
-              </Suspense>
-            ) : streaming ? (
-              <Typing />
-            ) : null}
-            {message.status === 'error' || message.status === 'interrupted' ? (
-              <p className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1 text-xs leading-5 text-muted-foreground">
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    'size-1.5 rounded-full',
-                    message.status === 'error' ? 'bg-destructive' : 'bg-warning',
-                  )}
-                />
-                {t(message.status === 'error' ? 'chat.error' : 'chat.interrupted')}
-                {message.meta.error_code
-                  ? ' · ' +
-                    t(
-                      i18n.exists('errors.' + message.meta.error_code)
-                        ? 'errors.' + message.meta.error_code
-                        : 'errors.UNKNOWN_ERROR',
-                    )
-                  : null}
-              </p>
-            ) : null}
+      <MessageLayout align={user ? 'end' : 'start'} className="gap-3.5">
+        {user ? (
+          <MessageContent className="items-end gap-0">
+            <span className="sr-only">{t('chat.you')}</span>
+            <Bubble align="end" variant="ghost" className="max-w-[85%]">
+              <BubbleContent className="rounded-3xl rounded-br-lg bg-bubble px-4 py-2.5">
+                <p className="chat-user-text text-message break-words whitespace-pre-wrap">
+                  {message.content}
+                </p>
+              </BubbleContent>
+            </Bubble>
             {message.reference_file_ids?.length ? (
               <Suspense>
                 <References ids={message.reference_file_ids} />
               </Suspense>
             ) : null}
-            {actions}
-          </div>
-        </>
-      )}
+            <MessageFooter className="p-0">{actions}</MessageFooter>
+          </MessageContent>
+        ) : (
+          <>
+            <span
+              aria-hidden="true"
+              className={cn(
+                'mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-accent text-primary',
+                streaming && 'animate-pulse',
+              )}
+            >
+              <Sparkles size={15} strokeWidth={1.8} />
+            </span>
+            <MessageContent className="min-w-0 flex-1 gap-0">
+              <span className="sr-only">{t('chat.assistant')}</span>
+              {message.content ? (
+                <Suspense
+                  fallback={
+                    <p className="text-message break-words whitespace-pre-wrap">
+                      {message.content}
+                    </p>
+                  }
+                >
+                  <Markdown
+                    content={message.content}
+                    complete={!streaming}
+                    onIllustration={illustrate}
+                  />
+                </Suspense>
+              ) : streaming ? (
+                <Typing />
+              ) : null}
+              {message.status === 'error' || message.status === 'interrupted' ? (
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1 text-xs leading-5 text-muted-foreground">
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'size-1.5 rounded-full',
+                      message.status === 'error' ? 'bg-destructive' : 'bg-warning',
+                    )}
+                  />
+                  {t(message.status === 'error' ? 'chat.error' : 'chat.interrupted')}
+                  {message.meta.error_code
+                    ? ' · ' +
+                      t(
+                        i18n.exists('errors.' + message.meta.error_code)
+                          ? 'errors.' + message.meta.error_code
+                          : 'errors.UNKNOWN_ERROR',
+                      )
+                    : null}
+                </p>
+              ) : null}
+              {message.reference_file_ids?.length ? (
+                <Suspense>
+                  <References ids={message.reference_file_ids} />
+                </Suspense>
+              ) : null}
+              <ApiNotice error={illustrationError} />
+              <MessageFooter className="p-0">{actions}</MessageFooter>
+            </MessageContent>
+          </>
+        )}
+      </MessageLayout>
     </article>
   )
 })

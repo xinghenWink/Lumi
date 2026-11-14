@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Sidebar } from '../components/shared/Sidebar'
+import { SidebarInset } from '../components/ui/sidebar'
 import { MobileNavigation } from '../components/shared/MobileNavigation'
 import { ThemeToggle } from '../components/shared/ThemeToggle'
 import { routeTitle } from '../features/accounts/navigation'
@@ -29,9 +30,9 @@ export function ShellLayout({ admin }: { admin: boolean }) {
       >
         {t('app.skipLink')}
       </a>
-      <aside className="desktop-sidebar hidden h-full w-[264px] shrink-0 border-r border-border lg:block">
+      <div className="desktop-sidebar hidden h-full w-[264px] shrink-0 border-r border-border lg:block">
         <Sidebar admin={admin} />
-      </aside>
+      </div>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border/70 px-3 sm:px-5">
           <MobileNavigation key={location.key} admin={admin} />
@@ -48,11 +49,14 @@ export function ShellLayout({ admin }: { admin: boolean }) {
           <ThemeToggle />
         </header>
         <RuntimeBanner />
-        <main id="main-content" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
+        <SidebarInset
+          id="main-content"
+          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto"
+        >
           <DropLayer>
             <Outlet />
           </DropLayer>
-        </main>
+        </SidebarInset>
       </div>
     </div>
   )

@@ -13,9 +13,11 @@ import { useOwnedMutation } from '../../features/accounts/owned-mutation'
 import { ApiNotice } from '../shared/ApiNotice'
 import { Panel } from '../shared/Panel'
 import { Button } from '../ui/button'
+import { Textarea } from '../ui/textarea'
 import { Input } from '../ui/input'
 import { ModalDialog } from '../ui/modal-dialog'
-import { Field, selectClass, textareaClass } from '../ui/field'
+import { Field } from '../ui/field'
+import { NativeSelect, NativeSelectOption } from '../ui/native-select'
 
 export function CreditOverview({ userId }: { userId?: string }) {
   const runtime = useRuntime(),
@@ -206,9 +208,9 @@ export function CreditOverview({ userId }: { userId?: string }) {
         >
           <div className="grid grid-cols-2 gap-3">
             <Field id={id + '-bucket'} label={t('credits.bucket')}>
-              <select
+              <NativeSelect
                 id={id + '-bucket'}
-                className={selectClass}
+                className="h-10 rounded-lg"
                 value={form.bucket}
                 onChange={(event) =>
                   setForm({
@@ -218,16 +220,16 @@ export function CreditOverview({ userId }: { userId?: string }) {
                 }
               >
                 {['permanent', 'daily'].map((bucket) => (
-                  <option key={bucket} value={bucket}>
+                  <NativeSelectOption key={bucket} value={bucket}>
                     {t('credits.' + bucket)}
-                  </option>
+                  </NativeSelectOption>
                 ))}
-              </select>
+              </NativeSelect>
             </Field>
             <Field id={id + '-action'} label={t('credits.action')}>
-              <select
+              <NativeSelect
                 id={id + '-action'}
-                className={selectClass}
+                className="h-10 rounded-lg"
                 value={form.action}
                 onChange={(event) => {
                   const action = event.target.value
@@ -236,11 +238,11 @@ export function CreditOverview({ userId }: { userId?: string }) {
                 }}
               >
                 {['add', 'subtract', 'set'].map((action) => (
-                  <option key={action} value={action}>
+                  <NativeSelectOption key={action} value={action}>
                     {t('credits.' + action)}
-                  </option>
+                  </NativeSelectOption>
                 ))}
-              </select>
+              </NativeSelect>
             </Field>
           </div>
           <Field id={id + '-amount'} label={t('credits.amount')}>
@@ -256,9 +258,9 @@ export function CreditOverview({ userId }: { userId?: string }) {
             />
           </Field>
           <Field id={id + '-note'} label={t('credits.note')}>
-            <textarea
+            <Textarea
               id={id + '-note'}
-              className={textareaClass}
+
               rows={3}
               maxLength={200}
               required

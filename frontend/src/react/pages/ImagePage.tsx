@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useStore } from 'zustand'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -6,6 +6,7 @@ import { Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { images, type ImageFile, type ImageTask } from '../../api/images'
 import { ApiError } from '../../api/transport'
+import { useImageController } from '../features/images/use-image-controller'
 import { useRuntime } from '../app/context'
 import { useModels } from '../features/catalog/models'
 import { imageSubmissionScope } from '../features/images/controller'
@@ -30,10 +31,33 @@ const suggestions = [
 ] as const
 
 export default function ImagePage() {
+  const runtime = useRuntime()
+  const [error, setError] = useState<unknown>()
+  const [image, setImage] = useState(() => runtime.imageController)
+  useEffect(() => {
+    if (image || error) return
+    let active = true
+    void runtime.loadImage().then(
+      (controller) => {
+        if (active) setImage(controller)
+      },
+      (failure: unknown) => {
+        if (active) setError(failure)
+      },
+    )
+    return () => {
+      active = false
+    }
+  }, [error, image, runtime])
+  if (!image) return <PageStatus error={error} retry={() => setError(undefined)} />
+  return <ImageWorkspace />
+}
+
+function ImageWorkspace() {
   const { id = '' } = useParams(),
     runtime = useRuntime(),
     { t } = useTranslation()
-  const image = runtime.image,
+  const image = useImageController(),
     models = useModels('image'),
     data = useQuery(image.options(id))
   // Desktop is a studio with a persistent parameter panel; smaller screens dock the composer.

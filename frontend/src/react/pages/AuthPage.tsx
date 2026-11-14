@@ -8,6 +8,9 @@ import { useRuntime } from '../app/context'
 import { ApiNotice } from '../components/shared/ApiNotice'
 import { PageStatus } from '../components/shared/PageStatus'
 import { Button } from '../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Checkbox } from '../components/ui/checkbox'
+import { Field, FieldGroup } from '../components/ui/field'
 import { Input } from '../components/ui/input'
 import { ApiError } from '../../api/transport'
 import { safeRedirect, validEmail, validPassword } from '../../features/accounts/utils'
@@ -126,7 +129,6 @@ function AuthForm({ registering }: { registering: boolean }) {
       setBusy(false)
     }
   }
-  const field = 'flex flex-col gap-1.5 text-xs font-medium'
   const redirect = params.get('redirect')
   const suffix = redirect ? '?redirect=' + encodeURIComponent(redirect) : ''
   return (
@@ -168,150 +170,150 @@ function AuthForm({ registering }: { registering: boolean }) {
       ) : (
         <form
           noValidate
-          className="flex flex-col gap-5"
           onSubmit={(event) => {
             void submit(event)
           }}
         >
-          {registering && config.data.turnstile_enabled ? (
-            <div ref={container} className="max-w-full overflow-x-auto" />
-          ) : null}
-          {registering ? (
-            <label className={field}>
-              {t('auth.nickname')}
-              <Input
-                name="nickname"
-                autoComplete="nickname"
-                maxLength={30}
-                placeholder={t('auth.nicknamePlaceholder')}
-                value={nickname}
-                onChange={(event) => setNickname(event.target.value)}
-                disabled={busy}
-              />
-            </label>
-          ) : null}
-          <label className={field}>
-            {t('auth.email')}
-            <Input
-              name="email"
-              type="email"
-              autoComplete="email"
-              maxLength={254}
-              placeholder={t('auth.emailPlaceholder')}
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              disabled={busy}
-            />
-          </label>
-          <div className={field}>
-            <label htmlFor="auth-password">{t('auth.password')}</label>
-            <div className="relative">
-              <Input
-                id="auth-password"
-                name="password"
-                className="pr-12"
-                type={visible ? 'text' : 'password'}
-                autoComplete={registering ? 'new-password' : 'current-password'}
-                maxLength={128}
-                placeholder={t('auth.passwordHint')}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                disabled={busy}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute top-0.5 right-1 size-10"
-                aria-label={t(visible ? 'auth.hidePassword' : 'auth.showPassword')}
-                onClick={() => setVisible((value) => !value)}
-              >
-                {visible ? <EyeOff size={17} /> : <Eye size={17} />}
-              </Button>
-            </div>
-          </div>
-          {registering && config.data.email_verification_enabled ? (
-            <label className={field}>
-              {t('auth.code')}
-              <span className="flex min-w-0 gap-2">
+          <FieldGroup className="gap-5">
+            {registering && config.data.turnstile_enabled ? (
+              <div ref={container} className="max-w-full overflow-x-auto" />
+            ) : null}
+            {registering ? (
+              <Field id="auth-nickname" label={t('auth.nickname')}>
                 <Input
-                  name="code"
-                  autoComplete="one-time-code"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={code}
-                  onChange={(event) => setCode(event.target.value)}
-                  placeholder={t('auth.codePlaceholder')}
+                  id="auth-nickname"
+                  name="nickname"
+                  autoComplete="nickname"
+                  maxLength={30}
+                  placeholder={t('auth.nicknamePlaceholder')}
+                  value={nickname}
+                  onChange={(event) => setNickname(event.target.value)}
+                  disabled={busy}
+                />
+              </Field>
+            ) : null}
+            <Field id="auth-email" label={t('auth.email')}>
+              <Input
+                id="auth-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                maxLength={254}
+                placeholder={t('auth.emailPlaceholder')}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                disabled={busy}
+              />
+            </Field>
+            <Field id="auth-password" label={t('auth.password')}>
+              <div className="relative">
+                <Input
+                  id="auth-password"
+                  name="password"
+                  className="pr-12"
+                  type={visible ? 'text' : 'password'}
+                  autoComplete={registering ? 'new-password' : 'current-password'}
+                  maxLength={128}
+                  placeholder={t('auth.passwordHint')}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
                   disabled={busy}
                 />
                 <Button
                   type="button"
-                  variant="outline"
-                  className="shrink-0"
-                  disabled={busy || sending || seconds > 0}
-                  onClick={() => {
-                    void sendCode()
-                  }}
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-0.5 right-1 size-10"
+                  aria-label={t(visible ? 'auth.hidePassword' : 'auth.showPassword')}
+                  onClick={() => setVisible((value) => !value)}
                 >
-                  {sending
-                    ? t('auth.sendingCode')
-                    : seconds
-                      ? t('auth.resend', { seconds })
-                      : t('auth.sendCode')}
+                  {visible ? <EyeOff size={17} /> : <Eye size={17} />}
                 </Button>
-              </span>
-            </label>
-          ) : null}
-          {registering ? (
-            <label className="flex items-start gap-2.5 text-xs leading-6 text-muted-foreground">
-              <input
-                className="mt-1 size-4 shrink-0 accent-primary"
-                type="checkbox"
-                name="accept_terms"
-                checked={agreed}
-                onChange={(event) => setAgreed(event.target.checked)}
-                disabled={busy}
-              />
-              <span>
-                {t('auth.agree')}{' '}
-                <a
-                  className="text-primary"
-                  href={config.data.site.terms_url || '/terms'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {t('auth.terms')}
-                </a>{' '}
-                {t('auth.and')}{' '}
-                <a
-                  className="text-primary"
-                  href={config.data.site.privacy_url || '/privacy'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {t('auth.privacy')}
-                </a>
-              </span>
-            </label>
-          ) : (
-            <Link to="/forgot-password" className="self-end text-xs text-primary hover:underline">
-              {t('ops.forgot')}
-            </Link>
-          )}
-          {validation ? (
-            <p role="alert" className="text-sm text-destructive">
-              {validation}
-            </p>
-          ) : null}
-          <ApiNotice error={error} />
-          {notice ? (
-            <p role="status" className="text-sm text-primary">
-              {notice}
-            </p>
-          ) : null}
-          <Button type="submit" size="lg" className="mt-1 w-full" disabled={busy || sending}>
-            {t(busy ? 'auth.submitting' : registering ? 'auth.create' : 'auth.enter')}
-          </Button>
+              </div>
+            </Field>
+            {registering && config.data.email_verification_enabled ? (
+              <Field id="auth-code" label={t('auth.code')}>
+                <span className="flex min-w-0 gap-2">
+                  <Input
+                    id="auth-code"
+                    name="code"
+                    autoComplete="one-time-code"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                    placeholder={t('auth.codePlaceholder')}
+                    disabled={busy}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="shrink-0"
+                    disabled={busy || sending || seconds > 0}
+                    onClick={() => {
+                      void sendCode()
+                    }}
+                  >
+                    {sending
+                      ? t('auth.sendingCode')
+                      : seconds
+                        ? t('auth.resend', { seconds })
+                        : t('auth.sendCode')}
+                  </Button>
+                </span>
+              </Field>
+            ) : null}
+            {registering ? (
+              <div className="flex items-start gap-2.5 text-xs leading-6 text-muted-foreground">
+                <Checkbox
+                  className="mt-1"
+                  id="auth-terms"
+                  name="accept_terms"
+                  checked={agreed}
+                  onCheckedChange={(value) => setAgreed(value === true)}
+                  disabled={busy}
+                />
+                <label htmlFor="auth-terms">
+                  {t('auth.agree')}{' '}
+                  <a
+                    className="text-primary"
+                    href={config.data.site.terms_url || '/terms'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {t('auth.terms')}
+                  </a>{' '}
+                  {t('auth.and')}{' '}
+                  <a
+                    className="text-primary"
+                    href={config.data.site.privacy_url || '/privacy'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {t('auth.privacy')}
+                  </a>
+                </label>
+              </div>
+            ) : (
+              <Link to="/forgot-password" className="self-end text-xs text-primary hover:underline">
+                {t('ops.forgot')}
+              </Link>
+            )}
+            {validation ? (
+              <p role="alert" className="text-sm text-destructive">
+                {validation}
+              </p>
+            ) : null}
+            <ApiNotice error={error} />
+            {notice ? (
+              <p role="status" className="text-sm text-primary">
+                {notice}
+              </p>
+            ) : null}
+            <Button type="submit" size="lg" className="mt-1 w-full" disabled={busy || sending}>
+              {t(busy ? 'auth.submitting' : registering ? 'auth.create' : 'auth.enter')}
+            </Button>
+          </FieldGroup>
         </form>
       )}
     </>
@@ -356,15 +358,19 @@ export default function AuthPage() {
           ))}
         </div>
       </aside>
-      <section className="mx-auto w-full max-w-[400px] rounded-2xl border border-border bg-card p-6 shadow-md animate-rise-in sm:p-8">
-        <h1 className="text-[22px] font-semibold tracking-tight">
-          {t(registering ? 'auth.registerTitle' : 'auth.loginTitle')}
-        </h1>
-        <p className="mt-1.5 mb-6 text-sm leading-6 text-muted-foreground">
-          {t(registering ? 'auth.registerDescription' : 'auth.loginDescription')}
-        </p>
-        <AuthForm key={location.pathname} registering={registering} />
-      </section>
+      <Card className="mx-auto w-full gap-0 max-w-[400px] rounded-2xl border border-border bg-card p-6 shadow-md animate-rise-in sm:p-8">
+        <CardHeader className="p-0">
+          <CardTitle as="h1" className="text-[22px] font-semibold tracking-tight">
+            {t(registering ? 'auth.registerTitle' : 'auth.loginTitle')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <p className="mt-1.5 mb-6 text-sm leading-6 text-muted-foreground">
+            {t(registering ? 'auth.registerDescription' : 'auth.loginDescription')}
+          </p>
+          <AuthForm key={location.pathname} registering={registering} />
+        </CardContent>
+      </Card>
     </div>
   )
 }

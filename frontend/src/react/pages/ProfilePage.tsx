@@ -16,7 +16,8 @@ import { UserAvatar } from '../components/shared/UserAvatar'
 import { ApiNotice } from '../components/shared/ApiNotice'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
-import { Field, selectClass } from '../components/ui/field'
+import { Field, FieldGroup } from '../components/ui/field'
+import { NativeSelect, NativeSelectOption } from '../components/ui/native-select'
 
 function ProfileForm({ user }: { user: User }) {
   const runtime = useRuntime(),
@@ -154,73 +155,80 @@ function ProfileForm({ user }: { user: User }) {
           </div>
           <ApiNotice error={avatar.error} />
           <form
-            className="grid gap-4"
             onSubmit={(event) => {
               event.preventDefault()
               setSaved(false)
               update.mutate()
             }}
           >
-            <Field id={id + '-nickname'} label={t('auth.nickname')}>
-              <Input
-                id={id + '-nickname'}
-                value={form.nickname}
-                maxLength={30}
-                required
-                disabled={update.isPending}
-                onChange={(event) => setForm({ ...form, nickname: event.target.value })}
-              />
-            </Field>
-            <Field id={id + '-email'} label={t('auth.email')} hint={t('profile.emailReadonly')}>
-              <Input id={id + '-email'} type="email" value={user.email} readOnly />
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field id={id + '-locale'} label={t('common.locale')}>
-                <select
-                  id={id + '-locale'}
-                  className={selectClass}
-                  value={form.locale}
-                  disabled={update.isPending}
-                  onChange={(event) => {
-                    if (event.target.value === 'zh-CN' || event.target.value === 'en')
-                      setForm({ ...form, locale: event.target.value })
-                  }}
-                >
-                  <option value="zh-CN">{t('common.zhCN')}</option>
-                  <option value="en">{t('common.en')}</option>
-                </select>
-              </Field>
-              <Field id={id + '-zone'} label={t('profile.timezone')}>
+            <FieldGroup>
+              <Field id={id + '-nickname'} label={t('auth.nickname')}>
                 <Input
-                  id={id + '-zone'}
-                  value={form.timezone}
-                  maxLength={100}
+                  id={id + '-nickname'}
+                  value={form.nickname}
+                  maxLength={30}
                   required
                   disabled={update.isPending}
-                  onChange={(event) => setForm({ ...form, timezone: event.target.value })}
+                  onChange={(event) => setForm({ ...form, nickname: event.target.value })}
                 />
               </Field>
-            </div>
-            <ApiNotice error={update.error} />
-            {saved ? (
-              <p role="status" className="text-xs text-primary">
-                {t('common.saved')}
-              </p>
-            ) : null}
-            <div>
-              <Button type="submit" disabled={update.isPending}>
-                {t('common.save')}
-              </Button>
-            </div>
+              <Field id={id + '-email'} label={t('auth.email')} hint={t('profile.emailReadonly')}>
+                <Input
+                  id={id + '-email'}
+                  aria-describedby={id + '-email-hint'}
+                  type="email"
+                  value={user.email}
+                  readOnly
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field id={id + '-locale'} label={t('common.locale')}>
+                  <NativeSelect
+                    id={id + '-locale'}
+                    className="h-10 rounded-lg"
+                    value={form.locale}
+                    disabled={update.isPending}
+                    onChange={(event) => {
+                      if (event.target.value === 'zh-CN' || event.target.value === 'en')
+                        setForm({ ...form, locale: event.target.value })
+                    }}
+                  >
+                    <NativeSelectOption value="zh-CN">{t('common.zhCN')}</NativeSelectOption>
+                    <NativeSelectOption value="en">{t('common.en')}</NativeSelectOption>
+                  </NativeSelect>
+                </Field>
+                <Field id={id + '-zone'} label={t('profile.timezone')}>
+                  <Input
+                    id={id + '-zone'}
+                    value={form.timezone}
+                    maxLength={100}
+                    required
+                    disabled={update.isPending}
+                    onChange={(event) => setForm({ ...form, timezone: event.target.value })}
+                  />
+                </Field>
+              </div>
+              <ApiNotice error={update.error} />
+              {saved ? (
+                <p role="status" className="text-xs text-primary">
+                  {t('common.saved')}
+                </p>
+              ) : null}
+              <div>
+                <Button type="submit" disabled={update.isPending}>
+                  {t('common.save')}
+                </Button>
+              </div>
+            </FieldGroup>
           </form>
         </Panel>
         <Panel title={t('nav.theme')} description={t('profile.themeDescription')}>
           <div className="max-w-sm">
             <Field id={id + '-theme'} label={t('nav.theme')}>
-              <select
+              <NativeSelect
                 id={id + '-theme'}
                 value={theme}
-                className={selectClass}
+                className="h-10 rounded-lg"
                 disabled={appearance.isPending}
                 onChange={(event) => {
                   const value = event.target.value
@@ -232,59 +240,60 @@ function ProfileForm({ user }: { user: User }) {
                 }}
               >
                 {['light', 'dark', 'system'].map((theme) => (
-                  <option key={theme} value={theme}>
+                  <NativeSelectOption key={theme} value={theme}>
                     {t('nav.' + theme)}
-                  </option>
+                  </NativeSelectOption>
                 ))}
-              </select>
+              </NativeSelect>
             </Field>
           </div>
           <ApiNotice error={appearance.error} />
         </Panel>
         <Panel title={t('profile.security')} description={t('profile.securityDescription')}>
           <form
-            className="grid gap-4"
             onSubmit={(event) => {
               event.preventDefault()
               change()
             }}
           >
-            {(['current', 'next', 'confirm'] as const).map((key) => (
-              <Field
-                key={key}
-                id={id + '-' + key}
-                label={t(
-                  key === 'current'
-                    ? 'profile.currentPassword'
-                    : key === 'next'
-                      ? 'profile.newPassword'
-                      : 'profile.confirmPassword',
-                )}
-                {...(key === 'next' ? { hint: t('auth.passwordHint') } : {})}
-              >
-                <Input
+            <FieldGroup>
+              {(['current', 'next', 'confirm'] as const).map((key) => (
+                <Field
+                  key={key}
                   id={id + '-' + key}
-                  type="password"
-                  autoComplete={key === 'current' ? 'current-password' : 'new-password'}
-                  maxLength={128}
-                  required
-                  value={password[key]}
-                  disabled={changePassword.isPending}
-                  onChange={(event) => setPassword({ ...password, [key]: event.target.value })}
-                />
-              </Field>
-            ))}
-            {validation ? (
-              <p role="alert" className="text-xs text-destructive">
-                {t(validation)}
-              </p>
-            ) : null}
-            <ApiNotice error={changePassword.error} />
-            <div>
-              <Button type="submit" disabled={changePassword.isPending}>
-                {t('profile.security')}
-              </Button>
-            </div>
+                  label={t(
+                    key === 'current'
+                      ? 'profile.currentPassword'
+                      : key === 'next'
+                        ? 'profile.newPassword'
+                        : 'profile.confirmPassword',
+                  )}
+                  {...(key === 'next' ? { hint: t('auth.passwordHint') } : {})}
+                >
+                  <Input
+                    id={id + '-' + key}
+                    type="password"
+                    autoComplete={key === 'current' ? 'current-password' : 'new-password'}
+                    maxLength={128}
+                    required
+                    value={password[key]}
+                    disabled={changePassword.isPending}
+                    onChange={(event) => setPassword({ ...password, [key]: event.target.value })}
+                  />
+                </Field>
+              ))}
+              {validation ? (
+                <p role="alert" className="text-xs text-destructive">
+                  {t(validation)}
+                </p>
+              ) : null}
+              <ApiNotice error={changePassword.error} />
+              <div>
+                <Button type="submit" disabled={changePassword.isPending}>
+                  {t('profile.security')}
+                </Button>
+              </div>
+            </FieldGroup>
           </form>
         </Panel>
       </div>

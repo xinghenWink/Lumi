@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { ApiError } from '../../../api/transport'
 import type { ImageConversation } from '../../../api/images'
 import { useRuntime } from '../../app/context'
 import { ModalDialog } from '../ui/modal-dialog'
@@ -21,11 +22,14 @@ export function ImageConversationActions({ row }: { row: ImageConversation }) {
     [title, setTitle] = useState('')
   const mutation = useMutation({
     mutationFn: async (action: 'rename' | 'delete' | 'pin') => {
+      const epoch = runtime.session.snapshot().epoch
+      const image = await runtime.loadImage()
+      if (runtime.session.snapshot().epoch !== epoch) throw new ApiError('AUTH_REQUIRED', 401)
       if (action === 'delete') {
-        await runtime.image.remove(row.id)
+        await image.remove(row.id)
         if (location.pathname === '/create/' + row.id) await navigate('/create', { replace: true })
       } else
-        await runtime.image.update(
+        await image.update(
           row,
           action === 'rename' ? title.trim() : row.title || t('images.untitled'),
           action === 'pin' ? !row.pinned : row.pinned,

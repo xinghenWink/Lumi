@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
+import { createStore } from 'zustand/vanilla'
 import { ApiError } from '../../api/transport'
 import { session } from '../features/auth/session-adapter'
 import type { SessionService } from '../../api/auth-session'
@@ -6,7 +7,7 @@ import { createSessionStore } from '../stores/session'
 import { createThemeStore } from '../stores/theme'
 import { createChatController } from '../features/chat/controller'
 import { createModelSelectionStore } from '../features/catalog/models'
-import { createImageController } from '../features/images/controller'
+import type { ImageController } from '../features/images/controller'
 
 export function createAppRuntime(service: SessionService = session) {
   const queryClient = new QueryClient({
@@ -22,7 +23,11 @@ export function createAppRuntime(service: SessionService = session) {
   })
   const sessionState = createSessionStore(service)
   const chat = createChatController(service, queryClient)
-  const image = createImageController(service, queryClient)
+  let image: Promise<ImageController> | undefined
+  let imageController: ImageController | undefined
+  let disposed = false
+  let unsubscribeImage: (() => void) | undefined
+  const imageNavigation = createStore(() => ({ lastOpened: '' }))
   const modelStore = createModelSelectionStore()
   let epoch = service.getSnapshot().epoch
   let identity = service.getSnapshot().user?.id
@@ -43,8 +48,30 @@ export function createAppRuntime(service: SessionService = session) {
     sessionStore: sessionState.store,
     themeStore: createThemeStore(),
     modelStore,
+    imageNavigation,
     chat,
-    image,
+    loadImage() {
+      if (disposed) return Promise.reject(new Error('Application runtime was disposed'))
+      image ??= import('../features/images/controller')
+        .then(({ createImageController }) => {
+          if (disposed) throw new Error('Application runtime was disposed')
+          const controller = createImageController(service, queryClient)
+          imageController = controller
+          unsubscribeImage = controller.store.subscribe((next, previous) => {
+            if (next.lastOpened !== previous.lastOpened)
+              imageNavigation.setState({ lastOpened: next.lastOpened })
+          })
+          return controller
+        })
+        .catch((error: unknown) => {
+          image = undefined
+          throw error
+        })
+      return image
+    },
+    get imageController() {
+      return imageController
+    },
     queryClient,
     get sessionExitTarget() {
       return sessionExitTarget
@@ -55,10 +82,12 @@ export function createAppRuntime(service: SessionService = session) {
       service.clear()
     },
     dispose() {
+      disposed = true
       unsubscribe()
       sessionState.dispose()
       chat.dispose()
-      image.dispose()
+      unsubscribeImage?.()
+      imageController?.dispose()
       queryClient.clear()
     },
   }

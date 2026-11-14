@@ -1,5 +1,9 @@
 # 技术决策记录
 
+## shadcn/ui 与 AI Elements
+
+- ADR-135：使用 shadcn 官方 Registry 的 New York / Radix 组件和迁入 shadcn/ui 的 AI Elements 模式。直接依赖锁定 `@shadcn/react@0.3.1` 用于消息滚动，以及 `@radix-ui/react-avatar@1.3.1`、`@radix-ui/react-checkbox@1.4.1`、`@radix-ui/react-label@2.1.17`、`@radix-ui/react-separator@1.2.0` 用于界面原语。复用项目的 `cn`、Tailwind 令牌、鉴权、数据请求、SSE、Markdown 和上传逻辑。长会话通过 TanStack Virtual 锚定阅读位置。后台和法律页的中文文案，以及图片控制器与参考图界面，按使用场景加载以维持首屏预算。弹窗使用静态样式遮罩以适配生产 CSP。本次不涉及迁移或 OpenAPI 变更。
+
 ## 生图分辨率预设
 
 - ADR-134 由服务端提供比例、分辨率和精确像素的预设表，前端生图和画布共用。全站可停用任一比例或分辨率，提交时由服务端核对。已有模型保留明确配置的尺寸，后台新建模型默认继承预设。请求、任务和报价继续使用像素尺寸，旧配置及任务通过前向迁移 00013 保留。

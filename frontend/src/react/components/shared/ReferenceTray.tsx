@@ -8,10 +8,11 @@ import type { Rejections } from '../../features/files/reference-rules'
 import type { UploadItem } from '../../features/files/reference-uploads'
 import { errorText } from '../../lib/errors'
 import { cn } from '../../lib/utils'
+import { Attachment, AttachmentAction, AttachmentMedia } from '../ui/attachment'
 import { ProtectedImage } from '../images/ProtectedImage'
 
 const chip =
-  'group relative size-16 shrink-0 overflow-hidden rounded-xl border border-border bg-muted shadow-xs animate-rise-in'
+  'group relative size-16 shrink-0 gap-0 overflow-hidden p-0 rounded-xl border border-border bg-muted shadow-xs animate-rise-in'
 const corner =
   'absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-foreground/75 text-background shadow-sm transition-[opacity,background-color] hover:bg-foreground focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40'
 
@@ -34,28 +35,30 @@ function Committed({
     queryFn: ({ signal }) => images.file(id, signal),
   })
   return (
-    <div className={chip}>
-      {preview ? (
-        <img src={preview} alt={t('images.references')} className="size-full object-cover" />
-      ) : query.data ? (
-        <ProtectedImage
-          file={query.data}
-          alt={t('images.references')}
-          className="size-full object-cover"
-        />
-      ) : query.isError ? (
-        <span
-          className="grid size-full place-items-center text-destructive"
-          title={errorText(t, i18n, query.error)}
-        >
-          <AlertCircle size={18} aria-hidden="true" />
-          <span className="sr-only">{errorText(t, i18n, query.error)}</span>
-        </span>
-      ) : (
-        <span aria-hidden="true" className="lumi-shimmer block size-full" />
-      )}
+    <Attachment className={chip}>
+      <AttachmentMedia className="relative size-full rounded-none">
+        {preview ? (
+          <img src={preview} alt={t('images.references')} className="size-full object-cover" />
+        ) : query.data ? (
+          <ProtectedImage
+            file={query.data}
+            alt={t('images.references')}
+            className="size-full object-cover"
+          />
+        ) : query.isError ? (
+          <span
+            className="grid size-full place-items-center text-destructive"
+            title={errorText(t, i18n, query.error)}
+          >
+            <AlertCircle size={18} aria-hidden="true" />
+            <span className="sr-only">{errorText(t, i18n, query.error)}</span>
+          </span>
+        ) : (
+          <span aria-hidden="true" className="lumi-shimmer block size-full" />
+        )}
+      </AttachmentMedia>
       {onRemove ? (
-        <button
+        <AttachmentAction
           type="button"
           className={cn(corner, 'reveal-on-hover')}
           disabled={disabled}
@@ -63,9 +66,9 @@ function Committed({
           onClick={() => onRemove(id)}
         >
           <X size={12} strokeWidth={2.5} />
-        </button>
+        </AttachmentAction>
       ) : null}
-    </div>
+    </Attachment>
   )
 }
 
@@ -82,36 +85,38 @@ function Local({
   const failed = item.status === 'error'
   const message = failed ? errorText(t, i18n, item.error) : t('react.uploading')
   return (
-    <div className={cn(chip, failed && 'border-destructive/60')} title={message}>
-      <img
-        src={item.url}
-        alt=""
-        className={cn('size-full object-cover', failed ? 'opacity-35 grayscale' : 'opacity-55')}
-      />
+    <Attachment className={cn(chip, failed && 'border-destructive/60')} title={message}>
+      <AttachmentMedia className="relative size-full rounded-none">
+        <img
+          src={item.url}
+          alt=""
+          className={cn('size-full object-cover', failed ? 'opacity-35 grayscale' : 'opacity-55')}
+        />
+      </AttachmentMedia>
       {failed ? (
-        <button
+        <AttachmentAction
           type="button"
-          className="absolute inset-0 grid place-items-center text-destructive focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+          className="absolute inset-0 grid size-full place-items-center text-destructive focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
           aria-label={t('react.retryUpload')}
           onClick={() => onRetry(item.key)}
         >
           <RotateCw size={18} strokeWidth={2.2} />
-        </button>
+        </AttachmentAction>
       ) : (
         <span aria-hidden="true" className="absolute inset-0 grid place-items-center">
           <span className="size-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
         </span>
       )}
       <span className="sr-only">{failed ? t('react.uploadFailed') + ' ' + message : message}</span>
-      <button
+      <AttachmentAction
         type="button"
         className={corner}
         aria-label={t('react.cancelUpload')}
         onClick={() => onCancel(item.key)}
       >
         <X size={12} strokeWidth={2.5} />
-      </button>
-    </div>
+      </AttachmentAction>
+    </Attachment>
   )
 }
 

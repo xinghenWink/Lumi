@@ -13,6 +13,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { ImageFile, ImageInput } from '../../../api/images'
 import { ApiError } from '../../../api/transport'
+import { useImageController } from '../../features/images/use-image-controller'
 import { useRuntime } from '../../app/context'
 import { useFileDrop } from '../../features/files/drop'
 import { referenceAccept } from '../../features/files/reference-rules'
@@ -42,16 +43,15 @@ export function ImageComposer({
   conversationId: string
   layout?: 'panel' | 'dock'
 }) {
-  const runtime = useRuntime(),
+  const runtime = useRuntime()
+  const controller = useImageController(),
     { t } = useTranslation(),
     navigate = useNavigate()
-  const scope = useStore(runtime.image.store, (state) =>
-    imageSubmissionScope(state, conversationId),
-  )
-  const draft = useStore(runtime.image.store, (state) => state.drafts[scope] ?? emptyImageDraft)
-  const pending = useStore(runtime.image.store, (state) => state.pending[scope])
-  const sending = useStore(runtime.image.store, (state) => !!state.sending[scope])
-  const error = useStore(runtime.image.store, (state) => state.errors[scope])
+  const scope = useStore(controller.store, (state) => imageSubmissionScope(state, conversationId))
+  const draft = useStore(controller.store, (state) => state.drafts[scope] ?? emptyImageDraft)
+  const pending = useStore(controller.store, (state) => state.pending[scope])
+  const sending = useStore(controller.store, (state) => !!state.sending[scope])
+  const error = useStore(controller.store, (state) => state.errors[scope])
   const options = useImageOptions(draft)
   const [library, setLibrary] = useState(false),
     [sheet, setSheet] = useState(false)
@@ -68,11 +68,11 @@ export function ImageComposer({
   useEffect(() => {
     if (draft.references.length) textarea.current?.focus()
   }, [draft.references.length])
-  function patch(value: Parameters<typeof runtime.image.draft>[1]) {
-    runtime.image.draft(conversationId, value)
+  function patch(value: Parameters<typeof controller.draft>[1]) {
+    controller.draft(conversationId, value)
   }
   function attach(file: ImageFile) {
-    const current = runtime.image.store.getState().drafts[scope] ?? emptyImageDraft
+    const current = controller.store.getState().drafts[scope] ?? emptyImageDraft
     if (current.references.includes(file.id)) return
     if (!options.maxReferences || current.references.length >= options.maxReferences)
       throw new ApiError('IMAGE_REFERENCE_INVALID')
@@ -140,7 +140,7 @@ export function ImageComposer({
         reference_file_ids: draft.references,
       }
     }
-    const result = await runtime.image.submit(conversationId, body)
+    const result = await controller.submit(conversationId, body)
     if (result) await navigate('/create/' + result, { replace: true })
   }
   const summary = options.quality

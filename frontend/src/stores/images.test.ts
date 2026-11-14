@@ -35,7 +35,7 @@ describe('image request replay and account isolation', () => {
           resolve = done
         }),
     )
-    const store = runtime.image
+    const store = await runtime.loadImage()
     store.activate(conversation.id)
     store.draft(conversation.id, { prompt: 'earlier prompt' })
     const pending = store.submit(conversation.id, input('earlier prompt'))
@@ -53,7 +53,7 @@ describe('image request replay and account isolation', () => {
       .spyOn(images, 'submit')
       .mockRejectedValueOnce(new ApiError('NETWORK_ERROR'))
       .mockImplementationOnce(async (body) => ({ ...task, conversation_id: body.conversation_id }))
-    const store = runtime.image
+    const store = await runtime.loadImage()
     store.draft('', { prompt: '星空' })
     await store.submit('', input('星空'))
     expect(store.store.getState().pending.new).toBeTruthy()
@@ -74,7 +74,7 @@ describe('image request replay and account isolation', () => {
           resolve = done
         }),
     )
-    const store = runtime.image
+    const store = await runtime.loadImage()
     store.draft('', { prompt: 'private' })
     const pending = runtime.queryClient
       .fetchQuery({
@@ -101,7 +101,7 @@ describe('image request replay and account isolation', () => {
     vi.spyOn(images, 'events').mockRejectedValue(new ApiError('NETWORK_ERROR'))
     const poll = vi.spyOn(images, 'task').mockResolvedValue({ ...task, version: task.version + 1 }),
       cancel = vi.spyOn(images, 'cancel'),
-      store = runtime.image
+      store = await runtime.loadImage()
     await store.open(conversation.id)
     await vi.advanceTimersByTimeAsync(3000)
     expect(poll).toHaveBeenCalledTimes(1)
@@ -119,7 +119,7 @@ describe('image request replay and account isolation', () => {
     vi.spyOn(images, 'events').mockImplementation(async (_id, _signal, onTask) => {
       event = onTask
     })
-    const store = runtime.image
+    const store = await runtime.loadImage()
     await store.open(conversation.id)
     await store.open('')
     event?.(task)

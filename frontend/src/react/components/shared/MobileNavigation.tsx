@@ -1,12 +1,20 @@
-import * as Dialog from '@radix-ui/react-dialog'
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+  SheetTrigger,
+} from '../ui/sheet'
 import { Menu, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Sidebar } from './Sidebar'
 import { Button } from '../ui/button'
 
 export function MobileNavigation({ admin }: { admin: boolean }) {
   const [open, setOpen] = useState(false)
+  const searchOnOpen = useRef(false)
   const { t } = useTranslation()
   useEffect(() => {
     if (!open) return
@@ -21,19 +29,21 @@ export function MobileNavigation({ admin }: { admin: boolean }) {
     const listener = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'k') return
       event.preventDefault()
-      if (window.matchMedia('(max-width: 1023px)').matches) setOpen(true)
-      requestAnimationFrame(() => {
-        document.querySelectorAll<HTMLInputElement>('[data-history-search]').forEach((input) => {
-          if (input.getClientRects().length) input.focus()
-        })
+      if (window.matchMedia('(max-width: 1023px)').matches && !open) {
+        searchOnOpen.current = true
+        setOpen(true)
+        return
+      }
+      document.querySelectorAll<HTMLInputElement>('[data-history-search]').forEach((input) => {
+        if (input.getClientRects().length) input.focus()
       })
     }
     window.addEventListener('keydown', listener)
     return () => window.removeEventListener('keydown', listener)
-  }, [admin])
+  }, [admin, open])
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button
           type="button"
           className="lg:hidden"
@@ -43,32 +53,36 @@ export function MobileNavigation({ admin }: { admin: boolean }) {
         >
           <Menu size={20} />
         </Button>
-      </Dialog.Trigger>
-      <Dialog.Portal>
-        {/* Static CSS preserves the existing self-only style-element policy. */}
-        <div
-          aria-hidden="true"
-          className="fixed inset-0 z-40 touch-none bg-overlay backdrop-blur-[2px] animate-fade-in"
-        />
-        <Dialog.Content className="mobile-sidebar fixed inset-y-0 left-0 z-50 w-[280px] max-w-[calc(100vw-20px)] border-r border-border bg-sidebar shadow-lg outline-none animate-drawer-in">
-          <Dialog.Title className="sr-only">
-            {t(admin ? 'nav.admin' : 'nav.workspace')}
-          </Dialog.Title>
-          <Dialog.Description className="sr-only">{t('nav.openMenu')}</Dialog.Description>
-          <Dialog.Close asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute top-4 right-2 z-10 size-9"
-              aria-label={t('nav.closeMenu')}
-            >
-              <X size={18} />
-            </Button>
-          </Dialog.Close>
-          <Sidebar admin={admin} onNavigate={() => setOpen(false)} />
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+      </SheetTrigger>
+      <SheetContent
+        className="mobile-sidebar"
+        onOpenAutoFocus={(event) => {
+          if (!searchOnOpen.current) return
+          searchOnOpen.current = false
+          const input = document.querySelector<HTMLInputElement>(
+            '.mobile-sidebar [data-history-search]',
+          )
+          if (input) {
+            event.preventDefault()
+            input.focus()
+          }
+        }}
+      >
+        <SheetTitle className="sr-only">{t(admin ? 'nav.admin' : 'nav.workspace')}</SheetTitle>
+        <SheetDescription className="sr-only">{t('nav.openMenu')}</SheetDescription>
+        <SheetClose asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-2 z-10 size-9"
+            aria-label={t('nav.closeMenu')}
+          >
+            <X size={18} />
+          </Button>
+        </SheetClose>
+        <Sidebar admin={admin} onNavigate={() => setOpen(false)} />
+      </SheetContent>
+    </Sheet>
   )
 }

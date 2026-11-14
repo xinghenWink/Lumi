@@ -1,4 +1,4 @@
-import * as Dialog from '@radix-ui/react-dialog'
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from './dialog'
 import { X } from 'lucide-react'
 import type { ReactNode, RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -46,75 +46,59 @@ export function ModalDialog({
   const kind: ModalVariant = variant ?? (wide ? 'wide' : 'default')
   const immersive = kind === 'fullscreen'
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
       onOpenChange={(value) => {
         if (!busy) onOpenChange(value)
       }}
     >
-      <Dialog.Portal>
-        {/* A static overlay element keeps the self-only style-element CSP intact. */}
-        <div
-          aria-hidden="true"
-          className={cn(
-            'fixed inset-0 z-50 touch-none animate-fade-in',
-            immersive ? 'bg-scrim' : 'bg-overlay backdrop-blur-[2px]',
-            overlayClassName,
-          )}
-        />
-        <Dialog.Content
-          data-lumi-modal
-          data-variant={kind}
-          className={cn(
-            'fixed z-60 overflow-auto overscroll-contain text-foreground outline-none',
-            contentClass[kind],
-            className,
-          )}
-          onCloseAutoFocus={(event) => {
-            if (returnFocus?.current) {
-              event.preventDefault()
-              returnFocus.current.focus({ preventScroll: true })
-            }
-          }}
+      <DialogContent
+        data-lumi-modal
+        data-variant={kind}
+        overlayClassName={cn(immersive && 'bg-scrim backdrop-blur-none', overlayClassName)}
+        className={cn('text-foreground', contentClass[kind], className)}
+        onCloseAutoFocus={(event) => {
+          if (returnFocus?.current) {
+            event.preventDefault()
+            returnFocus.current.focus({ preventScroll: true })
+          }
+        }}
+      >
+        {kind === 'sheet' ? (
+          <div
+            aria-hidden="true"
+            className="mx-auto mb-4 h-1 w-10 rounded-full bg-input sm:hidden"
+          />
+        ) : null}
+        <DialogTitle
+          className={immersive ? 'sr-only' : 'pr-10 text-base font-semibold tracking-tight'}
         >
-          {kind === 'sheet' ? (
-            <div
-              aria-hidden="true"
-              className="mx-auto mb-4 h-1 w-10 rounded-full bg-input sm:hidden"
-            />
-          ) : null}
-          <Dialog.Title
-            className={immersive ? 'sr-only' : 'pr-10 text-base font-semibold tracking-tight'}
+          {title}
+        </DialogTitle>
+        <DialogDescription
+          className={immersive ? 'sr-only' : 'mt-1.5 mb-5 text-xs leading-5 text-muted-foreground'}
+        >
+          {description}
+        </DialogDescription>
+        <DialogClose asChild>
+          <Button
+            type="button"
+            disabled={busy}
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'absolute z-10 size-9 rounded-full',
+              immersive
+                ? 'top-3 right-3 bg-white/10 text-white hover:bg-white/20 hover:text-white'
+                : 'top-3.5 right-3.5',
+            )}
+            aria-label={t('common.close')}
           >
-            {title}
-          </Dialog.Title>
-          <Dialog.Description
-            className={
-              immersive ? 'sr-only' : 'mt-1.5 mb-5 text-xs leading-5 text-muted-foreground'
-            }
-          >
-            {description}
-          </Dialog.Description>
-          <Dialog.Close asChild>
-            <Button
-              type="button"
-              disabled={busy}
-              variant="ghost"
-              size="icon"
-              className={cn(
-                'absolute z-10 size-9 rounded-full',
-                immersive
-                  ? 'top-3 right-3 bg-white/10 text-white hover:bg-white/20 hover:text-white'
-                  : 'top-3.5 right-3.5',
-              )}
-              aria-label={t('common.close')}
-            >
-              <X size={18} />
-            </Button>
-          </Dialog.Close>
-          {children}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+            <X size={18} />
+          </Button>
+        </DialogClose>
+        {children}
+      </DialogContent>
+    </Dialog>
   )
 }

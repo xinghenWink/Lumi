@@ -7,9 +7,14 @@ import { chats, type Conversation } from '../../../api/chat'
 import { images } from '../../../api/images'
 import { useSession } from '../../features/auth/hooks'
 import { ApiNotice } from './ApiNotice'
+import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { ConversationActions } from '../chat/ConversationActions'
-import { ImageConversationActions } from '../images/ImageConversationActions'
+const ImageConversationActions = lazy(() =>
+  import('../images/ImageConversationActions').then((module) => ({
+    default: module.ImageConversationActions,
+  })),
+)
 const VirtualHistoryRows = lazy(() => import('./VirtualHistoryRows'))
 // Canvas history carries its own lazily loaded copy, so it stays out of the shell bundle.
 const CanvasHistory = lazy(() => import('../canvas/CanvasHistory'))
@@ -68,7 +73,9 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
           </span>
         </Link>
         {image ? (
-          <ImageConversationActions row={row} />
+          <Suspense fallback={null}>
+            <ImageConversationActions row={row} />
+          </Suspense>
         ) : (
           <ConversationActions row={{ ...row, busy: row.busy ?? false }} />
         )}
@@ -106,10 +113,10 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
         }}
       >
         <Search size={14} className="shrink-0 text-muted-foreground" />
-        <input
+        <Input
           data-history-search
           type="search"
-          className="h-8 min-w-0 w-full bg-transparent text-base outline-none placeholder:text-muted-foreground lg:text-xs"
+          className="h-8 min-w-0 w-full rounded-none border-0 bg-transparent p-0 text-base shadow-none outline-none focus:ring-0 placeholder:text-muted-foreground lg:text-xs"
           value={search}
           onChange={(event) =>
             setSearches((state) => ({

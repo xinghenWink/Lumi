@@ -257,6 +257,18 @@ test('React real streaming history stop editing isolation and bounded rendering'
     )
     const input = page.getByLabel('消息内容', { exact: true })
     await input.fill('解释海风与灯塔')
+    await input.press('Shift+Enter')
+    await expect(input).toHaveValue('解释海风与灯塔\n')
+    await input.fill('解释海风与灯塔')
+    await input.evaluate((element) => {
+      element.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+    })
+    await input.press('Enter')
+    await expect(page).toHaveURL(/\/chat$/)
+    await expect(page.locator('.chat-message')).toHaveCount(0)
+    await input.evaluate((element) => {
+      element.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }))
+    })
     await input.press('Enter')
     await expect(page).toHaveURL(/\/chat\/[a-f0-9-]+$/)
     await expect(
@@ -376,6 +388,7 @@ test('React real streaming history stop editing isolation and bounded rendering'
     await dialog.getByRole('button', { name: '保存', exact: true }).click()
     await expect(dialog).not.toBeVisible()
     await expect(page.locator('.chat-current-title')).toContainText(renamed)
+    await expect(page.locator('.chat-current-title').getByRole('button')).toBeFocused()
     await page.locator('.chat-current-title').getByRole('button').click()
     await page.getByRole('menuitem', { name: '置顶', exact: true }).click()
     await expect
@@ -497,8 +510,23 @@ test('React real streaming history stop editing isolation and bounded rendering'
     })
     await member.goto('/chat/' + performanceID)
     const older = member.getByRole('button', { name: '加载更早的消息', exact: true })
-    // Load all 500 rows before asserting virtualized DOM size.
-    await expect(older).toBeVisible()
+    // The first request crosses the threshold with the reader at the oldest loaded row.
+    const viewport = member.locator('.chat-message-scroll')
+    const anchor = viewport.locator('article').filter({ hasText: 'Message 400.' })
+    await expect(anchor).toHaveCount(1)
+    await older.scrollIntoViewIfNeeded()
+    await viewport.evaluate((element) => {
+      element.scrollTop = 0
+    })
+    const anchorOffset = () =>
+      anchor.evaluate((element) => {
+        const viewport = element.closest('.chat-message-scroll')
+        if (!viewport) throw new Error('Missing chat viewport')
+        return element.getBoundingClientRect().top - viewport.getBoundingClientRect().top
+      })
+    await expect.poll(anchorOffset).toBeGreaterThanOrEqual(0)
+    const offset = await anchorOffset()
+    let firstPage = true
     let hasMore = true
     while (hasMore) {
       const response = member.waitForResponse(
@@ -506,6 +534,13 @@ test('React real streaming history stop editing isolation and bounded rendering'
       )
       await older.click()
       hasMore = record(await (await response).json()).next_cursor !== ''
+      if (firstPage) {
+        await expect(member.locator('.chat-virtual-row').first()).toBeVisible()
+        await expect(anchor).toBeInViewport()
+        // Dynamic Markdown and virtual row measurement may settle within a line of text.
+        await expect.poll(async () => Math.abs((await anchorOffset()) - offset)).toBeLessThan(24)
+        firstPage = false
+      }
     }
     await expect(member.locator('.chat-virtual-row').first()).toBeVisible()
     expect(await member.locator('.chat-message').count()).toBeLessThan(60)

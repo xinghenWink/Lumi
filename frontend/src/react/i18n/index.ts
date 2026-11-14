@@ -34,7 +34,7 @@ export async function createAppI18n(locale: 'zh-CN' | 'en' = 'zh-CN') {
       resources: { 'zh-CN': { translation: zhCN } },
       // Preserve existing message placeholders without duplicating both language catalogs.
       interpolation: { prefix: '{', suffix: '}', escapeValue: false },
-      react: { useSuspense: false },
+      react: { useSuspense: false, bindI18nStore: 'added' },
     })
   return language
 }

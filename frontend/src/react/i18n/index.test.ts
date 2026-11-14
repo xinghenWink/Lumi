@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { loadRouteCopy } from './route-copy'
 import { createAppI18n } from './index'
 import { messages } from '../../i18n/resources'
 import zhCN from './zh-CN'
@@ -34,6 +35,8 @@ describe('shared translation compatibility', () => {
       const language = await createAppI18n(locale)
       // Canvas copy is loaded by the canvas routes rather than with the shell.
       await loadCanvasCatalog(language, locale)
+      await loadRouteCopy(language, 'admin')
+      await loadRouteCopy(language, 'legal')
       for (const key of keys) expect(language.exists(key), `${locale}: ${key}`).toBe(true)
       for (const action of auditActions)
         expect(language.exists('audit.actions.' + action), `${locale}: ${action}`).toBe(true)
@@ -48,6 +51,10 @@ describe('shared translation compatibility', () => {
     expect(paths(canvasZh).sort()).toEqual(paths(canvasEn).sort())
     expect(language.t('workspace.greeting', { name: '小明' })).toBe('你好，小明。')
     expect(language.t('auth.emailPlaceholder')).toBe('you@example.com')
+    expect(language.exists('admin.console')).toBe(false)
+    expect(language.exists('legal.termsTitle')).toBe(false)
+    await loadRouteCopy(language, 'admin')
+    await loadRouteCopy(language, 'legal')
     for (const key of paths(messages['zh-CN'])) expect(language.exists(key)).toBe(true)
     await language.changeLanguage('en')
     expect(language.t('workspace.greeting', { name: 'Alex' })).toBe('Hello, Alex.')

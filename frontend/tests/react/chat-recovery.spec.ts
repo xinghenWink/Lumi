@@ -205,9 +205,17 @@ test('real vision, IME, protected blobs, reload and cursor replay survive a brow
         response.request().method() === 'POST' &&
         new URL(response.url()).pathname === '/api/v1/files',
     )
-    await page
-      .getByLabel('添加图片', { exact: true })
-      .setInputFiles({ name: 'reference.png', mimeType: 'image/png', buffer: fixturePNG() })
+    const fileChooser = page.waitForEvent('filechooser')
+    const attach = page.getByRole('button', { name: '添加图片', exact: true })
+    await attach.focus()
+    await attach.press('Enter')
+    await (
+      await fileChooser
+    ).setFiles({
+      name: 'reference.png',
+      mimeType: 'image/png',
+      buffer: fixturePNG(),
+    })
     const uploaded = await upload
     expect(uploaded.ok()).toBe(true)
     const file = parseFile(await uploaded.json())

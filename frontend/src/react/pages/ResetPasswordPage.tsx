@@ -5,6 +5,8 @@ import { operations } from '../../api/operations'
 import { validEmail, validPassword } from '../../features/accounts/utils'
 import { ApiNotice } from '../components/shared/ApiNotice'
 import { Button } from '../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Field, FieldGroup } from '../components/ui/field'
 import { Input } from '../components/ui/input'
 
 export default function ResetPasswordPage() {
@@ -46,50 +48,61 @@ export default function ResetPasswordPage() {
   }
   return (
     <section className="mx-auto my-auto w-full max-w-lg px-4 py-12">
-      <div className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-6 shadow-md sm:p-8">
-        <h1 className="text-[22px] font-semibold tracking-tight">
-          {t(resetting ? 'ops.resetTitle' : 'ops.forgotTitle')}
-        </h1>
-        <ApiNotice error={error} />
-        {done ? (
-          <p role="status" className="text-sm leading-7">
-            {t(resetting ? 'ops.resetDone' : 'ops.resetSent')}
-          </p>
-        ) : (
-          <form
-            className="flex flex-col gap-5"
-            noValidate
-            onSubmit={(event) => {
-              void submit(event)
-            }}
-          >
-            <label className="flex flex-col gap-1.5 text-xs font-medium">
-              {t(resetting ? 'ops.newPassword' : 'auth.email')}
-              <Input
-                type={resetting ? 'password' : 'email'}
-                autoComplete={resetting ? 'new-password' : 'email'}
-                value={resetting ? password : email}
-                onChange={(event) =>
-                  resetting ? setPassword(event.target.value) : setEmail(event.target.value)
-                }
-                maxLength={resetting ? 128 : 254}
-                disabled={busy}
-              />
-            </label>
-            {validation ? (
-              <p role="alert" className="text-sm text-destructive">
-                {validation}
-              </p>
-            ) : null}
-            <Button type="submit" disabled={busy}>
-              {t(busy ? 'auth.submitting' : resetting ? 'ops.resetPassword' : 'ops.sendReset')}
-            </Button>
-          </form>
-        )}
-        <Link className="text-sm text-primary hover:underline" to="/login">
-          {t('ops.backLogin')}
-        </Link>
-      </div>
+      <Card className="gap-5 rounded-2xl border border-border bg-card p-6 shadow-md sm:p-8">
+        <CardHeader className="p-0">
+          <CardTitle as="h1" className="text-[22px] font-semibold tracking-tight">
+            {t(resetting ? 'ops.resetTitle' : 'ops.forgotTitle')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5 p-0">
+          <ApiNotice error={error} />
+          {done ? (
+            <p role="status" className="text-sm leading-7">
+              {t(resetting ? 'ops.resetDone' : 'ops.resetSent')}
+            </p>
+          ) : (
+            <form
+              noValidate
+              onSubmit={(event) => {
+                void submit(event)
+              }}
+            >
+              <FieldGroup className="gap-5">
+                <Field
+                  id="reset-credential"
+                  label={t(resetting ? 'ops.newPassword' : 'auth.email')}
+                  invalid={!!validation}
+                >
+                  <Input
+                    id="reset-credential"
+                    aria-invalid={!!validation}
+                    aria-describedby={validation ? 'reset-validation' : undefined}
+                    type={resetting ? 'password' : 'email'}
+                    autoComplete={resetting ? 'new-password' : 'email'}
+                    value={resetting ? password : email}
+                    onChange={(event) =>
+                      resetting ? setPassword(event.target.value) : setEmail(event.target.value)
+                    }
+                    maxLength={resetting ? 128 : 254}
+                    disabled={busy}
+                  />
+                </Field>
+                {validation ? (
+                  <p id="reset-validation" role="alert" className="text-sm text-destructive">
+                    {validation}
+                  </p>
+                ) : null}
+                <Button type="submit" disabled={busy}>
+                  {t(busy ? 'auth.submitting' : resetting ? 'ops.resetPassword' : 'ops.sendReset')}
+                </Button>
+              </FieldGroup>
+            </form>
+          )}
+          <Link className="text-sm text-primary hover:underline" to="/login">
+            {t('ops.backLogin')}
+          </Link>
+        </CardContent>
+      </Card>
     </section>
   )
 }

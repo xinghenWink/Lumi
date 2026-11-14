@@ -9,7 +9,7 @@ export function ModeTabs() {
   const runtime = useRuntime()
   const image = useLocation().pathname.startsWith('/create')
   const lastChat = useStore(runtime.chat.store, (state) => state.lastOpened)
-  const imageConversation = useStore(runtime.image.store, (state) => state.lastOpened)
+  const imageConversation = useStore(runtime.imageNavigation, (state) => state.lastOpened)
   return (
     <nav
       aria-label={t('chat.mode')}
