@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useId, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useStore } from 'zustand'
-import { RotateCw, Sparkles } from 'lucide-react'
+import { RotateCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Message } from '../../api/chat'
 import { useRuntime } from '../app/context'
@@ -12,6 +12,7 @@ import { ChatComposer } from '../components/chat/ChatComposer'
 import { ModeTabs } from '../components/chat/ModeTabs'
 import { ConversationActions } from '../components/chat/ConversationActions'
 import { ApiNotice } from '../components/shared/ApiNotice'
+import { BrandMark } from '../components/shared/BrandMark'
 import { PageStatus } from '../components/shared/PageStatus'
 import { ModalDialog } from '../components/ui/modal-dialog'
 import { Button } from '../components/ui/button'
@@ -101,9 +102,9 @@ export default function ChatPage() {
         </Suspense>
       ) : (
         <section className="flex min-h-0 flex-1 flex-col items-center justify-end px-5 pb-8 text-center">
-          <span className="mb-5 grid size-12 place-items-center rounded-2xl bg-accent text-primary animate-rise-in">
-            <Sparkles size={24} strokeWidth={1.6} />
-          </span>
+          <div className="mb-5 animate-rise-in">
+            <BrandMark compact markClassName="size-12" />
+          </div>
           <h1 className="text-[28px] leading-tight font-semibold tracking-tight text-balance sm:text-[32px]">
             {t('react.title')}
           </h1>

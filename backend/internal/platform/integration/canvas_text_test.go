@@ -26,7 +26,7 @@ import (
 )
 
 func TestCanvasTextRuns(t *testing.T) {
-	f := accountFixtureWithMigrations(t, func(ctx context.Context, pool *pgxpool.Pool) (result error) {
+	f := accountFixture(t, func(ctx context.Context, pool *pgxpool.Pool) (result error) {
 		conn := stdlib.OpenDB(*pool.Config().ConnConfig)
 		defer func() { result = errors.Join(result, conn.Close()) }()
 		p, err := goose.NewProvider(goose.DialectPostgres, conn, os.DirFS("../../../migrations"),
@@ -36,7 +36,7 @@ func TestCanvasTextRuns(t *testing.T) {
 		}
 		_, err = p.UpTo(ctx, 11)
 		return err
-	})
+	}, false)
 	admin := creditActor(t, f)
 	member := creditMember(t, f, admin, 0)
 	other := creditMember(t, f, admin, 0)

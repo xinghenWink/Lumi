@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
@@ -27,7 +28,6 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/images"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/user"
-	"github.com/xinghenWink/Lumi/backend/migrations"
 )
 
 func canvasPNG(t *testing.T) []byte {
@@ -67,21 +67,27 @@ func TestCanvasRebuildPersistenceGenerationAndRetention(t *testing.T) {
 
 func TestCanvasRebuildUpgrade(t *testing.T) {
 	f := accountFixtureWithMigrations(t, func(ctx context.Context, pool *pgxpool.Pool) error {
-		conn := stdlib.OpenDB(*pool.Config().ConnConfig)
-		defer func() {
-			if err := conn.Close(); err != nil {
-				t.Error(err)
+		return withCanvasUpgradeProvider(ctx, pool, func(p *goose.Provider) error {
+			if _, err := p.UpTo(ctx, 10); err != nil {
+				return err
 			}
-		}()
-		provider, err := goose.NewProvider(goose.DialectPostgres, conn, os.DirFS("../../../migrations"),
-			goose.WithTableName("public.goose_db_version"), goose.WithDisableGlobalRegistry(true))
-		if err != nil {
+			// Current image services need migration 13 to seed image tasks before cleanup.
+			_, err := p.ApplyVersion(ctx, 13, true)
 			return err
-		}
-		_, err = provider.UpTo(ctx, 10)
-		return err
+		})
 	})
 	testCanvas(t, f, true)
+}
+
+func withCanvasUpgradeProvider(ctx context.Context, pool *pgxpool.Pool, work func(*goose.Provider) error) (result error) {
+	conn := stdlib.OpenDB(*pool.Config().ConnConfig)
+	defer func() { result = errors.Join(result, conn.Close()) }()
+	provider, err := goose.NewProvider(goose.DialectPostgres, conn, os.DirFS("../../../migrations"),
+		goose.WithTableName("public.goose_db_version"), goose.WithDisableGlobalRegistry(true), goose.WithAllowOutofOrder(true))
+	if err != nil {
+		return err
+	}
+	return work(provider)
 }
 
 func testCanvas(t *testing.T, f *fixture, upgrade bool) {
@@ -325,7 +331,10 @@ func testCanvas(t *testing.T, f *fixture, upgrade bool) {
 			if _, err := f.pool.Exec(f.ctx, "UPDATE canvases SET document=jsonb_set(document,'{schema}','1') WHERE id=$1", id); err != nil {
 				t.Fatal(err)
 			}
-			if err := migrations.Up(f.ctx, f.pool); err != nil {
+			if err := withCanvasUpgradeProvider(f.ctx, f.pool, func(p *goose.Provider) error {
+				_, err := p.Up(f.ctx)
+				return err
+			}); err != nil {
 				t.Fatal(err)
 			}
 			f.services.Images.Execute(f.ctx, running)

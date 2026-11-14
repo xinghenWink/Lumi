@@ -1,5 +1,5 @@
 import { useStore } from 'zustand'
-import { MessageSquare, Sparkles } from 'lucide-react'
+import { Image, MessageSquare } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useRuntime } from '../../app/context'
@@ -20,7 +20,7 @@ export function ModeTabs() {
         {
           to: imageConversation ? '/create/' + imageConversation : '/create',
           key: 'chat.imageMode',
-          icon: Sparkles,
+          icon: Image,
         },
       ].map(({ to, key, icon: Icon }) => {
         const active = image === (key === 'chat.imageMode')

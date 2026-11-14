@@ -2356,6 +2356,8 @@ export interface components {
     ModelCapabilities: {
       /** @description Chat model accepts explicit reasoning effort. */
       reasoning_effort?: boolean
+      /** @description Image model inherits the site's enabled ratio and resolution presets. Otherwise its explicit sizes are used. */
+      use_size_presets?: boolean
       vision: boolean
       stream: boolean
       max_context_tokens: number
@@ -2607,9 +2609,14 @@ export interface components {
       /** Format: int64 */
       max_upload_bytes: number
       sizes: string[]
+      /** @description Optional legacy or custom one-to-one mappings, available with explicitly sized models. */
       ratio_sizes: {
         [key: string]: string
       }
+      /** @description Site preset catalog. Disabled choices remain in the catalog so administrators can re-enable them. */
+      readonly resolution_presets?: components['schemas']['ImageResolutionPreset'][]
+      disabled_ratios?: ('1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16')[]
+      disabled_resolutions?: ('1k' | '2k' | '4k')[]
       /** Format: int64 */
       per_user_concurrency: number
       /** Format: int64 */
@@ -2624,6 +2631,14 @@ export interface components {
       admin_can_view_content: boolean
       /** Format: int64 */
       version: number
+    }
+    ImageResolutionPreset: {
+      /** @enum {string} */
+      ratio: '1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16'
+      /** @enum {string} */
+      resolution: '1k' | '2k' | '4k'
+      /** @description Exact width and height sent to the provider, in pixels. */
+      size: string
     }
     ImageTaskInput: {
       /**

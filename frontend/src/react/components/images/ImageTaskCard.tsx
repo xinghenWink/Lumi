@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Copy, Download, Info, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -64,6 +64,7 @@ export const ImageTaskCard = memo(function ImageTaskCard({
   const [preview, setPreview] = useState<number | null>(null),
     [details, setDetails] = useState(false),
     [deleting, setDeleting] = useState<string | null>(null)
+  const detailsTrigger = useRef<HTMLButtonElement>(null)
   const files = task.items.flatMap((item) => (item.file ? [item.file] : []))
   // One ratio per task keeps result tiles in a row the same height, including failed slots.
   const aspect = taskAspect(task, files[0])
@@ -94,21 +95,67 @@ export const ImageTaskCard = memo(function ImageTaskCard({
   })
   const action =
     'size-7 rounded-lg text-foreground hover:bg-foreground/10 focus-visible:outline-offset-0'
+  const references =
+    task.content_visible && task.reference_file_ids.length ? (
+      <ReferenceChips ids={task.reference_file_ids} className="image-task-references justify-end" />
+    ) : null
+
+  function taskActions(variant: 'ghost' | 'outline') {
+    return (
+      <>
+        {!admin && done && onReuse ? (
+          <Button type="button" variant={variant} size="sm" onClick={() => onReuse(task)}>
+            <RotateCcw size={13} />
+            {t('images.regenerate')}
+          </Button>
+        ) : null}
+        <Button
+          type="button"
+          variant={variant}
+          size="sm"
+          aria-haspopup="dialog"
+          onClick={(event) => {
+            detailsTrigger.current = event.currentTarget
+            setDetails(true)
+          }}
+        >
+          <Info size={13} />
+          {t('images.details')}
+        </Button>
+      </>
+    )
+  }
+
   return (
     <article
       className="image-task border-b border-border py-6 last:border-0"
       data-task-id={task.id}
     >
-      <header className="mb-4 flex items-start gap-3">
-        <div className="min-w-0 flex-1">
+      <header
+        className={cn(
+          'mb-4 gap-3',
+          admin ? 'flex items-start' : 'grid sm:grid-cols-[minmax(0,1fr)_14rem]',
+        )}
+      >
+        <div className={cn('min-w-0 flex-1', !admin && 'sm:col-start-1 sm:row-start-1')}>
           <p className="text-sm leading-6 break-words whitespace-pre-wrap">
             {task.content_visible ? task.prompt : t('images.hidden')}
           </p>
           <p className="mt-1 text-2xs text-muted-foreground">{parameters}</p>
         </div>
-        {task.content_visible && task.reference_file_ids.length ? (
-          <ReferenceChips ids={task.reference_file_ids} />
-        ) : null}
+        {admin ? (
+          references
+        ) : (
+          <div className="row-start-1 flex flex-col items-end gap-2 sm:col-start-2">
+            {references}
+            <div
+              data-testid="image-task-top-actions"
+              className="flex flex-wrap justify-end gap-1.5"
+            >
+              {taskActions('outline')}
+            </div>
+          </div>
+        )}
       </header>
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
         <span
@@ -273,16 +320,7 @@ export const ImageTaskCard = memo(function ImageTaskCard({
             {t(task.cancel_requested ? 'images.cancelRequested' : 'images.cancel')}
           </Button>
         ) : null}
-        {!admin && done && onReuse ? (
-          <Button variant="ghost" size="sm" onClick={() => onReuse(task)}>
-            <RotateCcw size={13} />
-            {t('images.regenerate')}
-          </Button>
-        ) : null}
-        <Button variant="ghost" size="sm" onClick={() => setDetails(true)}>
-          <Info size={13} />
-          {t('images.details')}
-        </Button>
+        {taskActions('ghost')}
       </div>
       {preview !== null ? (
         <ImagePreview
@@ -299,6 +337,7 @@ export const ImageTaskCard = memo(function ImageTaskCard({
         onOpenChange={setDetails}
         title={t('images.details')}
         description={parameters}
+        returnFocus={detailsTrigger}
       >
         <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 text-xs">
           {[

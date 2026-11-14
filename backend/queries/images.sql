@@ -5,7 +5,7 @@ SELECT u.*,r.upstream_model_name FROM model_routes r JOIN upstreams u ON u.id=r.
 WHERE m.id=$1 AND m.type='image' AND m.enabled AND r.enabled AND u.enabled AND u.api_key_enc<>''
 ORDER BY r.priority,u.priority,r.id LIMIT 1;
 -- name: SaveImageSettings :one
-UPDATE image_settings SET max_n=$1,max_references=$2,max_upload_bytes=$3,sizes=$4,ratio_sizes=$5,per_user_concurrency=$6,global_concurrency=$7,timeout_seconds=$8,queue_timeout_seconds=$9,split_requests=$10,retention_days=$11,admin_can_view_content=$12,version=version+1 WHERE singleton=true AND version=$13 RETURNING *;
+UPDATE image_settings SET max_n=$1,max_references=$2,max_upload_bytes=$3,sizes=$4,ratio_sizes=$5,per_user_concurrency=$6,global_concurrency=$7,timeout_seconds=$8,queue_timeout_seconds=$9,split_requests=$10,retention_days=$11,admin_can_view_content=$12,disabled_ratios=COALESCE(sqlc.narg(disabled_ratios)::text[],disabled_ratios),disabled_resolutions=COALESCE(sqlc.narg(disabled_resolutions)::text[],disabled_resolutions),version=version+1 WHERE singleton=true AND version=sqlc.arg(version) RETURNING *;
 -- name: LockImageScheduler :exec
 SELECT pg_advisory_xact_lock(719005);
 -- name: InsertImageFile :one

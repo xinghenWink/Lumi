@@ -213,7 +213,7 @@ test('React real image generation editing gallery cancellation and administrator
       capabilities: {
         ...defaultCapabilities('image'),
         qualities: ['low', 'medium', 'high'],
-        sizes: ['1024x1024', '1536x1024', 'auto'],
+        sizes: ['1024x1024', '1536x1024', '2016x1344', 'auto'],
         max_n: 4,
         supports_edit: true,
         max_reference_images: 4,
@@ -349,9 +349,16 @@ test('React real image generation editing gallery cancellation and administrator
         .count(),
     ).toBe(1)
     await parameters.getByRole('radio', { name: '3:2', exact: true }).check()
-    await expect(parameters.getByLabel('尺寸', { exact: true })).toHaveValue('1536x1024')
+    const resolution = parameters.getByLabel('分辨率', { exact: true })
+    await expect(resolution).toHaveValue('1536x1024')
+    await resolution.selectOption({ label: '2K · 2016 × 1344' })
+    await expect(parameters.getByRole('radio', { name: '3:2', exact: true })).toBeChecked()
+    await expect(resolution).toHaveValue('2016x1344')
+    await parameters.getByRole('radio', { name: '按尺寸', exact: true }).check()
     await parameters.getByLabel('尺寸', { exact: true }).selectOption('1024x1024')
     await expect(parameters.getByRole('radio', { name: '按尺寸', exact: true })).toBeChecked()
+    await parameters.getByRole('radio', { name: '3:2', exact: true }).check()
+    await resolution.selectOption({ label: '2K · 2016 × 1344' })
     await parameters.getByRole('radio', { name: '2 张', exact: true }).check()
     await parameters.scrollIntoViewIfNeeded()
     expect(
@@ -434,6 +441,7 @@ test('React real image generation editing gallery cancellation and administrator
     const firstID = await task.getAttribute('data-task-id')
     if (!firstID) throw new Error('Missing task ID')
     const persisted = parseTask(await api('GET', '/image-tasks/' + firstID, undefined, memberToken))
+    expect(persisted).toMatchObject({ ratio: '3:2', size: '2016x1344' })
     const original = persisted.items[0]?.file
     if (!original) throw new Error('Missing image file')
     expect(original.width).toBe(900)
@@ -464,6 +472,20 @@ test('React real image generation editing gallery cancellation and administrator
     expect(await member.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     )
+    const topActions = task.getByTestId('image-task-top-actions')
+    const detailsButton = topActions.getByRole('button', { name: '任务详情', exact: true })
+    await detailsButton.click()
+    const taskDetails = member.getByRole('dialog', { name: '任务详情', exact: true })
+    await expect(taskDetails.getByText(firstID, { exact: true })).toBeVisible()
+    await member.keyboard.press('Escape')
+    await expect(taskDetails).toBeHidden()
+    await expect(detailsButton).toBeFocused()
+    await topActions.getByRole('button', { name: '使用相同参数', exact: true }).click()
+    await expect(prompt).toHaveValue('partial')
+    expect(calls).toBe(1)
+    if (mobile) await member.getByRole('button', { name: '生图参数', exact: true }).click()
+    await expect(parameters.getByLabel('分辨率', { exact: true })).toHaveValue('2016x1344')
+    await member.keyboard.press('Escape')
     await member.screenshot({ path: info.outputPath('images-light.png'), animations: 'disabled' })
     await member.getByRole('button', { name: '切换深色主题', exact: true }).click()
     await member.screenshot({ path: info.outputPath('images-dark.png'), animations: 'disabled' })
@@ -597,9 +619,18 @@ test('React real image generation editing gallery cancellation and administrator
     })
     await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
     await page.goto('/admin/image-settings')
+    await page.getByRole('switch', { name: '4K', exact: true }).uncheck()
+    await page.getByRole('switch', { name: '9:16', exact: true }).uncheck()
     await page.getByLabel('允许管理员查看提示词、参考图与结果', { exact: true }).check()
     await page.getByRole('button', { name: '保存修改', exact: true }).click()
     await expect(page.getByRole('status')).toContainText('生图设置已保存')
+    await page.reload()
+    await expect(page.getByRole('switch', { name: '4K', exact: true })).not.toBeChecked()
+    await expect(page.getByRole('switch', { name: '9:16', exact: true })).not.toBeChecked()
+    expect(parseImageConfiguration(await api('GET', '/admin/image-settings'))).toMatchObject({
+      disabled_resolutions: ['4k'],
+      disabled_ratios: ['9:16'],
+    })
     await page.screenshot({ path: info.outputPath('image-settings.png'), animations: 'disabled' })
     await page.goto('/admin/image-tasks')
     await page.getByLabel('用户 ID', { exact: true }).fill(String(memberUser.id))

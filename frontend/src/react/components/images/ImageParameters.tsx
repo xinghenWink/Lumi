@@ -19,6 +19,7 @@ export function ImageParameters({
 }) {
   const { t } = useTranslation()
   const size = useId()
+  const hasRatio = !!options.ratio
   return (
     <div className="flex flex-col gap-4">
       {options.priced.length ? (
@@ -50,7 +51,7 @@ export function ImageParameters({
                 />
               ),
             },
-            ...options.ratios.map(([ratio]) => {
+            ...options.ratios.map((ratio) => {
               const box = ratioBox(ratio)
               return {
                 value: ratio,
@@ -69,28 +70,46 @@ export function ImageParameters({
           onChange={(ratio) =>
             onPatch({
               ratio,
-              size: options.ratios.find(([value]) => value === ratio)?.[1] ?? options.size,
+              size:
+                options.variants.find(
+                  (preset) => preset.ratio === ratio && preset.resolution === options.resolution,
+                )?.size ??
+                options.ratioOptions.get(ratio)?.[0] ??
+                options.size,
             })
           }
         />
       ) : null}
       <div className="flex min-w-0 flex-col gap-1.5">
         <label htmlFor={size} className="text-xs font-medium text-muted-foreground">
-          {t('images.size')}
+          {t(hasRatio ? 'images.resolution' : 'images.size')}
         </label>
         <select
           id={size}
-          aria-label={t('images.size')}
+          aria-label={t(hasRatio ? 'images.resolution' : 'images.size')}
           className={selectClass + ' h-9'}
           value={options.size}
           disabled={disabled}
-          onChange={(event) => onPatch({ size: event.target.value, ratio: '' })}
+          onChange={(event) => onPatch({ size: event.target.value })}
         >
-          {options.sizes.map((value) => (
-            <option key={value} value={value}>
-              {value === 'auto' ? t('images.auto') : value.replace('x', ' × ')}
-            </option>
-          ))}
+          {(hasRatio ? options.ratioSizes : options.sizes).map((value) => {
+            const preset = options.variants.find(
+              (item) => item.ratio === options.ratio && item.size === value,
+            )
+            const pixels = value.replace('x', ' × ')
+            return (
+              <option key={value} value={value}>
+                {preset
+                  ? t('images.resolutionOption', {
+                      resolution: preset.resolution.toUpperCase(),
+                      pixels,
+                    })
+                  : value === 'auto'
+                    ? t('images.auto')
+                    : pixels}
+              </option>
+            )
+          })}
         </select>
       </div>
       {options.maxN ? (

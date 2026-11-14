@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { images, type ImageConfiguration } from '../../../api/images'
+import { images, type ImageConfiguration, type ImageResolutionPreset } from '../../../api/images'
 import { ApiError } from '../../../api/transport'
 import { useRuntime } from '../../app/context'
 import { useSession } from '../../features/auth/hooks'
@@ -30,6 +30,77 @@ const ratioText = (value: ImageConfiguration) =>
   Object.entries(value.ratio_sizes)
     .map(([ratio, size]) => ratio + '=' + size)
     .join('\n')
+
+function toggled<T>(disabled: T[], value: T, enabled: boolean): T[] {
+  return enabled ? disabled.filter((item) => item !== value) : [...disabled, value]
+}
+
+function PresetSwitches({
+  form,
+  onChange,
+}: {
+  form: ImageConfiguration
+  onChange(patch: Pick<ImageConfiguration, 'disabled_ratios' | 'disabled_resolutions'>): void
+}) {
+  const { t } = useTranslation()
+  const presets: ImageResolutionPreset[] = form.resolution_presets ?? []
+  const ratios = [...new Set(presets.map((preset) => preset.ratio))]
+  const resolutions = [...new Set(presets.map((preset) => preset.resolution))]
+  const disabledRatios = form.disabled_ratios ?? []
+  const disabledResolutions = form.disabled_resolutions ?? []
+  if (!presets.length) return null
+  return (
+    <section className="grid gap-3 rounded-xl border border-border p-4">
+      <div>
+        <h2 className="text-sm font-semibold">{t('images.presetTitle')}</h2>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{t('images.presetHint')}</p>
+      </div>
+      <fieldset>
+        <legend className="text-xs font-medium">{t('images.ratio')}</legend>
+        <div className="grid grid-cols-3 gap-x-4 sm:flex sm:flex-wrap">
+          {ratios.map((ratio) => {
+            const checked = !disabledRatios.includes(ratio)
+            return (
+              <CheckField
+                key={ratio}
+                role="switch"
+                label={ratio}
+                checked={checked}
+                disabled={checked && ratios.length - disabledRatios.length === 1}
+                onChange={(enabled) =>
+                  onChange({ disabled_ratios: toggled(disabledRatios, ratio, enabled) })
+                }
+              />
+            )
+          })}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend className="text-xs font-medium">{t('images.resolution')}</legend>
+        <div className="flex flex-wrap gap-x-4">
+          {resolutions.map((resolution) => {
+            const checked = !disabledResolutions.includes(resolution)
+            return (
+              <CheckField
+                key={resolution}
+                role="switch"
+                label={resolution.toUpperCase()}
+                checked={checked}
+                disabled={checked && resolutions.length - disabledResolutions.length === 1}
+                onChange={(enabled) =>
+                  onChange({
+                    disabled_resolutions: toggled(disabledResolutions, resolution, enabled),
+                  })
+                }
+              />
+            )
+          })}
+        </div>
+      </fieldset>
+    </section>
+  )
+}
+
 function ConfigurationForm({
   initial,
   reload,
@@ -94,25 +165,33 @@ function ConfigurationForm({
               />
             ))}
           </div>
-          <Field id={id + '-sizes'} label={t('images.sizes')}>
-            <textarea
-              id={id + '-sizes'}
-              className={textareaClass}
-              rows={5}
-              required
-              value={sizes}
-              onChange={(event) => setSizes(event.target.value)}
-            />
-          </Field>
-          <Field id={id + '-ratios'} label={t('images.ratio_sizes')}>
-            <textarea
-              id={id + '-ratios'}
-              className={textareaClass}
-              rows={7}
-              value={ratios}
-              onChange={(event) => setRatios(event.target.value)}
-            />
-          </Field>
+          <PresetSwitches form={form} onChange={(patch) => setForm({ ...form, ...patch })} />
+          <details className="grid gap-4 rounded-xl border border-border p-4">
+            <summary className="cursor-pointer text-sm font-medium">
+              {t('images.customSizes')}
+            </summary>
+            <div className="mt-4 grid gap-4">
+              <Field id={id + '-sizes'} label={t('images.sizes')}>
+                <textarea
+                  id={id + '-sizes'}
+                  className={textareaClass}
+                  rows={5}
+                  required
+                  value={sizes}
+                  onChange={(event) => setSizes(event.target.value)}
+                />
+              </Field>
+              <Field id={id + '-ratios'} label={t('images.ratio_sizes')}>
+                <textarea
+                  id={id + '-ratios'}
+                  className={textareaClass}
+                  rows={7}
+                  value={ratios}
+                  onChange={(event) => setRatios(event.target.value)}
+                />
+              </Field>
+            </div>
+          </details>
           <CheckField
             label={t('images.split_requests')}
             checked={form.split_requests}

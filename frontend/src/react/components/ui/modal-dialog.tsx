@@ -26,6 +26,7 @@ export function ModalDialog({
   wide = false,
   variant,
   className,
+  overlayClassName,
   children,
 }: {
   open: boolean
@@ -38,6 +39,7 @@ export function ModalDialog({
   wide?: boolean
   variant?: ModalVariant
   className?: string
+  overlayClassName?: string
   children: ReactNode
 }) {
   const { t } = useTranslation()
@@ -57,6 +59,7 @@ export function ModalDialog({
           className={cn(
             'fixed inset-0 z-50 touch-none animate-fade-in',
             immersive ? 'bg-scrim' : 'bg-overlay backdrop-blur-[2px]',
+            overlayClassName,
           )}
         />
         <Dialog.Content
@@ -70,7 +73,7 @@ export function ModalDialog({
           onCloseAutoFocus={(event) => {
             if (returnFocus?.current) {
               event.preventDefault()
-              returnFocus.current.focus()
+              returnFocus.current.focus({ preventScroll: true })
             }
           }}
         >

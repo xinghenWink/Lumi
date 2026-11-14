@@ -195,6 +195,8 @@ type ImageSetting struct {
 	RetentionDays       int32
 	AdminCanViewContent bool
 	Version             int64
+	DisabledRatios      []string
+	DisabledResolutions []string
 }
 
 type ImageTask struct {

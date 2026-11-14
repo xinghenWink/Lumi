@@ -485,7 +485,7 @@ func (q *Queries) GetImageReferenceFiles(ctx context.Context, arg GetImageRefere
 }
 
 const getImageSettings = `-- name: GetImageSettings :one
-SELECT singleton, max_n, max_references, max_upload_bytes, sizes, ratio_sizes, per_user_concurrency, global_concurrency, timeout_seconds, queue_timeout_seconds, split_requests, retention_days, admin_can_view_content, version FROM image_settings WHERE singleton=true
+SELECT singleton, max_n, max_references, max_upload_bytes, sizes, ratio_sizes, per_user_concurrency, global_concurrency, timeout_seconds, queue_timeout_seconds, split_requests, retention_days, admin_can_view_content, version, disabled_ratios, disabled_resolutions FROM image_settings WHERE singleton=true
 `
 
 func (q *Queries) GetImageSettings(ctx context.Context) (ImageSetting, error) {
@@ -506,6 +506,8 @@ func (q *Queries) GetImageSettings(ctx context.Context) (ImageSetting, error) {
 		&i.RetentionDays,
 		&i.AdminCanViewContent,
 		&i.Version,
+		&i.DisabledRatios,
+		&i.DisabledResolutions,
 	)
 	return i, err
 }
@@ -1497,7 +1499,7 @@ func (q *Queries) RemoveImageConversation(ctx context.Context, arg RemoveImageCo
 }
 
 const saveImageSettings = `-- name: SaveImageSettings :one
-UPDATE image_settings SET max_n=$1,max_references=$2,max_upload_bytes=$3,sizes=$4,ratio_sizes=$5,per_user_concurrency=$6,global_concurrency=$7,timeout_seconds=$8,queue_timeout_seconds=$9,split_requests=$10,retention_days=$11,admin_can_view_content=$12,version=version+1 WHERE singleton=true AND version=$13 RETURNING singleton, max_n, max_references, max_upload_bytes, sizes, ratio_sizes, per_user_concurrency, global_concurrency, timeout_seconds, queue_timeout_seconds, split_requests, retention_days, admin_can_view_content, version
+UPDATE image_settings SET max_n=$1,max_references=$2,max_upload_bytes=$3,sizes=$4,ratio_sizes=$5,per_user_concurrency=$6,global_concurrency=$7,timeout_seconds=$8,queue_timeout_seconds=$9,split_requests=$10,retention_days=$11,admin_can_view_content=$12,disabled_ratios=COALESCE($13::text[],disabled_ratios),disabled_resolutions=COALESCE($14::text[],disabled_resolutions),version=version+1 WHERE singleton=true AND version=$15 RETURNING singleton, max_n, max_references, max_upload_bytes, sizes, ratio_sizes, per_user_concurrency, global_concurrency, timeout_seconds, queue_timeout_seconds, split_requests, retention_days, admin_can_view_content, version, disabled_ratios, disabled_resolutions
 `
 
 type SaveImageSettingsParams struct {
@@ -1513,6 +1515,8 @@ type SaveImageSettingsParams struct {
 	SplitRequests       bool
 	RetentionDays       int32
 	AdminCanViewContent bool
+	DisabledRatios      []string
+	DisabledResolutions []string
 	Version             int64
 }
 
@@ -1530,6 +1534,8 @@ func (q *Queries) SaveImageSettings(ctx context.Context, arg SaveImageSettingsPa
 		arg.SplitRequests,
 		arg.RetentionDays,
 		arg.AdminCanViewContent,
+		arg.DisabledRatios,
+		arg.DisabledResolutions,
 		arg.Version,
 	)
 	var i ImageSetting
@@ -1548,6 +1554,8 @@ func (q *Queries) SaveImageSettings(ctx context.Context, arg SaveImageSettingsPa
 		&i.RetentionDays,
 		&i.AdminCanViewContent,
 		&i.Version,
+		&i.DisabledRatios,
+		&i.DisabledResolutions,
 	)
 	return i, err
 }

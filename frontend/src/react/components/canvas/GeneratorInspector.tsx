@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { ArrowUp, Loader2, SlidersHorizontal, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { CanvasGeneratorContent, CanvasNode, CanvasTextSettings } from '../../../api/canvases'
@@ -16,10 +16,11 @@ import { useImageOptions } from '../../features/images/options'
 import { ImageParameters } from '../images/ImageParameters'
 import { ApiNotice } from '../shared/ApiNotice'
 import { Button } from '../ui/button'
+import { ModalDialog } from '../ui/modal-dialog'
 import { CanvasPrompt } from './CanvasPrompt'
 
 const selectClass =
-  'h-9 min-w-0 max-w-52 rounded-full border border-border bg-muted px-3 text-sm focus-visible:outline-ring'
+  'h-9 min-w-0 rounded-full border border-border bg-muted px-3 text-sm focus-visible:outline-ring'
 const defaultImage: CanvasGeneratorContent = {
   prompt: '',
   model_id: null,
@@ -44,6 +45,7 @@ function Composer({
   model,
   options,
   parameters,
+  parameterSummary,
   footer,
   disabled,
   busy,
@@ -57,6 +59,7 @@ function Composer({
   model: string
   options: Array<{ id: string; name: string }>
   parameters: ReactNode
+  parameterSummary?: string
   footer: ReactNode
   disabled: boolean
   busy: boolean
@@ -67,6 +70,7 @@ function Composer({
 }) {
   const { t } = useTranslation()
   const [showParameters, setShowParameters] = useState(false)
+  const parametersButton = useRef<HTMLButtonElement>(null)
   return (
     <section
       aria-label={label}
@@ -86,15 +90,10 @@ function Composer({
         </button>
       </div>
       {footer}
-      {showParameters ? (
-        <div className="max-h-48 overflow-auto rounded-xl border border-border bg-background p-2">
-          {parameters}
-        </div>
-      ) : null}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="@container flex flex-wrap items-center gap-2">
         <select
           aria-label={t('canvas.generator.model')}
-          className={selectClass}
+          className={selectClass + ' max-w-[min(45%,13rem)]'}
           value={model}
           disabled={busy || !options.length}
           onChange={(event) => onModel(event.target.value)}
@@ -107,14 +106,24 @@ function Composer({
           ))}
         </select>
         <Button
+          ref={parametersButton}
           type="button"
           variant="outline"
+          aria-haspopup="dialog"
           aria-expanded={showParameters}
-          onClick={() => setShowParameters(!showParameters)}
+          onClick={() => setShowParameters(true)}
         >
           <SlidersHorizontal size={15} />
           {t('canvas.prompt.parameters')}
         </Button>
+        {parameterSummary ? (
+          <p
+            data-testid="canvas-image-parameter-summary"
+            className="order-last basis-full text-xs text-muted-foreground tabular-nums @min-[480px]:order-none @min-[480px]:basis-auto"
+          >
+            {parameterSummary}
+          </p>
+        ) : null}
         <Button
           type="button"
           aria-label={t('canvas.generator.run')}
@@ -126,6 +135,24 @@ function Composer({
           {busy ? <Loader2 size={17} className="animate-spin" /> : <ArrowUp size={17} />}
         </Button>
       </div>
+      <ModalDialog
+        open={showParameters}
+        onOpenChange={setShowParameters}
+        title={t(
+          node.kind === 'text' ? 'canvas.prompt.textParameters' : 'canvas.prompt.imageParameters',
+        )}
+        description={t('canvas.prompt.parametersDescription')}
+        returnFocus={parametersButton}
+        className="z-[70]"
+        overlayClassName="z-[65]"
+      >
+        {parameters}
+        <div className="mt-5 flex justify-end">
+          <Button type="button" onClick={() => setShowParameters(false)}>
+            {t('canvas.generator.close')}
+          </Button>
+        </div>
+      </ModalDialog>
     </section>
   )
 }
@@ -149,6 +176,16 @@ function ImageComposer({ node, onClose }: { node: CanvasNode; onClose(): void })
     settings.model_id ?? undefined,
   )
   const model = options.model
+  const parameterSummary =
+    options.size && options.n
+      ? t('canvas.prompt.imageParameterSummary', {
+          ratio: options.ratio || t('images.custom'),
+          resolution:
+            options.resolution?.toUpperCase() ??
+            (options.size === 'auto' ? t('images.auto') : options.size.replace('x', ' × ')),
+          count: t('react.imageCount', { count: options.n }),
+        })
+      : ''
   const prompt = buildPrompt(settings.prompt, inputs.texts)
   function patch(change: Partial<CanvasGeneratorContent>, key = '') {
     editor.apply(
@@ -203,6 +240,7 @@ function ImageComposer({ node, onClose }: { node: CanvasNode; onClose(): void })
       options={options.models.items.map((item) => ({ id: item.id, name: item.display_name }))}
       onModel={(id) => patch({ model_id: id, quality: '', size: '', ratio: '' })}
       parameters={<ImageParameters options={options} disabled={busy} onPatch={patch} />}
+      parameterSummary={parameterSummary}
       footer={
         <>
           <p data-testid="canvas-inputs" className="sr-only">

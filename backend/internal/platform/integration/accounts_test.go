@@ -89,6 +89,10 @@ func newAccountFixture(t *testing.T) *fixture {
 }
 
 func accountFixtureWithMigrations(t *testing.T, migrate func(context.Context, *pgxpool.Pool) error) *fixture {
+	return accountFixture(t, migrate, true)
+}
+
+func accountFixture(t *testing.T, migrate func(context.Context, *pgxpool.Pool) error, prepare bool) *fixture {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
 	t.Cleanup(cancel)
@@ -109,7 +113,11 @@ func accountFixtureWithMigrations(t *testing.T, migrate func(context.Context, *p
 	if err := migrate(ctx, pool); err != nil {
 		t.Fatalf("account migrations: %v", err)
 	}
-	interactive, err := db.OpenInteractive(ctx, pool.Config().ConnString())
+	openInteractive := db.OpenInteractive
+	if !prepare {
+		openInteractive = db.Open
+	}
+	interactive, err := openInteractive(ctx, pool.Config().ConnString())
 	if err != nil {
 		t.Fatal(err)
 	}

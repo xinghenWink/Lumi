@@ -8,7 +8,13 @@ import wordmarkDark from '../../assets/brand/lumi-wordmark-dark.webp'
 /** The bundled wordmark spells the product name; a renamed site shows its name as text. */
 const product = 'lumi'
 
-export function BrandMark({ compact = false }: { compact?: boolean }) {
+export function BrandMark({
+  compact = false,
+  markClassName,
+}: {
+  compact?: boolean
+  markClassName?: string
+}) {
   const { t } = useTranslation()
   const config = usePublicConfig()
   const name = config.data?.site.name || t('app.name')
@@ -17,9 +23,15 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
     <span className={cn('flex min-w-0 items-center', lettered ? 'gap-1.5' : 'gap-2.5')}>
       {logo ? (
-        <img src={logo} alt="" className="size-8 rounded-lg object-contain" />
+        <img src={logo} alt="" className={cn('size-8 rounded-lg object-contain', markClassName)} />
       ) : (
-        <img src={mark} alt="" width={128} height={128} className="size-8 shrink-0" />
+        <img
+          src={mark}
+          alt=""
+          width={128}
+          height={128}
+          className={cn('size-8 shrink-0', markClassName)}
+        />
       )}
       {compact ? null : lettered ? (
         <>

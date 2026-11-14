@@ -132,7 +132,10 @@ export function ModelEditor({
                 className={selectClass}
                 onChange={(event) => {
                   const type = event.target.value === 'image' ? 'image' : 'chat',
-                    capabilities = defaultCapabilities(type)
+                    capabilities = {
+                      ...defaultCapabilities(type),
+                      ...(type === 'image' ? { use_size_presets: true } : {}),
+                    }
                   setForm({ ...form, type, capabilities })
                 }}
               >
@@ -234,10 +237,20 @@ export function ModelEditor({
                     ))}
                   </div>
                 </fieldset>
-                <SizePicker
-                  value={form.capabilities.sizes}
-                  onChange={(sizes) => changeCaps({ sizes })}
+                <CheckField
+                  role="switch"
+                  label={t('images.useSizePresets')}
+                  checked={form.capabilities.use_size_presets ?? false}
+                  onChange={(use_size_presets) => changeCaps({ use_size_presets })}
                 />
+                {form.capabilities.use_size_presets ? (
+                  <p className="text-xs text-muted-foreground">{t('images.modelPresetHint')}</p>
+                ) : (
+                  <SizePicker
+                    value={form.capabilities.sizes}
+                    onChange={(sizes) => changeCaps({ sizes })}
+                  />
+                )}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <NumberField
                     label={t('catalog.maxN')}

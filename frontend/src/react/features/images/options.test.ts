@@ -37,6 +37,50 @@ const model: PublicModel = {
   },
 }
 describe('server-derived image options', () => {
+  it('keeps the exact draft size and lists only available resolutions for its ratio', () => {
+    const configured: ImageConfiguration = {
+      ...config,
+      sizes: ['1024x1024', '1536x1024'],
+      ratio_sizes: { '16:9': '1536x1024' },
+      resolution_presets: [
+        { ratio: '1:1', resolution: '1k', size: '1024x1024' },
+        { ratio: '16:9', resolution: '1k', size: '1280x720' },
+        { ratio: '16:9', resolution: '2k', size: '2048x1152' },
+        { ratio: '16:9', resolution: '4k', size: '3840x2160' },
+      ],
+      disabled_resolutions: ['4k'],
+    }
+    const inherited = { ...model, capabilities: { ...model.capabilities, use_size_presets: true } }
+    expect(
+      resolveImageOptions(
+        { ...emptyImageDraft, ratio: '16:9', size: '2048x1152' },
+        configured,
+        inherited,
+      ),
+    ).toMatchObject({
+      ratio: '16:9',
+      resolution: '2k',
+      size: '2048x1152',
+      ratioSizes: ['1280x720', '2048x1152'],
+    })
+    const explicit = {
+      ...model,
+      capabilities: { ...model.capabilities, sizes: ['1536x1024', '1280x720'] },
+    }
+    expect(
+      resolveImageOptions({ ...emptyImageDraft, ratio: '16:9' }, configured, explicit),
+    ).toMatchObject({
+      size: '1280x720',
+      ratioSizes: ['1280x720'],
+    })
+    expect(
+      resolveImageOptions(
+        { ...emptyImageDraft, ratio: '16:9', size: '3840x2160' },
+        { ...configured, disabled_ratios: ['16:9'] },
+        inherited,
+      ),
+    ).toMatchObject({ ratio: '1:1', resolution: '1k', size: '1024x1024' })
+  })
   it('does not invent dimensions, capabilities or defaults while backend data is unavailable', () => {
     expect(resolveImageOptions(emptyImageDraft)).toMatchObject({
       size: '',
@@ -58,7 +102,7 @@ describe('server-derived image options', () => {
       quality: 'high',
       n: 2,
       maxReferences: 2,
-      ratios: [['2:1', 'large']],
+      ratios: ['2:1'],
     })
     expect(
       resolveImageOptions(emptyImageDraft, config, {

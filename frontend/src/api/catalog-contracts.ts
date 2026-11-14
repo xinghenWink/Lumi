@@ -62,6 +62,9 @@ export function parseCapabilities(value: unknown): Capabilities {
     ...(data.reasoning_effort === undefined
       ? {}
       : { reasoning_effort: bool(data, 'reasoning_effort') }),
+    ...(data.use_size_presets === undefined
+      ? {}
+      : { use_size_presets: bool(data, 'use_size_presets') }),
     vision: bool(data, 'vision'),
     stream: bool(data, 'stream'),
     max_context_tokens: integer(data, 'max_context_tokens', 0, 1000000),
