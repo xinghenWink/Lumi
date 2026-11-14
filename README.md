@@ -34,7 +34,7 @@ Lumi 把流式聊天、生图与改图、积分兑换和管理后台整合到一
 
 | 层         | 技术                                                                                                                                      |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| 后端       | Go 1.26.10、Gin、pgx、sqlc、goose；JWT / Argon2id、SSE、OpenAPI 3.1。                                                                     |
+| 后端       | Go 1.26.11、Gin、pgx、sqlc、goose；JWT / Argon2id、SSE、OpenAPI 3.1。                                                                     |
 | 前端       | React、TypeScript strict、Vite 8、Tailwind CSS 4、shadcn/ui / Radix、lucide-react、React Router、TanStack Query、Zustand、react-i18next。 |
 | 数据与任务 | PostgreSQL 16 保存账号、会话、任务与账务；Redis 7 处理队列、限流和流式续传；图片保存在持久目录。                                          |
 | 部署       | 单个非 root 应用镜像、Docker Compose、Caddy / Nginx HTTPS 反代；GitHub Actions 发布到 GHCR。                                              |
@@ -148,12 +148,12 @@ BACKUP_KEEP=7 bash backup.sh
 
 ## 本地开发
 
-需要 Go **1.26.10**、Node **22.19+（22.x）**、pnpm **10.27.0**、Docker 和 Compose。Make 命令以 Linux / macOS / WSL 为主；Go 版本与 CI / 发布保持一致。
+需要 Go **1.26.11**、Node **22.19+（22.x）**、pnpm **10.27.0**、Docker 和 Compose。Make 命令以 Linux / macOS / WSL 为主；Go 版本与 CI / 发布保持一致。
 
 ```sh
 git clone https://github.com/xinghenWink/Lumi.git
 cd Lumi
-export GOTOOLCHAIN=go1.26.10
+export GOTOOLCHAIN=go1.26.11
 corepack enable
 corepack prepare pnpm@10.27.0 --activate
 make install
