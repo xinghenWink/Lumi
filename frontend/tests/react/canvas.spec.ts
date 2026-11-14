@@ -372,6 +372,10 @@ test('canvas journey composes, generates from references, persists and edits', a
     const parameters = inspector.getByRole('button', { name: '参数', exact: true })
     const summary = inspector.getByTestId('canvas-image-parameter-summary')
     await expect(summary).toHaveText('1:1 · 1K · 1 张')
+    const run = inspector.getByRole('button', { name: '生成', exact: true })
+    // The quote can resize and re-anchor the editor after the model changes.
+    await expect(run).toBeEnabled({ timeout: 15_000 })
+    await parameters.click({ trial: true })
     await expect(async () => {
       const [parameterButtonBox, summaryBox] = await Promise.all([box(parameters), box(summary)])
       expect(summaryBox.x).toBeGreaterThan(parameterButtonBox.x + parameterButtonBox.width)
@@ -395,7 +399,6 @@ test('canvas journey composes, generates from references, persists and edits', a
     await expect(imageParameters).toBeHidden()
     await expect(parameters).toBeFocused()
     await expect(inspector.getByLabel('提示词', { exact: true })).toHaveValue(/@\[/)
-    const run = inspector.getByRole('button', { name: '生成', exact: true })
     await expect(run).toBeEnabled({ timeout: 15_000 })
     const estimate = inspector.getByText(/^预计 [\d,]+ 积分$/)
     const cost = Number((await estimate.textContent())?.replace(/\D/g, ''))
