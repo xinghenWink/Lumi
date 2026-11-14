@@ -336,6 +336,10 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(prompt).toHaveValue('image-only draft')
     // Desktop keeps parameters visible in the studio panel; smaller screens open a sheet.
     const mobile = info.project.name.includes('mobile')
+    if (!mobile) {
+      await expect(send).toHaveText('开始生成')
+      await expect(send.locator('svg')).toHaveCount(0)
+    }
     const parameters = member.getByRole(mobile ? 'dialog' : 'region', {
       name: '生图参数',
       exact: true,
@@ -528,12 +532,15 @@ test('React real image generation editing gallery cancellation and administrator
     const [first, second] = await references
       .locator('div[data-slot="attachment"]')
       .evaluateAll((tiles) =>
-        tiles.map((tile) => ({
-          x: tile.offsetLeft,
-          y: tile.offsetTop,
-          width: tile.offsetWidth,
-          height: tile.offsetHeight,
-        })),
+        tiles.map((tile) => {
+          if (!(tile instanceof HTMLElement)) throw new Error('Expected an HTML attachment')
+          return {
+            x: tile.offsetLeft,
+            y: tile.offsetTop,
+            width: tile.offsetWidth,
+            height: tile.offsetHeight,
+          }
+        }),
       )
     if (!first || !second) throw new Error('Missing reference thumbnails')
     expect(first).toMatchObject({ width: 64, height: 64 })

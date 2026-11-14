@@ -271,6 +271,9 @@ test('React real streaming history stop editing isolation and bounded rendering'
     })
     await input.press('Enter')
     await expect(page).toHaveURL(/\/chat\/[a-f0-9-]+$/)
+    const assistantLogo = page.locator('.chat-message-assistant [aria-hidden="true"] img[alt=""]')
+    await expect(assistantLogo).toBeVisible()
+    await expect(assistantLogo).toHaveAttribute('src', /\/assets\/lumi-mark-[^/]+\.webp$/)
     await expect(
       page
         .locator('.chat-message-assistant')

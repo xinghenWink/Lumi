@@ -1,10 +1,11 @@
-import { Check, Copy, Pencil, RefreshCw, Sparkles } from 'lucide-react'
+import { Check, Copy, Pencil, RefreshCw } from 'lucide-react'
 import { lazy, memo, Suspense, useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { Message } from '../../../api/chat'
 import type { Illustration } from '../../../features/chat/markdown'
 import { ApiNotice } from '../shared/ApiNotice'
+import { BrandMark } from '../shared/BrandMark'
 import { useRuntime } from '../../app/context'
 import { cn } from '../../lib/utils'
 import { Message as MessageLayout, MessageContent, MessageFooter } from '../ui/message'
@@ -168,12 +169,9 @@ export const MessageCard = memo(function MessageCard({
           <>
             <span
               aria-hidden="true"
-              className={cn(
-                'mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-accent text-primary',
-                streaming && 'animate-pulse',
-              )}
+              className={cn('mt-0.5 size-7 shrink-0', streaming && 'animate-pulse')}
             >
-              <Sparkles size={15} strokeWidth={1.8} />
+              <BrandMark compact markClassName="size-7" />
             </span>
             <MessageContent className="min-w-0 flex-1 gap-0">
               <span className="sr-only">{t('chat.assistant')}</span>

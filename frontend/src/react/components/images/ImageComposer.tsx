@@ -1,13 +1,5 @@
 import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import {
-  ArrowUp,
-  ImagePlus,
-  Images,
-  Plus,
-  RotateCw,
-  SlidersHorizontal,
-  Sparkles,
-} from 'lucide-react'
+import { ArrowUp, ImagePlus, Images, Plus, RotateCw, SlidersHorizontal } from 'lucide-react'
 import { useStore } from 'zustand'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -406,7 +398,6 @@ export function ImageComposer({
           ) : null}
           {retryButton}
           <Button type="submit" size="lg" className="w-full" disabled={disabled}>
-            <Sparkles size={16} />
             {t('images.send')}
           </Button>
           <p className="text-center text-2xs text-muted-foreground">{t('react.promptHint')}</p>
