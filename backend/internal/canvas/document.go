@@ -17,7 +17,7 @@ import (
 
 // Limits shared with the web client (frontend/src/features/canvas/document.ts).
 const (
-	Schema           = 1
+	Schema           = 2
 	MaxNodes         = 500
 	MaxEdges         = 1000
 	MaxTitle         = 100
@@ -41,6 +41,10 @@ const (
 	KindGenerator = "generator"
 	KindGroup     = "group"
 
+	EdgeInput  = "input"
+	EdgeResult = "result"
+
+	StateEmpty   = "empty"
 	StateReady   = "ready"
 	StatePending = "pending"
 	StateFailed  = "failed"
@@ -101,6 +105,7 @@ type Edge struct {
 	ID   uuid.UUID `json:"id"`
 	From uuid.UUID `json:"from"`
 	To   uuid.UUID `json:"to"`
+	Kind string    `json:"kind"`
 }
 
 // Document is painted in node order; group frames are always drawn beneath other nodes.
@@ -147,7 +152,7 @@ func Validate(doc Document) error {
 		}
 		edges[edge.ID] = true
 		pair := [2]uuid.UUID{edge.From, edge.To}
-		if edge.From == edge.To || pairs[pair] || !Connectable(kinds[edge.From], kinds[edge.To]) {
+		if edge.From == edge.To || pairs[pair] || !connectable(kinds[edge.From], kinds[edge.To], edge.Kind) {
 			return fmt.Errorf("edge %s: invalid connection", edge.ID)
 		}
 		pairs[pair] = true
@@ -155,14 +160,13 @@ func Validate(doc Document) error {
 	return nil
 }
 
-// Connectable lists the only two edge directions: inputs flow into a generator, and a
-// generator points at the images it produced.
-func Connectable(from, to string) bool {
-	switch to {
-	case KindGenerator:
-		return from == KindImage || from == KindText || from == KindGroup
-	case KindImage:
-		return from == KindGenerator
+func connectable(from, to, kind string) bool {
+	switch kind {
+	case EdgeInput:
+		return (from == KindImage || from == KindText || from == KindGroup) &&
+			(to == KindGenerator || to == KindImage)
+	case EdgeResult:
+		return (from == KindGenerator || from == KindImage) && to == KindImage
 	}
 	return false
 }
@@ -185,8 +189,13 @@ func validateNode(node Node, kinds map[uuid.UUID]string) error {
 	}
 	switch node.Kind {
 	case KindImage:
-		if present != 1 || node.Image == nil {
+		if node.Image == nil || node.Text != nil {
 			return fmt.Errorf("image content required")
+		}
+		if node.Generator != nil {
+			if err := validateGenerator(*node.Generator); err != nil {
+				return err
+			}
 		}
 		return validateImage(*node.Image)
 	case KindText:
@@ -219,6 +228,10 @@ func validateImage(image ImageContent) error {
 		return fmt.Errorf("invalid position")
 	}
 	switch image.State {
+	case StateEmpty:
+		if image.FileID != nil || image.TaskID != nil || image.Position != nil || image.ErrorCode != "" {
+			return fmt.Errorf("empty image has no file or task")
+		}
 	case StateReady:
 		if image.FileID == nil || image.ErrorCode != "" {
 			return fmt.Errorf("ready image needs a file")

@@ -46,17 +46,20 @@ describe('canvas document rules', () => {
       'edge',
     )
     expect(
-      mutate((d) => d.edges.push({ id: crypto.randomUUID(), from: ids.text, to: ids.output })),
+      mutate((d) =>
+        d.edges.push({ id: crypto.randomUUID(), from: ids.text, to: ids.output, kind: 'result' }),
+      ),
     ).toBe('edge')
   })
 
   it('allows only input and result edge directions', () => {
-    expect(connectable('image', 'generator')).toBe(true)
-    expect(connectable('group', 'generator')).toBe(true)
-    expect(connectable('generator', 'image')).toBe(true)
-    expect(connectable('generator', 'generator')).toBe(false)
-    expect(connectable('text', 'image')).toBe(false)
-    expect(connectable(undefined, 'generator')).toBe(false)
+    expect(connectable('image', 'generator', 'input')).toBe(true)
+    expect(connectable('group', 'generator', 'input')).toBe(true)
+    expect(connectable('generator', 'image', 'result')).toBe(true)
+    expect(connectable('generator', 'generator', 'input')).toBe(false)
+    expect(connectable('text', 'image', 'input')).toBe(true)
+    expect(connectable('text', 'image', 'result')).toBe(false)
+    expect(connectable(undefined, 'generator', 'input')).toBe(false)
   })
 
   it('keeps multiline text and sizes images by aspect ratio', () => {
@@ -70,7 +73,7 @@ describe('canvas document rules', () => {
   it('parses server canvases strictly', () => {
     const doc = sampleDocument()
     expect(parseDocument(JSON.parse(JSON.stringify(doc)))).toEqual(doc)
-    expect(() => parseDocument({ ...doc, schema: 2 })).toThrow('RESPONSE_INVALID')
+    expect(() => parseDocument({ ...doc, schema: 1 })).toThrow('RESPONSE_INVALID')
     expect(() => parseDocument({ ...doc, viewport: { x: 0, y: 0, zoom: 'x' } })).toThrow()
     const canvas = parseCanvas({
       id: 'c',

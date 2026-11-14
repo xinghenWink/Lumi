@@ -2,6 +2,7 @@ import type { CanvasDocument, CanvasEdge, CanvasNode } from '../../api/canvases'
 import {
   clampCoordinate,
   clampSize,
+  canGenerate,
   connectable,
   edgeKey,
   groupNode,
@@ -102,7 +103,10 @@ export function removeEdges(doc: CanvasDocument, ids: Iterable<string>): CanvasD
 export function canConnect(doc: CanvasDocument, from: string, to: string) {
   if (from === to || doc.edges.length >= LIMITS.edges) return false
   const nodes = nodeMap(doc)
-  if (!connectable(nodes.get(from)?.kind, nodes.get(to)?.kind)) return false
+  const source = nodes.get(from)
+  const target = nodes.get(to)
+  if (!canGenerate(target) || !connectable(source?.kind, target?.kind, 'input')) return false
+  if (source?.kind === 'image' && source.image?.state !== 'ready') return false
   return !doc.edges.some((edge) => edge.from === from && edge.to === to)
 }
 
@@ -113,7 +117,7 @@ export function connect(
   id = newId(),
 ): CanvasDocument {
   if (!canConnect(doc, from, to)) return doc
-  return { ...doc, edges: [...doc.edges, { id, from, to }] }
+  return { ...doc, edges: [...doc.edges, { id, from, to, kind: 'input' }] }
 }
 
 /** Wraps the selected non-group nodes in a new frame with room for its title. */
@@ -239,7 +243,7 @@ export function insertFragment(
     const from = ids.get(edge.from),
       to = ids.get(edge.to)
     if (!from || !to || existing.has(from + '>' + to)) continue
-    edges.push({ id: makeId(), from, to })
+    edges.push({ id: makeId(), from, to, kind: edge.kind })
   }
   const groups = nodes.filter((node) => node.kind === 'group'),
     others = nodes.filter((node) => node.kind !== 'group')

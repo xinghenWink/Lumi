@@ -268,6 +268,11 @@ func (s *Service) Delete(ctx context.Context, actor user.Actor, id uuid.UUID) er
 		if err := q.RemoveCanvasConversation(ctx, query.RemoveCanvasConversationParams{ID: conversation, UserID: actor.ID}); err != nil {
 			return fmt.Errorf("delete canvas conversation: %w", err)
 		}
+		if err := q.RequestCanvasTaskCancellation(ctx, query.RequestCanvasTaskCancellationParams{
+			ConversationID: conversation, UserID: actor.ID,
+		}); err != nil {
+			return fmt.Errorf("cancel canvas tasks: %w", err)
+		}
 		return nil
 	})
 }

@@ -1,5 +1,11 @@
 # 技术决策记录
 
+## 无限画布重写
+
+- ADR-132：独立画布编辑页以 [basketikun/infinite-canvas `9cd3deac`](https://github.com/basketikun/infinite-canvas/tree/9cd3deacbcc598361807afc16c059a80dd18b6f9) 的节点菜单、连线和操作布局为参考，在 Lumi 内实现。继续使用已有 React、Zustand、Go 和 UI 组件，无新增依赖。
+- 文档 v2 区分输入和产出连线，允许空图片原位生图。画布运行入口在图片任务事务内校验画布版本、解析输入、扣费并保存任务占位。保存的任务 ID 供前端刷新后恢复监听。
+- 前向迁移 00011 清除旧画布并隐藏其生成图片，复用现有任务取消、退款和文件清理。运行和部署说明见 [画布重写](CANVAS_REBUILD.md)。
+
 ## 无限画布（2026-11-14）
 
 - ADR-131：按用户确认新增 M8 无限画布，修正 [REACT_UI_REFACTOR.md](REACT_UI_REFACTOR.md) 中“不提供画布编辑器”的结论。参考的开源项目 basketikun/infinite-canvas（MIT）是独立应用：antd 运行时注入 `<style>`、模型脚本使用 `new Function`、浏览器直连供应商并在本地保存 API Key、数据只存 IndexedDB，与现有 CSP、积分 / 鉴权链路及 AGENTS.md“不得拷贝参考项目代码”冲突。因此在现有技术栈内原生重建，只参照其交互与数据模型，不拷贝代码、不导入其文件格式，也不新增任何依赖。

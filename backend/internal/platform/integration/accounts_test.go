@@ -85,6 +85,11 @@ type reply struct {
 
 func newAccountFixture(t *testing.T) *fixture {
 	t.Helper()
+	return accountFixtureWithMigrations(t, migrations.Up)
+}
+
+func accountFixtureWithMigrations(t *testing.T, migrate func(context.Context, *pgxpool.Pool) error) *fixture {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
 	t.Cleanup(cancel)
 	postgres, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ContainerRequest: testcontainers.ContainerRequest{Image: "postgres:16-alpine", ExposedPorts: []string{"5432/tcp"}, Env: map[string]string{"POSTGRES_USER": "lumi", "POSTGRES_PASSWORD": "integration-only", "POSTGRES_DB": "lumi"}, WaitingFor: wait.ForLog("database system is ready to accept connections").WithOccurrence(2)}, Started: true})
@@ -101,7 +106,7 @@ func newAccountFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	if err := migrations.Up(ctx, pool); err != nil {
+	if err := migrate(ctx, pool); err != nil {
 		t.Fatalf("account migrations: %v", err)
 	}
 	interactive, err := db.OpenInteractive(ctx, pool.Config().ConnString())

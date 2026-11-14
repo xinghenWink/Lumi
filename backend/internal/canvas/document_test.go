@@ -25,9 +25,9 @@ func sampleDocument() (Document, map[string]uuid.UUID) {
 		{ID: ids["pending"], Kind: KindImage, X: 800, Y: 260, W: 240, H: 240, Image: &ImageContent{State: StatePending, TaskID: pointer(ids["task"]), Position: pointer[int32](0)}},
 	}
 	doc.Edges = []Edge{
-		{ID: ids["e1"], From: ids["image"], To: ids["generator"]},
-		{ID: ids["e2"], From: ids["text"], To: ids["generator"]},
-		{ID: ids["e3"], From: ids["generator"], To: ids["output"]},
+		{ID: ids["e1"], From: ids["image"], To: ids["generator"], Kind: EdgeInput},
+		{ID: ids["e2"], From: ids["text"], To: ids["generator"], Kind: EdgeInput},
+		{ID: ids["e3"], From: ids["generator"], To: ids["output"], Kind: EdgeResult},
 	}
 	return doc, ids
 }
@@ -53,7 +53,7 @@ func TestValidateAcceptsCompleteDocument(t *testing.T) {
 
 func TestValidateRejectsMalformedDocuments(t *testing.T) {
 	cases := map[string]func(*Document, map[string]uuid.UUID){
-		"schema":            func(d *Document, _ map[string]uuid.UUID) { d.Schema = 2 },
+		"schema":            func(d *Document, _ map[string]uuid.UUID) { d.Schema = 1 },
 		"zoom":              func(d *Document, _ map[string]uuid.UUID) { d.Viewport.Zoom = 9 },
 		"viewport far away": func(d *Document, _ map[string]uuid.UUID) { d.Viewport.X = MaxCoordinate + 1 },
 		"duplicate node":    func(d *Document, _ map[string]uuid.UUID) { d.Nodes[1].ID = d.Nodes[0].ID },
@@ -94,8 +94,9 @@ func TestValidateRejectsMalformedDocuments(t *testing.T) {
 		},
 		"duplicate edge id": func(d *Document, ids map[string]uuid.UUID) { d.Edges[1].ID = ids["e1"] },
 		"dangling edge":     func(d *Document, _ map[string]uuid.UUID) { d.Edges[0].From = uuid.New() },
-		"text into image": func(d *Document, ids map[string]uuid.UUID) {
+		"text result edge": func(d *Document, ids map[string]uuid.UUID) {
 			d.Edges[1].To = ids["output"]
+			d.Edges[1].Kind = EdgeResult
 		},
 		"generator into text": func(d *Document, ids map[string]uuid.UUID) {
 			d.Edges[2].To = ids["text"]
@@ -118,14 +119,14 @@ func TestValidateRejectsMalformedDocuments(t *testing.T) {
 }
 
 func TestConnectableDirections(t *testing.T) {
-	allowed := [][2]string{{KindImage, KindGenerator}, {KindText, KindGenerator}, {KindGroup, KindGenerator}, {KindGenerator, KindImage}}
+	allowed := [][3]string{{KindImage, KindGenerator, EdgeInput}, {KindText, KindImage, EdgeInput}, {KindGroup, KindGenerator, EdgeInput}, {KindGenerator, KindImage, EdgeResult}, {KindImage, KindImage, EdgeResult}}
 	for _, pair := range allowed {
-		if !Connectable(pair[0], pair[1]) {
+		if !connectable(pair[0], pair[1], pair[2]) {
 			t.Fatalf("%s -> %s should connect", pair[0], pair[1])
 		}
 	}
-	for _, pair := range [][2]string{{KindGenerator, KindGenerator}, {KindImage, KindImage}, {KindText, KindText}, {KindGenerator, KindGroup}, {"", KindGenerator}} {
-		if Connectable(pair[0], pair[1]) {
+	for _, pair := range [][2]string{{KindGenerator, KindGenerator}, {KindText, KindText}, {KindGenerator, KindGroup}, {"", KindGenerator}} {
+		if connectable(pair[0], pair[1], EdgeInput) {
 			t.Fatalf("%s -> %s should not connect", pair[0], pair[1])
 		}
 	}
@@ -136,7 +137,7 @@ func TestEncodeIsCanonicalAndBounded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(encoded) != `{"schema":1,"viewport":{"x":0,"y":0,"zoom":1},"nodes":[],"edges":[]}` {
+	if string(encoded) != `{"schema":2,"viewport":{"x":0,"y":0,"zoom":1},"nodes":[],"edges":[]}` {
 		t.Fatalf("unexpected canonical form %s", encoded)
 	}
 	doc, _ := sampleDocument()

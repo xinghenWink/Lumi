@@ -1,35 +1,13 @@
 import type { CanvasDocument, CanvasNode } from '../../api/canvases'
 import type { ImageTask } from '../../api/images'
 import { terminal } from '../../api/images'
-import { clampSize, imageNode } from './document'
-import type { Rect } from './geometry'
-
-/** Pending result slots for a freshly accepted task, connected to their generator. */
-export function addResultSlots(
-  doc: CanvasDocument,
-  generator: string,
-  task: Pick<ImageTask, 'id'>,
-  slots: readonly Rect[],
-  makeId: () => string,
-): CanvasDocument {
-  const nodes = slots.map((slot, position) =>
-    imageNode(slot, { state: 'pending', task_id: task.id, position }, makeId()),
-  )
-  const owner = doc.nodes.some((node) => node.id === generator)
-  return {
-    ...doc,
-    nodes: [...doc.nodes, ...nodes],
-    edges: owner
-      ? [...doc.edges, ...nodes.map((node) => ({ id: makeId(), from: generator, to: node.id }))]
-      : doc.edges,
-  }
-}
+import { clampSize } from './document'
 
 function settle(node: CanvasNode, task: ImageTask): CanvasNode {
   const image = node.image
   if (!image || image.state !== 'pending' || image.task_id !== task.id) return node
   const item = task.items.find((entry) => entry.position === image.position)
-  if (item?.status === 'succeeded' && item.file_id) {
+  if (item?.status === 'succeeded' && item.file_id && terminal(task.status)) {
     const file = item.file
     // Keep the width the user sees and follow the real aspect ratio.
     const h = file && file.width > 0 ? clampSize((node.w * file.height) / file.width) : node.h

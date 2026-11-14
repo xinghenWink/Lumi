@@ -4,22 +4,30 @@ package integration_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"image"
 	"image/color"
 	"image/png"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
 	"github.com/xinghenWink/Lumi/backend/internal/canvas"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
 	"github.com/xinghenWink/Lumi/backend/internal/images"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/user"
+	"github.com/xinghenWink/Lumi/backend/migrations"
 )
 
 func canvasPNG(t *testing.T) []byte {
@@ -53,8 +61,31 @@ func errorCode(t *testing.T, response reply) string {
 	return failure.Code
 }
 
-func TestM8CanvasPersistenceGenerationAndRetention(t *testing.T) {
-	f := newAccountFixture(t)
+func TestCanvasRebuildPersistenceGenerationAndRetention(t *testing.T) {
+	testCanvas(t, newAccountFixture(t), false)
+}
+
+func TestCanvasRebuildUpgrade(t *testing.T) {
+	f := accountFixtureWithMigrations(t, func(ctx context.Context, pool *pgxpool.Pool) error {
+		conn := stdlib.OpenDB(*pool.Config().ConnConfig)
+		defer func() {
+			if err := conn.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		provider, err := goose.NewProvider(goose.DialectPostgres, conn, os.DirFS("../../../migrations"),
+			goose.WithTableName("public.goose_db_version"), goose.WithDisableGlobalRegistry(true))
+		if err != nil {
+			return err
+		}
+		_, err = provider.UpTo(ctx, 10)
+		return err
+	})
+	testCanvas(t, f, true)
+}
+
+func testCanvas(t *testing.T, f *fixture, upgrade bool) {
+	t.Helper()
 	admin := creditActor(t, f)
 	creditPricing(t, f, admin, 0)
 	member := creditMember(t, f, admin, 10000)
@@ -69,7 +100,29 @@ func TestM8CanvasPersistenceGenerationAndRetention(t *testing.T) {
 		var input struct {
 			Count int `json:"n"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
+			r.Body = http.MaxBytesReader(w, r.Body, 2<<20)
+			input.Count = 1
+			_, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+			if err != nil {
+				w.WriteHeader(400)
+				return
+			}
+			form, err := multipart.NewReader(r.Body, params["boundary"]).ReadForm(2 << 20)
+			if err != nil {
+				w.WriteHeader(400)
+				return
+			}
+			defer func() {
+				if err := form.RemoveAll(); err != nil {
+					t.Error(err)
+				}
+			}()
+			if !strings.Contains(strings.Join(form.Value["prompt"], ""), "暖色调") {
+				w.WriteHeader(400)
+				return
+			}
+		} else if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			w.WriteHeader(400)
 			return
 		}
@@ -150,7 +203,7 @@ func TestM8CanvasPersistenceGenerationAndRetention(t *testing.T) {
 		{ID: textNode, Kind: canvas.KindText, Y: 340, W: 240, H: 120, Text: &canvas.TextContent{Content: "暖色调\n胶片质感"}},
 		{ID: generatorNode, Kind: canvas.KindGenerator, X: 500, W: 320, H: 240, Generator: &canvas.GeneratorContent{Prompt: "一只猫", Count: 1}},
 	}
-	doc.Edges = []canvas.Edge{{ID: uuid.New(), From: imageNode, To: generatorNode}, {ID: uuid.New(), From: textNode, To: generatorNode}}
+	doc.Edges = []canvas.Edge{{ID: uuid.New(), From: imageNode, To: generatorNode, Kind: canvas.EdgeInput}, {ID: uuid.New(), From: textNode, To: generatorNode, Kind: canvas.EdgeInput}}
 	path := "/api/v1/canvases/" + id.String()
 
 	t.Run("save validates version, files and size", func(t *testing.T) {
@@ -191,9 +244,24 @@ func TestM8CanvasPersistenceGenerationAndRetention(t *testing.T) {
 
 	t.Run("generation runs in the canvas conversation", func(t *testing.T) {
 		before := creditBalance(t, f, member.ID)
-		submitted := f.call(t, client, "POST", "/api/v1/image-tasks", token, images.Input{ConversationID: board.ConversationID, ModelID: model.ID, Prompt: "一只猫\n\n暖色调", Quality: "low", Size: "1024x1024", Count: 1, ReferenceFileIDs: []uuid.UUID{}}, uuid.NewString())
+		input := canvas.RunInput{Version: board.Version, NodeID: generatorNode, ModelID: model.ID, Quality: "low", Size: "1024x1024", Count: 1}
+		key := uuid.NewString()
+		expectStatus(t, f.call(t, otherClient, "POST", path+"/runs", otherToken, input, key), 404)
+		submitted := f.call(t, client, "POST", path+"/runs", token, input, key)
 		expectStatus(t, submitted, 202)
-		task := decodeReply[images.Task](t, submitted)
+		run := decodeReply[canvas.Run](t, submitted)
+		task := run.Task
+		board = run.Canvas
+		if task.Prompt != "一只猫\n\n暖色调\n胶片质感" || len(task.ReferenceFileIDs) != 1 || len(board.Document.Nodes) != 4 {
+			t.Fatalf("run did not persist or resolve inputs: %+v", task)
+		}
+		replay := decodeReply[canvas.Run](t, f.call(t, client, "POST", path+"/runs", token, input, key))
+		if replay.Task.ID != task.ID || creditBalance(t, f, member.ID).Total != before.Total-task.TotalCost {
+			t.Fatal("replay created another charge or task")
+		}
+		expectStatus(t, f.call(t, client, "POST", path+"/runs", token, input, uuid.NewString()), 409)
+		input.Count = 2
+		expectStatus(t, f.call(t, client, "POST", path+"/runs", token, input, key), 409)
 		if after := creditBalance(t, f, member.ID); after.Total >= before.Total {
 			t.Fatal("canvas generation was not charged")
 		}
@@ -212,10 +280,9 @@ func TestM8CanvasPersistenceGenerationAndRetention(t *testing.T) {
 		if len(listed.Items) != 1 || listed.Items[0].ID != task.ID {
 			t.Fatal("canvas tasks not listed by conversation")
 		}
-		output := uuid.New()
-		withResult := doc
-		withResult.Nodes = append(append([]canvas.Node{}, doc.Nodes...), canvas.Node{ID: output, Kind: canvas.KindImage, X: 900, W: 300, H: 300, Image: &canvas.ImageContent{State: canvas.StateReady, FileID: finished.Items[0].FileID, TaskID: &task.ID, Position: new(int32)}})
-		withResult.Edges = append(append([]canvas.Edge{}, doc.Edges...), canvas.Edge{ID: uuid.New(), From: generatorNode, To: output})
+		withResult := board.Document
+		withResult.Nodes[3].Image.State = canvas.StateReady
+		withResult.Nodes[3].Image.FileID = finished.Items[0].FileID
 		saved := f.call(t, client, "PUT", path, token, canvas.SaveInput{Title: board.Title, Document: withResult, Version: board.Version})
 		expectStatus(t, saved, 200)
 		board = decodeReply[canvas.Canvas](t, saved)
@@ -235,7 +302,63 @@ func TestM8CanvasPersistenceGenerationAndRetention(t *testing.T) {
 		borrowed.Nodes = append([]canvas.Node{}, board.Document.Nodes...)
 		borrowed.Nodes = append(borrowed.Nodes, canvas.Node{ID: uuid.New(), Kind: canvas.KindImage, W: 100, H: 100, Image: &canvas.ImageContent{State: canvas.StatePending, TaskID: &elsewhere.ID, Position: new(int32)}})
 		expectStatus(t, f.call(t, client, "PUT", path, token, canvas.SaveInput{Document: borrowed, Version: board.Version}), 400)
+		if upgrade {
+			ordinary, ok, err := f.services.Images.Claim(f.ctx, elsewhere.ID)
+			if err != nil || !ok {
+				t.Fatalf("claim ordinary image: %v", err)
+			}
+			f.services.Images.Execute(f.ctx, ordinary)
+			normal, err := f.services.Images.Get(f.ctx, actor, elsewhere.ID, false)
+			if err != nil || normal.Status != "succeeded" {
+				t.Fatalf("ordinary image: %v, %s", err, normal.Status)
+			}
+			queued, err := f.services.Canvas.Run(f.ctx, f.services.Images, actor, id, uuid.NewString(), canvas.RunInput{
+				Version: board.Version, NodeID: generatorNode, ModelID: model.ID, Quality: "low", Size: "1024x1024", Count: 1,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			running, ok, err := f.services.Images.Claim(f.ctx, queued.Task.ID)
+			if err != nil || !ok {
+				t.Fatalf("claim old canvas task: %v", err)
+			}
+			if _, err := f.pool.Exec(f.ctx, "UPDATE canvases SET document=jsonb_set(document,'{schema}','1') WHERE id=$1", id); err != nil {
+				t.Fatal(err)
+			}
+			if err := migrations.Up(f.ctx, f.pool); err != nil {
+				t.Fatal(err)
+			}
+			f.services.Images.Execute(f.ctx, running)
+			if err := f.services.Images.Recover(f.ctx); err != nil {
+				t.Fatal(err)
+			}
+			canceled, err := f.services.Images.Get(f.ctx, actor, running.ID, false)
+			if err != nil || canceled.Status != "canceled" || canceled.RefundedCost != canceled.TotalCost {
+				t.Fatalf("old canvas task was not refunded: %v, %+v", err, canceled)
+			}
+			expectStatus(t, f.call(t, client, "GET", path, token, nil), 404)
+			list := decodeReply[canvas.Page](t, f.call(t, client, "GET", "/api/v1/canvases", token, nil))
+			if len(list.Items) != 0 {
+				t.Fatal("old canvases survived")
+			}
+			if _, err := f.services.Files.Get(f.ctx, actor.ID, *finished.Items[0].FileID); err == nil {
+				t.Fatal("old canvas generation survived")
+			}
+			if normal.Items[0].FileID == nil {
+				t.Fatal("ordinary generation missing")
+			}
+			if _, err := f.services.Files.Get(f.ctx, actor.ID, *normal.Items[0].FileID); err != nil {
+				t.Fatal("ordinary generation removed", err)
+			}
+			newBoard := decodeReply[canvas.Canvas](t, f.call(t, client, "POST", "/api/v1/canvases", token, canvas.CreateInput{ID: uuid.New()}))
+			if newBoard.Document.Schema != 2 || len(newBoard.Document.Nodes) != 0 {
+				t.Fatal("new board is not an empty v2 document")
+			}
+		}
 	})
+	if upgrade {
+		return
+	}
 
 	t.Run("placed uploads survive expiry until the canvas is deleted", func(t *testing.T) {
 		stray, err := f.services.Files.Upload(f.ctx, actor, "upload", bitmap, 10<<20)
@@ -257,7 +380,22 @@ func TestM8CanvasPersistenceGenerationAndRetention(t *testing.T) {
 	})
 
 	t.Run("deleting a canvas cancels its queued tasks", func(t *testing.T) {
-		queued, err := f.services.Images.Submit(f.ctx, actor, uuid.NewString(), images.Input{ConversationID: board.ConversationID, ModelID: model.ID, Prompt: "queued", Quality: "low", Size: "1024x1024", Count: 1})
+		temporary, err := f.services.Files.Upload(f.ctx, actor, "upload", bitmap, 10<<20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.pool.Exec(f.ctx, "UPDATE files SET created_at=now()-interval '2 days' WHERE id=$1", temporary.ID); err != nil {
+			t.Fatal(err)
+		}
+		newDoc := board.Document
+		newDoc.Nodes = append(newDoc.Nodes, canvas.Node{ID: uuid.New(), Kind: canvas.KindImage, W: 200, H: 200, Image: &canvas.ImageContent{State: canvas.StateReady, FileID: &temporary.ID}})
+		board, err = f.services.Canvas.Save(f.ctx, actor, board.ID, canvas.SaveInput{Title: board.Title, Document: newDoc, Version: board.Version})
+		if err != nil {
+			t.Fatal(err)
+		}
+		run, err := f.services.Canvas.Run(f.ctx, f.services.Images, actor, board.ID, uuid.NewString(), canvas.RunInput{
+			Version: board.Version, NodeID: generatorNode, ModelID: model.ID, Quality: "low", Size: "1024x1024", Count: 1,
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -271,14 +409,14 @@ func TestM8CanvasPersistenceGenerationAndRetention(t *testing.T) {
 		if err := f.services.Images.Recover(f.ctx); err != nil {
 			t.Fatal(err)
 		}
-		result, err := f.services.Images.Get(f.ctx, actor, queued.ID, false)
+		result, err := f.services.Images.Get(f.ctx, actor, run.Task.ID, false)
 		if err != nil || result.Status != "canceled" || result.RefundedCost != result.TotalCost {
 			t.Fatalf("queued canvas task was not refunded: %s", result.Status)
 		}
 		if err := f.services.Files.Cleanup(f.ctx, 0); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.services.Files.Get(f.ctx, actor.ID, upload.ID); err == nil {
+		if _, err := f.services.Files.Get(f.ctx, actor.ID, temporary.ID); err == nil {
 			t.Fatal("upload stayed protected after its canvas was deleted")
 		}
 	})

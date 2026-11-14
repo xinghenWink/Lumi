@@ -55,8 +55,16 @@ export const CanvasEdges = memo(function CanvasEdges({
             </path>
             <path
               d={path}
-              className={cn('fill-none', active ? 'stroke-primary' : 'stroke-muted-foreground/60')}
+              className={cn(
+                'fill-none',
+                active
+                  ? 'stroke-primary'
+                  : edge.kind === 'result'
+                    ? 'stroke-muted-foreground/50'
+                    : 'stroke-primary/60',
+              )}
               strokeWidth={active ? width * 1.8 : width}
+              strokeDasharray={edge.kind === 'result' ? `${5 / zoom} ${4 / zoom}` : undefined}
             />
           </g>
         )

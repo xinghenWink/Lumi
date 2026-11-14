@@ -1543,6 +1543,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/canvases/{id}/runs': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Generate images from a saved canvas node
+     * @description Resolves input edges from the specified canvas version. The task, charge and result slots are committed together. Replaying the same request with the same key returns the original task and the current canvas.
+     */
+    post: operations['runCanvasNode']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/canvases/{id}': {
     parameters: {
       query?: never
@@ -2558,7 +2578,7 @@ export interface components {
     ImageTaskInput: {
       /**
        * Format: uuid
-       * @description An image conversation ID or the conversation_id of an owned canvas.
+       * @description An image conversation ID. Canvas runs use POST /api/v1/canvases/{id}/runs.
        */
       conversation_id: string
       /** Format: uuid */
@@ -2671,10 +2691,10 @@ export interface components {
       y: number
       zoom: number
     }
-    /** @description A placed file (ready), one slot of a running task (pending) or a slot whose generation failed. */
+    /** @description An empty image, a placed file, or a pending or failed task slot. */
     CanvasImageContent: {
       /** @enum {string} */
-      state: 'ready' | 'pending' | 'failed'
+      state: 'empty' | 'ready' | 'pending' | 'failed'
       /** Format: uuid */
       file_id: string | null
       /** Format: uuid */
@@ -2696,7 +2716,7 @@ export interface components {
       ratio: string
       n: number
     }
-    /** @description Exactly the content object matching `kind` is present; group nodes carry none. Nodes paint in array order with group frames beneath. */
+    /** @description Text and generator nodes carry their matching content. Images may also store generation settings for in-place runs. Group frames paint beneath other nodes. */
     CanvasNode: {
       /** Format: uuid */
       id: string
@@ -2713,7 +2733,7 @@ export interface components {
       text?: components['schemas']['CanvasTextContent']
       generator?: components['schemas']['CanvasGeneratorContent']
     }
-    /** @description Inputs flow from image, text or group nodes into a generator; a generator points at the images it produced. */
+    /** @description Input edges connect text, images or groups to a generator or image. Result edges connect a generator or image to its output images. */
     CanvasEdge: {
       /** Format: uuid */
       id: string
@@ -2721,13 +2741,31 @@ export interface components {
       from: string
       /** Format: uuid */
       to: string
+      /** @enum {string} */
+      kind: 'input' | 'result'
     }
     CanvasDocument: {
       /** @constant */
-      schema: 1
+      schema: 2
       viewport: components['schemas']['CanvasViewport']
       nodes: components['schemas']['CanvasNode'][]
       edges: components['schemas']['CanvasEdge'][]
+    }
+    CanvasRunInput: {
+      version: number
+      /** Format: uuid */
+      node_id: string
+      /** Format: uuid */
+      model_id: string
+      /** @enum {string} */
+      quality: 'low' | 'medium' | 'high'
+      size: string
+      ratio: string
+      n: number
+    }
+    CanvasRun: {
+      canvas: components['schemas']['Canvas']
+      task: components['schemas']['ImageTask']
     }
     Canvas: {
       /** Format: uuid */
@@ -2735,7 +2773,7 @@ export interface components {
       title: string
       /**
        * Format: uuid
-       * @description Hidden canvas conversation used as ImageTaskInput.conversation_id.
+       * @description Hidden canvas conversation used to filter the owner's image task history.
        */
       conversation_id: string
       document: components['schemas']['CanvasDocument']
@@ -7610,6 +7648,69 @@ export interface operations {
         }
       }
       default: components['responses']['APIError']
+    }
+  }
+  runCanvasNode: {
+    parameters: {
+      query?: never
+      header: {
+        'Idempotency-Key': string
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CanvasRunInput']
+      }
+    }
+    responses: {
+      /** @description Accepted or replayed image task and saved canvas */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CanvasRun']
+        }
+      }
+      /** @description Invalid parameters, prompt or connected inputs */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Canvas or reference file is unavailable */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Stale canvas version, reused key, or canvas and billing limits */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Too many requests */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
     }
   }
   getCanvas: {

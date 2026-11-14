@@ -4,7 +4,7 @@ import { documentProblem, imageNode } from './document'
 import { decodeFragment, encodeFragment } from './clipboard'
 import { extractFragment } from './commands'
 import { emptyHistory, patch, record, redo, undo } from './history'
-import { buildPrompt, collectInputs, generatorFromSelection, placeOutputs } from './workflow'
+import { buildPrompt, collectInputs, generatorFromSelection } from './workflow'
 import { ids, must, sampleDocument, sequence } from './test-fixtures'
 
 describe('canvas workflow', () => {
@@ -19,16 +19,6 @@ describe('canvas workflow', () => {
     expect(missing).toMatchObject({ references: [ids.file], unavailable: 1 })
     expect(buildPrompt(' 一只猫 ', ['暖色调', '胶片'])).toBe('一只猫\n\n暖色调\n\n胶片')
     expect(buildPrompt('', [])).toBe('')
-  })
-
-  it('places results beside the generator and below occupied space', () => {
-    const doc = sampleDocument()
-    const generator = must(doc.nodes.find((node) => node.id === ids.generator))
-    const slots = placeOutputs(doc, generator, 2, 2)
-    expect(slots[0]).toMatchObject({ x: generator.x + generator.w + 96, w: 280, h: 140 })
-    // The pending result already occupies the top of that column.
-    expect(must(slots[0]).y).toBeGreaterThanOrEqual(280 + 24)
-    expect(must(slots[1]).y).toBe(must(slots[0]).y + 140 + 24)
   })
 
   it('creates a connected generator from a selection', () => {

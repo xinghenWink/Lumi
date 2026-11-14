@@ -173,4 +173,13 @@ describe('canvas autosave', () => {
     await vi.advanceTimersByTimeAsync(10000)
     expect(save).toHaveBeenCalledTimes(1)
   })
+
+  it('discards outstanding edits when leaving without saving', async () => {
+    const { editor, autosave, save, stop } = setup(savedAs(2))
+    editor.setTitle('草稿')
+    autosave.discard()
+    stop()
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(save).not.toHaveBeenCalled()
+  })
 })

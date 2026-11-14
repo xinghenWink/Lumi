@@ -4,6 +4,7 @@ import {
   addNodes,
   bringToFront,
   cascade,
+  connect,
   extractFragment,
   groupNodes,
   insertFragment,
@@ -11,10 +12,13 @@ import {
   removeEdges,
   removeNodes,
   ungroup,
+  updateNode,
   type Fragment,
 } from '../../../features/canvas/commands'
 import {
   DEFAULT_SIZE,
+  canGenerate,
+  groupNode,
   fitImage,
   generatorNode,
   imageNode,
@@ -71,6 +75,57 @@ export function addGenerator(editor: CanvasEditor, at = stageCenter(editor)) {
   const { w, h } = DEFAULT_SIZE.generator
   const node = generatorNode({ x: at.x - w / 2, y: at.y - h / 2 })
   if (place(editor, node)) editor.openInspector(node.id)
+}
+
+export type CreateKind = 'text' | 'image' | 'generator' | 'group'
+
+export function createAt(editor: CanvasEditor, kind: CreateKind, at: Point, source?: string) {
+  const node = {
+    text: textNode,
+    image: (point: Point) => imageNode(point, { state: 'empty' }),
+    generator: generatorNode,
+    group: groupNode,
+  }[kind](at)
+  const created = editor.apply((doc) => {
+    const next = addNodes(doc, [cascade(doc, node)])
+    if (next === doc || !source) return next
+    const connected = connect(next, source, node.id)
+    return connected === next ? doc : connected
+  })
+  if (!created) {
+    editor.notify({ key: 'canvas.editor.limit' })
+    return
+  }
+  editor.select([node.id])
+  if (kind === 'text') editor.setEditing(node.id)
+  if (kind === 'generator') editor.openInspector(node.id)
+}
+
+export function openImageGeneration(editor: CanvasEditor, image: CanvasNode) {
+  const doc = editor.state.doc
+  const edge = doc.edges.find((item) => item.kind === 'result' && item.to === image.id)
+  const source = doc.nodes.find((node) => node.id === edge?.from)
+  if (image.image?.state === 'failed' && !image.generator && source?.kind === 'generator') {
+    editor.select([source.id])
+    editor.openInspector(source.id)
+    return
+  }
+  if (image.image?.state === 'failed' && !image.generator && source?.generator) {
+    const settings = source.generator
+    editor.apply((current) => {
+      let next = updateNode(current, image.id, (node) => ({ ...node, generator: { ...settings } }))
+      for (const input of current.edges) {
+        if (input.kind === 'input' && input.to === source.id) {
+          next = connect(next, input.from, image.id)
+        }
+      }
+      return next
+    })
+  }
+  if (canGenerate(image)) {
+    editor.select([image.id])
+    editor.openInspector(image.id)
+  }
 }
 
 /** Creates a generator fed by the selection and opens its parameters. */

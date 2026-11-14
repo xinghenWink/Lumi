@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { useStore } from 'zustand'
 import { AlertTriangle, ArrowLeft, Check, CloudOff, Loader2 } from 'lucide-react'
 import type { ImageFile } from '../../../api/images'
-import { LIMITS } from '../../../features/canvas/document'
+import { canGenerate, LIMITS } from '../../../features/canvas/document'
+import { boundsOf } from '../../../features/canvas/geometry'
 import { insertFile } from '../../features/canvas/actions'
 import { useCanvas, useEditor } from '../../features/canvas/context'
 import { useImageConfig } from '../../features/images/config'
@@ -15,6 +16,8 @@ import { ApiNotice } from '../shared/ApiNotice'
 import { Button } from '../ui/button'
 import { ModalDialog } from '../ui/modal-dialog'
 import { CanvasViewport } from './CanvasViewport'
+import type { CreateMenuAnchor } from './CanvasCreateMenu'
+import { ThemeToggle } from '../shared/ThemeToggle'
 import { CanvasToolbar, SelectionBar, ZoomControls } from './CanvasControls'
 import { CanvasMiniMap } from './CanvasMiniMap'
 import { GeneratorInspector } from './GeneratorInspector'
@@ -53,10 +56,10 @@ function SaveState() {
       aria-live="polite"
       data-testid="canvas-save-state"
       data-status={status}
-      className="hidden items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground sm:inline-flex"
+      className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground"
     >
       {icon}
-      {t(label)}
+      <span className="sr-only sm:not-sr-only">{t(label)}</span>
     </span>
   )
 }
@@ -173,18 +176,16 @@ export function CanvasEditor({ rejected }: { rejected: Rejections | null }) {
   const [library, setLibrary] = useState(false)
   const [preview, setPreview] = useState<ImageFile | null>(null)
   const [minimap, setMinimap] = useState(true)
-  const selection = useEditor((state) => state.selection)
+  const [menu, setMenu] = useState<CreateMenuAnchor | null>(null)
   const inspectorId = useEditor((state) => state.inspector)
   const nodes = useEditor((state) => state.doc.nodes)
-  const selected =
-    selection.length === 1 ? nodes.find((node) => node.id === selection[0]) : undefined
-  // Desktop shows the parameters of a selected generator; small screens use a sheet.
-  const panel = wide && selected?.kind === 'generator' ? selected : undefined
-  const sheet = !wide && inspectorId ? nodes.find((node) => node.id === inspectorId) : undefined
+  const inspected = inspectorId ? nodes.find((node) => node.id === inspectorId) : undefined
+  const panel = wide && inspected && canGenerate(inspected) ? inspected : undefined
+  const sheet = !wide && inspected && canGenerate(inspected) ? inspected : undefined
   const maxBytes = config.data?.max_upload_bytes ?? 10 * 1_048_576
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 px-3 sm:px-4">
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 bg-card px-3 sm:px-4">
         <Link
           to="/canvas"
           aria-label={t('canvas.editor.back')}
@@ -194,21 +195,40 @@ export function CanvasEditor({ rejected }: { rejected: Rejections | null }) {
           <span className="hidden sm:inline">{t('canvas.editor.back')}</span>
         </Link>
         <TitleField />
-        <SaveState />
+        <div className="ml-auto flex min-w-0 items-center gap-2">
+          <SaveState />
+          <ThemeToggle />
+        </div>
       </div>
       <ConflictBanner />
       <div className="flex min-h-0 flex-1">
         <div className="relative min-h-0 min-w-0 flex-1">
-          <CanvasViewport />
-          <div className="absolute top-3 left-3 z-10">
-            <CanvasToolbar onLibrary={() => setLibrary(true)} />
-          </div>
-          <div className="absolute top-3 left-1/2 z-10 -translate-x-1/2">
-            <SelectionBar
-              onPreview={setPreview}
-              onDownload={(file) => void actions.download(file)}
+          <CanvasViewport menu={menu} onMenu={setMenu} />
+          <div className="absolute inset-x-2 top-2 z-10 w-fit sm:top-4 sm:left-4">
+            <CanvasToolbar
+              onLibrary={() => setLibrary(true)}
+              onCreate={() => {
+                const { stage } = editor.state
+                setMenu(
+                  menu
+                    ? null
+                    : {
+                        point: {
+                          x: Math.min(stage.width / 3, 160),
+                          y: Math.min(stage.height / 3, 130),
+                        },
+                      },
+                )
+              }}
             />
           </div>
+          <SelectionOverlay
+            onPreview={setPreview}
+            onDownload={(file) => void actions.download(file)}
+          />
+          {panel ? (
+            <GeneratorOverlay node={panel} onClose={() => editor.openInspector(null)} />
+          ) : null}
           <div className="absolute right-3 bottom-3 z-10 flex flex-col items-end gap-2">
             {minimap && wide ? <CanvasMiniMap /> : null}
             <ZoomControls
@@ -218,16 +238,6 @@ export function CanvasEditor({ rejected }: { rejected: Rejections | null }) {
           </div>
           <Notice rejected={rejected} maxBytes={maxBytes} />
         </div>
-        {panel ? (
-          <aside className="w-[340px] shrink-0 overflow-y-auto border-l border-border bg-card p-4">
-            <GeneratorInspector
-              key={panel.id}
-              node={panel}
-              onClose={() => editor.select([])}
-              className="min-h-full"
-            />
-          </aside>
-        ) : null}
       </div>
       {sheet ? (
         <ModalDialog
@@ -272,5 +282,75 @@ export function CanvasEditor({ rejected }: { rejected: Rejections | null }) {
       ) : null}
       <ApiNotice error={actions.error} />
     </div>
+  )
+}
+
+function SelectionOverlay({
+  onPreview,
+  onDownload,
+}: {
+  onPreview(file: ImageFile): void
+  onDownload(file: ImageFile): void
+}) {
+  const selection = useEditor((state) => state.selection)
+  const nodes = useEditor((state) => state.doc.nodes)
+  const viewport = useEditor((state) => state.viewport)
+  const stage = useEditor((state) => state.stage)
+  const wide = useMediaQuery('(min-width: 640px)')
+  const bounds = boundsOf(nodes.filter((node) => selection.includes(node.id)))
+  const x = bounds ? (bounds.x + bounds.w / 2) * viewport.zoom + viewport.x : stage.width / 2
+  const y = bounds ? bounds.y * viewport.zoom + viewport.y : 72
+  return (
+    <div
+      className="absolute z-10 -translate-x-1/2"
+      style={{
+        left: wide ? Math.max(174, Math.min(stage.width - 164, x)) : stage.width / 2,
+        top: wide ? Math.max(12, Math.min(stage.height - 54, y - 52)) : 92,
+      }}
+    >
+      <SelectionBar onPreview={onPreview} onDownload={onDownload} />
+    </div>
+  )
+}
+
+function GeneratorOverlay({
+  node,
+  onClose,
+}: {
+  node: Parameters<typeof GeneratorInspector>[0]['node']
+  onClose(): void
+}) {
+  const viewport = useEditor((state) => state.viewport)
+  const stage = useEditor((state) => state.stage)
+  const width = 344
+  const height = Math.min(550, stage.height - 64)
+  const x = (node.x + node.w) * viewport.zoom + viewport.x + 16
+  const left = node.x * viewport.zoom + viewport.x - width - 16
+  const bottom = (node.y + node.h) * viewport.zoom + viewport.y + 12
+  const beside = x + width < stage.width - 12 || left > 60
+  return (
+    <aside
+      className="absolute z-10 overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-lg"
+      style={{
+        width,
+        maxHeight: height,
+        left: Math.max(
+          60,
+          Math.min(
+            stage.width - width - 12,
+            x + width < stage.width - 12 ? x : beside ? left : node.x * viewport.zoom + viewport.x,
+          ),
+        ),
+        top: Math.max(
+          12,
+          Math.min(
+            stage.height - height - 12,
+            beside ? node.y * viewport.zoom + viewport.y : bottom,
+          ),
+        ),
+      }}
+    >
+      <GeneratorInspector key={node.id} node={node} onClose={onClose} />
+    </aside>
   )
 }

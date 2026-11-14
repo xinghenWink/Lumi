@@ -34,7 +34,7 @@ export type IdFactory = () => string
 export const newId: IdFactory = () => crypto.randomUUID()
 
 export function emptyDocument(): CanvasDocument {
-  return { schema: 1, viewport: { x: 0, y: 0, zoom: 1 }, nodes: [], edges: [] }
+  return { schema: 2, viewport: { x: 0, y: 0, zoom: 1 }, nodes: [], edges: [] }
 }
 
 export const clamp = (value: number, min: number, max: number) =>
@@ -99,11 +99,22 @@ export function groupNode(at: Placement, title = '', id = newId()): CanvasNode {
   return { ...frame('group', at, id), title }
 }
 
-/** The only two edge directions: inputs into a generator, a generator to its results. */
-export function connectable(from: CanvasNodeKind | undefined, to: CanvasNodeKind | undefined) {
-  if (to === 'generator') return from === 'image' || from === 'text' || from === 'group'
-  if (to === 'image') return from === 'generator'
-  return false
+export function canGenerate(node: CanvasNode | undefined) {
+  return (
+    node?.kind === 'generator' || node?.image?.state === 'empty' || node?.image?.state === 'failed'
+  )
+}
+
+export function connectable(
+  from: CanvasNodeKind | undefined,
+  to: CanvasNodeKind | undefined,
+  kind: CanvasEdge['kind'],
+) {
+  if (kind === 'result') return (from === 'image' || from === 'generator') && to === 'image'
+  return (
+    (from === 'image' || from === 'text' || from === 'group') &&
+    (to === 'image' || to === 'generator')
+  )
 }
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -128,26 +139,29 @@ function nodeProblem(node: CanvasNode, kinds: Map<string, CanvasNodeKind>): stri
     return 'group'
   const parts = [node.image, node.text, node.generator].filter((part) => part !== undefined)
   if (node.kind === 'group') return parts.length ? 'content' : ''
-  if (parts.length !== 1) return 'content'
+  if (node.kind === 'image' ? !node.image || !!node.text : parts.length !== 1) return 'content'
   if (node.kind === 'text') {
     const content = node.text?.content
     return content !== undefined && runes(content) <= LIMITS.text && !textControl.test(content)
       ? ''
       : 'text'
   }
-  if (node.kind === 'generator') {
+  if (node.kind === 'generator' || node.generator) {
     const g = node.generator
     if (!g || runes(g.prompt) > LIMITS.prompt || textControl.test(g.prompt)) return 'prompt'
     if (g.model_id !== null && !uuid.test(g.model_id)) return 'model'
     if ((g.size && !sizePattern.test(g.size)) || (g.ratio && !ratioPattern.test(g.ratio)))
       return 'size'
-    return Number.isInteger(g.n) && g.n >= 1 && g.n <= LIMITS.count ? '' : 'count'
+    if (!Number.isInteger(g.n) || g.n < 1 || g.n > LIMITS.count) return 'count'
+    if (node.kind === 'generator') return ''
   }
   const image = node.image
   if (!image || !codePattern.test(image.error_code)) return 'image'
   if (image.position !== null && (image.position < 0 || image.position >= LIMITS.count))
     return 'position'
   if (image.position !== null && image.task_id === null) return 'position'
+  if (image.state === 'empty')
+    return image.file_id || image.task_id || image.error_code ? 'image' : ''
   if (image.state === 'ready') return image.file_id && !image.error_code ? '' : 'image'
   if (image.state === 'pending')
     return !image.file_id && image.task_id && image.position !== null && !image.error_code
@@ -159,7 +173,7 @@ function nodeProblem(node: CanvasNode, kinds: Map<string, CanvasNodeKind>): stri
 /** Returns the first problem the server would reject, or an empty string. */
 export function documentProblem(doc: CanvasDocument): string {
   const { viewport } = doc
-  if (doc.schema !== 1) return 'schema'
+  if (doc.schema !== 2) return 'schema'
   if (
     !inCoordinate(viewport.x) ||
     !inCoordinate(viewport.y) ||
@@ -182,7 +196,7 @@ export function documentProblem(doc: CanvasDocument): string {
     const pair = edge.from + '>' + edge.to
     if (!uuid.test(edge.id) || edges.has(edge.id)) return 'edge-id'
     if (edge.from === edge.to || pairs.has(pair)) return 'edge'
-    if (!connectable(kinds.get(edge.from), kinds.get(edge.to))) return 'edge'
+    if (!connectable(kinds.get(edge.from), kinds.get(edge.to), edge.kind)) return 'edge'
     edges.add(edge.id)
     pairs.add(pair)
   }

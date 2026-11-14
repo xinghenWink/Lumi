@@ -14,7 +14,26 @@ func (h *Handler) canvasRoutes(protected *gin.RouterGroup) {
 	protected.POST("/canvases", h.csrf, h.canvasLimit, h.canvasCreate)
 	protected.GET("/canvases/:id", h.canvasGet)
 	protected.PUT("/canvases/:id", h.csrf, h.canvasLimit, h.canvasSave)
+	protected.POST("/canvases/:id/runs", h.csrf, h.imageLimit, h.canvasRun)
 	protected.DELETE("/canvases/:id", h.csrf, h.canvasLimit, h.canvasDelete)
+}
+func (h *Handler) canvasRun(c *gin.Context) {
+	p, ok := principal(c)
+	if !ok {
+		return
+	}
+	id, err := identifier(c.Param("id"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	var input canvas.RunInput
+	if err := decode(c, &input); err != nil {
+		h.fail(c, err)
+		return
+	}
+	result, err := h.services.Canvas.Run(c.Request.Context(), h.services.Images, p.Actor, id, c.GetHeader("Idempotency-Key"), input)
+	h.imageReply(c, result, err, 202)
 }
 
 // canvasLimit allows debounced autosave during continuous editing while bounding abuse.

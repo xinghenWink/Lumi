@@ -1,6 +1,7 @@
 import { createStore } from 'zustand/vanilla'
 import type { Canvas, CanvasDocument, CanvasViewport } from '../../../api/canvases'
 import type { ImageFile } from '../../../api/images'
+import { clampCoordinate } from '../../../features/canvas/document'
 import {
   emptyHistory,
   patch,
@@ -18,10 +19,9 @@ export type Preview =
   | { kind: 'move'; ids: ReadonlySet<string>; dx: number; dy: number }
   | { kind: 'resize'; id: string; rect: Rect }
 
-/** Uploads and submissions that are not in the document until the server answers. */
+/** An upload preview displayed until the file is ready. */
 export interface Placeholder {
   id: string
-  kind: 'upload' | 'submit'
   rect: Rect
   preview?: string
 }
@@ -34,7 +34,6 @@ export interface Notice {
 
 export interface EditorState {
   canvasId: string
-  conversationId: string
   title: string
   doc: CanvasDocument
   viewport: CanvasViewport
@@ -72,7 +71,6 @@ function filesOf(list: readonly ImageFile[]) {
 function initial(canvas: Canvas): EditorState {
   return {
     canvasId: canvas.id,
-    conversationId: canvas.conversation_id,
     title: canvas.title,
     doc: canvas.document,
     viewport: canvas.document.viewport,
@@ -80,7 +78,7 @@ function initial(canvas: Canvas): EditorState {
     files: filesOf(canvas.files),
     selection: [],
     edgeSelection: [],
-    tool: 'select',
+    tool: 'hand',
     history: emptyHistory(),
     preview: null,
     placeholders: [],
@@ -160,7 +158,10 @@ export function createCanvasEditor(canvas: Canvas) {
       })
     },
     setViewport(viewport: CanvasViewport) {
-      store.setState((state) => ({ viewport, viewRevision: state.viewRevision + 1 }))
+      store.setState((state) => ({
+        viewport: { ...viewport, x: clampCoordinate(viewport.x), y: clampCoordinate(viewport.y) },
+        viewRevision: state.viewRevision + 1,
+      }))
     },
     setTitle(title: string) {
       store.setState((state) => ({ title, revision: state.revision + 1 }))

@@ -41,9 +41,10 @@ export function createAutosave(editor: CanvasEditor, options: AutosaveOptions) {
   let timer: ReturnType<typeof setTimeout> | undefined
   let due = Infinity
   let inflight: Promise<void> | null = null
+  let running = false
   let failures = 0
   let active = false
-  let unsubscribe = () => {}
+  let discarded = false
 
   const set = (value: SaveStatus, error: unknown = null) =>
     status.setState({ status: value, error })
@@ -55,7 +56,7 @@ export function createAutosave(editor: CanvasEditor, options: AutosaveOptions) {
   }
 
   function schedule(delay: number) {
-    if (!active || blocked()) return
+    if (!active || discarded || blocked()) return
     const at = Date.now() + delay
     if (timer && at >= due) return
     if (timer) clearTimeout(timer)
@@ -100,7 +101,7 @@ export function createAutosave(editor: CanvasEditor, options: AutosaveOptions) {
 
   /** Saves now if anything changed; resolves once no save is running. */
   async function flush(): Promise<void> {
-    if (blocked()) return
+    if (blocked() || running || discarded) return
     if (timer) {
       clearTimeout(timer)
       timer = undefined
@@ -130,8 +131,46 @@ export function createAutosave(editor: CanvasEditor, options: AutosaveOptions) {
     status,
     flush,
     pending,
+    discard() {
+      discarded = true
+      if (timer) clearTimeout(timer)
+      timer = undefined
+      due = Infinity
+    },
     /** Document edits not yet saved; viewport moves alone do not warrant a leave prompt. */
     unsaved: () => editor.state.revision !== saved.revision,
+    async submit<T>(
+      request: (version: number) => Promise<{ canvas: Canvas; task: T }>,
+      apply: (canvas: Canvas, task: T) => void,
+    ): Promise<T | undefined> {
+      if (running) return undefined
+      await flush()
+      if (running || blocked() || pending()) return undefined
+      running = true
+      const version = editor.state.version
+      try {
+        const result = await request(version)
+        if (result.canvas.version !== version + 1) {
+          set('conflict')
+          return result.task
+        }
+        const clean = !pending()
+        const previousView = saved.view
+        editor.adopt(result.canvas)
+        apply(result.canvas, result.task)
+        if (clean) {
+          saved = { revision: editor.state.revision, view: previousView }
+          set('saved')
+        }
+        return result.task
+      } catch (error) {
+        if (error instanceof ApiError && error.code === 'CANVAS_CONFLICT') set('conflict', error)
+        throw error
+      } finally {
+        running = false
+        if (pending()) schedule(editDelay)
+      }
+    },
     /** Conflict resolution: adopt the server copy, or keep local edits over it. */
     async resolve(side: 'theirs' | 'mine') {
       const latest = await options.load()
@@ -151,16 +190,12 @@ export function createAutosave(editor: CanvasEditor, options: AutosaveOptions) {
      */
     mount() {
       active = true
-      unsubscribe = watch()
+      const unsubscribe = watch()
       if (pending()) schedule(editDelay)
       return () => {
         unsubscribe()
-        void flush().finally(() => {
-          active = false
-          if (timer) clearTimeout(timer)
-          timer = undefined
-          due = Infinity
-        })
+        active = false
+        void flush()
       }
     },
   }

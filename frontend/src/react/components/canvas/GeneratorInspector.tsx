@@ -5,14 +5,13 @@ import type { CanvasGeneratorContent, CanvasNode } from '../../../api/canvases'
 import type { ImageInput } from '../../../api/images'
 import { updateNode } from '../../../features/canvas/commands'
 import { LIMITS } from '../../../features/canvas/document'
-import { aspectOf, buildPrompt, collectInputs } from '../../../features/canvas/workflow'
-import { useCanvas, useEditor } from '../../features/canvas/context'
+import { buildPrompt, collectInputs } from '../../../features/canvas/workflow'
+import { useCanvas, useCanvasImage, useEditor } from '../../features/canvas/context'
 import { useImageOptions } from '../../features/images/options'
 import type { ImageDraft } from '../../features/images/controller'
 import { ImageParameters } from '../images/ImageParameters'
 import { ApiNotice } from '../shared/ApiNotice'
 import { Button } from '../ui/button'
-import { cn } from '../../lib/utils'
 
 const selectClass =
   'h-9 w-full min-w-0 rounded-lg border border-input bg-card px-2.5 text-sm shadow-xs outline-none focus:border-ring focus:ring-3 focus:ring-ring/15 disabled:opacity-50'
@@ -21,15 +20,7 @@ const selectClass =
  * Parameters for one generator node. Inputs come from its incoming edges; quotes and
  * limits come from the same backend options the image studio uses.
  */
-export function GeneratorInspector({
-  node,
-  onClose,
-  className,
-}: {
-  node: CanvasNode
-  onClose(): void
-  className?: string
-}) {
+export function GeneratorInspector({ node, onClose }: { node: CanvasNode; onClose(): void }) {
   const { t } = useTranslation()
   const { editor, generation } = useCanvas()
   const promptField = useId(),
@@ -63,21 +54,26 @@ export function GeneratorInspector({
   const patch = (change: Partial<CanvasGeneratorContent>, key = '') =>
     editor.apply(
       (current) =>
-        updateNode(current, node.id, (item) =>
-          item.generator ? { ...item, generator: { ...item.generator, ...change } } : item,
-        ),
+        updateNode(current, node.id, (item) => ({
+          ...item,
+          generator: { ...generator, ...change },
+        })),
       { key },
     )
   const references = inputs.references.length
   const problem = !model
     ? 'canvas.generator.noModel'
-    : references && !model.capabilities.supports_edit
-      ? 'canvas.generator.noEdit'
-      : references > options.maxReferences
-        ? 'canvas.generator.tooManyReferences'
-        : !prompt
-          ? 'canvas.generator.emptyPrompt'
-          : ''
+    : inputs.unavailable
+      ? 'canvas.generator.missingInput'
+      : references && !model.capabilities.supports_edit
+        ? 'canvas.generator.noEdit'
+        : references > options.maxReferences
+          ? 'canvas.generator.tooManyReferences'
+          : !prompt
+            ? 'canvas.generator.emptyPrompt'
+            : new TextEncoder().encode(prompt).length > 64000
+              ? 'canvas.generator.longPrompt'
+              : ''
   const insufficient =
     !!options.quote &&
     !!options.account.data &&
@@ -90,15 +86,12 @@ export function GeneratorInspector({
     setSubmitting(true)
     try {
       await generation.submit({
-        generator: node.id,
-        modelId: model.id,
-        prompt: prompt.slice(0, 64000),
+        node_id: node.id,
+        model_id: model.id,
         quality: options.quality as ImageInput['quality'],
         size: options.size,
         ratio: options.ratio,
         n: options.n,
-        references: inputs.references,
-        aspect: aspectOf(options.size, options.ratio),
       })
     } finally {
       setSubmitting(false)
@@ -109,7 +102,7 @@ export function GeneratorInspector({
     <section
       aria-label={t('canvas.generator.heading')}
       data-testid="canvas-inspector"
-      className={cn('flex min-h-0 flex-col gap-4', className)}
+      className="flex min-h-0 flex-col gap-4"
     >
       <header className="flex items-center gap-2">
         <Sparkles size={16} className="text-primary" aria-hidden="true" />
@@ -151,6 +144,22 @@ export function GeneratorInspector({
           <p className="text-xs leading-5 text-warning">
             {t('canvas.generator.unavailable', { count: inputs.unavailable })}
           </p>
+        ) : null}
+        {inputs.references.length ? (
+          <div className="flex flex-wrap gap-1.5">
+            {inputs.references.map((id, index) => (
+              <ReferenceThumbnail key={id} id={id} index={index} />
+            ))}
+          </div>
+        ) : null}
+        {inputs.texts.length ? (
+          <ul className="grid max-h-20 gap-1 overflow-y-auto text-xs text-muted-foreground">
+            {inputs.texts.map((text, index) => (
+              <li key={index} className="truncate" title={text}>
+                {text}
+              </li>
+            ))}
+          </ul>
         ) : null}
       </div>
       <div className="flex flex-col gap-1.5">
@@ -215,4 +224,17 @@ export function GeneratorInspector({
       </div>
     </section>
   )
+}
+
+function ReferenceThumbnail({ id, index }: { id: string; index: number }) {
+  const { t } = useTranslation()
+  const file = useEditor((state) => state.files[id])
+  const image = useCanvasImage(file, 'thumb')
+  return image?.url ? (
+    <img
+      src={image.url}
+      alt={t('canvas.generator.reference', { number: index + 1 })}
+      className="size-9 rounded border border-border object-cover"
+    />
+  ) : null
 }

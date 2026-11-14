@@ -1,7 +1,7 @@
 import type { components } from './schema'
 import { authorized } from './protected'
 import { ApiError, noContent, record } from './transport'
-import { parseFile } from './images'
+import { parseFile, parseTask } from './images'
 
 type S = components['schemas']
 export type Canvas = S['Canvas']
@@ -10,6 +10,7 @@ export type CanvasPage = S['CanvasPage']
 export type CanvasDocument = S['CanvasDocument']
 export type CanvasNode = S['CanvasNode']
 export type CanvasEdge = S['CanvasEdge']
+export type CanvasRunInput = S['CanvasRunInput']
 export type CanvasViewport = S['CanvasViewport']
 export type CanvasImageContent = S['CanvasImageContent']
 export type CanvasGeneratorContent = S['CanvasGeneratorContent']
@@ -55,7 +56,7 @@ function parseNode(v: unknown): CanvasNode {
   if (d.image !== undefined) {
     const i = record(d.image)
     node.image = {
-      state: choice(i.state, ['ready', 'pending', 'failed']),
+      state: choice(i.state, ['empty', 'ready', 'pending', 'failed']),
       file_id: nullableText(i.file_id),
       task_id: nullableText(i.task_id),
       position: nullableInt(i.position),
@@ -80,14 +81,19 @@ function parseNode(v: unknown): CanvasNode {
 export function parseDocument(v: unknown): CanvasDocument {
   const d = record(v),
     viewport = record(d.viewport)
-  if (d.schema !== 1) throw invalid()
+  if (d.schema !== 2) throw invalid()
   return {
-    schema: 1,
+    schema: 2,
     viewport: { x: real(viewport.x), y: real(viewport.y), zoom: real(viewport.zoom) },
     nodes: list(d.nodes, parseNode),
     edges: list(d.edges, (value) => {
       const e = record(value)
-      return { id: str(e.id), from: str(e.from), to: str(e.to) }
+      return {
+        id: str(e.id),
+        from: str(e.from),
+        to: str(e.to),
+        kind: choice(e.kind, ['input', 'result']),
+      }
     }),
   }
 }
@@ -141,5 +147,14 @@ export const canvases = {
     body: { title: string; document: CanvasDocument; version: number },
     signal?: AbortSignal,
   ) => authorized(one(id), parseCanvas, { method: 'PUT', body, ...signalOptions(signal) }),
+  run: (id: string, body: CanvasRunInput, key: string) =>
+    authorized(
+      one(id) + '/runs',
+      (value) => {
+        const result = record(value)
+        return { canvas: parseCanvas(result.canvas), task: parseTask(result.task) }
+      },
+      { method: 'POST', body, idempotencyKey: key },
+    ),
   remove: (id: string) => authorized(one(id), noContent, { method: 'DELETE' }),
 }

@@ -264,14 +264,25 @@ test('canvas journey composes, generates from references, persists and edits', a
     await page.getByLabel('画布名称', { exact: true }).fill(title)
 
     // Upload a reference image and add a text note on empty space.
-    await page.getByTestId('canvas-upload-input').setInputFiles({
-      name: 'reference.png',
-      mimeType: 'image/png',
-      buffer: png,
+    const drop = await page.evaluateHandle(
+      (bytes) => {
+        const data = new DataTransfer()
+        data.items.add(new File([Uint8Array.from(bytes)], 'reference.png', { type: 'image/png' }))
+        return data
+      },
+      [...png],
+    )
+    const dropArea = await box(viewport)
+    await viewport.dispatchEvent('drop', {
+      dataTransfer: drop,
+      clientX: dropArea.x + dropArea.width / 2 - 140,
+      clientY: dropArea.y + dropArea.height / 2 - 140,
     })
+    await drop.dispose()
     await expect(nodes('image').locator('img')).toHaveCount(1, { timeout: 20_000 })
     const stage = await box(viewport)
     await page.mouse.dblclick(stage.x + stage.width * 0.22, stage.y + stage.height * 0.78)
+    await page.getByRole('menuitem', { name: '文本', exact: true }).click()
     const note = page.getByLabel('文本内容', { exact: true })
     await expect(note).toBeFocused()
     await note.fill('暖色水彩风格')
@@ -378,7 +389,7 @@ test('canvas journey composes, generates from references, persists and edits', a
       )
       return text
     })
-    expect(copied.startsWith('lumi-canvas/v1:')).toBe(true)
+    expect(copied.startsWith('lumi-canvas/v2:')).toBe(true)
     await expect(nodes('text')).toHaveCount(2)
     await page.keyboard.press('Control+D')
     await expect(nodes('text')).toHaveCount(3)
@@ -397,6 +408,89 @@ test('canvas journey composes, generates from references, persists and edits', a
     const card = page.getByTestId('canvas-card').filter({ hasText: title })
     await expect(card).toContainText('7 个节点')
     await expect(card.locator('img')).toBeVisible()
+    await page.getByRole('link', { name: '新建画布', exact: true }).click()
+    await expect(viewport).toBeVisible()
+    await expect(page.locator('.desktop-sidebar')).toHaveCount(0)
+
+    // Drag a connection to empty space and undo the new node and edge together.
+    await page.getByRole('button', { name: '添加文本（T）', exact: true }).click()
+    const newNote = page.getByLabel('文本内容', { exact: true })
+    await newNote.fill('原位生图')
+    await newNote.press('Escape')
+    const stageBox = await box(viewport)
+    const createTarget = {
+      x: stageBox.x + stageBox.width * 0.7,
+      y: stageBox.y + stageBox.height * 0.35,
+    }
+    const fromNote = nodes('text').locator('[data-handle="out"]')
+    await drag(page, center(await box(fromNote)), createTarget)
+    await page.getByRole('menuitem', { name: '图片', exact: true }).click()
+    await expect(nodes('image')).toHaveCount(1)
+    await expect(edges).toHaveCount(1)
+    await page.keyboard.press('Control+Z')
+    await expect(nodes('image')).toHaveCount(0)
+    await expect(edges).toHaveCount(0)
+    await page.keyboard.press('Control+Shift+Z')
+    const imageId = await nodes('image').getAttribute('data-node-id')
+    await nodes('image').getByRole('button', { name: '设置生成', exact: true }).click()
+    await inspector.getByLabel('模型', { exact: true }).selectOption({ label: modelName })
+    await expect(run).toBeEnabled()
+    const sent = page.waitForResponse(
+      (response) => response.url().endsWith('/runs') && response.status() === 202,
+    )
+    await run.click()
+    const accepted = record(await (await sent).json())
+    const savedCanvas = record(accepted.canvas)
+    const storedNodes = record(savedCanvas.document).nodes
+    expect(storedNodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: imageId,
+          image: expect.objectContaining({ state: 'pending', position: 0 }),
+        }),
+      ]),
+    )
+    await page.reload()
+    await expect(nodes('image').locator('img')).toHaveCount(1, { timeout: 25_000 })
+    await expect(nodes('image')).toHaveAttribute('data-node-id', imageId ?? '')
+    expect(upstream.generations).toBeGreaterThan(0)
+    await saved()
+
+    // Modifier-drag selects both nodes even when the hand tool is active.
+    await page.keyboard.press('1')
+    const a = await box(nodes('text'))
+    const b = await box(nodes('image'))
+    await page.keyboard.down('Control')
+    await drag(
+      page,
+      { x: Math.min(a.x, b.x) - 15, y: Math.min(a.y, b.y) - 15 },
+      {
+        x: Math.max(a.x + a.width, b.x + b.width) + 15,
+        y: Math.max(a.y + a.height, b.y + b.height) + 15,
+      },
+    )
+    await page.keyboard.up('Control')
+    await expect(nodes('text')).toHaveAttribute('data-selected', 'true')
+    await expect(nodes('image')).toHaveAttribute('data-selected', 'true')
+    await nodes('image').click()
+    await page
+      .getByRole('toolbar', { name: '选中操作' })
+      .getByRole('button', { name: '生成', exact: true })
+      .click()
+    await expect(inspector.getByTestId('canvas-inputs')).toHaveText('1 张参考图 · 0 段文本')
+    await page.route('**/api/v1/canvases/*', async (route) => {
+      if (route.request().method() === 'PUT') {
+        await new Promise<void>((resolve) => setTimeout(resolve, 2000))
+      }
+      await route.continue()
+    })
+    await page.getByLabel('画布名称', { exact: true }).fill('从结果继续')
+    await page.getByRole('link', { name: '画布列表', exact: true }).click()
+    const leaveDialog = page.getByRole('dialog', { name: '离开画布？' })
+    await expect(leaveDialog).toBeVisible()
+    await leaveDialog.getByRole('button', { name: '保存并离开' }).click()
+    await expect(page).toHaveURL(/\/canvas$/)
+    await expect(page.getByTestId('canvas-card').filter({ hasText: '从结果继续' })).toBeVisible()
     await expect(
       page.locator('.desktop-sidebar').getByRole('link', { name: title, exact: true }),
     ).toBeVisible()
@@ -459,7 +553,7 @@ test('canvas on small screens keeps tools reachable and pans by touch', async ({
   await expect(inspector).toBeVisible()
   await inspector.getByRole('button', { name: '完成', exact: true }).click()
   await expect(inspector).toBeHidden()
-  await nodes('generator').getByRole('button', { name: '编辑', exact: true }).click()
+  await nodes('generator').getByRole('button', { name: '设置生成', exact: true }).click()
   await expect(inspector).toBeVisible()
   await inspector.getByRole('button', { name: '完成', exact: true }).click()
 
@@ -481,6 +575,25 @@ test('canvas on small screens keeps tools reachable and pans by touch', async ({
       return [Math.round(after.x - before.x), Math.round(after.y - before.y)]
     })
     .toEqual([-60, 40])
+  const zoom = page.getByRole('button', { name: /^缩放 \d+%$/ })
+  const zoomBeforePinch = await zoom.getAttribute('aria-label')
+  const pinch = (half: number) => [
+    { x: stage.x + stage.width / 2 - half, y: stage.y + stage.height - 75, id: 1 },
+    { x: stage.x + stage.width / 2 + half, y: stage.y + stage.height - 75, id: 2 },
+  ]
+  await session.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: pinch(25).slice(0, 1),
+  })
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pinch(25) })
+  for (let spread = 30; spread <= 65; spread += 5) {
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: pinch(spread),
+    })
+  }
+  await expect(zoom).not.toHaveAttribute('aria-label', zoomBeforePinch ?? '')
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   await noHorizontalOverflow(page)
   await expect(page.getByTestId('canvas-save-state')).toHaveAttribute('data-status', 'saved', {
     timeout: 15_000,

@@ -20,6 +20,9 @@ WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL RETURNING *;
 UPDATE canvases SET deleted_at=now(),version=version+1 WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL RETURNING conversation_id;
 -- name: RemoveCanvasConversation :exec
 UPDATE conversations SET deleted_at=now(),version=version+1 WHERE id=$1 AND user_id=$2 AND type='canvas' AND deleted_at IS NULL;
+-- name: RequestCanvasTaskCancellation :exec
+UPDATE image_tasks SET cancel_requested=true,version=version+1,updated_at=now()
+WHERE conversation_id=$1 AND user_id=$2 AND status IN ('queued','running') AND NOT cancel_requested;
 -- name: DeleteStaleCanvasFiles :exec
 DELETE FROM canvas_files WHERE canvas_id=$1 AND NOT (file_id=ANY(sqlc.arg(file_ids)::uuid[]));
 -- name: InsertCanvasFiles :exec

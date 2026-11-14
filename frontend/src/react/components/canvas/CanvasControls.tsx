@@ -73,7 +73,7 @@ export function ToolButton({
 
 const panel = 'rounded-xl border border-border bg-card/95 p-1 shadow-md backdrop-blur-sm'
 
-export function CanvasToolbar({ onLibrary }: { onLibrary(): void }) {
+export function CanvasToolbar({ onLibrary, onCreate }: { onLibrary(): void; onCreate(): void }) {
   const { t } = useTranslation()
   const services = useCanvas()
   const { editor, uploads } = services
@@ -86,7 +86,7 @@ export function CanvasToolbar({ onLibrary }: { onLibrary(): void }) {
       role="toolbar"
       aria-label={t('canvas.tools.toolbar')}
       aria-orientation="vertical"
-      className={cn(panel, 'flex flex-col gap-0.5')}
+      className={cn(panel, 'flex flex-wrap gap-0.5 sm:flex-col')}
     >
       <ToolButton
         label={t('canvas.tools.select')}
@@ -103,6 +103,9 @@ export function CanvasToolbar({ onLibrary }: { onLibrary(): void }) {
         <Hand size={17} />
       </ToolButton>
       <span className="mx-1.5 my-1 h-px bg-border" aria-hidden="true" />
+      <ToolButton label={t('canvas.tools.create')} onClick={onCreate}>
+        <Plus size={17} />
+      </ToolButton>
       <ToolButton label={t('canvas.tools.text')} onClick={() => addText(editor)}>
         <Type size={17} />
       </ToolButton>
@@ -197,7 +200,7 @@ export function SelectionBar({
   if (!selection.length && !edges.length) return null
   const chosen = nodes.filter((node) => selection.includes(node.id))
   const feedable = chosen.some(
-    (node) => node.kind === 'image' || node.kind === 'text' || node.kind === 'group',
+    (node) => node.image?.state === 'ready' || node.kind === 'text' || node.kind === 'group',
   )
   const groups = chosen.some((node) => node.kind === 'group')
   const single = chosen.length === 1 ? chosen[0] : undefined

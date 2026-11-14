@@ -38,8 +38,18 @@ export function sampleDocument(): CanvasDocument {
       imageNode({ x: -400, y: 0 }, { state: 'ready', file_id: ids.looseFile }, ids.loose),
     ],
     edges: [
-      { id: '40000000-0000-4000-8000-000000000001', from: ids.group, to: ids.generator },
-      { id: '40000000-0000-4000-8000-000000000002', from: ids.generator, to: ids.output },
+      {
+        id: '40000000-0000-4000-8000-000000000001',
+        from: ids.group,
+        to: ids.generator,
+        kind: 'input',
+      },
+      {
+        id: '40000000-0000-4000-8000-000000000002',
+        from: ids.generator,
+        to: ids.output,
+        kind: 'result',
+      },
     ],
   }
 }

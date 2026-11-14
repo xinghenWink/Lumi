@@ -31,10 +31,12 @@ import {
   addGenerator,
   addText,
   copySelection,
+  createAt,
   duplicateSelection,
   fitAll,
   groupSelection,
   nudgeSelection,
+  openImageGeneration,
   pasteFragment,
   removeSelection,
   resetZoom,
@@ -46,6 +48,7 @@ import {
 import { useFileDrop } from '../../features/files/drop'
 import { useImageConfig } from '../../features/images/config'
 import { CanvasEdges } from './CanvasEdges'
+import { CanvasCreateMenu, type CreateMenuAnchor } from './CanvasCreateMenu'
 import { CanvasNodeView } from './CanvasNodeView'
 import { cn } from '../../lib/utils'
 
@@ -71,7 +74,13 @@ const isEditable = (target: EventTarget | null) =>
 const modalOpen = () => !!document.querySelector('[data-lumi-modal]')
 const DRAG_THRESHOLD = 3
 
-export function CanvasViewport() {
+export function CanvasViewport({
+  menu,
+  onMenu,
+}: {
+  menu: CreateMenuAnchor | null
+  onMenu(menu: CreateMenuAnchor | null): void
+}) {
   const { t } = useTranslation()
   const { editor, uploads } = useCanvas()
   const doc = useEditor((state) => state.doc)
@@ -266,7 +275,8 @@ export function CanvasViewport() {
   }
 
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.button === 2 || isEditable(event.target)) return
+    if (event.button > 1 || isEditable(event.target)) return
+    if (menu) onMenu(null)
     const point = local(event)
     pointers.current.set(event.pointerId, point)
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -281,7 +291,11 @@ export function CanvasViewport() {
     const handle = target?.closest('[data-handle]')?.getAttribute('data-handle')
     const nodeId = target?.closest('[data-node-id]')?.getAttribute('data-node-id') ?? null
     const edgeId = target?.closest('[data-edge-id]')?.getAttribute('data-edge-id') ?? null
-    if (event.button === 1 || space.current || state.tool === 'hand') {
+    const mod = event.ctrlKey || event.metaKey
+    const background = !nodeId && !edgeId
+    const select =
+      event.pointerType === 'touch' ? state.tool === 'select' : mod || state.tool === 'select'
+    if (event.button === 1 || space.current || (background && !select)) {
       gesture.current = {
         kind: 'pan',
         pointer: event.pointerId,
@@ -325,15 +339,6 @@ export function CanvasViewport() {
     }
     if (edgeId) {
       editor.selectEdge(edgeId)
-      return
-    }
-    if (event.pointerType === 'touch') {
-      gesture.current = {
-        kind: 'pan',
-        pointer: event.pointerId,
-        start: point,
-        origin: state.viewport,
-      }
       return
     }
     gesture.current = {
@@ -417,11 +422,15 @@ export function CanvasViewport() {
   }
 
   function finish(event: ReactPointerEvent<HTMLDivElement>, cancelled = false) {
+    const current = gesture.current
+    if (current?.kind === 'pinch' && !cancelled) {
+      pointers.current.set(event.pointerId, local(event))
+      track(local(event), event.pointerId, event.shiftKey)
+    }
     if (!cancelled) settle()
     else cancelAnimationFrame(frame.current)
     latest.current = null
     pointers.current.delete(event.pointerId)
-    const current = gesture.current
     if (!current) return
     if (current.kind === 'pinch') {
       // Lifting one finger ends the pinch; the remaining finger does nothing until lifted.
@@ -465,12 +474,19 @@ export function CanvasViewport() {
     } else if (current.kind === 'connect') {
       setDraft(null)
       if (cancelled) return
-      const target = document
-        .elementFromPoint(event.clientX, event.clientY)
-        ?.closest('[data-node-id]')
-        ?.getAttribute('data-node-id')
+      const hit = document.elementFromPoint(event.clientX, event.clientY)
+      const target = hit?.closest('[data-node-id]')?.getAttribute('data-node-id')
       if (target && canConnect(state.doc, current.from, target))
         editor.apply((doc) => connect(doc, current.from, target))
+      else if (!target && hit?.closest('[data-testid="canvas-viewport"]'))
+        onMenu({ point: local(event), source: current.from })
+    } else if (
+      current.kind === 'pan' &&
+      !cancelled &&
+      distance(current.start, local(event)) < DRAG_THRESHOLD
+    ) {
+      editor.select([])
+      editor.openInspector(null)
     }
   }
 
@@ -482,10 +498,11 @@ export function CanvasViewport() {
       const node = state.doc.nodes.find((item) => item.id === nodeId)
       if (node?.kind === 'text') editor.setEditing(node.id)
       if (node?.kind === 'generator') editor.openInspector(node.id)
+      if (node?.kind === 'image') openImageGeneration(editor, node)
       return
     }
     if (target?.closest('[data-edge-id]')) return
-    addText(editor, screenToWorld(local(event), state.viewport))
+    onMenu({ point: local(event) })
   }
 
   // Previewed geometry replaces stored geometry while a drag is in progress.
@@ -541,6 +558,9 @@ export function CanvasViewport() {
       onPointerMove={onPointerMove}
       onPointerUp={(event) => finish(event)}
       onPointerCancel={(event) => finish(event, true)}
+      onLostPointerCapture={(event) => {
+        if (pointers.current.has(event.pointerId)) finish(event, true)
+      }}
       onDoubleClick={onDoubleClick}
       onContextMenu={(event) => event.preventDefault()}
     >
@@ -585,10 +605,8 @@ export function CanvasViewport() {
           <div
             key={item.id}
             role="status"
-            aria-label={t(
-              item.kind === 'upload' ? 'canvas.nodes.uploading' : 'canvas.nodes.submitting',
-            )}
-            className="absolute top-0 left-0 grid place-items-center overflow-hidden rounded-xl border border-dashed border-input bg-muted/80"
+            aria-label={t('canvas.nodes.uploading')}
+            className="pointer-events-none absolute top-0 left-0 grid place-items-center overflow-hidden rounded-xl border border-dashed border-input bg-muted/80"
             style={{
               transform: `translate(${item.rect.x}px, ${item.rect.y}px)`,
               width: item.rect.w,
@@ -621,6 +639,18 @@ export function CanvasViewport() {
         <p className="pointer-events-none absolute inset-x-6 top-1/2 -translate-y-1/2 text-center text-sm text-muted-foreground">
           {t('canvas.editor.empty')}
         </p>
+      ) : null}
+      {menu ? (
+        <CanvasCreateMenu
+          anchor={menu}
+          width={stage.width}
+          height={stage.height}
+          onDismiss={() => onMenu(null)}
+          onChoose={(kind) => {
+            createAt(editor, kind, screenToWorld(menu.point, editor.state.viewport), menu.source)
+            onMenu(null)
+          }}
+        />
       ) : null}
     </div>
   )

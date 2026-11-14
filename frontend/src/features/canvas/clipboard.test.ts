@@ -8,7 +8,7 @@ describe('canvas clipboard', () => {
   it('round-trips a fragment through tagged text', () => {
     const fragment = extractFragment(sampleDocument(), [ids.group, ids.generator])
     const text = encodeFragment(fragment)
-    expect(text.startsWith('lumi-canvas/v1:')).toBe(true)
+    expect(text.startsWith('lumi-canvas/v2:')).toBe(true)
     const decoded = decodeFragment(text)
     expect(decoded).toEqual(fragment)
     const pasted = insertFragment(
@@ -23,12 +23,15 @@ describe('canvas clipboard', () => {
 
   it('ignores unrelated, malformed and invalid text', () => {
     expect(decodeFragment('hello')).toBeNull()
-    expect(decodeFragment('lumi-canvas/v1:{')).toBeNull()
-    expect(decodeFragment('lumi-canvas/v1:{"nodes":[],"edges":[]}')).toBeNull()
+    expect(decodeFragment('lumi-canvas/v2:{')).toBeNull()
+    expect(decodeFragment('lumi-canvas/v2:{"nodes":[],"edges":[]}')).toBeNull()
     const fragment = extractFragment(sampleDocument(), [ids.text])
-    const broken = { ...fragment, edges: [{ id: ids.loose, from: ids.text, to: ids.text }] }
+    const broken = {
+      ...fragment,
+      edges: [{ id: ids.loose, from: ids.text, to: ids.text, kind: 'input' as const }],
+    }
     expect(decodeFragment(encodeFragment(broken))).toBeNull()
-    const oversized = 'lumi-canvas/v1:' + ' '.repeat(2 * 1024 * 1024)
+    const oversized = 'lumi-canvas/v2:' + ' '.repeat(2 * 1024 * 1024)
     expect(decodeFragment(oversized)).toBeNull()
   })
 })

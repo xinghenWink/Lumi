@@ -1,12 +1,14 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, ImageOff, Loader2, Sparkles, Wand2, X } from 'lucide-react'
+import { AlertCircle, ImageOff, ImagePlus, Loader2, Sparkles, Wand2, X } from 'lucide-react'
 import type { CanvasNode } from '../../../api/canvases'
 import type { ImageFile } from '../../../api/images'
 import { updateNode } from '../../../features/canvas/commands'
-import { LIMITS } from '../../../features/canvas/document'
+import { canGenerate, LIMITS } from '../../../features/canvas/document'
+import { referenceAccept } from '../../features/files/reference-rules'
 import type { Rect } from '../../../features/canvas/geometry'
 import { useCanvas, useCanvasImage, useEditor } from '../../features/canvas/context'
+import { openImageGeneration } from '../../features/canvas/actions'
 import { cn } from '../../lib/utils'
 
 const stop = (event: { stopPropagation(): void }) => event.stopPropagation()
@@ -58,6 +60,7 @@ function Frame({
         editor.select([node.id])
         if (node.kind === 'text') editor.setEditing(node.id)
         if (node.kind === 'generator') editor.openInspector(node.id)
+        if (node.kind === 'image') openImageGeneration(editor, node)
       }}
     >
       {children}
@@ -100,7 +103,8 @@ function summary(node: CanvasNode) {
 
 function ImageContent({ node, zoom }: { node: CanvasNode; zoom: number }) {
   const { t, i18n } = useTranslation()
-  const { generation } = useCanvas()
+  const { editor, generation, uploads } = useCanvas()
+  const picker = useRef<HTMLInputElement>(null)
   const image = node.image
   const file: ImageFile | undefined = useEditor((state) =>
     image?.file_id ? state.files[image.file_id] : undefined,
@@ -131,13 +135,56 @@ function ImageContent({ node, zoom }: { node: CanvasNode; zoom: number }) {
         ) : null}
       </div>
     )
-  if (image?.state === 'failed') {
+  if (image?.state === 'empty' || image?.state === 'failed') {
     const key = 'errors.' + image.error_code
+    const failed = image.state === 'failed'
     return (
-      <div className="flex size-full flex-col items-center justify-center gap-1.5 rounded-xl border border-destructive/30 bg-destructive/[0.06] p-3 text-center text-xs text-destructive">
-        <AlertCircle size={18} aria-hidden="true" />
-        <span className="font-medium">{t('canvas.nodes.failed')}</span>
+      <div
+        className={cn(
+          'flex size-full flex-col items-center justify-center gap-2 rounded-xl border p-3 text-center text-xs',
+          failed
+            ? 'border-destructive/30 bg-card text-destructive'
+            : 'border-dashed border-input bg-card text-muted-foreground',
+        )}
+      >
+        {failed ? (
+          <AlertCircle size={20} aria-hidden="true" />
+        ) : (
+          <ImagePlus size={24} aria-hidden="true" />
+        )}
+        <span className="font-medium">
+          {t(failed ? 'canvas.nodes.failed' : 'canvas.nodes.emptyImage')}
+        </span>
         {image.error_code && i18n.exists(key) ? <span>{t(key)}</span> : null}
+        <div className="flex flex-wrap justify-center gap-2">
+          <button
+            type="button"
+            onPointerDown={stop}
+            onClick={() => picker.current?.click()}
+            className="min-h-8 rounded-md border border-border px-2.5 text-foreground hover:bg-muted"
+          >
+            {t('canvas.tools.upload')}
+          </button>
+          <button
+            type="button"
+            onPointerDown={stop}
+            onClick={() => openImageGeneration(editor, node)}
+            className="min-h-8 rounded-md bg-primary px-2.5 text-primary-foreground"
+          >
+            {t(failed ? 'canvas.generator.retry' : 'canvas.generator.edit')}
+          </button>
+        </div>
+        <input
+          ref={picker}
+          type="file"
+          hidden
+          accept={referenceAccept}
+          aria-label={t('canvas.tools.upload')}
+          onChange={(event) => {
+            uploads.place(Array.from(event.currentTarget.files ?? []), node, node.id)
+            event.currentTarget.value = ''
+          }}
+        />
       </div>
     )
   }
@@ -300,7 +347,7 @@ export const CanvasNodeView = memo(function CanvasNodeView(
       </Frame>
     )
   return (
-    <Frame {...props} port={node.image?.state === 'ready'}>
+    <Frame {...props} port={node.image?.state === 'ready'} inputPort={canGenerate(node)}>
       <ImageContent node={node} zoom={props.zoom} />
     </Frame>
   )

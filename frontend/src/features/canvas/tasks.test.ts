@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { ImageFile, ImageTask } from '../../api/images'
 import { task as baseTask } from '../images/test-fixtures'
 import { documentProblem } from './document'
-import { addResultSlots, applyTask } from './tasks'
-import { ids, must, sampleDocument, sequence } from './test-fixtures'
+import { applyTask } from './tasks'
+import { ids, must, sampleDocument } from './test-fixtures'
 
 const file: ImageFile = {
   id: '20000000-0000-4000-8000-000000000009',
@@ -25,23 +25,6 @@ function task(change: Partial<ImageTask>): ImageTask {
 }
 
 describe('canvas task results', () => {
-  it('adds connected pending slots for a submitted task', () => {
-    const doc = addResultSlots(
-      sampleDocument(),
-      ids.generator,
-      { id: ids.task },
-      [
-        { x: 0, y: 900, w: 280, h: 280 },
-        { x: 0, y: 1200, w: 280, h: 280 },
-      ],
-      sequence(),
-    )
-    const added = doc.nodes.slice(-2)
-    expect(added.map((node) => node.image?.position)).toEqual([0, 1])
-    expect(doc.edges.filter((edge) => edge.from === ids.generator)).toHaveLength(3)
-    expect(documentProblem(doc)).toBe('')
-  })
-
   it('settles pending slots from task items', () => {
     const running = applyTask(
       sampleDocument(),

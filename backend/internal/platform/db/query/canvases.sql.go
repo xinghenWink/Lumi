@@ -353,6 +353,21 @@ func (q *Queries) RemoveCanvasConversation(ctx context.Context, arg RemoveCanvas
 	return err
 }
 
+const requestCanvasTaskCancellation = `-- name: RequestCanvasTaskCancellation :exec
+UPDATE image_tasks SET cancel_requested=true,version=version+1,updated_at=now()
+WHERE conversation_id=$1 AND user_id=$2 AND status IN ('queued','running') AND NOT cancel_requested
+`
+
+type RequestCanvasTaskCancellationParams struct {
+	ConversationID uuid.UUID
+	UserID         uuid.UUID
+}
+
+func (q *Queries) RequestCanvasTaskCancellation(ctx context.Context, arg RequestCanvasTaskCancellationParams) error {
+	_, err := q.db.Exec(ctx, requestCanvasTaskCancellation, arg.ConversationID, arg.UserID)
+	return err
+}
+
 const saveCanvas = `-- name: SaveCanvas :one
 UPDATE canvases SET title=$3,document=$4,node_count=$5,cover_file_id=$6,version=version+1,updated_at=now()
 WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL RETURNING id, user_id, conversation_id, title, document, node_count, cover_file_id, version, created_at, updated_at, deleted_at

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Lumi API
-  version: 0.7.0
+  version: 0.8.0
   description: >-
     Accounts, credits, upstream configuration and owner-isolated chat. Mutations require Origin and
     X-Lumi-CSRF: 1. Chat POST streams use meta, delta, error, done and ping SSE events. Reuse request_id
@@ -4922,6 +4922,48 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CanvasCreateInput'
+  /api/v1/canvases/{id}/runs:
+    post:
+      operationId: runCanvasNode
+      summary: Generate images from a saved canvas node
+      description: Resolves input edges from the specified canvas version. The task, charge and result slots are committed together. Replaying the same request with the same key returns the original task and the current canvas.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanvasRunInput'
+      responses:
+        '202':
+          description: Accepted or replayed image task and saved canvas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanvasRun'
+        '400':
+          description: Invalid parameters, prompt or connected inputs
+        '401':
+          description: Authentication required
+        '404':
+          description: Canvas or reference file is unavailable
+        '409':
+          description: Stale canvas version, reused key, or canvas and billing limits
+        '429':
+          description: Too many requests
   /api/v1/canvases/{id}:
     get:
       operationId: getCanvas
@@ -7898,7 +7940,7 @@ components:
         conversation_id:
           type: string
           format: uuid
-          description: An image conversation ID or the conversation_id of an owned canvas.
+          description: An image conversation ID. Canvas runs use POST /api/v1/canvases/{id}/runs.
         model_id:
           type: string
           format: uuid
@@ -8226,11 +8268,12 @@ components:
     CanvasImageContent:
       type: object
       additionalProperties: false
-      description: A placed file (ready), one slot of a running task (pending) or a slot whose generation failed.
+      description: An empty image, a placed file, or a pending or failed task slot.
       properties:
         state:
           type: string
           enum:
+            - empty
             - ready
             - pending
             - failed
@@ -8309,7 +8352,7 @@ components:
     CanvasNode:
       type: object
       additionalProperties: false
-      description: Exactly the content object matching `kind` is present; group nodes carry none. Nodes paint in array order with group frames beneath.
+      description: Text and generator nodes carry their matching content. Images may also store generation settings for in-place runs. Group frames paint beneath other nodes.
       properties:
         id:
           type: string
@@ -8363,7 +8406,7 @@ components:
     CanvasEdge:
       type: object
       additionalProperties: false
-      description: Inputs flow from image, text or group nodes into a generator; a generator points at the images it produced.
+      description: Input edges connect text, images or groups to a generator or image. Result edges connect a generator or image to its output images.
       properties:
         id:
           type: string
@@ -8374,17 +8417,23 @@ components:
         to:
           type: string
           format: uuid
+        kind:
+          type: string
+          enum:
+            - input
+            - result
       required:
         - id
         - from
         - to
+        - kind
     CanvasDocument:
       type: object
       additionalProperties: false
       properties:
         schema:
           type: integer
-          const: 1
+          const: 2
         viewport:
           $ref: '#/components/schemas/CanvasViewport'
         nodes:
@@ -8402,6 +8451,52 @@ components:
         - viewport
         - nodes
         - edges
+    CanvasRunInput:
+      type: object
+      additionalProperties: false
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        node_id:
+          type: string
+          format: uuid
+        model_id:
+          type: string
+          format: uuid
+        quality:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+        size:
+          type: string
+        ratio:
+          type: string
+        'n':
+          type: integer
+          minimum: 1
+          maximum: 10
+      required:
+        - version
+        - node_id
+        - model_id
+        - quality
+        - size
+        - ratio
+        - 'n'
+    CanvasRun:
+      type: object
+      additionalProperties: false
+      properties:
+        canvas:
+          $ref: '#/components/schemas/Canvas'
+        task:
+          $ref: '#/components/schemas/ImageTask'
+      required:
+        - canvas
+        - task
     Canvas:
       type: object
       additionalProperties: false
@@ -8415,7 +8510,7 @@ components:
         conversation_id:
           type: string
           format: uuid
-          description: Hidden canvas conversation used as ImageTaskInput.conversation_id.
+          description: Hidden canvas conversation used to filter the owner's image task history.
         document:
           $ref: '#/components/schemas/CanvasDocument'
         files:

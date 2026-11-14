@@ -94,6 +94,7 @@ const router = createBrowserRouter([
   {
     element: <SessionBoundary />,
     children: [
+      { path: '/canvas/:id', element: pending(<CanvasPage />) },
       {
         element: pending(<WorkspaceShell />),
         children: [
@@ -103,7 +104,6 @@ const router = createBrowserRouter([
             element: pending(<ImagePage />),
           })),
           { path: '/canvas', element: pending(<CanvasListPage />) },
-          { path: '/canvas/:id', element: pending(<CanvasPage />) },
           { path: '/me/chats', element: pending(<ChatHistoryPage />) },
           { path: '/me/images', element: pending(<ImageGalleryPage />) },
           { path: '/me', element: pending(<ProfilePage />) },

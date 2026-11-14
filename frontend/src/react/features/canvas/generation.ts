@@ -1,23 +1,12 @@
-import { images, terminal, type ImageInput, type ImageTask } from '../../../api/images'
+import { canvases, type CanvasRunInput } from '../../../api/canvases'
+import { images, terminal, type ImageTask } from '../../../api/images'
 import { ApiError } from '../../../api/transport'
-import { capacity } from '../../../features/canvas/commands'
-import { newId, pendingTasks } from '../../../features/canvas/document'
-import { addResultSlots, applyTask, failTask } from '../../../features/canvas/tasks'
-import { placeOutputs } from '../../../features/canvas/workflow'
+import { pendingTasks } from '../../../features/canvas/document'
+import { applyTask, failTask } from '../../../features/canvas/tasks'
+import type { Autosave } from './autosave'
 import type { CanvasEditor } from './editor'
 
-export interface GenerationRequest {
-  generator: string
-  modelId: string
-  prompt: string
-  quality: ImageInput['quality']
-  size: string
-  ratio: string
-  n: number
-  references: readonly string[]
-  /** Width / height of the requested size, used to shape placeholders. */
-  aspect: number
-}
+export type GenerationRequest = Omit<CanvasRunInput, 'version'>
 
 export interface GenerationHooks {
   /** Called after a task is charged and again when it settles (credits, gallery). */
@@ -32,7 +21,7 @@ const POLL_MS = 3000
 function unknownOutcome(error: unknown) {
   return (
     error instanceof ApiError &&
-    (error.code === 'NETWORK_ERROR' || error.status === 0 || [502, 503, 504].includes(error.status))
+    (error.code === 'NETWORK_ERROR' || error.status === 0 || error.status >= 500)
   )
 }
 
@@ -41,11 +30,17 @@ function unknownOutcome(error: unknown) {
  * that follow the task over SSE (falling back to polling) and settle in every undo
  * snapshot, so undo never brings back a placeholder for a paid image.
  */
-export function createCanvasGeneration(editor: CanvasEditor, hooks: GenerationHooks) {
+export function createCanvasGeneration(
+  editor: CanvasEditor,
+  autosave: Autosave,
+  hooks: GenerationHooks,
+) {
   const followers = new Map<string, AbortController>()
   const timers = new Map<string, ReturnType<typeof setTimeout>>()
   const wait = hooks.wait ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)))
   let active = false
+  let submitting = false
+  const unresolved = new Map<string, { input: CanvasRunInput; key: string }>()
 
   function stop(id: string) {
     followers.get(id)?.abort()
@@ -109,66 +104,82 @@ export function createCanvasGeneration(editor: CanvasEditor, hooks: GenerationHo
     mount() {
       active = true
       for (const id of pendingTasks(editor.state.doc)) follow(id)
+      const unsubscribe = editor.store.subscribe((state, previous) => {
+        if (state.doc !== previous.doc) {
+          for (const id of pendingTasks(state.doc)) follow(id)
+        }
+      })
       return () => {
         active = false
+        unsubscribe()
         for (const id of [...followers.keys()]) stop(id)
       }
     },
-    /**
-     * Submits one task for a generator. Placeholders show where results will land until
-     * the server accepts the task; returns false when nothing was charged.
-     */
     async submit(request: GenerationRequest): Promise<boolean> {
-      if (!active) return false
-      const state = editor.state
-      const generator = state.doc.nodes.find((node) => node.id === request.generator)
-      if (!generator) return false
-      if (capacity(state.doc) < request.n) {
-        editor.notify({ key: 'canvas.editor.limit' })
-        return false
-      }
-      const placeholders = placeOutputs(state.doc, generator, request.n, request.aspect).map(
-        (rect) => ({ id: newId(), kind: 'submit' as const, rect }),
-      )
-      editor.addPlaceholders(placeholders)
-      const input: ImageInput = {
-        conversation_id: state.conversationId,
-        model_id: request.modelId,
-        prompt: request.prompt,
-        quality: request.quality,
-        size: request.size,
-        n: request.n,
-        reference_file_ids: [...request.references],
-        ...(request.ratio ? { ratio: request.ratio } : {}),
-      }
-      const key = crypto.randomUUID()
+      if (!active || submitting) return false
+      submitting = true
       try {
-        let task: ImageTask | undefined
-        for (let attempt = 0; !task; attempt++) {
-          try {
-            task = await images.submit(input, key)
-          } catch (error) {
-            if (attempt >= 2 || !unknownOutcome(error) || !active) throw error
-            await wait(1000 * (attempt + 1))
-          }
-        }
-        if (!active) return true
-        const accepted = task
-        editor.removePlaceholders(placeholders.map((item) => item.id))
-        editor.apply((doc) => {
-          const owner = doc.nodes.find((node) => node.id === request.generator) ?? generator
-          const slots = placeOutputs(doc, owner, request.n, request.aspect)
-          return addResultSlots(doc, request.generator, accepted, slots, newId)
-        })
+        const task = await autosave.submit(
+          async (version) => {
+            const pending = unresolved.get(request.node_id) ?? {
+              input: { ...request, version },
+              key: crypto.randomUUID(),
+            }
+            unresolved.set(request.node_id, pending)
+            for (let attempt = 0; ; attempt++) {
+              try {
+                const result = await canvases.run(editor.state.canvasId, pending.input, pending.key)
+                unresolved.delete(request.node_id)
+                return result
+              } catch (error) {
+                if (!unknownOutcome(error)) {
+                  unresolved.delete(request.node_id)
+                  throw error
+                }
+                if (attempt >= 2 || !active) throw error
+                await wait(1000 * (attempt + 1))
+              }
+            }
+          },
+          (board, accepted) => {
+            if (!active) return
+            const slots = board.document.nodes.filter((node) => node.image?.task_id === accepted.id)
+            const byID = new Map(slots.map((node) => [node.id, node]))
+            editor.apply((doc) => {
+              const present = new Set(doc.nodes.map((node) => node.id))
+              const appended = slots.filter((node) => !present.has(node.id))
+              return {
+                ...doc,
+                nodes: [
+                  ...doc.nodes.map((node) => {
+                    const image = byID.get(node.id)?.image
+                    return image ? { ...node, image } : node
+                  }),
+                  ...appended,
+                ],
+                edges: [
+                  ...doc.edges,
+                  ...board.document.edges.filter(
+                    (edge) =>
+                      edge.kind === 'result' &&
+                      byID.has(edge.to) &&
+                      !present.has(edge.to) &&
+                      present.has(edge.from),
+                  ),
+                ],
+              }
+            })
+          },
+        )
+        if (!task || !active) return !!task
         hooks.changed()
-        accept(accepted)
-        if (!terminal(accepted.status)) follow(accepted.id)
+        accept(task)
         return true
       } catch (error) {
-        if (!active) return false
-        editor.removePlaceholders(placeholders.map((item) => item.id))
-        editor.notify({ key: '', error })
+        if (active) editor.notify({ key: '', error })
         return false
+      } finally {
+        submitting = false
       }
     },
     async cancel(id: string) {
