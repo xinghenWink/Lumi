@@ -235,6 +235,25 @@ func (s *Service) Save(ctx context.Context, actor user.Actor, id uuid.UUID, inpu
 		if len(owned) != len(files) || len(ownedTasks) != len(tasks) {
 			return problem.Invalid()
 		}
+		textRuns := make(map[uuid.UUID]bool)
+		for _, node := range input.Document.Nodes {
+			if node.Text != nil && node.Text.RunID != nil {
+				textRuns[*node.Text.RunID] = true
+			}
+		}
+		if len(textRuns) > 0 {
+			ids := make([]uuid.UUID, 0, len(textRuns))
+			for id := range textRuns {
+				ids = append(ids, id)
+			}
+			ownedRuns, err := q.CanvasOwnedTextRuns(ctx, query.CanvasOwnedTextRunsParams{CanvasID: id, UserID: actor.ID, Ids: ids})
+			if err != nil {
+				return fmt.Errorf("check canvas text runs: %w", err)
+			}
+			if len(ownedRuns) != len(ids) {
+				return problem.Invalid()
+			}
+		}
 		row, err = q.SaveCanvas(ctx, query.SaveCanvasParams{ID: id, UserID: actor.ID, Title: title, Document: raw, NodeCount: int32(len(input.Document.Nodes)), CoverFileID: input.Document.Cover()}) // #nosec G115 -- Validate caps nodes at MaxNodes.
 		if err != nil {
 			return fmt.Errorf("save canvas: %w", err)
@@ -272,6 +291,9 @@ func (s *Service) Delete(ctx context.Context, actor user.Actor, id uuid.UUID) er
 			ConversationID: conversation, UserID: actor.ID,
 		}); err != nil {
 			return fmt.Errorf("cancel canvas tasks: %w", err)
+		}
+		if err := q.CancelCanvasTextRuns(ctx, id); err != nil {
+			return fmt.Errorf("cancel canvas text work: %w", err)
 		}
 		return nil
 	})

@@ -107,7 +107,8 @@ export function canConnect(doc: CanvasDocument, from: string, to: string) {
   const target = nodes.get(to)
   if (!canGenerate(target) || !connectable(source?.kind, target?.kind, 'input')) return false
   if (source?.kind === 'image' && source.image?.state !== 'ready') return false
-  return !doc.edges.some((edge) => edge.from === from && edge.to === to)
+  if (source?.text?.state === 'pending') return false
+  return !doc.edges.some((edge) => edge.kind === 'input' && edge.from === from && edge.to === to)
 }
 
 export function connect(
@@ -201,7 +202,10 @@ export function extractFragment(doc: CanvasDocument, ids: Iterable<string>): Fra
   const picked = withMembers(doc, ids)
   const kept = new Set(
     doc.nodes
-      .filter((node) => picked.has(node.id) && node.image?.state !== 'pending')
+      .filter(
+        (node) =>
+          picked.has(node.id) && node.image?.state !== 'pending' && node.text?.state !== 'pending',
+      )
       .map((node) => node.id),
   )
   // A member copied without its frame becomes a free node.
@@ -235,6 +239,19 @@ export function insertFragment(
       group_id: node.group_id ? (ids.get(node.group_id) ?? null) : null,
     }
     if (node.image) copy.image = { ...node.image, task_id: null, position: null }
+    if (node.text) copy.text = { content: node.text.content }
+    for (const settings of ['generator', 'text_settings'] as const) {
+      const value = copy[settings]
+      if (!value?.mentions) continue
+      const mentions = value.mentions.map((mention) => ({
+        ...mention,
+        node_id: ids.get(mention.node_id) ?? mention.node_id,
+      }))
+      if (settings === 'generator' && copy.generator)
+        copy.generator = { ...copy.generator, mentions }
+      if (settings === 'text_settings' && copy.text_settings)
+        copy.text_settings = { ...copy.text_settings, mentions }
+    }
     return copy
   })
   const existing = new Set(doc.edges.map(edgeKey))
@@ -242,8 +259,9 @@ export function insertFragment(
   for (const edge of fragment.edges) {
     const from = ids.get(edge.from),
       to = ids.get(edge.to)
-    if (!from || !to || existing.has(from + '>' + to)) continue
-    edges.push({ id: makeId(), from, to, kind: edge.kind })
+    if (!from || !to) continue
+    const copy = { id: makeId(), from, to, kind: edge.kind }
+    if (!existing.has(edgeKey(copy))) edges.push(copy)
   }
   const groups = nodes.filter((node) => node.kind === 'group'),
     others = nodes.filter((node) => node.kind !== 'group')

@@ -62,7 +62,7 @@ func (s *Service) Run(ctx context.Context, imageService *images.Service, actor u
 		}
 		node := doc.Nodes[nodeIndex]
 		inPlace := node.Image != nil && (node.Image.State == StateEmpty || node.Image.State == StateFailed)
-		if node.Kind != KindGenerator && !inPlace {
+		if node.Kind != KindGenerator && !inPlace && (node.Image == nil || node.Image.State != StateReady) {
 			return images.Input{}, problem.Invalid()
 		}
 		added := int(input.Count)
@@ -70,7 +70,7 @@ func (s *Service) Run(ctx context.Context, imageService *images.Service, actor u
 			added--
 		}
 		if len(doc.Nodes)+added > MaxNodes || len(doc.Edges)+added > MaxEdges {
-			return images.Input{}, problem.New("CANVAS_LIMIT", 409)
+			return images.Input{}, problem.New("CANVAS_DOCUMENT_LIMIT", 409)
 		}
 		prompt, files, err := generationInputs(doc, node)
 		if err != nil {
@@ -119,10 +119,15 @@ func (s *Service) Run(ctx context.Context, imageService *images.Service, actor u
 }
 
 func generationInputs(doc Document, target Node) (string, []uuid.UUID, error) {
-	parts := []string{}
+	var prompt string
+	var mentions []Mention
 	if target.Generator != nil {
-		parts = append(parts, strings.TrimSpace(target.Generator.Prompt))
+		prompt, mentions = target.Generator.Prompt, target.Generator.Mentions
 	}
+	return resolveInputs(doc, target, prompt, mentions, true)
+}
+
+func resolveInputs(doc Document, target Node, prompt string, mentions []Mention, useImageSource bool) (string, []uuid.UUID, error) {
 	byID := make(map[uuid.UUID]Node, len(doc.Nodes))
 	groups := make(map[uuid.UUID][]Node)
 	for _, node := range doc.Nodes {
@@ -132,7 +137,10 @@ func generationInputs(doc Document, target Node) (string, []uuid.UUID, error) {
 		}
 	}
 	files := []uuid.UUID{}
-	seenNodes, seenFiles := map[uuid.UUID]bool{target.ID: true}, map[uuid.UUID]bool{}
+	seenNodes, imageNumbers := map[uuid.UUID]bool{}, map[uuid.UUID]int{}
+	tokens := make(map[uuid.UUID]string)
+	textInputs := make(map[uuid.UUID]string)
+	textOrder := []uuid.UUID{}
 	take := func(node Node) error {
 		if seenNodes[node.ID] {
 			return nil
@@ -140,7 +148,9 @@ func generationInputs(doc Document, target Node) (string, []uuid.UUID, error) {
 		seenNodes[node.ID] = true
 		if node.Text != nil {
 			if text := strings.TrimSpace(node.Text.Content); text != "" {
-				parts = append(parts, text)
+				tokens[node.ID] = text
+				textInputs[node.ID] = text
+				textOrder = append(textOrder, node.ID)
 			}
 		}
 		if node.Image != nil {
@@ -148,13 +158,20 @@ func generationInputs(doc Document, target Node) (string, []uuid.UUID, error) {
 				return problem.New("IMAGE_REFERENCES_INVALID", 400)
 			}
 			id := *node.Image.FileID
-			if !seenFiles[id] {
+			if imageNumbers[id] == 0 {
 				files = append(files, id)
-				seenFiles[id] = true
+				imageNumbers[id] = len(files)
 			}
+			tokens[node.ID] = fmt.Sprintf("[Image %d]", imageNumbers[id])
 		}
 		return nil
 	}
+	if useImageSource && target.Image != nil && target.Image.State == StateReady {
+		if err := take(target); err != nil {
+			return "", nil, err
+		}
+	}
+	seenNodes[target.ID] = true
 	for _, edge := range doc.Edges {
 		if edge.To != target.ID || edge.Kind != EdgeInput {
 			continue
@@ -176,7 +193,25 @@ func generationInputs(doc Document, target Node) (string, []uuid.UUID, error) {
 			}
 		}
 	}
-	return strings.Join(slices.DeleteFunc(parts, func(value string) bool { return value == "" }), "\n\n"), files, nil
+	replacements := make([]string, 0, len(mentions)*2)
+	for _, mention := range mentions {
+		replacement, ok := tokens[mention.NodeID]
+		if !ok {
+			return "", nil, problem.New("CANVAS_REFERENCE_MISSING", 400)
+		}
+		replacements = append(replacements, mention.Token, replacement)
+		delete(textInputs, mention.NodeID)
+	}
+	parts := []string{}
+	if content := strings.TrimSpace(strings.NewReplacer(replacements...).Replace(prompt)); content != "" {
+		parts = append(parts, content)
+	}
+	for _, id := range textOrder {
+		if text, ok := textInputs[id]; ok {
+			parts = append(parts, text)
+		}
+	}
+	return strings.Join(parts, "\n\n"), files, nil
 }
 
 func placeResults(doc *Document, nodeIndex int, task query.ImageTask) error {
@@ -196,7 +231,7 @@ func placeResults(doc *Document, nodeIndex int, task query.ImageTask) error {
 	for position := int32(0); position < task.ImageCount; position++ {
 		slotPosition := position
 		slot := &ImageContent{State: StatePending, TaskID: &task.ID, Position: &slotPosition}
-		if position == 0 && source.Kind == KindImage {
+		if position == 0 && source.Image != nil && source.Image.State != StateReady {
 			doc.Nodes[nodeIndex].Image = slot
 			continue
 		}

@@ -17,6 +17,8 @@ import {
 } from '../../../features/canvas/commands'
 import {
   DEFAULT_SIZE,
+  LIMITS,
+  newId,
   canGenerate,
   groupNode,
   fitImage,
@@ -65,10 +67,51 @@ export function insertFile(editor: CanvasEditor, file: ImageFile) {
   )
 }
 
+export function appendImageEdits(
+  editor: CanvasEditor,
+  sourceID: string,
+  files: readonly ImageFile[],
+) {
+  const changed = editor.apply((doc) => {
+    const source = doc.nodes.find((node) => node.id === sourceID)
+    if (
+      !source ||
+      !files.length ||
+      doc.nodes.length + files.length > LIMITS.nodes ||
+      doc.edges.length + files.length > LIMITS.edges
+    )
+      return doc
+    const x =
+      source.x + source.w + 96 > LIMITS.coordinate ? source.x - 416 : source.x + source.w + 96
+    let y = source.y
+    const nodes = files.map((file) => {
+      const size = fitImage(file.width, file.height)
+      const node = cascade(doc, imageNode({ x, y, ...size }, { state: 'ready', file_id: file.id }))
+      y = node.y + node.h + 24
+      return node
+    })
+    return {
+      ...doc,
+      nodes: [...doc.nodes, ...nodes],
+      edges: [
+        ...doc.edges,
+        ...nodes.map((node) => ({
+          id: newId(),
+          from: sourceID,
+          to: node.id,
+          kind: 'result' as const,
+        })),
+      ],
+    }
+  })
+  if (changed) editor.addFiles(files)
+  return changed
+}
+
 export function addText(editor: CanvasEditor, at = stageCenter(editor)) {
   const { w, h } = DEFAULT_SIZE.text
   const node = textNode({ x: at.x - w / 2, y: at.y - h / 2 })
-  if (place(editor, node)) editor.setEditing(node.id)
+  if (place(editor, node)) editor.openInspector(node.id)
 }
 
 export function addGenerator(editor: CanvasEditor, at = stageCenter(editor)) {
@@ -97,23 +140,20 @@ export function createAt(editor: CanvasEditor, kind: CreateKind, at: Point, sour
     return
   }
   editor.select([node.id])
-  if (kind === 'text') editor.setEditing(node.id)
-  if (kind === 'generator') editor.openInspector(node.id)
+  if (kind === 'text' || kind === 'generator') editor.openInspector(node.id)
 }
 
 export function openImageGeneration(editor: CanvasEditor, image: CanvasNode) {
   const doc = editor.state.doc
   const edge = doc.edges.find((item) => item.kind === 'result' && item.to === image.id)
   const source = doc.nodes.find((node) => node.id === edge?.from)
-  if (image.image?.state === 'failed' && !image.generator && source?.kind === 'generator') {
-    editor.select([source.id])
-    editor.openInspector(source.id)
-    return
-  }
-  if (image.image?.state === 'failed' && !image.generator && source?.generator) {
+  if (image.image?.state === 'failed' && !image.generator && source) {
     const settings = source.generator
     editor.apply((current) => {
-      let next = updateNode(current, image.id, (node) => ({ ...node, generator: { ...settings } }))
+      let next = settings
+        ? updateNode(current, image.id, (node) => ({ ...node, generator: { ...settings } }))
+        : current
+      if (source.image?.state === 'ready') next = connect(next, source.id, image.id)
       for (const input of current.edges) {
         if (input.kind === 'input' && input.to === source.id) {
           next = connect(next, input.from, image.id)

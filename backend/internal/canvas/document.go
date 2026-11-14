@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"slices"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -73,32 +75,51 @@ type ImageContent struct {
 }
 
 type TextContent struct {
-	Content string `json:"content"`
+	Content   string     `json:"content"`
+	RunID     *uuid.UUID `json:"run_id,omitempty"`
+	Position  *int32     `json:"position,omitempty"`
+	State     string     `json:"state,omitempty"`
+	ErrorCode string     `json:"error_code,omitempty"`
+}
+
+type Mention struct {
+	NodeID uuid.UUID `json:"node_id"`
+	Token  string    `json:"token"`
+}
+
+type TextSettings struct {
+	Prompt    string     `json:"prompt"`
+	Mentions  []Mention  `json:"mentions,omitempty"`
+	ModelID   *uuid.UUID `json:"model_id"`
+	Reasoning string     `json:"reasoning"`
+	Count     int32      `json:"n"`
 }
 
 // GeneratorContent keeps the last chosen parameters; empty values mean "use the defaults"
 // so a generator never pins an option that an administrator later disables.
 type GeneratorContent struct {
-	Prompt  string     `json:"prompt"`
-	ModelID *uuid.UUID `json:"model_id"`
-	Quality string     `json:"quality"`
-	Size    string     `json:"size"`
-	Ratio   string     `json:"ratio"`
-	Count   int32      `json:"n"`
+	Prompt   string     `json:"prompt"`
+	Mentions []Mention  `json:"mentions,omitempty"`
+	ModelID  *uuid.UUID `json:"model_id"`
+	Quality  string     `json:"quality"`
+	Size     string     `json:"size"`
+	Ratio    string     `json:"ratio"`
+	Count    int32      `json:"n"`
 }
 
 type Node struct {
-	ID        uuid.UUID         `json:"id"`
-	Kind      string            `json:"kind"`
-	X         float64           `json:"x"`
-	Y         float64           `json:"y"`
-	W         float64           `json:"w"`
-	H         float64           `json:"h"`
-	Title     string            `json:"title"`
-	GroupID   *uuid.UUID        `json:"group_id"`
-	Image     *ImageContent     `json:"image,omitempty"`
-	Text      *TextContent      `json:"text,omitempty"`
-	Generator *GeneratorContent `json:"generator,omitempty"`
+	ID           uuid.UUID         `json:"id"`
+	Kind         string            `json:"kind"`
+	X            float64           `json:"x"`
+	Y            float64           `json:"y"`
+	W            float64           `json:"w"`
+	H            float64           `json:"h"`
+	Title        string            `json:"title"`
+	GroupID      *uuid.UUID        `json:"group_id"`
+	Image        *ImageContent     `json:"image,omitempty"`
+	Text         *TextContent      `json:"text,omitempty"`
+	Generator    *GeneratorContent `json:"generator,omitempty"`
+	TextSettings *TextSettings     `json:"text_settings,omitempty"`
 }
 
 type Edge struct {
@@ -145,13 +166,17 @@ func Validate(doc Document) error {
 		}
 	}
 	edges := make(map[uuid.UUID]bool, len(doc.Edges))
-	pairs := make(map[[2]uuid.UUID]bool, len(doc.Edges))
+	type connection struct {
+		from, to uuid.UUID
+		kind     string
+	}
+	pairs := make(map[connection]bool, len(doc.Edges))
 	for _, edge := range doc.Edges {
 		if edge.ID == uuid.Nil || edges[edge.ID] {
 			return fmt.Errorf("invalid or duplicate edge id")
 		}
 		edges[edge.ID] = true
-		pair := [2]uuid.UUID{edge.From, edge.To}
+		pair := connection{edge.From, edge.To, edge.Kind}
 		if edge.From == edge.To || pairs[pair] || !connectable(kinds[edge.From], kinds[edge.To], edge.Kind) {
 			return fmt.Errorf("edge %s: invalid connection", edge.ID)
 		}
@@ -164,14 +189,24 @@ func connectable(from, to, kind string) bool {
 	switch kind {
 	case EdgeInput:
 		return (from == KindImage || from == KindText || from == KindGroup) &&
-			(to == KindGenerator || to == KindImage)
+			(to == KindGenerator || to == KindImage || to == KindText)
 	case EdgeResult:
-		return (from == KindGenerator || from == KindImage) && to == KindImage
+		return ((from == KindGenerator || from == KindImage) && to == KindImage) ||
+			(from == KindText && to == KindText)
 	}
 	return false
 }
 
 func validateNode(node Node, kinds map[uuid.UUID]string) error {
+	if node.TextSettings != nil {
+		settings := node.TextSettings
+		if node.Kind != KindText || settings.Count < 1 || settings.Count > 3 ||
+			(settings.ModelID != nil && *settings.ModelID == uuid.Nil) ||
+			!slices.Contains([]string{"", "low", "medium", "high"}, settings.Reasoning) ||
+			!validPrompt(settings.Prompt, settings.Mentions) {
+			return fmt.Errorf("invalid text settings")
+		}
+	}
 	if !coordinate(node.X) || !coordinate(node.Y) || !size(node.W) || !size(node.H) {
 		return fmt.Errorf("invalid geometry")
 	}
@@ -201,6 +236,20 @@ func validateNode(node Node, kinds map[uuid.UUID]string) error {
 	case KindText:
 		if present != 1 || node.Text == nil || !multiline(node.Text.Content, MaxText) {
 			return fmt.Errorf("invalid text content")
+		}
+		t := node.Text
+		switch t.State {
+		case "":
+			if t.RunID != nil || t.Position != nil || t.ErrorCode != "" {
+				return fmt.Errorf("invalid text run reference")
+			}
+		case StatePending, StateReady, StateFailed:
+			if t.RunID == nil || *t.RunID == uuid.Nil || t.Position == nil || *t.Position < 0 || *t.Position >= 3 ||
+				!codePattern.MatchString(t.ErrorCode) || (t.State != StateFailed && t.ErrorCode != "") {
+				return fmt.Errorf("invalid text result")
+			}
+		default:
+			return fmt.Errorf("invalid text state")
 		}
 	case KindGenerator:
 		if present != 1 || node.Generator == nil {
@@ -251,7 +300,7 @@ func validateImage(image ImageContent) error {
 }
 
 func validateGenerator(generator GeneratorContent) error {
-	if !multiline(generator.Prompt, MaxPrompt) {
+	if !validPrompt(generator.Prompt, generator.Mentions) {
 		return fmt.Errorf("invalid prompt")
 	}
 	if generator.ModelID != nil && *generator.ModelID == uuid.Nil {
@@ -269,6 +318,23 @@ func validateGenerator(generator GeneratorContent) error {
 		return fmt.Errorf("invalid count")
 	}
 	return nil
+}
+
+var mentionPattern = regexp.MustCompile(`@\[[^\[\]\r\n]{1,50}\]`)
+
+func validPrompt(prompt string, mentions []Mention) bool {
+	if !multiline(prompt, MaxPrompt) || len(mentions) > MaxNodes {
+		return false
+	}
+	seen := make(map[string]bool, len(mentions))
+	for _, mention := range mentions {
+		if mention.NodeID == uuid.Nil || seen[mention.Token] || mentionPattern.FindString(mention.Token) != mention.Token ||
+			mention.Token == "" || !strings.Contains(prompt, mention.Token) {
+			return false
+		}
+		seen[mention.Token] = true
+	}
+	return true
 }
 
 // FileIDs returns every file the document places, in first-seen order without duplicates.

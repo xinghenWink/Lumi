@@ -66,7 +66,7 @@ export function createCanvasUploads(editor: CanvasEditor, hooks: UploadHooks) {
             const image = imageNode({ x: next.item.rect.x, y: next.item.rect.y, ...size }, content)
             if (!next.target) return addNodes(doc, [image])
             return updateNode(doc, next.target, (node) =>
-              node.image?.state === 'empty' || node.image?.state === 'failed'
+              node.image && node.image.state !== 'pending'
                 ? { ...node, h: fitImage(file.width, file.height, node.w).h, image: content }
                 : node,
             )

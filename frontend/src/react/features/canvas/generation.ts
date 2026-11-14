@@ -18,7 +18,7 @@ export interface GenerationHooks {
 const POLL_MS = 3000
 
 /** Network failures leave the submission outcome unknown; the same key replays safely. */
-function unknownOutcome(error: unknown) {
+export function unknownOutcome(error: unknown) {
   return (
     error instanceof ApiError &&
     (error.code === 'NETWORK_ERROR' || error.status === 0 || error.status >= 500)

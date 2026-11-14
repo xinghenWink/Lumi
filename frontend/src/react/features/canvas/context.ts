@@ -6,11 +6,13 @@ import type { BlobCache } from './blob-cache'
 import type { CanvasEditor, EditorState } from './editor'
 import type { CanvasGeneration } from './generation'
 import type { createCanvasUploads } from './uploads'
+import type { createCanvasTextRuns } from './text-runs'
 
 export interface CanvasServices {
   editor: CanvasEditor
   autosave: Autosave
   generation: CanvasGeneration
+  textRuns: ReturnType<typeof createCanvasTextRuns>
   uploads: ReturnType<typeof createCanvasUploads>
   blobs: BlobCache
 }

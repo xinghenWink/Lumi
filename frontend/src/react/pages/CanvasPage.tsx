@@ -13,6 +13,7 @@ import { createCanvasGeneration } from '../features/canvas/generation'
 import { useCanvasCatalog } from '../features/canvas/i18n'
 import { canvasListKey, patchCanvasList, useCanvasMutations } from '../features/canvas/queries'
 import { createCanvasUploads } from '../features/canvas/uploads'
+import { createCanvasTextRuns } from '../features/canvas/text-runs'
 import { useImageConfig } from '../features/images/config'
 import type { Rejections } from '../features/files/reference-rules'
 import { CanvasEditor } from '../components/canvas/CanvasEditor'
@@ -47,6 +48,7 @@ function Workspace({ canvas }: { canvas: Canvas }) {
       editor,
       autosave,
       generation: createCanvasGeneration(editor, autosave, { changed: refresh }),
+      textRuns: createCanvasTextRuns(editor, autosave),
       uploads: createCanvasUploads(editor, { rejected: setRejected }),
       blobs: createBlobCache(),
     }
@@ -65,9 +67,9 @@ function Workspace({ canvas }: { canvas: Canvas }) {
   useEffect(() => services.uploads.setMaxBytes(maxBytes), [services, maxBytes])
 
   useEffect(() => {
-    const { autosave, generation, uploads, blobs } = services
+    const { autosave, generation, textRuns, uploads, blobs } = services
     // Each controller restarts cleanly when React StrictMode replays this effect.
-    const stops = [autosave.mount(), generation.mount(), uploads.mount()]
+    const stops = [autosave.mount(), generation.mount(), textRuns.mount(), uploads.mount()]
     const hidden = () => {
       if (document.visibilityState === 'hidden') void autosave.flush()
     }

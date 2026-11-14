@@ -2,6 +2,7 @@ package canvas
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -41,5 +42,26 @@ func TestPlaceResultsInAnEmptyImage(t *testing.T) {
 	}
 	if slots[1].X <= image.X+image.W || slots[1].H != 140 {
 		t.Fatalf("incorrect additional slot geometry: %+v", slots[1])
+	}
+}
+
+func TestGenerationInputsResolveMentionIdentityAndOrder(t *testing.T) {
+	doc, ids := sampleDocument()
+	target := doc.Nodes[3]
+	target.Generator.Prompt = "Describe @[first] with @[note] and @[copy]"
+	target.Generator.Mentions = []Mention{{NodeID: ids["image"], Token: "@[first]"}, {NodeID: ids["text"], Token: "@[note]"}}
+	copy := doc.Nodes[1]
+	copy.ID = uuid.New()
+	doc.Nodes = append(doc.Nodes, copy)
+	doc.Edges = append(doc.Edges, Edge{ID: uuid.New(), From: copy.ID, To: target.ID, Kind: EdgeInput})
+	target.Generator.Mentions = append(target.Generator.Mentions, Mention{NodeID: copy.ID, Token: "@[copy]"})
+	prompt, files, err := generationInputs(doc, target)
+	if err != nil || len(files) != 1 || files[0] != ids["file"] || strings.Count(prompt, "[Image 1]") != 2 ||
+		strings.Count(prompt, doc.Nodes[2].Text.Content) != 1 {
+		t.Fatalf("resolve mentions: %q %v %v", prompt, files, err)
+	}
+	doc.Edges = doc.Edges[:3]
+	if _, _, err := generationInputs(doc, target); err == nil {
+		t.Fatal("disconnected mention was accepted")
 	}
 }

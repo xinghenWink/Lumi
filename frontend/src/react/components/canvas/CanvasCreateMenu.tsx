@@ -34,9 +34,7 @@ export function CanvasCreateMenu({
   useEffect(() => {
     menu.current?.querySelector('button')?.focus({ preventScroll: true })
   }, [])
-  const options = anchor.source
-    ? items.filter(({ kind }) => kind === 'image' || kind === 'generator')
-    : items
+  const options = anchor.source ? items.filter(({ kind }) => kind !== 'group') : items
   return (
     <div
       ref={menu}

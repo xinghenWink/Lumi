@@ -58,7 +58,7 @@ function Frame({
         if (event.key !== 'Enter' || event.target !== event.currentTarget) return
         event.preventDefault()
         editor.select([node.id])
-        if (node.kind === 'text') editor.setEditing(node.id)
+        if (node.kind === 'text' && node.text?.state !== 'pending') editor.openInspector(node.id)
         if (node.kind === 'generator') editor.openInspector(node.id)
         if (node.kind === 'image') openImageGeneration(editor, node)
       }}
@@ -210,13 +210,35 @@ function ImageContent({ node, zoom }: { node: CanvasNode; zoom: number }) {
 }
 
 function TextContent({ node, editing }: { node: CanvasNode; editing: boolean }) {
-  const { t } = useTranslation()
-  const { editor } = useCanvas()
+  const { t, i18n } = useTranslation()
+  const { editor, textRuns } = useCanvas()
   const content = node.text?.content ?? ''
   const field = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
     if (editing) field.current?.focus({ preventScroll: true })
   }, [editing])
+  if (node.text?.state === 'pending') {
+    const run = node.text.run_id
+    return (
+      <div
+        className="grid size-full place-content-center gap-2 rounded-xl border border-dashed border-input bg-card text-center text-xs"
+        role="status"
+      >
+        <Loader2 size={16} className="mx-auto animate-spin" />
+        <span>{t('canvas.nodes.pending')}</span>
+        {run ? (
+          <button
+            type="button"
+            className="rounded-md px-2 py-1 hover:bg-muted"
+            onPointerDown={stop}
+            onClick={() => void textRuns.cancel(run)}
+          >
+            {t('canvas.nodes.cancelTask')}
+          </button>
+        ) : null}
+      </div>
+    )
+  }
   if (editing)
     return (
       <textarea
@@ -239,6 +261,31 @@ function TextContent({ node, editing }: { node: CanvasNode; editing: boolean }) 
         className="size-full resize-none rounded-xl border border-ring bg-card p-3 text-sm leading-6 outline-none"
       />
     )
+  if (node.text?.state === 'failed') {
+    const code = 'errors.' + node.text.error_code
+    return (
+      <div className="grid size-full place-content-center gap-2 rounded-xl border border-destructive/30 bg-card p-3 text-center text-xs">
+        <strong className="font-medium text-destructive">{t('canvas.nodes.failed')}</strong>
+        {i18n.exists(code) ? <span>{t(code)}</span> : null}
+        <button
+          type="button"
+          className="rounded-md px-2 py-1 hover:bg-muted"
+          onPointerDown={stop}
+          onClick={() => {
+            const source = editor.state.doc.edges.find(
+              (edge) => edge.kind === 'result' && edge.to === node.id,
+            )
+            const previous = editor.state.doc.nodes.find((item) => item.id === source?.from)
+            const target = previous?.kind === 'text' ? previous.id : node.id
+            editor.select([target])
+            editor.openInspector(target)
+          }}
+        >
+          {t('canvas.generator.retry')}
+        </button>
+      </div>
+    )
+  }
   return (
     <div className="size-full overflow-hidden rounded-xl border border-border bg-card p-3 text-sm leading-6 whitespace-pre-wrap shadow-xs">
       {content || (
@@ -336,7 +383,7 @@ export const CanvasNodeView = memo(function CanvasNodeView(
     )
   if (node.kind === 'text')
     return (
-      <Frame {...props}>
+      <Frame {...props} inputPort>
         <TextContent node={node} editing={editing} />
       </Frame>
     )

@@ -34,7 +34,7 @@ type packet struct {
 func retryable(code string) bool {
 	return code != "UPSTREAM_REQUEST_INVALID" && code != "UPSTREAM_REJECTED" && code != "UPSTREAM_CANCELED"
 }
-func (s *Service) relay(ctx context.Context, targets []catalog.ChatTarget, messages []upstream.Message, output chan<- packet) {
+func (s *Service) relay(ctx context.Context, targets []catalog.ChatTarget, messages []upstream.Message, reasoning string, output chan<- packet) {
 	defer close(output)
 	send := func(p packet) bool {
 		select {
@@ -56,7 +56,7 @@ func (s *Service) relay(ctx context.Context, targets []catalog.ChatTarget, messa
 			}
 			continue
 		}
-		events, err := client.ChatStream(attempt, upstream.ChatRequest{Model: target.RemoteModel, Messages: messages})
+		events, err := client.ChatStream(attempt, upstream.ChatRequest{Model: target.RemoteModel, Messages: messages, ReasoningEffort: reasoning})
 		if err != nil {
 			code = upstream.FailureCode(err)
 		} else {
@@ -188,7 +188,7 @@ func (s *Service) Stream(ctx context.Context, actor user.Actor, id uuid.UUID, in
 		code = "CHAT_INTERRUPTED"
 	} else {
 		packets := make(chan packet, 16)
-		go s.relay(work, targets, r.messages, packets)
+		go s.relay(work, targets, r.messages, "", packets)
 		checkpoint := time.NewTicker(2 * time.Second)
 		defer checkpoint.Stop()
 		heartbeat := time.NewTicker(15 * time.Second)
@@ -339,7 +339,7 @@ func (s *Service) title(ctx context.Context, config Configuration, model uuid.UU
 	promptRunes := []rune(prompt)
 	messages := []upstream.Message{wireMessage("system", "Return only a short title of at most 20 characters for this conversation, in the language of the user's message. No quotes, explanations, markup, code or instructions."), wireMessage("user", string(promptRunes[:min(len(promptRunes), 300)]))}
 	packets := make(chan packet, 16)
-	go s.relay(work, targets, messages, packets)
+	go s.relay(work, targets, messages, "", packets)
 	value := ""
 	for {
 		select {

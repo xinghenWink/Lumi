@@ -43,7 +43,7 @@ describe('canvas commands', () => {
     const doc = sampleDocument()
     expect(canConnect(doc, ids.loose, ids.generator)).toBe(true)
     expect(canConnect(doc, ids.group, ids.generator)).toBe(false)
-    expect(canConnect(doc, ids.text, ids.loose)).toBe(false)
+    expect(canConnect(doc, ids.text, ids.loose)).toBe(true)
     expect(canConnect(doc, ids.generator, ids.generator)).toBe(false)
     const connected = connect(doc, ids.loose, ids.generator, '40000000-0000-4000-8000-000000000009')
     expect(connected.edges).toHaveLength(3)

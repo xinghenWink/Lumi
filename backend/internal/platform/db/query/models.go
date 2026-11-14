@@ -52,6 +52,28 @@ type CanvasFile struct {
 	FileID   uuid.UUID
 }
 
+type CanvasTextItem struct {
+	RunID      uuid.UUID
+	Position   int32
+	Status     string
+	Content    string
+	ErrorCode  string
+	LeaseUntil *time.Time
+}
+
+type CanvasTextRun struct {
+	ID               uuid.UUID
+	CanvasID         uuid.UUID
+	UserID           uuid.UUID
+	IdempotencyKey   string
+	RequestHash      string
+	ModelID          uuid.UUID
+	Prompt           string
+	ReferenceFileIds []uuid.UUID
+	Reasoning        string
+	CreatedAt        time.Time
+}
+
 type ChatDailyUsage struct {
 	UserID uuid.UUID
 	Day    time.Time

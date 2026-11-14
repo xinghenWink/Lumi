@@ -491,12 +491,18 @@ export function CanvasViewport({
   }
 
   function onDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
-    const target = event.target instanceof Element ? event.target : null
+    // Pointer capture can retarget the click to the viewport even when it started on a node.
+    const target =
+      event.target === event.currentTarget
+        ? document.elementFromPoint(event.clientX, event.clientY)
+        : event.target instanceof Element
+          ? event.target
+          : null
     const nodeId = target?.closest('[data-node-id]')?.getAttribute('data-node-id')
     const state = editor.state
     if (nodeId) {
       const node = state.doc.nodes.find((item) => item.id === nodeId)
-      if (node?.kind === 'text') editor.setEditing(node.id)
+      if (node?.kind === 'text' && node.text?.state !== 'pending') editor.setEditing(node.id)
       if (node?.kind === 'generator') editor.openInspector(node.id)
       if (node?.kind === 'image') openImageGeneration(editor, node)
       return
@@ -548,7 +554,8 @@ export function CanvasViewport({
       style={
         grid >= 8
           ? {
-              backgroundImage: 'radial-gradient(circle, var(--input) 1px, transparent 1.4px)',
+              backgroundImage:
+                'linear-gradient(to right, color-mix(in srgb, var(--input) 35%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--input) 35%, transparent) 1px, transparent 1px)',
               backgroundSize: `${grid}px ${grid}px`,
               backgroundPosition: `${viewport.x}px ${viewport.y}px`,
             }
@@ -586,6 +593,7 @@ export function CanvasViewport({
           edges={doc.edges}
           rects={rects}
           selected={edgeSelection}
+          selectedNodes={selection}
           zoom={viewport.zoom}
           draft={draft}
         />

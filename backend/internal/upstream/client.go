@@ -37,8 +37,9 @@ type Message struct {
 	Content json.RawMessage `json:"content"`
 }
 type ChatRequest struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
+	Model           string    `json:"model"`
+	Messages        []Message `json:"messages"`
+	ReasoningEffort string    `json:"reasoning_effort,omitempty"`
 }
 type ChatEvent struct {
 	Content, FinishReason, ErrorCode string

@@ -52,6 +52,7 @@ export interface EditorState {
   editing: string | null
   /** Generator whose parameters are open in the bottom sheet on small screens. */
   inspector: string | null
+  closedInspector: string | null
   /** On-screen size of the viewport element, for centering and fitting. */
   stage: Size
   notice: Notice | null
@@ -86,6 +87,7 @@ function initial(canvas: Canvas): EditorState {
     viewRevision: 0,
     editing: null,
     inspector: null,
+    closedInspector: null,
     stage: { width: 0, height: 0 },
     notice: null,
   }
@@ -168,13 +170,19 @@ export function createCanvasEditor(canvas: Canvas) {
     },
     select(ids: readonly string[], mode: 'replace' | 'toggle' | 'add' = 'replace') {
       store.setState((state) => {
-        if (mode === 'replace') return { selection: [...ids], edgeSelection: [] }
+        if (mode === 'replace')
+          return {
+            selection: [...ids],
+            edgeSelection: [],
+            closedInspector:
+              ids.length === 1 && state.selection[0] === ids[0] ? state.closedInspector : null,
+          }
         const current = new Set(state.selection)
         for (const id of ids) {
           if (mode === 'toggle' && current.has(id)) current.delete(id)
           else current.add(id)
         }
-        return { selection: [...current], edgeSelection: [] }
+        return { selection: [...current], edgeSelection: [], closedInspector: null }
       })
     },
     selectEdge(id: string | null) {
@@ -193,7 +201,10 @@ export function createCanvasEditor(canvas: Canvas) {
       store.setState({ stage })
     },
     openInspector(id: string | null) {
-      store.setState({ inspector: id })
+      store.setState({ inspector: id, ...(id ? { closedInspector: null } : {}) })
+    },
+    closeInspector(id: string) {
+      store.setState({ inspector: null, closedInspector: id })
     },
     notify(notice: Notice | null) {
       store.setState({ notice })

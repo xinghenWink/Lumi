@@ -18,6 +18,7 @@ export default {
     UPSTREAM_CANCELED: '上游请求已取消。',
   },
   catalog: {
+    reasoningEffort: '支持设置推理强度',
     channelsTitle: '上游渠道',
     channelsDescription: '管理服务连接、测试可用性并导入模型。',
     modelsTitle: '平台模型',

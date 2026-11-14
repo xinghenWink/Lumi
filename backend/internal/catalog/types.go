@@ -52,6 +52,7 @@ type Channel struct {
 	UpdatedAt           time.Time  `json:"updated_at"`
 }
 type Capabilities struct {
+	ReasoningEffort    bool     `json:"reasoning_effort,omitempty"`
 	Vision             bool     `json:"vision"`
 	Stream             bool     `json:"stream"`
 	MaxContextTokens   int32    `json:"max_context_tokens"`

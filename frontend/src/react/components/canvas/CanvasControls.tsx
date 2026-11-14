@@ -8,6 +8,11 @@ import {
   Frame,
   Hand,
   ImagePlus,
+  Info,
+  Scissors,
+  Grid2X2,
+  ZoomIn,
+  ClipboardCopy,
   Images,
   Maximize,
   Minus,
@@ -21,7 +26,9 @@ import {
   Ungroup,
   Map as MapIcon,
 } from 'lucide-react'
-import type { ImageFile } from '../../../api/images'
+import { images, type ImageFile } from '../../../api/images'
+import type { CanvasNode } from '../../../api/canvases'
+import type { ImageTool } from './CanvasImageTools'
 import { referenceAccept } from '../../features/files/reference-rules'
 import { useCanvas, useEditor } from '../../features/canvas/context'
 import {
@@ -33,6 +40,7 @@ import {
   groupSelection,
   raiseSelection,
   removeSelection,
+  openImageGeneration,
   resetZoom,
   stageCenter,
   ungroupSelection,
@@ -187,9 +195,13 @@ export function ZoomControls({
 export function SelectionBar({
   onPreview,
   onDownload,
+  onTool,
+  onReplace,
 }: {
   onPreview(file: ImageFile): void
   onDownload(file: ImageFile): void
+  onTool(tool: ImageTool, node: CanvasNode, file: ImageFile): void
+  onReplace(node: CanvasNode): void
 }) {
   const { t } = useTranslation()
   const { editor } = useCanvas()
@@ -208,18 +220,53 @@ export function SelectionBar({
     single?.image?.state === 'ready' && single.image.file_id
       ? files[single.image.file_id]
       : undefined
+  const source =
+    single &&
+    nodes.find(
+      (node) =>
+        node.id ===
+        editor.state.doc.edges.find((edge) => edge.kind === 'result' && edge.to === single.id)
+          ?.from,
+    )
+  const prompt = single?.generator?.prompt || source?.generator?.prompt
+  async function copyPrompt() {
+    try {
+      const taskId = single?.image?.task_id
+      const value = taskId ? (await images.task(taskId)).prompt : prompt
+      if (value) await navigator.clipboard.writeText(value)
+    } catch (error) {
+      editor.notify({ key: '', error })
+    }
+  }
   return (
     <div
       role="toolbar"
       aria-label={t('canvas.selection.toolbar')}
-      className={cn(panel, 'flex max-w-[calc(100vw-32px)] items-center gap-0.5 overflow-x-auto')}
+      className={cn(
+        panel,
+        'flex max-w-[calc(100vw-32px)] items-center gap-0.5 overflow-x-auto dark:bg-white dark:text-neutral-900 [&_button]:dark:text-neutral-800 [&_button:hover]:dark:bg-neutral-200',
+      )}
     >
       {selection.length ? (
         <span className="px-2 text-xs whitespace-nowrap text-muted-foreground">
           {t('canvas.selection.count', { count: selection.length })}
         </span>
       ) : null}
-      {feedable ? (
+      {single &&
+      single.kind !== 'group' &&
+      single.text?.state !== 'pending' &&
+      single.image?.state !== 'pending' ? (
+        <ToolButton
+          label={t('canvas.generator.edit')}
+          onClick={() => {
+            if (single.kind === 'image') openImageGeneration(editor, single)
+            else editor.openInspector(single.id)
+          }}
+        >
+          <Sparkles size={15} />
+        </ToolButton>
+      ) : null}
+      {feedable && (!single || single.kind !== 'image') ? (
         <button
           type="button"
           onClick={() => generateFromSelection(editor)}
@@ -229,6 +276,14 @@ export function SelectionBar({
           {t('canvas.selection.generate')}
         </button>
       ) : null}
+      {single?.kind === 'text' && single.text?.state !== 'pending' ? (
+        <ToolButton
+          label={t('canvas.prompt.editBody')}
+          onClick={() => editor.setEditing(single.id)}
+        >
+          <Type size={16} />
+        </ToolButton>
+      ) : null}
       {file ? (
         <>
           <ToolButton label={t('canvas.selection.preview')} onClick={() => onPreview(file)}>
@@ -236,6 +291,44 @@ export function SelectionBar({
           </ToolButton>
           <ToolButton label={t('canvas.selection.download')} onClick={() => onDownload(file)}>
             <Download size={16} />
+          </ToolButton>
+        </>
+      ) : null}
+      {file && single ? (
+        <>
+          <ToolButton
+            label={t('canvas.imageTools.info')}
+            onClick={() => onTool('info', single, file)}
+          >
+            <Info size={16} />
+          </ToolButton>
+          <ToolButton label={t('canvas.imageTools.replace')} onClick={() => onReplace(single)}>
+            <ImagePlus size={16} />
+          </ToolButton>
+          <ToolButton
+            label={t('canvas.imageTools.copyPrompt')}
+            disabled={!prompt && !single.image?.task_id}
+            onClick={() => void copyPrompt()}
+          >
+            <ClipboardCopy size={16} />
+          </ToolButton>
+          <ToolButton
+            label={t('canvas.imageTools.crop')}
+            onClick={() => onTool('crop', single, file)}
+          >
+            <Scissors size={16} />
+          </ToolButton>
+          <ToolButton
+            label={t('canvas.imageTools.split')}
+            onClick={() => onTool('split', single, file)}
+          >
+            <Grid2X2 size={16} />
+          </ToolButton>
+          <ToolButton
+            label={t('canvas.imageTools.upscale')}
+            onClick={() => onTool('upscale', single, file)}
+          >
+            <ZoomIn size={16} />
           </ToolButton>
         </>
       ) : null}

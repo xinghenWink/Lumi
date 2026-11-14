@@ -90,7 +90,7 @@ func TestValidateRejectsMalformedDocuments(t *testing.T) {
 			d.Edges[0].To = ids["image"]
 		},
 		"duplicate edge pair": func(d *Document, _ map[string]uuid.UUID) {
-			d.Edges = append(d.Edges, Edge{ID: uuid.New(), From: d.Edges[0].From, To: d.Edges[0].To})
+			d.Edges = append(d.Edges, Edge{ID: uuid.New(), From: d.Edges[0].From, To: d.Edges[0].To, Kind: EdgeInput})
 		},
 		"duplicate edge id": func(d *Document, ids map[string]uuid.UUID) { d.Edges[1].ID = ids["e1"] },
 		"dangling edge":     func(d *Document, _ map[string]uuid.UUID) { d.Edges[0].From = uuid.New() },
@@ -125,7 +125,7 @@ func TestConnectableDirections(t *testing.T) {
 			t.Fatalf("%s -> %s should connect", pair[0], pair[1])
 		}
 	}
-	for _, pair := range [][2]string{{KindGenerator, KindGenerator}, {KindText, KindText}, {KindGenerator, KindGroup}, {"", KindGenerator}} {
+	for _, pair := range [][2]string{{KindGenerator, KindGenerator}, {KindText, KindGroup}, {KindGenerator, KindGroup}, {"", KindGenerator}} {
 		if connectable(pair[0], pair[1], EdgeInput) {
 			t.Fatalf("%s -> %s should not connect", pair[0], pair[1])
 		}

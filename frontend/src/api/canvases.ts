@@ -11,6 +11,10 @@ export type CanvasDocument = S['CanvasDocument']
 export type CanvasNode = S['CanvasNode']
 export type CanvasEdge = S['CanvasEdge']
 export type CanvasRunInput = S['CanvasRunInput']
+export type CanvasMention = S['CanvasMention']
+export type CanvasTextSettings = S['CanvasTextSettings']
+export type CanvasTextRunInput = S['CanvasTextRunInput']
+export type CanvasTextRun = S['CanvasTextRun']
 export type CanvasViewport = S['CanvasViewport']
 export type CanvasImageContent = S['CanvasImageContent']
 export type CanvasGeneratorContent = S['CanvasGeneratorContent']
@@ -41,6 +45,11 @@ const choice = <const T extends readonly string[]>(v: unknown, choices: T): T[nu
   return value as T[number]
 }
 
+function parseMention(value: unknown): CanvasMention {
+  const d = record(value)
+  return { node_id: str(d.node_id), token: str(d.token) }
+}
+
 function parseNode(v: unknown): CanvasNode {
   const d = record(v)
   const node: CanvasNode = {
@@ -63,11 +72,35 @@ function parseNode(v: unknown): CanvasNode {
       error_code: str(i.error_code),
     }
   }
-  if (d.text !== undefined) node.text = { content: str(record(d.text).content) }
+  if (d.text !== undefined) {
+    const value = record(d.text)
+    node.text = {
+      content: str(value.content),
+      ...(value.run_id === undefined ? {} : { run_id: str(value.run_id) }),
+      ...(value.position === undefined ? {} : { position: int(value.position) }),
+      ...(value.state === undefined
+        ? {}
+        : { state: choice(value.state, ['pending', 'ready', 'failed']) }),
+      ...(value.error_code === undefined ? {} : { error_code: str(value.error_code) }),
+    }
+  }
+  if (d.text_settings !== undefined) {
+    const settings = record(d.text_settings)
+    node.text_settings = {
+      prompt: str(settings.prompt),
+      model_id: nullableText(settings.model_id),
+      reasoning: choice(settings.reasoning, ['', 'low', 'medium', 'high']),
+      n: int(settings.n),
+      ...(settings.mentions === undefined
+        ? {}
+        : { mentions: list(settings.mentions, parseMention) }),
+    }
+  }
   if (d.generator !== undefined) {
     const g = record(d.generator)
     node.generator = {
       prompt: str(g.prompt),
+      ...(g.mentions === undefined ? {} : { mentions: list(g.mentions, parseMention) }),
       model_id: nullableText(g.model_id),
       quality: choice(g.quality, ['', 'low', 'medium', 'high']),
       size: str(g.size),
@@ -135,6 +168,22 @@ const root = '/api/v1/canvases'
 const one = (id: string) => root + '/' + encodeURIComponent(id)
 const signalOptions = (signal?: AbortSignal) => (signal ? { signal } : {})
 
+function parseTextRun(value: unknown): CanvasTextRun {
+  const d = record(value)
+  return {
+    id: str(d.id),
+    items: list(d.items, (item) => {
+      const entry = record(item)
+      return {
+        position: int(entry.position),
+        status: choice(entry.status, ['queued', 'running', 'succeeded', 'failed', 'canceled']),
+        content: str(entry.content),
+        error_code: str(entry.error_code),
+      }
+    }),
+  }
+}
+
 export const canvases = {
   list: (q: URLSearchParams, signal?: AbortSignal) =>
     authorized(root + '?' + q, parseCanvasPage, signalOptions(signal)),
@@ -157,4 +206,23 @@ export const canvases = {
       { method: 'POST', body, idempotencyKey: key },
     ),
   remove: (id: string) => authorized(one(id), noContent, { method: 'DELETE' }),
+  runText: (id: string, body: CanvasTextRunInput, key: string) =>
+    authorized(
+      one(id) + '/text-runs',
+      (value) => {
+        const result = record(value)
+        return { canvas: parseCanvas(result.canvas), task: parseTextRun(result.task) }
+      },
+      { method: 'POST', body, idempotencyKey: key },
+    ),
+  textRun: (id: string, run: string, signal?: AbortSignal) =>
+    authorized(
+      one(id) + '/text-runs/' + encodeURIComponent(run),
+      parseTextRun,
+      signalOptions(signal),
+    ),
+  cancelText: (id: string, run: string) =>
+    authorized(one(id) + '/text-runs/' + encodeURIComponent(run) + '/cancel', parseTextRun, {
+      method: 'POST',
+    }),
 }

@@ -1,4 +1,4 @@
-import type { CanvasDocument, CanvasNode } from '../../api/canvases'
+import type { CanvasDocument, CanvasMention, CanvasNode } from '../../api/canvases'
 import { DEFAULT_SIZE, generatorNode, LIMITS, newId, nodeMap, type IdFactory } from './document'
 import { addNodes } from './commands'
 import { boundsOf } from './geometry'
@@ -25,13 +25,9 @@ export function collectInputs(
   generator: string,
   available: (fileId: string) => boolean = () => true,
 ): GenerationInputs {
-  const nodes = nodeMap(doc)
   const result: GenerationInputs = { references: [], texts: [], unavailable: 0 }
   const seen = new Set<string>()
-  const seenNodes = new Set([generator])
-  const take = (node: CanvasNode | undefined) => {
-    if (!node || seenNodes.has(node.id)) return
-    seenNodes.add(node.id)
+  for (const node of referenceNodes(doc, generator, true)) {
     if (node.kind === 'text') {
       const text = node.text?.content.trim()
       if (text) result.texts.push(text)
@@ -44,13 +40,41 @@ export function collectInputs(
       }
     }
   }
+  return result
+}
+
+export function referenceNodes(doc: CanvasDocument, target: string, includeSource = false) {
+  const nodes = nodeMap(doc)
+  const result = new Map<string, CanvasNode>()
+  const self = nodes.get(target)
+  if (includeSource && self?.image?.state === 'ready') result.set(target, self)
+  const take = (node: CanvasNode) => {
+    if (node.id !== target && (node.kind === 'text' || node.kind === 'image'))
+      result.set(node.id, node)
+  }
   for (const edge of doc.edges) {
-    if (edge.to !== generator || edge.kind !== 'input') continue
+    if (edge.to !== target || edge.kind !== 'input') continue
     const source = nodes.get(edge.from)
     if (source?.kind === 'group') members(doc, source.id).forEach(take)
-    else take(source)
+    else if (source) take(source)
   }
-  return result
+  return [...result.values()]
+}
+
+export function missingMentions(
+  nodes: readonly CanvasNode[],
+  mentions: readonly CanvasMention[],
+  available: (id: string) => boolean,
+) {
+  return mentions.filter(
+    (mention) =>
+      !nodes.some(
+        (node) =>
+          node.id === mention.node_id &&
+          (node.text?.content.trim() ||
+            (node.image?.state === 'ready' && node.image.file_id && available(node.image.file_id))),
+      ),
+  )
 }
 
 /** Connected text follows the generator's own prompt, one paragraph each. */

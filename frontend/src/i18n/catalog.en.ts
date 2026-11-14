@@ -19,6 +19,7 @@ export default {
     UPSTREAM_CANCELED: 'The upstream request was canceled.',
   },
   catalog: {
+    reasoningEffort: 'Supports reasoning effort',
     channelsTitle: 'Upstreams',
     channelsDescription: 'Manage connections, test availability and import models.',
     modelsTitle: 'Platform models',

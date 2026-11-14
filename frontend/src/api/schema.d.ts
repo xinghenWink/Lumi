@@ -1543,6 +1543,54 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/canvases/{id}/text-runs': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['submitCanvasText']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/canvases/{id}/text-runs/{run}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['getCanvasTextRun']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/canvases/{id}/text-runs/{run}/cancel': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['cancelCanvasTextRun']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/canvases/{id}/runs': {
     parameters: {
       query?: never
@@ -2306,6 +2354,8 @@ export interface components {
       next_cursor: string
     }
     ModelCapabilities: {
+      /** @description Chat model accepts explicit reasoning effort. */
+      reasoning_effort?: boolean
       vision: boolean
       stream: boolean
       max_context_tokens: number
@@ -2704,10 +2754,52 @@ export interface components {
     }
     CanvasTextContent: {
       content: string
+      /** Format: uuid */
+      run_id?: string
+      position?: number
+      /** @enum {string} */
+      state?: 'pending' | 'ready' | 'failed'
+      error_code?: string
+    }
+    CanvasMention: {
+      /** Format: uuid */
+      node_id: string
+      token: string
+    }
+    CanvasTextSettings: {
+      prompt: string
+      /** Format: uuid */
+      model_id: string | null
+      /** @enum {string} */
+      reasoning: '' | 'low' | 'medium' | 'high'
+      n: number
+      mentions?: components['schemas']['CanvasMention'][]
+    }
+    CanvasTextRunInput: {
+      version: number
+      /** Format: uuid */
+      node_id: string
+      /** Format: uuid */
+      model_id: string
+      /** @enum {string} */
+      reasoning: '' | 'low' | 'medium' | 'high'
+      n: number
+    }
+    CanvasTextRun: {
+      /** Format: uuid */
+      id: string
+      items: {
+        position: number
+        /** @enum {string} */
+        status: 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled'
+        content: string
+        error_code: string
+      }[]
     }
     /** @description Last chosen generation parameters; empty strings and a null model fall back to the current defaults. */
     CanvasGeneratorContent: {
       prompt: string
+      mentions?: components['schemas']['CanvasMention'][]
       /** Format: uuid */
       model_id: string | null
       /** @enum {string} */
@@ -2732,8 +2824,9 @@ export interface components {
       image?: components['schemas']['CanvasImageContent']
       text?: components['schemas']['CanvasTextContent']
       generator?: components['schemas']['CanvasGeneratorContent']
+      text_settings?: components['schemas']['CanvasTextSettings']
     }
-    /** @description Input edges connect text, images or groups to a generator or image. Result edges connect a generator or image to its output images. */
+    /** @description Input edges connect text, images or groups to a text, generator or image node. Result edges connect a text, generator or image node to a compatible output. */
     CanvasEdge: {
       /** Format: uuid */
       id: string
@@ -7648,6 +7741,97 @@ export interface operations {
         }
       }
       default: components['responses']['APIError']
+    }
+  }
+  submitCanvasText: {
+    parameters: {
+      query?: never
+      header: {
+        'Idempotency-Key': string
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CanvasTextRunInput']
+      }
+    }
+    responses: {
+      /** @description A durable text run and its saved canvas slots */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            canvas: components['schemas']['Canvas']
+            task: components['schemas']['CanvasTextRun']
+          }
+        }
+      }
+      /** @description Version conflict or reused idempotency key */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  getCanvasTextRun: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+        run: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Text candidates and their statuses */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CanvasTextRun']
+        }
+      }
+      /** @description Canvas or run unavailable to this owner */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  cancelCanvasTextRun: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+        run: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Remaining candidates canceled, completed candidates retained */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CanvasTextRun']
+        }
+      }
     }
   }
   runCanvasNode: {

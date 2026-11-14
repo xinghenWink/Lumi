@@ -181,6 +181,13 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 	if accounts != nil {
 		stopImages := startImageWorkers(ctx, accounts.Images)
 		defer stopImages()
+		textCtx, stopText := context.WithCancel(ctx)
+		textDone := make(chan struct{})
+		go func() {
+			defer close(textDone)
+			accounts.Canvas.WorkText(textCtx, accounts.Chat, logger)
+		}()
+		defer func() { stopText(); <-textDone }()
 		stopResume := accounts.Chat.EnableResume(ctx, cache)
 		defer stopResume()
 		stopOperations := startOperationJobs(ctx, database, cache, logger)

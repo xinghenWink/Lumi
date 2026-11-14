@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Lumi API
-  version: 0.8.0
+  version: 0.9.0
   description: >-
     Accounts, credits, upstream configuration and owner-isolated chat. Mutations require Origin and
     X-Lumi-CSRF: 1. Chat POST streams use meta, delta, error, done and ping SSE events. Reuse request_id
@@ -4922,6 +4922,67 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CanvasCreateInput'
+  /api/v1/canvases/{id}/text-runs:
+    post:
+      operationId: submitCanvasText
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: header, name: Idempotency-Key, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanvasTextRunInput'
+      responses:
+        '202':
+          description: A durable text run and its saved canvas slots
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [canvas, task]
+                properties:
+                  canvas:
+                    $ref: '#/components/schemas/Canvas'
+                  task:
+                    $ref: '#/components/schemas/CanvasTextRun'
+        '409':
+          description: Version conflict or reused idempotency key
+  /api/v1/canvases/{id}/text-runs/{run}:
+    get:
+      operationId: getCanvasTextRun
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: run, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Text candidates and their statuses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanvasTextRun'
+        '404':
+          description: Canvas or run unavailable to this owner
+  /api/v1/canvases/{id}/text-runs/{run}/cancel:
+    post:
+      operationId: cancelCanvasTextRun
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: path, name: run, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Remaining candidates canceled, completed candidates retained
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanvasTextRun'
   /api/v1/canvases/{id}/runs:
     post:
       operationId: runCanvasNode
@@ -7113,6 +7174,9 @@ components:
       type: object
       additionalProperties: false
       properties:
+        reasoning_effort:
+          type: boolean
+          description: Chat model accepts explicit reasoning effort.
         vision:
           type: boolean
         stream:
@@ -8310,8 +8374,57 @@ components:
         content:
           type: string
           maxLength: 8000
+        run_id: { type: string, format: uuid }
+        position: { type: integer, minimum: 0, maximum: 2 }
+        state: { type: string, enum: [pending, ready, failed] }
+        error_code: { type: string }
       required:
         - content
+    CanvasMention:
+      type: object
+      additionalProperties: false
+      required: [node_id, token]
+      properties:
+        node_id: { type: string, format: uuid }
+        token: { type: string }
+    CanvasTextSettings:
+      type: object
+      additionalProperties: false
+      required: [prompt, model_id, reasoning, n]
+      properties:
+        prompt: { type: string, maxLength: 8000 }
+        model_id: { type: [string, 'null'], format: uuid }
+        reasoning: { type: string, enum: ['', low, medium, high] }
+        'n': { type: integer, minimum: 1, maximum: 3 }
+        mentions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanvasMention'
+    CanvasTextRunInput:
+      type: object
+      additionalProperties: false
+      required: [version, node_id, model_id, reasoning, n]
+      properties:
+        version: { type: integer, minimum: 1 }
+        node_id: { type: string, format: uuid }
+        model_id: { type: string, format: uuid }
+        reasoning: { type: string, enum: ['', low, medium, high] }
+        'n': { type: integer, minimum: 1, maximum: 3 }
+    CanvasTextRun:
+      type: object
+      required: [id, items]
+      properties:
+        id: { type: string, format: uuid }
+        items:
+          type: array
+          items:
+            type: object
+            required: [position, status, content, error_code]
+            properties:
+              position: { type: integer, minimum: 0, maximum: 2 }
+              status: { type: string, enum: [queued, running, succeeded, failed, canceled] }
+              content: { type: string, maxLength: 8000 }
+              error_code: { type: string }
     CanvasGeneratorContent:
       type: object
       additionalProperties: false
@@ -8320,6 +8433,10 @@ components:
         prompt:
           type: string
           maxLength: 8000
+        mentions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanvasMention'
         model_id:
           type:
             - string
@@ -8394,6 +8511,8 @@ components:
           $ref: '#/components/schemas/CanvasTextContent'
         generator:
           $ref: '#/components/schemas/CanvasGeneratorContent'
+        text_settings:
+          $ref: '#/components/schemas/CanvasTextSettings'
       required:
         - id
         - kind
@@ -8406,7 +8525,7 @@ components:
     CanvasEdge:
       type: object
       additionalProperties: false
-      description: Input edges connect text, images or groups to a generator or image. Result edges connect a generator or image to its output images.
+      description: Input edges connect text, images or groups to a text, generator or image node. Result edges connect a text, generator or image node to a compatible output.
       properties:
         id:
           type: string

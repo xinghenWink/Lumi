@@ -15,7 +15,47 @@ func (h *Handler) canvasRoutes(protected *gin.RouterGroup) {
 	protected.GET("/canvases/:id", h.canvasGet)
 	protected.PUT("/canvases/:id", h.csrf, h.canvasLimit, h.canvasSave)
 	protected.POST("/canvases/:id/runs", h.csrf, h.imageLimit, h.canvasRun)
+	protected.POST("/canvases/:id/text-runs", h.csrf, h.canvasLimit, h.canvasTextSubmit)
+	protected.GET("/canvases/:id/text-runs/:run", h.canvasTextResult)
+	protected.POST("/canvases/:id/text-runs/:run/cancel", h.csrf, h.canvasLimit, h.canvasTextResult)
 	protected.DELETE("/canvases/:id", h.csrf, h.canvasLimit, h.canvasDelete)
+}
+func (h *Handler) canvasTextSubmit(c *gin.Context) {
+	p, ok := principal(c)
+	if !ok {
+		return
+	}
+	id, err := identifier(c.Param("id"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	var input canvas.TextRunInput
+	if err := decode(c, &input); err != nil {
+		h.fail(c, err)
+		return
+	}
+	result, err := h.services.Canvas.SubmitText(c.Request.Context(), h.services.Chat, p.Actor, id, c.GetHeader("Idempotency-Key"), input)
+	h.imageReply(c, result, err, 202)
+}
+
+func (h *Handler) canvasTextResult(c *gin.Context) {
+	p, ok := principal(c)
+	if !ok {
+		return
+	}
+	id, err := identifier(c.Param("id"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	run, err := identifier(c.Param("run"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	result, err := h.services.Canvas.TextRun(c.Request.Context(), p.User.ID, id, run, c.Request.Method == "POST")
+	h.imageReply(c, result, err, 200)
 }
 func (h *Handler) canvasRun(c *gin.Context) {
 	p, ok := principal(c)

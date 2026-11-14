@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useStore } from 'zustand'
@@ -8,6 +8,7 @@ import { canGenerate, LIMITS } from '../../../features/canvas/document'
 import { boundsOf } from '../../../features/canvas/geometry'
 import { insertFile } from '../../features/canvas/actions'
 import { useCanvas, useEditor } from '../../features/canvas/context'
+import type { Preview } from '../../features/canvas/editor'
 import { useImageConfig } from '../../features/images/config'
 import { useImageActions } from '../../features/images/actions'
 import { useMediaQuery } from '../../lib/media'
@@ -21,7 +22,9 @@ import { ThemeToggle } from '../shared/ThemeToggle'
 import { CanvasToolbar, SelectionBar, ZoomControls } from './CanvasControls'
 import { CanvasMiniMap } from './CanvasMiniMap'
 import { GeneratorInspector } from './GeneratorInspector'
-import type { Rejections } from '../../features/files/reference-rules'
+import { referenceAccept, type Rejections } from '../../features/files/reference-rules'
+import { CanvasImageTools, type ImageTool } from './CanvasImageTools'
+import type { CanvasNode } from '../../../api/canvases'
 
 const ImageLibrary = lazy(() =>
   import('../images/ImageLibrary').then((module) => ({ default: module.ImageLibrary })),
@@ -175,13 +178,28 @@ export function CanvasEditor({ rejected }: { rejected: Rejections | null }) {
   const actions = useImageActions()
   const [library, setLibrary] = useState(false)
   const [preview, setPreview] = useState<ImageFile | null>(null)
+  const [imageTool, setImageTool] = useState<{
+    tool: ImageTool
+    node: CanvasNode
+    file: ImageFile
+  } | null>(null)
+  const replaceTarget = useRef<CanvasNode | null>(null)
+  const replacePicker = useRef<HTMLInputElement>(null)
   const [minimap, setMinimap] = useState(true)
   const [menu, setMenu] = useState<CreateMenuAnchor | null>(null)
   const inspectorId = useEditor((state) => state.inspector)
+  const selection = useEditor((state) => state.selection)
+  const editing = useEditor((state) => state.editing)
   const nodes = useEditor((state) => state.doc.nodes)
-  const inspected = inspectorId ? nodes.find((node) => node.id === inspectorId) : undefined
-  const panel = wide && inspected && canGenerate(inspected) ? inspected : undefined
-  const sheet = !wide && inspected && canGenerate(inspected) ? inspected : undefined
+  const inspected =
+    selection.length === 1 && selection[0] !== editing
+      ? nodes.find((node) => node.id === selection[0])
+      : undefined
+  const closed = useEditor((state) => state.closedInspector)
+  const panel =
+    wide && inspected && canGenerate(inspected) && inspected.id !== closed ? inspected : undefined
+  const sheet =
+    !wide && inspected?.id === inspectorId && canGenerate(inspected) ? inspected : undefined
   const maxBytes = config.data?.max_upload_bytes ?? 10 * 1_048_576
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -225,11 +243,16 @@ export function CanvasEditor({ rejected }: { rejected: Rejections | null }) {
           <SelectionOverlay
             onPreview={setPreview}
             onDownload={(file) => void actions.download(file)}
+            onTool={(tool, node, file) => setImageTool({ tool, node, file })}
+            onReplace={(node) => {
+              replaceTarget.current = node
+              replacePicker.current?.click()
+            }}
           />
           {panel ? (
-            <GeneratorOverlay node={panel} onClose={() => editor.openInspector(null)} />
+            <GeneratorOverlay node={panel} onClose={() => editor.closeInspector(panel.id)} />
           ) : null}
-          <div className="absolute right-3 bottom-3 z-10 flex flex-col items-end gap-2">
+          <div className="absolute bottom-3 left-3 z-10 flex flex-col items-start gap-2">
             {minimap && wide ? <CanvasMiniMap /> : null}
             <ZoomControls
               minimap={minimap && wide}
@@ -239,12 +262,39 @@ export function CanvasEditor({ rejected }: { rejected: Rejections | null }) {
           <Notice rejected={rejected} maxBytes={maxBytes} />
         </div>
       </div>
+      <input
+        ref={replacePicker}
+        type="file"
+        accept={referenceAccept}
+        hidden
+        aria-label={t('canvas.imageTools.replace')}
+        onChange={(event) => {
+          const target = replaceTarget.current
+          if (target)
+            services.uploads.place(Array.from(event.currentTarget.files ?? []), target, target.id)
+          replaceTarget.current = null
+          event.currentTarget.value = ''
+        }}
+      />
+      {imageTool ? (
+        <CanvasImageTools
+          key={imageTool.tool + imageTool.node.id}
+          tool={imageTool.tool}
+          nodeID={imageTool.node.id}
+          file={imageTool.file}
+          onClose={() => setImageTool(null)}
+        />
+      ) : null}
       {sheet ? (
         <ModalDialog
           open
           variant="sheet"
-          title={t('canvas.generator.heading')}
-          description={t('canvas.generator.promptPlaceholder')}
+          title={t(sheet.kind === 'text' ? 'canvas.prompt.textEditor' : 'canvas.generator.heading')}
+          description={t(
+            sheet.kind === 'text'
+              ? 'canvas.prompt.textPlaceholder'
+              : 'canvas.generator.promptPlaceholder',
+          )}
           onOpenChange={(open) => {
             if (!open) editor.openInspector(null)
           }}
@@ -285,19 +335,32 @@ export function CanvasEditor({ rejected }: { rejected: Rejections | null }) {
   )
 }
 
+function visualNode(node: CanvasNode, preview: Preview | null) {
+  if (preview?.kind === 'move' && preview.ids.has(node.id))
+    return { ...node, x: node.x + preview.dx, y: node.y + preview.dy }
+  return preview?.kind === 'resize' && preview.id === node.id ? preview.rect : node
+}
+
 function SelectionOverlay({
   onPreview,
   onDownload,
+  onTool,
+  onReplace,
 }: {
   onPreview(file: ImageFile): void
   onDownload(file: ImageFile): void
+  onTool(tool: ImageTool, node: CanvasNode, file: ImageFile): void
+  onReplace(node: CanvasNode): void
 }) {
   const selection = useEditor((state) => state.selection)
   const nodes = useEditor((state) => state.doc.nodes)
   const viewport = useEditor((state) => state.viewport)
   const stage = useEditor((state) => state.stage)
+  const preview = useEditor((state) => state.preview)
   const wide = useMediaQuery('(min-width: 640px)')
-  const bounds = boundsOf(nodes.filter((node) => selection.includes(node.id)))
+  const bounds = boundsOf(
+    nodes.filter((node) => selection.includes(node.id)).map((node) => visualNode(node, preview)),
+  )
   const x = bounds ? (bounds.x + bounds.w / 2) * viewport.zoom + viewport.x : stage.width / 2
   const y = bounds ? bounds.y * viewport.zoom + viewport.y : 72
   return (
@@ -308,7 +371,12 @@ function SelectionOverlay({
         top: wide ? Math.max(12, Math.min(stage.height - 54, y - 52)) : 92,
       }}
     >
-      <SelectionBar onPreview={onPreview} onDownload={onDownload} />
+      <SelectionBar
+        onPreview={onPreview}
+        onDownload={onDownload}
+        onTool={onTool}
+        onReplace={onReplace}
+      />
     </div>
   )
 }
@@ -322,32 +390,56 @@ function GeneratorOverlay({
 }) {
   const viewport = useEditor((state) => state.viewport)
   const stage = useEditor((state) => state.stage)
-  const width = 344
-  const height = Math.min(550, stage.height - 64)
-  const x = (node.x + node.w) * viewport.zoom + viewport.x + 16
-  const left = node.x * viewport.zoom + viewport.x - width - 16
-  const bottom = (node.y + node.h) * viewport.zoom + viewport.y + 12
-  const beside = x + width < stage.width - 12 || left > 60
+  const preview = useEditor((state) => state.preview)
+  const panel = useRef<HTMLElement>(null)
+  const [height, setHeight] = useState(320)
+  useLayoutEffect(() => {
+    const element = panel.current
+    if (!element) return
+    const content = element.firstElementChild
+    const update = () => setHeight(element.scrollHeight + 2)
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+    if (content) observer.observe(content)
+    return () => observer.disconnect()
+  }, [node.id])
+  const rect = visualNode(node, preview)
+  const nodeLeft = rect.x * viewport.zoom + viewport.x
+  const nodeRight = nodeLeft + rect.w * viewport.zoom
+  const nodeTop = rect.y * viewport.zoom + viewport.y
+  const below = Math.max(12, nodeTop + rect.h * viewport.zoom + 16)
+  const above = Math.min(stage.height - 12, nodeTop - 64)
+  const desiredHeight = Math.min(height, 420, stage.height - 24)
+  const belowSpace = stage.height - 12 - below
+  const aboveSpace = above - 12
+  const leftSpace = nodeLeft - 82
+  const rightSpace = stage.width - nodeRight - 28
+  const side =
+    Math.max(aboveSpace, belowSpace) < desiredHeight && Math.max(leftSpace, rightSpace) >= 330
+  const width = Math.min(590, stage.width - 100, side ? Math.max(leftSpace, rightSpace) : Infinity)
+  const maxHeight = side
+    ? desiredHeight
+    : Math.min(desiredHeight, Math.max(124, aboveSpace, belowSpace))
+  const left = side
+    ? rightSpace >= leftSpace
+      ? nodeRight + 16
+      : nodeLeft - width - 16
+    : Math.max(66, Math.min(stage.width - width - 12, (nodeLeft + nodeRight - width) / 2))
+  const top = side
+    ? Math.max(12, Math.min(stage.height - maxHeight - 12, nodeTop))
+    : belowSpace >= maxHeight
+      ? below
+      : Math.max(12, above - maxHeight)
   return (
     <aside
-      className="absolute z-10 overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-lg"
+      ref={panel}
+      className="absolute z-10 overflow-y-auto rounded-2xl border border-border bg-card p-3 shadow-lg sm:p-4"
       style={{
-        width,
-        maxHeight: height,
-        left: Math.max(
-          60,
-          Math.min(
-            stage.width - width - 12,
-            x + width < stage.width - 12 ? x : beside ? left : node.x * viewport.zoom + viewport.x,
-          ),
-        ),
-        top: Math.max(
-          12,
-          Math.min(
-            stage.height - height - 12,
-            beside ? node.y * viewport.zoom + viewport.y : bottom,
-          ),
-        ),
+        width: Math.max(0, width),
+        left,
+        top,
+        maxHeight,
       }}
     >
       <GeneratorInspector key={node.id} node={node} onClose={onClose} />

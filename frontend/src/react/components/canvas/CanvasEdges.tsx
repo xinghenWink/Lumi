@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { CanvasEdge } from '../../../api/canvases'
+import { edgeKey } from '../../../features/canvas/document'
 import {
   edgePath,
   inputPort,
@@ -18,17 +19,20 @@ export const CanvasEdges = memo(function CanvasEdges({
   edges,
   rects,
   selected,
+  selectedNodes,
   zoom,
   draft,
 }: {
   edges: readonly CanvasEdge[]
   rects: ReadonlyMap<string, Rect>
   selected: readonly string[]
+  selectedNodes: readonly string[]
   zoom: number
   draft: { from: Point; to: Point } | null
 }) {
   const { t } = useTranslation()
   const width = 1.75 / zoom
+  const connections = new Set(edges.map(edgeKey))
   return (
     <svg
       aria-hidden="true"
@@ -40,8 +44,17 @@ export const CanvasEdges = memo(function CanvasEdges({
         const from = rects.get(edge.from),
           to = rects.get(edge.to)
         if (!from || !to) return null
-        const path = edgePath(outputPort(from), inputPort(to))
-        const active = selected.includes(edge.id)
+        const start = outputPort(from)
+        const end = inputPort(to)
+        const parallel = connections.has(
+          edgeKey({ ...edge, kind: edge.kind === 'result' ? 'input' : 'result' }),
+        )
+        const offset = parallel ? (edge.kind === 'result' ? 8 : -8) / zoom : 0
+        const path = edgePath({ ...start, y: start.y + offset }, { ...end, y: end.y + offset })
+        const active =
+          selected.includes(edge.id) ||
+          selectedNodes.includes(edge.to) ||
+          selectedNodes.includes(edge.from)
         return (
           <g key={edge.id}>
             <path
@@ -58,7 +71,7 @@ export const CanvasEdges = memo(function CanvasEdges({
               className={cn(
                 'fill-none',
                 active
-                  ? 'stroke-primary'
+                  ? 'stroke-primary dark:stroke-white'
                   : edge.kind === 'result'
                     ? 'stroke-muted-foreground/50'
                     : 'stroke-primary/60',

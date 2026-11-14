@@ -1,73 +1,172 @@
-import { useId, useMemo, useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import { ArrowUp, Loader2, SlidersHorizontal, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Loader2, Sparkles, X } from 'lucide-react'
-import type { CanvasGeneratorContent, CanvasNode } from '../../../api/canvases'
+import type { CanvasGeneratorContent, CanvasNode, CanvasTextSettings } from '../../../api/canvases'
 import type { ImageInput } from '../../../api/images'
 import { updateNode } from '../../../features/canvas/commands'
-import { LIMITS } from '../../../features/canvas/document'
-import { buildPrompt, collectInputs } from '../../../features/canvas/workflow'
-import { useCanvas, useCanvasImage, useEditor } from '../../features/canvas/context'
+import {
+  buildPrompt,
+  collectInputs,
+  missingMentions,
+  referenceNodes,
+} from '../../../features/canvas/workflow'
+import { useCanvas, useEditor } from '../../features/canvas/context'
+import { useModels } from '../../features/catalog/models'
 import { useImageOptions } from '../../features/images/options'
-import type { ImageDraft } from '../../features/images/controller'
 import { ImageParameters } from '../images/ImageParameters'
 import { ApiNotice } from '../shared/ApiNotice'
 import { Button } from '../ui/button'
+import { CanvasPrompt } from './CanvasPrompt'
 
 const selectClass =
-  'h-9 w-full min-w-0 rounded-lg border border-input bg-card px-2.5 text-sm shadow-xs outline-none focus:border-ring focus:ring-3 focus:ring-ring/15 disabled:opacity-50'
+  'h-9 min-w-0 max-w-52 rounded-full border border-border bg-muted px-3 text-sm focus-visible:outline-ring'
+const defaultImage: CanvasGeneratorContent = {
+  prompt: '',
+  model_id: null,
+  quality: '',
+  size: '',
+  ratio: '',
+  n: 1,
+}
+const defaultText: CanvasTextSettings = { prompt: '', model_id: null, reasoning: '', n: 1 }
 
-/**
- * Parameters for one generator node. Inputs come from its incoming edges; quotes and
- * limits come from the same backend options the image studio uses.
- */
 export function GeneratorInspector({ node, onClose }: { node: CanvasNode; onClose(): void }) {
+  return node.kind === 'text' ? (
+    <TextComposer node={node} onClose={onClose} />
+  ) : (
+    <ImageComposer node={node} onClose={onClose} />
+  )
+}
+
+function Composer({
+  node,
+  label,
+  model,
+  options,
+  parameters,
+  footer,
+  disabled,
+  busy,
+  onModel,
+  onClose,
+  onRun,
+  children,
+}: {
+  node: CanvasNode
+  label: string
+  model: string
+  options: Array<{ id: string; name: string }>
+  parameters: ReactNode
+  footer: ReactNode
+  disabled: boolean
+  busy: boolean
+  onModel(id: string): void
+  onClose(): void
+  onRun(): void
+  children: ReactNode
+}) {
+  const { t } = useTranslation()
+  const [showParameters, setShowParameters] = useState(false)
+  return (
+    <section
+      aria-label={label}
+      data-testid="canvas-inspector"
+      data-node-composer={node.kind}
+      className="flex min-w-0 flex-col gap-2"
+    >
+      <div className="relative pr-9">
+        {children}
+        <button
+          type="button"
+          aria-label={t('canvas.generator.close')}
+          onClick={onClose}
+          className="absolute top-0 right-0 grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-muted"
+        >
+          <X size={17} />
+        </button>
+      </div>
+      {footer}
+      {showParameters ? (
+        <div className="max-h-48 overflow-auto rounded-xl border border-border bg-background p-2">
+          {parameters}
+        </div>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          aria-label={t('canvas.generator.model')}
+          className={selectClass}
+          value={model}
+          disabled={busy || !options.length}
+          onChange={(event) => onModel(event.target.value)}
+        >
+          {!options.length ? <option value="">{t('canvas.generator.noModel')}</option> : null}
+          {options.map((item) => (
+            <option value={item.id} key={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+        <Button
+          type="button"
+          variant="outline"
+          aria-expanded={showParameters}
+          onClick={() => setShowParameters(!showParameters)}
+        >
+          <SlidersHorizontal size={15} />
+          {t('canvas.prompt.parameters')}
+        </Button>
+        <Button
+          type="button"
+          aria-label={t('canvas.generator.run')}
+          title={t('canvas.generator.run')}
+          className="ml-auto rounded-full"
+          disabled={disabled}
+          onClick={onRun}
+        >
+          {busy ? <Loader2 size={17} className="animate-spin" /> : <ArrowUp size={17} />}
+        </Button>
+      </div>
+    </section>
+  )
+}
+
+function ImageComposer({ node, onClose }: { node: CanvasNode; onClose(): void }) {
   const { t } = useTranslation()
   const { editor, generation } = useCanvas()
-  const promptField = useId(),
-    modelField = useId()
   const doc = useEditor((state) => state.doc)
   const files = useEditor((state) => state.files)
-  const [submitting, setSubmitting] = useState(false)
-  const generator: CanvasGeneratorContent = node.generator ?? {
-    prompt: '',
-    model_id: null,
-    quality: '',
-    size: '',
-    ratio: '',
-    n: 1,
-  }
-  const inputs = useMemo(
-    () => collectInputs(doc, node.id, (file) => !!files[file]),
-    [doc, node.id, files],
+  const [busy, setBusy] = useState(false)
+  const settings = node.generator ?? defaultImage
+  const available = (id: string) => !!files[id]
+  const inputs = collectInputs(doc, node.id, available)
+  const missing = missingMentions(
+    referenceNodes(doc, node.id, true),
+    settings.mentions ?? [],
+    available,
   )
-  const draft: ImageDraft = {
-    prompt: generator.prompt,
-    quality: generator.quality,
-    size: generator.size,
-    ratio: generator.ratio,
-    n: generator.n,
-    references: inputs.references,
-  }
-  const options = useImageOptions(draft, generator.model_id ?? undefined)
+  const options = useImageOptions(
+    { ...settings, references: inputs.references },
+    settings.model_id ?? undefined,
+  )
   const model = options.model
-  const prompt = buildPrompt(generator.prompt, inputs.texts)
-  const patch = (change: Partial<CanvasGeneratorContent>, key = '') =>
+  const prompt = buildPrompt(settings.prompt, inputs.texts)
+  function patch(change: Partial<CanvasGeneratorContent>, key = '') {
     editor.apply(
       (current) =>
         updateNode(current, node.id, (item) => ({
           ...item,
-          generator: { ...generator, ...change },
+          generator: { ...(item.generator ?? defaultImage), ...change },
         })),
       { key },
     )
-  const references = inputs.references.length
+  }
   const problem = !model
     ? 'canvas.generator.noModel'
-    : inputs.unavailable
+    : missing.length || inputs.unavailable
       ? 'canvas.generator.missingInput'
-      : references && !model.capabilities.supports_edit
+      : inputs.references.length && !model.capabilities.supports_edit
         ? 'canvas.generator.noEdit'
-        : references > options.maxReferences
+        : inputs.references.length > options.maxReferences
           ? 'canvas.generator.tooManyReferences'
           : !prompt
             ? 'canvas.generator.emptyPrompt'
@@ -79,11 +178,10 @@ export function GeneratorInspector({ node, onClose }: { node: CanvasNode; onClos
     !!options.account.data &&
     options.account.data.total < options.quote.total_cost
   const disabled =
-    submitting || !!problem || !options.quote || !options.quality || !options.size || insufficient
-
+    busy || !!problem || !options.quote || !options.quality || !options.size || insufficient
   async function run() {
-    if (disabled || !model || !options.quality) return
-    setSubmitting(true)
+    if (disabled || !model) return
+    setBusy(true)
     try {
       await generation.submit({
         node_id: node.id,
@@ -94,147 +192,167 @@ export function GeneratorInspector({ node, onClose }: { node: CanvasNode; onClos
         n: options.n,
       })
     } finally {
-      setSubmitting(false)
+      setBusy(false)
     }
   }
-
   return (
-    <section
-      aria-label={t('canvas.generator.heading')}
-      data-testid="canvas-inspector"
-      className="flex min-h-0 flex-col gap-4"
-    >
-      <header className="flex items-center gap-2">
-        <Sparkles size={16} className="text-primary" aria-hidden="true" />
-        <h2 className="flex-1 text-sm font-semibold">{t('canvas.generator.heading')}</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={t('canvas.generator.close')}
-          className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <X size={16} aria-hidden="true" />
-        </button>
-      </header>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={promptField} className="text-xs font-medium text-muted-foreground">
-          {t('canvas.generator.prompt')}
-        </label>
-        <textarea
-          id={promptField}
-          autoFocus
-          value={generator.prompt}
-          maxLength={LIMITS.prompt}
-          placeholder={t('canvas.generator.promptPlaceholder')}
-          onChange={(event) => patch({ prompt: event.target.value }, 'prompt:' + node.id)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-              event.preventDefault()
-              void run()
-            }
-          }}
-          className="min-h-28 w-full resize-y rounded-lg border border-input bg-card px-3 py-2 text-sm leading-6 shadow-xs outline-none focus:border-ring focus:ring-3 focus:ring-ring/15"
-        />
-        <p className="text-xs leading-5 text-muted-foreground" data-testid="canvas-inputs">
-          {references || inputs.texts.length
-            ? t('canvas.generator.inputs', { images: references, texts: inputs.texts.length })
-            : t('canvas.generator.noInputs')}
-        </p>
-        {inputs.unavailable ? (
-          <p className="text-xs leading-5 text-warning">
-            {t('canvas.generator.unavailable', { count: inputs.unavailable })}
+    <Composer
+      node={node}
+      label={t('canvas.generator.heading')}
+      model={model?.id ?? ''}
+      options={options.models.items.map((item) => ({ id: item.id, name: item.display_name }))}
+      onModel={(id) => patch({ model_id: id, quality: '', size: '', ratio: '' })}
+      parameters={<ImageParameters options={options} disabled={busy} onPatch={patch} />}
+      footer={
+        <>
+          <p data-testid="canvas-inputs" className="sr-only">
+            {t('canvas.generator.inputs', {
+              images: inputs.references.length,
+              texts: inputs.texts.length,
+            })}
           </p>
-        ) : null}
-        {inputs.references.length ? (
-          <div className="flex flex-wrap gap-1.5">
-            {inputs.references.map((id, index) => (
-              <ReferenceThumbnail key={id} id={id} index={index} />
-            ))}
-          </div>
-        ) : null}
-        {inputs.texts.length ? (
-          <ul className="grid max-h-20 gap-1 overflow-y-auto text-xs text-muted-foreground">
-            {inputs.texts.map((text, index) => (
-              <li key={index} className="truncate" title={text}>
-                {text}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={modelField} className="text-xs font-medium text-muted-foreground">
-          {t('canvas.generator.model')}
-        </label>
-        <select
-          id={modelField}
-          className={selectClass}
-          value={model?.id ?? ''}
-          disabled={submitting || !options.models.items.length}
-          onChange={(event) =>
-            patch({ model_id: event.target.value, quality: '', size: '', ratio: '' })
-          }
-        >
-          {options.models.items.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.display_name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <ImageParameters
-        options={options}
-        disabled={submitting}
-        onPatch={(value) => {
-          const change: Partial<CanvasGeneratorContent> = {}
-          if (value.quality !== undefined) change.quality = value.quality
-          if (value.size !== undefined) change.size = value.size
-          if (value.ratio !== undefined) change.ratio = value.ratio
-          if (value.n !== undefined) change.n = Math.max(1, Math.min(LIMITS.count, value.n))
-          patch(change)
-        }}
+          {problem ? (
+            <p role="status" className="text-xs text-warning">
+              {t(problem, { max: options.maxReferences })}
+            </p>
+          ) : null}
+          {options.error ? <ApiNotice error={options.error} /> : null}
+          {options.quote ? (
+            <p className="text-xs text-muted-foreground">
+              {t('images.estimate', { cost: options.quote.total_cost })}
+            </p>
+          ) : null}
+        </>
+      }
+      busy={busy}
+      disabled={disabled}
+      onClose={onClose}
+      onRun={() => void run()}
+    >
+      <CanvasPrompt
+        node={node}
+        value={settings.prompt}
+        mentions={settings.mentions ?? []}
+        onChange={(prompt, mentions) => patch({ prompt, mentions }, 'prompt:' + node.id)}
+        onSend={() => void run()}
+        placeholder={t('canvas.generator.promptPlaceholder')}
       />
-      {problem ? (
-        <p role="status" className="text-xs leading-5 text-warning">
-          {t(problem, { max: options.maxReferences })}
-        </p>
-      ) : null}
-      {options.error ? <ApiNotice error={options.error} /> : null}
-      <div className="mt-auto flex flex-col gap-2 border-t border-border pt-3">
-        <div className="flex justify-between gap-2 text-xs text-muted-foreground">
-          <span>
-            {options.quote
-              ? t('images.estimate', { cost: options.quote.total_cost })
-              : t(options.pricing ? 'common.loading' : 'images.noPrice')}
-          </span>
-          <span>
-            {options.account.data
-              ? t('images.balance', { balance: options.account.data.total })
-              : t('common.loading')}
-          </span>
-        </div>
-        <Button type="button" disabled={disabled} onClick={() => void run()}>
-          {submitting ? (
-            <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-          ) : (
-            <Sparkles size={16} aria-hidden="true" />
-          )}
-          {submitting ? t('canvas.generator.running') : t('canvas.generator.run')}
-        </Button>
-      </div>
-    </section>
+    </Composer>
   )
 }
 
-function ReferenceThumbnail({ id, index }: { id: string; index: number }) {
+function TextComposer({ node, onClose }: { node: CanvasNode; onClose(): void }) {
   const { t } = useTranslation()
-  const file = useEditor((state) => state.files[id])
-  const image = useCanvasImage(file, 'thumb')
-  return image?.url ? (
-    <img
-      src={image.url}
-      alt={t('canvas.generator.reference', { number: index + 1 })}
-      className="size-9 rounded border border-border object-cover"
-    />
-  ) : null
+  const { editor, textRuns } = useCanvas()
+  const doc = useEditor((state) => state.doc)
+  const files = useEditor((state) => state.files)
+  const [busy, setBusy] = useState(false)
+  const settings = node.text_settings ?? defaultText
+  const models = useModels('chat')
+  const available = (id: string) => !!files[id]
+  const inputs = collectInputs(doc, node.id, available)
+  const missing = missingMentions(referenceNodes(doc, node.id), settings.mentions ?? [], available)
+  const model =
+    (settings.model_id ? models.items.find((item) => item.id === settings.model_id) : undefined) ??
+    (inputs.references.length
+      ? models.items.find((item) => item.capabilities.vision)
+      : undefined) ??
+    models.selected
+  const reasoning = model?.capabilities.reasoning_effort ? settings.reasoning : ''
+  const problem = !model
+    ? 'canvas.prompt.noTextModel'
+    : missing.length || inputs.unavailable
+      ? 'canvas.generator.missingInput'
+      : inputs.references.length > 4
+        ? 'canvas.prompt.textLimit'
+        : inputs.references.length && !model.capabilities.vision
+          ? 'canvas.prompt.vision'
+          : !buildPrompt(settings.prompt, inputs.texts)
+            ? 'canvas.generator.emptyPrompt'
+            : ''
+  function patch(change: Partial<CanvasTextSettings>, key = '') {
+    editor.apply(
+      (current) =>
+        updateNode(current, node.id, (item) => ({
+          ...item,
+          text_settings: { ...(item.text_settings ?? defaultText), ...change },
+        })),
+      { key },
+    )
+  }
+  async function run() {
+    if (busy || problem || !model) return
+    setBusy(true)
+    try {
+      if (!node.text_settings) patch({ model_id: model.id })
+      await textRuns.submit({ node_id: node.id, model_id: model.id, reasoning, n: settings.n })
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Composer
+      node={node}
+      label={t('canvas.prompt.textEditor')}
+      model={model?.id ?? ''}
+      options={models.items.map((item) => ({ id: item.id, name: item.display_name }))}
+      onModel={(id) => patch({ model_id: id, reasoning: '' })}
+      parameters={
+        <div className="flex flex-wrap gap-3 text-xs">
+          <label className="grid gap-1">
+            {t('canvas.prompt.reasoning')}
+            <select
+              value={reasoning}
+              className={selectClass}
+              disabled={!model?.capabilities.reasoning_effort}
+              onChange={(event) => {
+                const value = event.target.value
+                if (value === '' || value === 'low' || value === 'medium' || value === 'high')
+                  patch({ reasoning: value })
+              }}
+            >
+              <option value="">{t('canvas.prompt.auto')}</option>
+              <option value="low">{t('credits.low')}</option>
+              <option value="medium">{t('credits.medium')}</option>
+              <option value="high">{t('credits.high')}</option>
+            </select>
+          </label>
+          <label className="grid gap-1">
+            {t('canvas.prompt.candidates')}
+            <select
+              value={settings.n}
+              className={selectClass}
+              onChange={(event) => patch({ n: Number(event.target.value) })}
+            >
+              {[1, 2, 3].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      }
+      footer={
+        problem ? (
+          <p role="status" className="text-xs text-warning">
+            {t(problem)}
+          </p>
+        ) : null
+      }
+      busy={busy}
+      disabled={busy || !!problem}
+      onClose={onClose}
+      onRun={() => void run()}
+    >
+      <CanvasPrompt
+        node={node}
+        value={settings.prompt}
+        mentions={settings.mentions ?? []}
+        onChange={(prompt, mentions) => patch({ prompt, mentions }, 'text-prompt:' + node.id)}
+        onSend={() => void run()}
+        placeholder={t('canvas.prompt.textPlaceholder')}
+      />
+    </Composer>
+  )
 }

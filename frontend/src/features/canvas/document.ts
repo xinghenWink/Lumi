@@ -101,7 +101,9 @@ export function groupNode(at: Placement, title = '', id = newId()): CanvasNode {
 
 export function canGenerate(node: CanvasNode | undefined) {
   return (
-    node?.kind === 'generator' || node?.image?.state === 'empty' || node?.image?.state === 'failed'
+    node?.kind === 'generator' ||
+    (node?.kind === 'text' && node.text?.state !== 'pending') ||
+    (!!node?.image && node.image.state !== 'pending')
   )
 }
 
@@ -110,10 +112,14 @@ export function connectable(
   to: CanvasNodeKind | undefined,
   kind: CanvasEdge['kind'],
 ) {
-  if (kind === 'result') return (from === 'image' || from === 'generator') && to === 'image'
+  if (kind === 'result')
+    return (
+      ((from === 'image' || from === 'generator') && to === 'image') ||
+      (from === 'text' && to === 'text')
+    )
   return (
     (from === 'image' || from === 'text' || from === 'group') &&
-    (to === 'image' || to === 'generator')
+    (to === 'image' || to === 'generator' || to === 'text')
   )
 }
 
@@ -137,18 +143,41 @@ function nodeProblem(node: CanvasNode, kinds: Map<string, CanvasNodeKind>): stri
   if (runes(node.title) > LIMITS.title || titleControl.test(node.title)) return 'title'
   if (node.group_id !== null && (node.kind === 'group' || kinds.get(node.group_id) !== 'group'))
     return 'group'
+  const settings = node.text_settings
+  if (
+    settings &&
+    (node.kind !== 'text' ||
+      !validPrompt(settings) ||
+      settings.n < 1 ||
+      settings.n > 3 ||
+      !Number.isInteger(settings.n) ||
+      (settings.model_id !== null && !uuid.test(settings.model_id)))
+  )
+    return 'text'
   const parts = [node.image, node.text, node.generator].filter((part) => part !== undefined)
   if (node.kind === 'group') return parts.length ? 'content' : ''
   if (node.kind === 'image' ? !node.image || !!node.text : parts.length !== 1) return 'content'
   if (node.kind === 'text') {
-    const content = node.text?.content
+    const text = node.text
+    if (
+      text?.state &&
+      (!text.run_id ||
+        !uuid.test(text.run_id) ||
+        text.position === undefined ||
+        text.position < 0 ||
+        text.position > 2 ||
+        !codePattern.test(text.error_code ?? '') ||
+        (text.state !== 'failed' && text.error_code))
+    )
+      return 'text'
+    const content = text?.content
     return content !== undefined && runes(content) <= LIMITS.text && !textControl.test(content)
       ? ''
       : 'text'
   }
   if (node.kind === 'generator' || node.generator) {
     const g = node.generator
-    if (!g || runes(g.prompt) > LIMITS.prompt || textControl.test(g.prompt)) return 'prompt'
+    if (!g || !validPrompt(g)) return 'prompt'
     if (g.model_id !== null && !uuid.test(g.model_id)) return 'model'
     if ((g.size && !sizePattern.test(g.size)) || (g.ratio && !ratioPattern.test(g.ratio)))
       return 'size'
@@ -168,6 +197,22 @@ function nodeProblem(node: CanvasNode, kinds: Map<string, CanvasNodeKind>): stri
       ? ''
       : 'image'
   return image.file_id ? 'image' : ''
+}
+
+function validPrompt(settings: Pick<CanvasGeneratorContent, 'prompt' | 'mentions'>) {
+  const mentions = settings.mentions ?? []
+  return (
+    runes(settings.prompt) <= LIMITS.prompt &&
+    !textControl.test(settings.prompt) &&
+    mentions.length <= LIMITS.nodes &&
+    new Set(mentions.map((mention) => mention.token)).size === mentions.length &&
+    mentions.every(
+      (mention) =>
+        uuid.test(mention.node_id) &&
+        /^@\[[^[\]\r\n]{1,50}\]$/u.test(mention.token) &&
+        settings.prompt.includes(mention.token),
+    )
+  )
 }
 
 /** Returns the first problem the server would reject, or an empty string. */
@@ -193,7 +238,7 @@ export function documentProblem(doc: CanvasDocument): string {
   const edges = new Set<string>(),
     pairs = new Set<string>()
   for (const edge of doc.edges) {
-    const pair = edge.from + '>' + edge.to
+    const pair = edgeKey(edge)
     if (!uuid.test(edge.id) || edges.has(edge.id)) return 'edge-id'
     if (edge.from === edge.to || pairs.has(pair)) return 'edge'
     if (!connectable(kinds.get(edge.from), kinds.get(edge.to), edge.kind)) return 'edge'
@@ -220,6 +265,6 @@ export function pendingTasks(doc: CanvasDocument) {
   return [...ids]
 }
 
-export function edgeKey(edge: Pick<CanvasEdge, 'from' | 'to'>) {
-  return edge.from + '>' + edge.to
+export function edgeKey(edge: Pick<CanvasEdge, 'from' | 'to' | 'kind'>) {
+  return edge.from + '>' + edge.to + ':' + edge.kind
 }

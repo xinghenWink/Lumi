@@ -197,6 +197,11 @@ export function ModelEditor({
                     checked={form.capabilities.vision}
                     onChange={(vision) => changeCaps({ vision })}
                   />
+                  <CheckField
+                    label={t('catalog.reasoningEffort')}
+                    checked={form.capabilities.reasoning_effort === true}
+                    onChange={(reasoning_effort) => changeCaps({ reasoning_effort })}
+                  />
                 </div>
                 <NumberField
                   label={t('catalog.maxContext')}

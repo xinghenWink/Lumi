@@ -128,6 +128,7 @@ test('canvas journey composes, generates from references, persists and edits', a
     png = fixturePNG()
   const wire = 'canvas-image-' + suffix,
     modelName = 'Canvas Image ' + suffix
+  const chatName = 'Canvas Text ' + suffix
   const upstream = { generations: 0, edits: 0, referenced: false, prompts: [] as string[] }
   const server = createServer(async (incoming, response) => {
     if (incoming.headers.authorization !== 'Bearer ' + key) {
@@ -145,6 +146,11 @@ test('canvas journey composes, generates from references, persists and edits', a
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)))
     const raw = Buffer.concat(chunks)
     let count = 1
+    if (incoming.url === '/v1/chat/completions') {
+      response.setHeader('Content-Type', 'text/event-stream')
+      response.end('data: {"choices":[{"delta":{"content":"画布改写完成"}}]}\n\ndata: [DONE]\n\n')
+      return
+    }
     if (incoming.url === '/v1/images/edits') {
       upstream.edits++
       upstream.referenced = raw.includes(Buffer.from([137, 80, 78, 71]))
@@ -171,7 +177,8 @@ test('canvas journey composes, generates from references, persists and edits', a
   if (!address || typeof address === 'string') throw new Error('Missing fixture address')
   const admin = await administrator(request, baseURL)
   let channelID = '',
-    modelID = ''
+    modelID = '',
+    chatID = ''
   let oldPricing: Record<string, unknown> | undefined,
     oldSettings: ReturnType<typeof parseImageConfiguration> | undefined
   try {
@@ -225,6 +232,35 @@ test('canvas journey composes, generates from references, persists and edits', a
       ).id,
     )
     oldPricing = await admin('GET', '/admin/pricing')
+    chatID = String(
+      (
+        await admin('POST', '/admin/models', {
+          version: 0,
+          display_name: chatName,
+          type: 'chat',
+          description: '',
+          icon: '',
+          sort_order: 0,
+          enabled: true,
+          is_default: true,
+          capabilities: {
+            ...defaultCapabilities('chat'),
+            stream: true,
+            vision: true,
+            reasoning_effort: true,
+          },
+          routes: [
+            {
+              upstream_id: channelID,
+              upstream_model_name: 'canvas-chat',
+              priority: 0,
+              weight: 1,
+              enabled: true,
+            },
+          ],
+        })
+      ).id,
+    )
     if (!Array.isArray(oldPricing.rules)) throw new Error('Missing price rules')
     await admin('PUT', '/admin/pricing', {
       ...oldPricing,
@@ -283,27 +319,55 @@ test('canvas journey composes, generates from references, persists and edits', a
     const stage = await box(viewport)
     await page.mouse.dblclick(stage.x + stage.width * 0.22, stage.y + stage.height * 0.78)
     await page.getByRole('menuitem', { name: '文本', exact: true }).click()
+    await expect(page.getByTestId('canvas-inspector')).toHaveAttribute('data-node-composer', 'text')
+    await nodes('text').dblclick()
     const note = page.getByLabel('文本内容', { exact: true })
     await expect(note).toBeFocused()
     await note.fill('暖色水彩风格')
     await note.press('Escape')
     await expect(nodes('text')).toContainText('暖色水彩风格')
 
-    // Generate from the selected image, then wire the note in as extra prompt text.
-    await nodes('image').first().click()
+    // Start from the text node and add a reference in the generator composer.
+    await nodes('text').first().click()
     await page
       .getByRole('toolbar', { name: '选中操作' })
       .getByRole('button', { name: '生成', exact: true })
       .click()
+    await page.getByRole('button', { name: '适配全部（1）', exact: true }).click()
     const inspector = page.getByTestId('canvas-inspector')
     await expect(inspector).toBeVisible()
-    await expect(inspector.getByTestId('canvas-inputs')).toHaveText('1 张参考图 · 0 段文本')
-    await page.getByRole('button', { name: '适配全部（1）', exact: true }).click()
-    const port = nodes('text').locator('[data-handle="out"]')
-    await drag(page, center(await box(port)), center(await box(nodes('generator'))))
+    await page.getByRole('button', { name: '切换深色主题', exact: true }).click()
+    await drag(
+      page,
+      { x: stage.x + stage.width - 36, y: stage.y + stage.height * 0.65 },
+      { x: stage.x + stage.width - 36, y: stage.y + stage.height * 0.35 },
+    )
+    const generator = await box(nodes('generator'))
+    const composer = await box(inspector)
+    expect(composer.y).toBeGreaterThan(generator.y + generator.height)
+    const nodeTools = await box(page.getByRole('toolbar', { name: '选中操作' }))
+    expect(nodeTools.y + nodeTools.height).toBeLessThan(generator.y)
+    await expect(inspector.getByTestId('canvas-inputs')).toHaveText('0 张参考图 · 1 段文本')
+    await inspector.getByRole('button', { name: '从画布添加引用' }).click()
+    await page
+      .getByRole('dialog', { name: '从画布添加引用' })
+      .getByRole('button', { name: /图片/ })
+      .click()
     await expect(inspector.getByTestId('canvas-inputs')).toHaveText('1 张参考图 · 1 段文本')
     await expect(edges).toHaveCount(2)
-    await inspector.getByLabel('提示词', { exact: true }).fill('canvas-journey')
+    await inspector.getByLabel('提示词', { exact: true }).fill('canvas-journey @')
+    await expect(inspector.getByRole('listbox')).toBeVisible()
+    await inspector.getByRole('option', { name: /暖色水彩风格/ }).click()
+    await expect(inspector.getByLabel('提示词', { exact: true })).toHaveValue(/@\[/)
+    await inspector.getByRole('button', { name: /断开 文本/ }).click()
+    await expect(inspector.getByText(/引用已失效/)).toBeVisible()
+    await expect(inspector.getByRole('button', { name: '生成', exact: true })).toBeDisabled()
+    await inspector.getByRole('button', { name: '从画布添加引用' }).click()
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /暖色水彩风格/ })
+      .click()
+    await expect(inspector.getByText(/引用已失效/)).toHaveCount(0)
     await inspector.getByLabel('模型', { exact: true }).selectOption({ label: modelName })
     const run = inspector.getByRole('button', { name: '生成', exact: true })
     await expect(run).toBeEnabled({ timeout: 15_000 })
@@ -365,7 +429,7 @@ test('canvas journey composes, generates from references, persists and edits', a
     await page.keyboard.press('1')
     const frame = await box(nodes('group'))
     const before = await box(nodes('text'))
-    const grip = { x: frame.x + 6, y: frame.y + frame.height - 6 }
+    const grip = { x: frame.x + frame.width - 6, y: frame.y + frame.height * 0.75 }
     await drag(page, grip, { x: grip.x + 60, y: grip.y + 40 })
     await expect
       .poll(async () => {
@@ -414,6 +478,7 @@ test('canvas journey composes, generates from references, persists and edits', a
 
     // Drag a connection to empty space and undo the new node and edge together.
     await page.getByRole('button', { name: '添加文本（T）', exact: true }).click()
+    await nodes('text').dblclick()
     const newNote = page.getByLabel('文本内容', { exact: true })
     await newNote.fill('原位生图')
     await newNote.press('Escape')
@@ -473,11 +538,82 @@ test('canvas journey composes, generates from references, persists and edits', a
     await expect(nodes('text')).toHaveAttribute('data-selected', 'true')
     await expect(nodes('image')).toHaveAttribute('data-selected', 'true')
     await nodes('image').click()
+    await expect(inspector.getByTestId('canvas-inputs')).toHaveText('1 张参考图 · 1 段文本')
+    await inspector.getByLabel('提示词', { exact: true }).fill('继续生成参考图')
+    await inspector.getByLabel('模型', { exact: true }).selectOption({ label: modelName })
+    await expect(run).toBeEnabled()
+    await run.click()
+    await expect(nodes('image').locator('img')).toHaveCount(2, { timeout: 25_000 })
+    await expect(nodes('image').first()).toHaveAttribute('data-node-id', imageId ?? '')
+    expect(upstream.edits).toBe(2)
+    await saved()
+    await page.keyboard.press('Control+Z')
+    await expect(nodes('image')).toHaveCount(1)
+
+    const uploadedFile = () =>
+      page.waitForResponse(
+        (response) =>
+          response.url().endsWith('/api/v1/files') &&
+          response.request().method() === 'POST' &&
+          response.ok(),
+      )
+    const applyImageEdit = async (name: string) => {
+      const uploaded = uploadedFile()
+      await page.getByRole('dialog', { name }).getByRole('button', { name: '添加结果' }).click()
+      return record(await (await uploaded).json())
+    }
+    await page.getByRole('button', { name: '裁剪图片', exact: true }).click()
+    const cropArea = page.getByTestId('canvas-image-tool-preview')
+    await expect(cropArea).toBeVisible()
+    const cropBox = await box(cropArea)
+    await drag(
+      page,
+      { x: cropBox.x + cropBox.width * 0.25, y: cropBox.y + cropBox.height * 0.25 },
+      { x: cropBox.x + cropBox.width * 0.75, y: cropBox.y + cropBox.height * 0.75 },
+    )
+    const cropped = await applyImageEdit('裁剪图片')
+    expect(Math.abs(Number(cropped.width) - 450)).toBeLessThanOrEqual(3)
+    expect(Math.abs(Number(cropped.height) - 300)).toBeLessThanOrEqual(3)
+    await expect(nodes('image')).toHaveCount(2)
+    await page.keyboard.press('Control+Z')
+    await expect(nodes('image')).toHaveCount(1)
+
+    await page.getByRole('button', { name: '放大图片', exact: true }).click()
+    await page.getByLabel('目标长边').selectOption('1024')
+    const enlarged = await applyImageEdit('放大图片')
+    expect(enlarged).toMatchObject({ width: 1024, height: 683 })
+    await expect(nodes('image')).toHaveCount(2)
+    await page.keyboard.press('Control+Z')
+    await expect(nodes('image')).toHaveCount(1)
+
+    await page.getByRole('button', { name: '切分图片', exact: true }).click()
     await page
-      .getByRole('toolbar', { name: '选中操作' })
-      .getByRole('button', { name: '生成', exact: true })
+      .getByRole('dialog', { name: '切分图片' })
+      .getByRole('button', { name: '添加结果' })
       .click()
-    await expect(inspector.getByTestId('canvas-inputs')).toHaveText('1 张参考图 · 0 段文本')
+    await expect(nodes('image')).toHaveCount(5)
+    const splitBox = await box(nodes('image').nth(1))
+    expect(splitBox.width / splitBox.height).toBeCloseTo(1.5)
+    await page.keyboard.press('Control+Z')
+    await expect(nodes('image')).toHaveCount(1)
+    await page.keyboard.press('Escape')
+    await nodes('text').click()
+    await expect(inspector).toHaveAttribute('data-node-composer', 'text')
+    await inspector.getByLabel('提示词', { exact: true }).fill('改写成一句话')
+    await inspector.getByLabel('模型', { exact: true }).selectOption({ label: chatName })
+    await inspector.getByRole('button', { name: '参数' }).click()
+    await inspector.getByLabel('推理强度').selectOption('high')
+    await inspector.getByLabel('生成次数').selectOption('2')
+    const textAccepted = page.waitForResponse(
+      (response) => response.url().endsWith('/text-runs') && response.status() === 202,
+    )
+    await run.click()
+    await textAccepted
+    await page.reload()
+    await expect(nodes('text').filter({ hasText: '画布改写完成' })).toHaveCount(2, {
+      timeout: 25_000,
+    })
+    await expect(nodes('text').first()).toContainText('原位生图')
     await page.route('**/api/v1/canvases/*', async (route) => {
       if (route.request().method() === 'PUT') {
         await new Promise<void>((resolve) => setTimeout(resolve, 2000))
@@ -508,6 +644,7 @@ test('canvas journey composes, generates from references, persists and edits', a
     }
     if (channelID) await admin('DELETE', '/admin/upstreams/' + channelID)
     if (modelID) await admin('DELETE', '/admin/models/' + modelID)
+    if (chatID) await admin('DELETE', '/admin/models/' + chatID)
     server.closeAllConnections()
     await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())))
   }
@@ -542,6 +679,10 @@ test('canvas on small screens keeps tools reachable and pans by touch', async ({
     expect(area.x + area.width).toBeLessThanOrEqual(width)
   }
   await toolbar.getByRole('button', { name: '添加文本（T）', exact: true }).click()
+  const inspector = page.getByTestId('canvas-inspector')
+  await expect(inspector).toHaveAttribute('data-node-composer', 'text')
+  await inspector.getByRole('button', { name: '完成', exact: true }).click()
+  await page.getByRole('button', { name: '编辑正文', exact: true }).click()
   const note = page.getByLabel('文本内容', { exact: true })
   await note.fill('移动端笔记')
   await note.press('Escape')
@@ -549,7 +690,6 @@ test('canvas on small screens keeps tools reachable and pans by touch', async ({
 
   // Generator parameters open as a sheet on small screens.
   await toolbar.getByRole('button', { name: '添加生成节点（G）', exact: true }).click()
-  const inspector = page.getByTestId('canvas-inspector')
   await expect(inspector).toBeVisible()
   await inspector.getByRole('button', { name: '完成', exact: true }).click()
   await expect(inspector).toBeHidden()
@@ -559,7 +699,7 @@ test('canvas on small screens keeps tools reachable and pans by touch', async ({
 
   // A one-finger drag on empty space pans the canvas.
   const stage = await box(viewport)
-  const start = { x: stage.x + stage.width - 30, y: stage.y + 120 }
+  const start = { x: stage.x + stage.width - 30, y: stage.y + stage.height - 170 }
   const before = await box(nodes('text'))
   const session = await page.context().newCDPSession(page)
   await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] })

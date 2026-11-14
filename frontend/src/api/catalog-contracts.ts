@@ -59,6 +59,9 @@ export function parseCapabilities(value: unknown): Capabilities {
     return value
   })
   return {
+    ...(data.reasoning_effort === undefined
+      ? {}
+      : { reasoning_effort: bool(data, 'reasoning_effort') }),
     vision: bool(data, 'vision'),
     stream: bool(data, 'stream'),
     max_context_tokens: integer(data, 'max_context_tokens', 0, 1000000),
