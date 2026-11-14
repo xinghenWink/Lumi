@@ -31,12 +31,15 @@ const defaultImage: CanvasGeneratorContent = {
 }
 const defaultText: CanvasTextSettings = { prompt: '', model_id: null, reasoning: '', n: 1 }
 
-export function GeneratorInspector({ node, onClose }: { node: CanvasNode; onClose(): void }) {
-  return node.kind === 'text' ? (
-    <TextComposer node={node} onClose={onClose} />
-  ) : (
-    <ImageComposer node={node} onClose={onClose} />
-  )
+interface InspectorProps {
+  node: CanvasNode
+  onClose(): void
+  parametersOpen: boolean
+  onParametersOpenChange(open: boolean): void
+}
+
+export function GeneratorInspector(props: InspectorProps) {
+  return props.node.kind === 'text' ? <TextComposer {...props} /> : <ImageComposer {...props} />
 }
 
 function Composer({
@@ -52,9 +55,10 @@ function Composer({
   onModel,
   onClose,
   onRun,
+  parametersOpen,
+  onParametersOpenChange,
   children,
-}: {
-  node: CanvasNode
+}: InspectorProps & {
   label: string
   model: string
   options: Array<{ id: string; name: string }>
@@ -64,12 +68,10 @@ function Composer({
   disabled: boolean
   busy: boolean
   onModel(id: string): void
-  onClose(): void
   onRun(): void
   children: ReactNode
 }) {
   const { t } = useTranslation()
-  const [showParameters, setShowParameters] = useState(false)
   const parametersButton = useRef<HTMLButtonElement>(null)
   return (
     <section
@@ -110,8 +112,8 @@ function Composer({
           type="button"
           variant="outline"
           aria-haspopup="dialog"
-          aria-expanded={showParameters}
-          onClick={() => setShowParameters(true)}
+          aria-expanded={parametersOpen}
+          onClick={() => onParametersOpenChange(true)}
         >
           <SlidersHorizontal size={15} />
           {t('canvas.prompt.parameters')}
@@ -136,8 +138,8 @@ function Composer({
         </Button>
       </div>
       <ModalDialog
-        open={showParameters}
-        onOpenChange={setShowParameters}
+        open={parametersOpen}
+        onOpenChange={onParametersOpenChange}
         title={t(
           node.kind === 'text' ? 'canvas.prompt.textParameters' : 'canvas.prompt.imageParameters',
         )}
@@ -148,7 +150,7 @@ function Composer({
       >
         {parameters}
         <div className="mt-5 flex justify-end">
-          <Button type="button" onClick={() => setShowParameters(false)}>
+          <Button type="button" onClick={() => onParametersOpenChange(false)}>
             {t('canvas.generator.close')}
           </Button>
         </div>
@@ -157,7 +159,7 @@ function Composer({
   )
 }
 
-function ImageComposer({ node, onClose }: { node: CanvasNode; onClose(): void }) {
+function ImageComposer({ node, ...props }: InspectorProps) {
   const { t } = useTranslation()
   const { editor, generation } = useCanvas()
   const doc = useEditor((state) => state.doc)
@@ -234,6 +236,7 @@ function ImageComposer({ node, onClose }: { node: CanvasNode; onClose(): void })
   }
   return (
     <Composer
+      {...props}
       node={node}
       label={t('canvas.generator.heading')}
       model={model?.id ?? ''}
@@ -264,7 +267,6 @@ function ImageComposer({ node, onClose }: { node: CanvasNode; onClose(): void })
       }
       busy={busy}
       disabled={disabled}
-      onClose={onClose}
       onRun={() => void run()}
     >
       <CanvasPrompt
@@ -279,7 +281,7 @@ function ImageComposer({ node, onClose }: { node: CanvasNode; onClose(): void })
   )
 }
 
-function TextComposer({ node, onClose }: { node: CanvasNode; onClose(): void }) {
+function TextComposer({ node, ...props }: InspectorProps) {
   const { t } = useTranslation()
   const { editor, textRuns } = useCanvas()
   const doc = useEditor((state) => state.doc)
@@ -330,6 +332,7 @@ function TextComposer({ node, onClose }: { node: CanvasNode; onClose(): void }) 
   }
   return (
     <Composer
+      {...props}
       node={node}
       label={t('canvas.prompt.textEditor')}
       model={model?.id ?? ''}
@@ -380,7 +383,6 @@ function TextComposer({ node, onClose }: { node: CanvasNode; onClose(): void }) 
       }
       busy={busy}
       disabled={busy || !!problem}
-      onClose={onClose}
       onRun={() => void run()}
     >
       <CanvasPrompt

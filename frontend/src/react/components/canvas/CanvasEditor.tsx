@@ -250,7 +250,11 @@ export function CanvasEditor({ rejected }: { rejected: Rejections | null }) {
             }}
           />
           {panel ? (
-            <GeneratorOverlay node={panel} onClose={() => editor.closeInspector(panel.id)} />
+            <GeneratorOverlay
+              key={panel.id}
+              node={panel}
+              onClose={() => editor.closeInspector(panel.id)}
+            />
           ) : null}
           <div className="absolute bottom-3 left-3 z-10 flex flex-col items-start gap-2">
             {minimap && wide ? <CanvasMiniMap /> : null}
@@ -286,27 +290,7 @@ export function CanvasEditor({ rejected }: { rejected: Rejections | null }) {
         />
       ) : null}
       {sheet ? (
-        <ModalDialog
-          open
-          variant="sheet"
-          title={t(sheet.kind === 'text' ? 'canvas.prompt.textEditor' : 'canvas.generator.heading')}
-          description={t(
-            sheet.kind === 'text'
-              ? 'canvas.prompt.textPlaceholder'
-              : 'canvas.generator.promptPlaceholder',
-          )}
-          onOpenChange={(open) => {
-            if (!open) editor.openInspector(null)
-          }}
-        >
-          <div className="max-h-[70dvh] overflow-y-auto pt-2">
-            <GeneratorInspector
-              key={sheet.id}
-              node={sheet}
-              onClose={() => editor.openInspector(null)}
-            />
-          </div>
-        </ModalDialog>
+        <GeneratorSheet key={sheet.id} node={sheet} onClose={() => editor.openInspector(null)} />
       ) : null}
       {library ? (
         <Suspense fallback={null}>
@@ -381,6 +365,38 @@ function SelectionOverlay({
   )
 }
 
+function GeneratorSheet({ node, onClose }: { node: CanvasNode; onClose(): void }) {
+  const { t } = useTranslation()
+  const [parametersOpen, setParametersOpen] = useState(false)
+  return (
+    <ModalDialog
+      open
+      variant="sheet"
+      title={t(node.kind === 'text' ? 'canvas.prompt.textEditor' : 'canvas.generator.heading')}
+      description={t(
+        node.kind === 'text'
+          ? 'canvas.prompt.textPlaceholder'
+          : 'canvas.generator.promptPlaceholder',
+      )}
+      onOpenChange={(open) => {
+        if (open) return
+        // A dismissal during child layer registration must close the parameters first.
+        if (parametersOpen) setParametersOpen(false)
+        else onClose()
+      }}
+    >
+      <div className="max-h-[70dvh] overflow-y-auto pt-2">
+        <GeneratorInspector
+          node={node}
+          onClose={onClose}
+          parametersOpen={parametersOpen}
+          onParametersOpenChange={setParametersOpen}
+        />
+      </div>
+    </ModalDialog>
+  )
+}
+
 function GeneratorOverlay({
   node,
   onClose,
@@ -393,6 +409,7 @@ function GeneratorOverlay({
   const preview = useEditor((state) => state.preview)
   const panel = useRef<HTMLElement>(null)
   const [height, setHeight] = useState(320)
+  const [parametersOpen, setParametersOpen] = useState(false)
   useLayoutEffect(() => {
     const element = panel.current
     if (!element) return
@@ -442,7 +459,12 @@ function GeneratorOverlay({
         maxHeight,
       }}
     >
-      <GeneratorInspector key={node.id} node={node} onClose={onClose} />
+      <GeneratorInspector
+        node={node}
+        onClose={onClose}
+        parametersOpen={parametersOpen}
+        onParametersOpenChange={setParametersOpen}
+      />
     </aside>
   )
 }

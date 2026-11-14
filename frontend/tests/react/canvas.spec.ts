@@ -723,6 +723,8 @@ test('canvas on small screens keeps tools reachable and pans by touch', async ({
   await expect(textParameters.getByLabel('生成次数')).toHaveValue('2')
   await page.keyboard.press('Escape')
   await expect(textParameters).toBeHidden()
+  await expect(inspector).toBeVisible()
+  await expect(parameters).toBeFocused()
   await inspector.getByRole('button', { name: '完成', exact: true }).click()
   await page.getByRole('button', { name: '编辑正文', exact: true }).click()
   const note = page.getByLabel('文本内容', { exact: true })
