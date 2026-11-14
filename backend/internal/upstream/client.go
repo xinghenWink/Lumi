@@ -44,6 +44,7 @@ type ChatRequest struct {
 type ChatEvent struct {
 	Content, FinishReason, ErrorCode string
 	Usage                            json.RawMessage
+	Sources                          []ChatSource
 }
 type ImageRequest struct {
 	Model   string `json:"model"`

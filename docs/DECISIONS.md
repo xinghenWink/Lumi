@@ -1,8 +1,16 @@
 # 技术决策记录
 
+## 聊天回复的上游组件标记
+
+- ADR-137 助手回复统一解析行内与嵌套的组件标记，并为流式输出暂缓显示半截标记。已识别的布局、选项和徽标转成受控样式，未知组件保留可读内容。引用仅在上游提供可用 HTTP(S) 网址时可点击，只有内部编号时正文显示「来源不可用」，参考标题仍可阅读。Chat Completions 的网址注解作为可选 `meta.sources` 随检查点和最终消息持久化，使用现有 JSONB，无需 SQL 迁移。提供者的引用数据在本轮有正文后才归入该回复。聊天与管理详情共用渲染，整条回复复制包含可用链接，JSON 和 Markdown 导出沿用历史原文。没有新增依赖、搜索请求或远程预览。
+
+- ADR-136 在分段渲染之前处理助手回复中的上游组件标记。独立的 `<CodeBlock>` 复用 Markdown 代码块的高亮、缩进和复制功能。GenUI 的静态选项和问题显示为 Markdown，状态声明和按钮表达式从显示和回复复制中移除。聊天与后台记录共用转换逻辑，历史消息打开时即生效，数据库仍保存上游原始文本。现有 HTML 禁用和 DOMPurify 规则继续生效。
+
 ## shadcn/ui 与 AI Elements
 
 - ADR-135：使用 shadcn 官方 Registry 的 New York / Radix 组件和迁入 shadcn/ui 的 AI Elements 模式。直接依赖锁定 `@shadcn/react@0.3.1` 用于消息滚动，以及 `@radix-ui/react-avatar@1.3.1`、`@radix-ui/react-checkbox@1.4.1`、`@radix-ui/react-label@2.1.17`、`@radix-ui/react-separator@1.2.0` 用于界面原语。复用项目的 `cn`、Tailwind 令牌、鉴权、数据请求、SSE、Markdown 和上传逻辑。长会话通过 TanStack Virtual 锚定阅读位置。后台和法律页的中文文案，以及图片控制器与参考图界面，按使用场景加载以维持首屏预算。弹窗使用静态样式遮罩以适配生产 CSP。本次不涉及迁移或 OpenAPI 变更。
+
+- 发布整合时将积分页面和后台运营专用中文文案移入对应路由的按需加载词表。工作区保留通用积分提示和常用操作文案，首屏继续执行原有 250,000 字节 gzip 脚本上限。
 
 ## 生图分辨率预设
 

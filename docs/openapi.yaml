@@ -286,6 +286,7 @@ paths:
     patch:
       operationId: updateMe
       summary: updateMe
+      description: Updates the supplied profile fields. The workspace language switcher sends only `locale` to save the account's interface language.
       security:
         - bearerAuth: []
       parameters:
@@ -7619,7 +7620,39 @@ components:
           type: string
         usage:
           $ref: '#/components/schemas/ChatUsage'
+        sources:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/ChatSource'
       required: []
+    ChatSource:
+      type: object
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: Absolute HTTP or HTTPS URL provided in an upstream citation.
+        title:
+          type: string
+          maxLength: 256
+        ref:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9_.:#-]{0,127}$'
+        start_index:
+          type: integer
+          minimum: 0
+          maximum: 2097151
+          description: Optional upstream character offset into the unmodified reply.
+        end_index:
+          type: integer
+          minimum: 0
+          maximum: 2097151
+          description: Optional upstream character offset into the unmodified reply.
+      required:
+        - url
     ChatMessage:
       type: object
       additionalProperties: false

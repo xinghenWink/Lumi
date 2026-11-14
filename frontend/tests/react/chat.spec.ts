@@ -43,7 +43,26 @@ test('React real streaming history stop editing isolation and bounded rendering'
     systemSeen = false,
     interruptions = 0
   const markdown =
-    '## 灯塔与海风\n\n先把问题拆成两步，再观察光线。\n\n| 项目 | 结果 |\n| --- | --- |\n| 风向 | 东南 |\n\n```go\nfmt.Println("lumi")\n```\n\n公式 $E=mc^2$。\n\n$$\n\\frac{a_1}{b}\n$$\n\n<script>window.untrusted=true</script>\n'
+    '## 灯塔与海风\n\n先把问题拆成两步，再观察光线。\n\n| 项目 | 结果 |\n| --- | --- |\n| 风向 | 东南 |\n\n' +
+    '<CodeBlock language="go" editable>\nfunc main() {\n\n    fmt.Println("lumi")\n}\n</CodeBlock>\n\n' +
+    '公式 $E=mc^2$。\n\n$$\n\\frac{a_1}{b}\n$$\n\n<script>window.untrusted=true</script>\n\n' +
+    '{@body const [scope, setScope] = DIL.useState("海风")}\n<box gap={3}>\n**比较范围**\n' +
+    '<radio-group value={scope} onChange={setScope}>\n<radio value="海风">海风</radio>\n' +
+    '{#each ["远处灯塔","海岸地形"] as v}<radio value={v}>{v}</radio>{/each}\n</radio-group>\n' +
+    '<button onClick={() => GenUI.issueNewTurn(scope)}>查看详细结果</button>\n</box>'
+  const sourceURL = 'https://example.com/lighthouse'
+  const source = {
+    type: 'url_citation',
+    ref: 'turn123news16',
+    url_citation: { url: sourceURL, title: '灯塔报告' },
+  }
+  const richMarkdown =
+    markdown +
+    '\n\n<badge color="success">观测完成</badge>。<Cite\n refs={["turn123news16","turn123news2"]}/>' +
+    '\n\n- <Link ref="turn123news16" title="查看报告"/>' +
+    '\n- <Link ref="turn123news2" title="仅有标题的报告"/>' +
+    '\n\n<row>{#each ["100ms","200ms","900ms"] as t,i}<box><text color={i===2?"green":"default"}>{t}</text></box>{/each}</row>' +
+    '\n\n<think>观测草稿</think>'
   const server = createServer(async (request, response) => {
     const receivedAt = Date.now()
     if (request.headers.authorization !== `Bearer ${key}`) {
@@ -67,8 +86,27 @@ test('React real streaming history stop editing isolation and bounded rendering'
     const body = record(JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown)
     if (body.model === 'bad-' + wire) {
       badCalls++
-      response.writeHead(429)
-      response.end(JSON.stringify({ error: { message: 'private-provider-error' } }))
+      response.setHeader('Content-Type', 'text/event-stream')
+      response.write(
+        'data: ' +
+          JSON.stringify({
+            choices: [
+              {
+                delta: {
+                  annotations: [
+                    {
+                      type: 'url_citation',
+                      ref: source.ref,
+                      url_citation: { url: 'https://example.com/discard' },
+                    },
+                  ],
+                },
+              },
+            ],
+          }) +
+          '\n\n',
+      )
+      response.end('data: {"error":{"message":"private-provider-error"}}\n\n')
       return
     }
     if (!Array.isArray(body.messages)) {
@@ -115,13 +153,32 @@ test('React real streaming history stop editing isolation and bounded rendering'
       return
     }
     const output =
-      prompt === '流式性能测试' ? '一段流畅的回答。'.repeat(180) + '\n\n结束。' : markdown
+      prompt === '流式性能测试' ? '一段流畅的回答。'.repeat(180) + '\n\n结束。' : richMarkdown
     let position = 0
     const timer = setInterval(() => {
       delta(output.slice(position, position + 12))
       position += 12
       if (position >= output.length) {
         clearInterval(timer)
+        if (output === richMarkdown) {
+          response.write(
+            'data: ' +
+              JSON.stringify({
+                choices: [
+                  {
+                    delta: {
+                      annotations: [
+                        source,
+                        source,
+                        { type: 'url_citation', url_citation: { url: 'javascript:invalid' } },
+                      ],
+                    },
+                  },
+                ],
+              }) +
+              '\n\n',
+          )
+        }
         done()
       }
     }, 20)
@@ -280,9 +337,36 @@ test('React real streaming history stop editing isolation and bounded rendering'
         .last()
         .getByRole('button', { name: '重新生成', exact: true }),
     ).toBeEnabled()
-    await expect(page.locator('.chat-markdown .shiki')).toBeVisible()
-    await expect(page.locator('.chat-markdown .katex')).toHaveCount(2)
-    expect(await page.locator('.chat-markdown script,.chat-markdown img').count()).toBe(0)
+    const answer = page.locator('.chat-message-assistant').last().locator('.chat-markdown')
+    await expect(answer.locator('.shiki')).toBeVisible()
+    await expect(answer.locator('.katex')).toHaveCount(2)
+    await expect(answer.getByRole('listitem')).toHaveText([
+      '海风',
+      '远处灯塔',
+      '海岸地形',
+      '查看报告',
+      '仅有标题的报告',
+    ])
+    await expect(answer).not.toContainText(/CodeBlock|radio-group|DIL\.useState|GenUI\./)
+    await expect(answer.locator('script,img,input,[onclick]')).toHaveCount(0)
+    await expect(answer.getByRole('link', { name: '灯塔报告' })).toHaveAttribute('href', sourceURL)
+    await expect(answer.getByRole('link', { name: '查看报告' })).toHaveAttribute('href', sourceURL)
+    await expect(answer.getByText('来源不可用', { exact: true })).toBeVisible()
+    await expect(answer.locator('.chat-reply-badge[data-tone="success"]')).toHaveText('观测完成')
+    await expect(answer).toContainText(/100ms\s+200ms\s+900ms/)
+    await expect(answer.getByText('观测草稿')).toBeHidden()
+    const reasoning = answer.getByText('思考过程', { exact: true })
+    await reasoning.focus()
+    await reasoning.press('Enter')
+    await expect(answer.getByText('观测草稿')).toBeVisible()
+    await reasoning.press('Enter')
+    await expect(answer.getByText('观测草稿')).toBeHidden()
+    await answer.getByRole('link', { name: '灯塔报告' }).focus()
+    await expect(answer.getByRole('link', { name: '灯塔报告' })).toBeFocused()
+    await page.screenshot({
+      path: info.outputPath('chat-sources-light.png'),
+      animations: 'disabled',
+    })
     const streamed = await stream
     expect(streamed.headers()['x-accel-buffering']).toBe('no')
     const wireResponse = await page.evaluate(async () => {
@@ -299,6 +383,8 @@ test('React real streaming history stop editing isolation and bounded rendering'
       'private-provider-error',
       'upstream_id',
       'request_hash',
+      'https://example.com/discard',
+      'javascript:invalid',
     ])
       expect(wireResponse).not.toContain(value)
     const conversationID = page.url().split('/').at(-1)
@@ -309,12 +395,32 @@ test('React real streaming history stop editing isolation and bounded rendering'
       .last()
       .getByRole('button', { name: '复制消息', exact: true })
       .click()
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('灯塔与海风')
+    const copiedAnswer = await page.evaluate(() => navigator.clipboard.readText())
+    expect(copiedAnswer).toContain('灯塔与海风')
+    expect(copiedAnswer).toContain('- 远处灯塔')
+    expect(copiedAnswer).not.toMatch(/CodeBlock|radio-group|DIL\.useState|GenUI\./)
+    expect(copiedAnswer).toContain(sourceURL)
+    expect(copiedAnswer).not.toMatch(/turn123|观测草稿/)
     await page.locator('.chat-code').getByRole('button', { name: '复制代码', exact: true }).click()
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('fmt.Println')
+    await expect
+      .poll(() =>
+        page.evaluate(async () => (await navigator.clipboard.readText()).replaceAll('\r\n', '\n')),
+      )
+      .toContain('func main() {\n\n    fmt.Println("lumi")\n}')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.screenshot({ path: info.outputPath('chat-light.png'), animations: 'disabled' })
     await page.getByRole('button', { name: '切换深色主题', exact: true }).click()
     await page.screenshot({ path: info.outputPath('chat-dark.png'), animations: 'disabled' })
+    await answer.getByRole('link', { name: '灯塔报告' }).scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: info.outputPath('chat-sources-dark.png'),
+      animations: 'disabled',
+    })
+    await page.reload()
+    await expect(answer.locator('.shiki')).toBeVisible()
+    await expect(answer.getByRole('link', { name: '灯塔报告' })).toHaveAttribute('href', sourceURL)
+    await expect(answer.getByText('仅有标题的报告', { exact: true })).toBeVisible()
+    await expect(answer).not.toContainText(/CodeBlock|radio-group|DIL\.useState|GenUI\./)
     await input.fill('保留的草稿')
     await page
       .getByRole('navigation', { name: '创作模式' })
@@ -459,6 +565,9 @@ test('React real streaming history stop editing isolation and bounded rendering'
         .getByRole('button', { name: '查看消息（需开启内容权限）', exact: true })
         .click()
       await expect(page.getByRole('dialog')).toContainText('灯塔与海风')
+      await expect(
+        page.getByRole('dialog').getByRole('link', { name: '灯塔报告' }).first(),
+      ).toHaveAttribute('href', sourceURL)
       expect(contentReads).toBe(2)
       await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
       const audit = await api(

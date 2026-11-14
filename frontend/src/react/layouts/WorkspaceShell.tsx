@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Sidebar } from '../components/shared/Sidebar'
 import { SidebarInset } from '../components/ui/sidebar'
 import { MobileNavigation } from '../components/shared/MobileNavigation'
+import { LanguageSwitcher } from '../components/shared/LanguageSwitcher'
 import { ThemeToggle } from '../components/shared/ThemeToggle'
 import { routeTitle } from '../features/accounts/navigation'
 import { usePublicConfig } from '../features/auth/hooks'
@@ -46,6 +47,7 @@ export function ShellLayout({ admin }: { admin: boolean }) {
             /
           </span>
           <span className="min-w-0 flex-1 truncate text-xs font-medium">{t(title)}</span>
+          <LanguageSwitcher />
           <ThemeToggle />
         </header>
         <RuntimeBanner />

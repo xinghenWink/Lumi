@@ -55,6 +55,46 @@
 .chat-markdown a:hover {
   text-decoration-color: var(--primary);
 }
+.chat-markdown .chat-citation,
+.chat-reply-badge {
+  display: inline;
+  margin-inline: 0.25em;
+  padding: 0.12em 0.55em;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--muted);
+  font-size: 0.82em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.chat-citation-unavailable {
+  color: var(--muted-foreground);
+}
+.chat-reply-badge[data-tone='danger'] {
+  color: var(--destructive);
+}
+.chat-reply-badge[data-tone='success'] {
+  color: var(--success);
+}
+.chat-reply-badge[data-tone='warning'] {
+  color: var(--warning);
+}
+.chat-markdown .chat-citation:focus-visible,
+.chat-reasoning summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.chat-reasoning {
+  margin: 0 0 14px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted-foreground);
+}
+.chat-reasoning summary {
+  cursor: pointer;
+  padding-block: 4px;
+}
 .chat-markdown blockquote {
   border-left: 2px solid var(--input);
   padding-left: 14px;

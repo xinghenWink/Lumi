@@ -5,9 +5,14 @@ import { CreditUsage } from '../components/credits/CreditUsage'
 import { CreditLedger } from '../components/credits/CreditLedger'
 import { RedemptionRecords } from '../components/credits/RedemptionRecords'
 import { Button } from '../components/ui/button'
+import { PageStatus } from '../components/shared/PageStatus'
+import { useRouteCopy } from '../i18n/route-copy'
+
 export default function CreditsPage() {
   const { t } = useTranslation(),
     [tab, setTab] = useState('ledger')
+  const copy = useRouteCopy('credits')
+  if (!copy.ready) return <PageStatus error={copy.error} retry={copy.retry} />
   return (
     <div className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
       <div className="mx-auto max-w-6xl">

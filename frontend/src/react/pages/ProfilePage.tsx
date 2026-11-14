@@ -26,9 +26,9 @@ function ProfileForm({ user }: { user: User }) {
     id = useId()
   const [form, setForm] = useState({
     nickname: user.nickname,
-    locale: user.locale,
     timezone: user.timezone,
   })
+  const [locale, setLocale] = useState<User['locale'] | null>(null)
   const [password, setPassword] = useState({ current: '', next: '', confirm: '' }),
     [validation, setValidation] = useState(''),
     [saved, setSaved] = useState(false)
@@ -44,16 +44,21 @@ function ProfileForm({ user }: { user: User }) {
     },
     [],
   )
-  const update = useOwnedMutation(user.id, async (check) => {
-    if (!form.nickname.trim() || Array.from(form.nickname.trim()).length > 30)
-      throw new ApiError('INVALID_INPUT')
-    const result = await accounts.updateMe({ ...form, nickname: form.nickname.trim() })
-    check()
-    runtime.session.updateUser(result)
-    await i18n.changeLanguage(result.locale)
-    check()
-    setSaved(true)
-  })
+  const update = useOwnedMutation(
+    user.id,
+    async (check) => {
+      const nickname = form.nickname.trim()
+      if (!nickname || Array.from(nickname).length > 30) throw new ApiError('INVALID_INPUT')
+      const result = await accounts.updateMe({ ...form, nickname, ...(locale ? { locale } : {}) })
+      check()
+      runtime.session.updateUser(result)
+      await i18n.changeLanguage(result.locale)
+      check()
+      setLocale(null)
+      setSaved(true)
+    },
+    { scope: 'profile' },
+  )
   const avatar = useOwnedMutation(user.id, async (check) => {
     const file = avatarFile.current
     if (!file) return
@@ -186,11 +191,11 @@ function ProfileForm({ user }: { user: User }) {
                   <NativeSelect
                     id={id + '-locale'}
                     className="h-10 rounded-lg"
-                    value={form.locale}
+                    value={locale ?? user.locale}
                     disabled={update.isPending}
                     onChange={(event) => {
                       if (event.target.value === 'zh-CN' || event.target.value === 'en')
-                        setForm({ ...form, locale: event.target.value })
+                        setLocale(event.target.value === user.locale ? null : event.target.value)
                     }}
                   >
                     <NativeSelectOption value="zh-CN">{t('common.zhCN')}</NativeSelectOption>

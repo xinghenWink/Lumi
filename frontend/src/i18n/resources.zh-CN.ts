@@ -1,10 +1,10 @@
 import base from './zh-CN'
 import accounts from './accounts-shell.zh-CN'
-import credits from './credits.zh-CN'
+import credits from './credits-shell.zh-CN'
 import catalog from './catalog-shell.zh-CN'
 import chat from './chat.zh-CN'
 import images from './images.zh-CN'
-import operations from './operations.zh-CN'
+import operations from './operations-shell.zh-CN'
 
 export default {
   ...base,

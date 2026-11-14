@@ -12,6 +12,7 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/media"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	platformredis "github.com/xinghenWink/Lumi/backend/internal/platform/redis"
+	"github.com/xinghenWink/Lumi/backend/internal/upstream"
 )
 
 type Gate interface {
@@ -55,10 +56,11 @@ type Conversation struct {
 	CreatedAt     time.Time  `json:"created_at"`
 }
 type Metadata struct {
-	FinishReason string `json:"finish_reason,omitempty"`
-	LatencyMS    int64  `json:"latency_ms,omitempty"`
-	ErrorCode    string `json:"error_code,omitempty"`
-	Usage        *Usage `json:"usage,omitempty"`
+	FinishReason string                `json:"finish_reason,omitempty"`
+	LatencyMS    int64                 `json:"latency_ms,omitempty"`
+	ErrorCode    string                `json:"error_code,omitempty"`
+	Usage        *Usage                `json:"usage,omitempty"`
+	Sources      []upstream.ChatSource `json:"sources,omitempty"`
 }
 type Usage struct {
 	PromptTokens     int64 `json:"prompt_tokens"`

@@ -8,6 +8,7 @@ export default {
     description: '让想法自由生长，Lumi 陪你一起探索。',
     changeLanguage: '切换语言',
     languageLabel: 'EN',
+    languageSelection: '切换语言（{language}）',
     switchLight: '切换浅色主题',
     switchDark: '切换深色主题',
     version: 'Lumi · {version}',

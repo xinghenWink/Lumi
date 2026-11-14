@@ -66,8 +66,12 @@ func (c *Client) ChatStream(ctx context.Context, input ChatRequest) (<-chan Chat
 			var chunk struct {
 				Choices []struct {
 					Delta struct {
-						Content *string `json:"content"`
+						Content     *string         `json:"content"`
+						Annotations json.RawMessage `json:"annotations"`
 					} `json:"delta"`
+					Message struct {
+						Annotations json.RawMessage `json:"annotations"`
+					} `json:"message"`
 					Finish *string `json:"finish_reason"`
 				} `json:"choices"`
 				Usage json.RawMessage `json:"usage"`
@@ -80,6 +84,7 @@ func (c *Client) ChatStream(ctx context.Context, input ChatRequest) (<-chan Chat
 			event := ChatEvent{Usage: chunk.Usage}
 			if len(chunk.Choices) > 0 {
 				choice := chunk.Choices[0]
+				event.Sources = MergeChatSources(readChatSources(choice.Delta.Annotations), readChatSources(choice.Message.Annotations))
 				if choice.Delta.Content != nil {
 					event.Content = *choice.Delta.Content
 				}

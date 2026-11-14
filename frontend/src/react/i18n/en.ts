@@ -8,6 +8,7 @@ export default {
     description: 'Give your ideas room to grow. Explore and create with Lumi.',
     changeLanguage: 'Change language',
     languageLabel: '中文',
+    languageSelection: 'Change language ({language})',
     switchLight: 'Switch to light theme',
     switchDark: 'Switch to dark theme',
     version: 'Lumi · {version}',

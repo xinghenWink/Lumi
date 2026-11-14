@@ -104,7 +104,7 @@ export default function ChatPage() {
           />
         </Suspense>
       ) : (
-        <section className="flex flex-1 flex-col items-center justify-end px-5 pt-4 pb-4 text-center sm:pb-8">
+        <section className="flex min-h-min flex-1 flex-col items-center justify-end px-5 pt-4 pb-4 text-center sm:pb-8">
           <div className="mb-3 animate-rise-in sm:mb-5">
             <BrandMark compact markClassName="size-12" />
           </div>

@@ -1,6 +1,8 @@
 import adminZh from './accounts-admin.zh-CN'
 import catalogAdminZh from './catalog-admin.zh-CN'
 import legalZh from './legal.zh-CN'
+import creditsZh from './credits.zh-CN'
+import operationsZh from './operations.zh-CN'
 import zhCN from './resources.zh-CN'
 import en from './resources.en'
 
@@ -10,6 +12,8 @@ export const messages = {
     ...zhCN,
     ...adminZh,
     ...legalZh,
+    credits: creditsZh.credits,
+    ops: operationsZh.ops,
     catalog: { ...zhCN.catalog, ...catalogAdminZh.catalog },
   },
   en,

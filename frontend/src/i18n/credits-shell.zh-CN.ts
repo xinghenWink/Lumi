@@ -1,0 +1,30 @@
+export default {
+  nav: {
+    credits: '积分与兑换',
+    pricing: '价格与赠送',
+    redeemCodes: '兑换码',
+    creditLedger: '积分流水',
+  },
+  errors: {
+    IDEMPOTENCY_KEY_INVALID: '本次操作缺少有效标识，请刷新页面后重试。',
+    IDEMPOTENCY_CONFLICT: '这次提交与原操作不一致，请重新填写后提交。',
+    CREDITS_INSUFFICIENT: '可用积分不足，请减少数量或兑换积分。',
+    CREDITS_LIMIT: '操作将超过积分余额上限，请联系管理员处理。',
+    PRICE_UNAVAILABLE: '该质量或操作已关闭，请选择其他配置。',
+    REDEEM_INVALID: '兑换码无效，请检查后重试。',
+    REDEEM_USED: '该兑换码的可用次数已用完。',
+    REDEEM_ALREADY_USED: '你已经使用过该兑换码。',
+    REDEEM_EXPIRED: '该兑换码已过期。',
+    REDEEM_DISABLED: '该兑换码已被停用。',
+    REDEEM_DELETE_USED: '已兑换过的码不能删除，请调整选择。',
+    REDEEM_COOLDOWN: '连续兑换失败次数过多，请在冷却结束后再试。',
+  },
+  credits: {
+    unit: '积分',
+    split: '每日 {daily} · 永久 {permanent}',
+    retryAfter: '请在 {seconds} 秒后重试',
+    low: '低',
+    medium: '中',
+    high: '高',
+  },
+}

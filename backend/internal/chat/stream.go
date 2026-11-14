@@ -47,6 +47,7 @@ func (s *Service) relay(ctx context.Context, targets []catalog.ChatTarget, messa
 	started := false
 	for index, target := range targets {
 		code := ""
+		var pendingSources []upstream.ChatSource
 		attempt, cancel := context.WithCancel(ctx)
 		client, err := s.catalog.RoutedChatClient(attempt, target)
 		if err != nil {
@@ -69,8 +70,13 @@ func (s *Service) relay(ctx context.Context, targets []catalog.ChatTarget, messa
 					code = event.ErrorCode
 					break
 				}
-				if event.Content != "" {
+				if !started {
+					pendingSources = upstream.MergeChatSources(pendingSources, event.Sources)
+					event.Sources = nil
+				}
+				if event.Content != "" && !started {
 					started = true
+					event.Sources = pendingSources
 				}
 				if !send(packet{event: event, target: target}) {
 					cancel()
@@ -255,6 +261,7 @@ func (s *Service) Stream(ctx context.Context, actor user.Actor, id uuid.UUID, in
 				if p.event.FinishReason != "" {
 					metadata.FinishReason = safeFinish(p.event.FinishReason)
 				}
+				metadata.Sources = upstream.MergeChatSources(metadata.Sources, p.event.Sources)
 				if usage := safeUsage(p.event.Usage); usage != nil {
 					metadata.Usage = usage
 				}

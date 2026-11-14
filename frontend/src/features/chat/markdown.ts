@@ -1,6 +1,12 @@
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import type { HighlighterCore } from 'shiki/core'
+import {
+  advanceMarkdownFence,
+  readReplyTag,
+  replyDecorationIndex,
+  type ReplyDecoration,
+} from './reply-markup'
 
 export interface MarkdownPart {
   key: number
@@ -21,17 +27,7 @@ export function partitionMarkdown(text: string, final: boolean): MarkdownPart[] 
       newline = i < lines.length - 1 ? '\n' : ''
     current += line + newline
     offset += line.length + newline.length
-    const marker = line.match(/^\s{0,3}(`{3,}|~{3,})/)
-    if (marker) {
-      const mark = marker[1] ?? ''
-      if (!fence) fence = mark
-      else if (
-        mark[0] === fence[0] &&
-        mark.length >= fence.length &&
-        /^\s{0,3}(`+|~+)\s*$/.test(line)
-      )
-        fence = ''
-    }
+    if (!math) fence = advanceMarkdownFence(line.replace(/^(?: {0,3}>[ \t]?)+/, ''), fence)
     if (!fence && line.trim() === '$$') math = !math
     if (!fence && !math && !line.trim() && newline) {
       parts.push({ key: start, source: current, complete: true })
@@ -54,24 +50,17 @@ export interface IllustrationLabels {
   action?: string
 }
 const illustrationName = '<AsyncImage'
-const illustrationAttribute = String.raw`\s+[A-Za-z][\w-]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|\{[^{}]*\}|[^\s"'=<>\x60/{}]+))?`
-const illustrationTag = new RegExp(String.raw`^<AsyncImage\b((?:${illustrationAttribute})*)\s*\/?>`)
-const illustrationValue =
-  /([A-Za-z][\w-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|\{\s*(?:"([^"]*)"|'([^']*)'|([^{}]*?))\s*\}|([^\s"'=<>`/{}]+))/g
 const illustrationRatios = new Set(['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16'])
 // Some upstream models emit JSX-style <AsyncImage query="…" aspectRatio="16:9"/> placeholders.
 export function parseIllustration(attributes: string): Illustration {
-  const values = new Map<string, string>()
-  for (const match of attributes.matchAll(illustrationValue))
-    values.set(
-      (match[1] ?? '').toLowerCase(),
-      match[2] ?? match[3] ?? match[4] ?? match[5] ?? match[6] ?? match[7] ?? '',
-    )
-  const prompt = (values.get('query') ?? values.get('prompt') ?? values.get('alt') ?? '')
+  return illustrationFrom(readReplyTag('<AsyncImage' + attributes + '>', 0)?.attributes)
+}
+function illustrationFrom(values: Map<string, string> | undefined): Illustration {
+  const prompt = (values?.get('query') ?? values?.get('prompt') ?? values?.get('alt') ?? '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 2000)
-  const ratio = (values.get('aspectratio') ?? '').replace(/\s+/g, '').replace('/', ':')
+  const ratio = (values?.get('aspectratio') ?? '').replace(/\s+/g, '').replace('/', ':')
   return { prompt, ratio: /^\d{1,2}:\d{1,2}$/.test(ratio) ? ratio : '' }
 }
 function illustrationHTML(
@@ -190,21 +179,57 @@ export async function renderMarkdown(
   complete: boolean,
   copyLabel: string,
   illustration?: IllustrationLabels,
+  reply?: { decorations: readonly ReplyDecoration[]; unavailable: string },
 ): Promise<string> {
   const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
-  // Raw HTML stays disabled; only the AsyncImage placeholder becomes a controlled illustration card.
+  if (reply) {
+    md.inline.ruler.before('autolink', 'lumi_reply_decoration', (state, silent) => {
+      if (state.src[state.pos] !== '<') return false
+      const match = replyDecorationIndex(state.src, state.pos)
+      if (!match || !reply.decorations[match.index]) return false
+      if (!silent) state.push('lumi_reply_decoration', '', 0).meta = { index: match.index }
+      state.pos = match.end
+      return true
+    })
+    md.renderer.rules.lumi_reply_decoration = (tokens, index) => {
+      const value = reply.decorations[Number(tokens[index]?.meta?.index)]
+      const escape = md.utils.escapeHtml
+      if (!value) return ''
+      if (value.kind === 'badge-open')
+        return '<span class="chat-reply-badge" data-tone="' + escape(value.tone) + '">'
+      if (value.kind === 'badge-close') return '</span>'
+      return (
+        value.items
+          .map(
+            ({ url, title }) =>
+              '<a class="chat-citation" rel="noopener noreferrer nofollow" href="' +
+              escape(url) +
+              '">' +
+              escape(title) +
+              '</a>',
+          )
+          .join('') +
+        (value.unavailable
+          ? '<span class="chat-citation chat-citation-unavailable">' +
+            escape(reply.unavailable) +
+            '</span>'
+          : '')
+      )
+    }
+  }
+  // Raw HTML stays disabled. The known placeholder becomes a controlled illustration card.
   md.inline.ruler.before('autolink', 'lumi_illustration', (state, silent) => {
     if (state.src.charCodeAt(state.pos) !== 0x3c) return false
     const rest = state.src.slice(state.pos, state.posMax)
-    const match = illustrationTag.exec(rest)
-    if (match) {
+    const tag = rest.startsWith(illustrationName) ? readReplyTag(state.src, state.pos) : undefined
+    if (tag?.name === 'asyncimage' && !tag.incomplete && tag.end <= state.posMax) {
       if (!silent) {
-        const item = parseIllustration(match[1] ?? '')
+        const item = illustrationFrom(tag.attributes)
         const token = state.push('lumi_illustration', '', 0)
         token.attrSet('prompt', item.prompt)
         token.attrSet('ratio', item.ratio)
       }
-      state.pos += match[0].length
+      state.pos = tag.end
       return true
     }
     // While streaming, an unfinished tag shows a placeholder instead of flashing raw markup.
@@ -306,7 +331,7 @@ export async function renderMarkdown(
       formulae.set(
         item.key,
         item.source.length <= 20000
-          ? await mathHTML(item.source, item.display)
+          ? await mathHTML(item.source, item.display).catch(() => md.utils.escapeHtml(item.source))
           : md.utils.escapeHtml(item.source),
       )
   }

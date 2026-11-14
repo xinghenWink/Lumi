@@ -172,7 +172,10 @@ export interface paths {
     delete: operations['m6_delete__api_v1_me']
     options?: never
     head?: never
-    /** updateMe */
+    /**
+     * updateMe
+     * @description Updates the supplied profile fields. The workspace language switcher sends only `locale` to save the account's interface language.
+     */
     patch: operations['updateMe']
     trace?: never
   }
@@ -2492,6 +2495,20 @@ export interface components {
       latency_ms?: number
       error_code?: string
       usage?: components['schemas']['ChatUsage']
+      sources?: components['schemas']['ChatSource'][]
+    }
+    ChatSource: {
+      /**
+       * Format: uri
+       * @description Absolute HTTP or HTTPS URL provided in an upstream citation.
+       */
+      url: string
+      title?: string
+      ref?: string
+      /** @description Optional upstream character offset into the unmodified reply. */
+      start_index?: number
+      /** @description Optional upstream character offset into the unmodified reply. */
+      end_index?: number
     }
     ChatMessage: {
       /** Format: uuid */

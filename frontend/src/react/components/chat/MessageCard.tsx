@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { Message } from '../../../api/chat'
 import type { Illustration } from '../../../features/chat/markdown'
+import { parseAssistantReply } from '../../../features/chat/reply-markup'
 import { ApiNotice } from '../shared/ApiNotice'
 import { BrandMark } from '../shared/BrandMark'
 import { useRuntime } from '../../app/context'
@@ -72,6 +73,7 @@ export const MessageCard = memo(function MessageCard({
   )
   const user = message.role === 'user'
   const streaming = message.status === 'streaming'
+  const content = message.content
   useEffect(() => {
     if (!copied) return
     const timer = setTimeout(() => setCopied(false), 2000)
@@ -86,7 +88,7 @@ export const MessageCard = memo(function MessageCard({
         !(lastAssistant && !streaming) && 'reveal-on-hover',
       )}
     >
-      {message.content ? (
+      {content ? (
         <Button
           type="button"
           variant="ghost"
@@ -96,7 +98,14 @@ export const MessageCard = memo(function MessageCard({
           title={t(copied ? 'chat.copied' : 'chat.copy')}
           onClick={() => {
             void navigator.clipboard
-              .writeText(message.content)
+              .writeText(
+                user
+                  ? content
+                  : parseAssistantReply(content, !streaming, message.meta.sources, {
+                      unavailable: t('chat.sourceUnavailable'),
+                      sources: t('chat.sources'),
+                    }).copy,
+              )
               .then(() => setCopied(true))
               .catch(() => setCopied(false))
           }}
@@ -175,17 +184,13 @@ export const MessageCard = memo(function MessageCard({
             </span>
             <MessageContent className="min-w-0 flex-1 gap-0">
               <span className="sr-only">{t('chat.assistant')}</span>
-              {message.content ? (
-                <Suspense
-                  fallback={
-                    <p className="text-message break-words whitespace-pre-wrap">
-                      {message.content}
-                    </p>
-                  }
-                >
+              {content ? (
+                <Suspense fallback={<Typing />}>
                   <Markdown
-                    content={message.content}
+                    assistant
+                    content={content}
                     complete={!streaming}
+                    sources={message.meta.sources}
                     onIllustration={illustrate}
                   />
                 </Suspense>
