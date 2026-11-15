@@ -10,6 +10,7 @@ import { errorText } from '../../lib/errors'
 import { cn } from '../../lib/utils'
 import { Attachment, AttachmentAction, AttachmentMedia } from '../ui/attachment'
 import { ProtectedImage } from '../images/ProtectedImage'
+import { ReferencePreviewButton } from '../images/ReferencePreviewButton'
 
 const chip =
   'group relative size-16 shrink-0 gap-0 overflow-hidden p-0 rounded-xl border border-border bg-muted shadow-xs animate-rise-in'
@@ -18,13 +19,17 @@ const corner =
 
 function Committed({
   id,
+  position,
   preview,
+  previewable,
   disabled,
   onRemove,
   className,
 }: {
   id: string
+  position: number
   preview: string | undefined
+  previewable: boolean
   disabled: boolean
   onRemove: ((id: string) => void) | undefined
   className: string
@@ -33,19 +38,31 @@ function Committed({
   const { user } = useSession()
   const query = useQuery({
     queryKey: ['user', user?.id, 'file', id],
-    enabled: !!user && !preview,
+    enabled: !!user && (!preview || previewable),
     queryFn: ({ signal }) => images.file(id, signal),
   })
+  const file = query.data
+  const renderImage = (image: ReactNode) =>
+    previewable && file ? (
+      <ReferencePreviewButton file={file} position={position}>
+        {image}
+      </ReferencePreviewButton>
+    ) : (
+      image
+    )
   return (
     <Attachment className={className}>
       <AttachmentMedia className="relative size-full rounded-none">
         {preview ? (
-          <img src={preview} alt={t('images.references')} className="size-full object-cover" />
-        ) : query.data ? (
+          renderImage(
+            <img src={preview} alt={t('images.references')} className="size-full object-cover" />,
+          )
+        ) : file ? (
           <ProtectedImage
-            file={query.data}
+            file={file}
             alt={t('images.references')}
             className="size-full object-cover"
+            renderImage={renderImage}
           />
         ) : query.isError ? (
           <span
@@ -134,6 +151,7 @@ export function ReferenceTray({
   previews,
   disabled = false,
   compact = false,
+  previewable = false,
   onRemove,
   onRetry,
   onCancel,
@@ -145,6 +163,7 @@ export function ReferenceTray({
   previews?: ReadonlyMap<string, string>
   disabled?: boolean
   compact?: boolean
+  previewable?: boolean
   onRemove?: (id: string) => void
   onRetry?: (key: string) => void
   onCancel?: (key: string) => void
@@ -155,11 +174,13 @@ export function ReferenceTray({
   const chipClass = cn(chip, compact && 'min-w-0 has-data-[slot=attachment-media]:p-0')
   return (
     <div className={cn('flex flex-wrap gap-2', className)}>
-      {ids.map((id) => (
+      {ids.map((id, index) => (
         <Committed
           key={id}
           id={id}
+          position={index + 1}
           preview={previews?.get(id)}
+          previewable={previewable}
           disabled={disabled}
           className={chipClass}
           onRemove={onRemove}

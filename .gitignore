@@ -13,5 +13,9 @@ frontend/test-results/
 frontend/playwright-report/
 deploy/data/
 deploy/backups/
+deploy/.deployment-plan.json
+deploy/.deployment.lock
+deploy/.deployment-executor.lock
+deploy/.lumi-update-*
 backend/data/
 *.tsbuildinfo

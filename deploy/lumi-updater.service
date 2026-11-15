@@ -1,0 +1,18 @@
+[Unit]
+Description=Lumi Compose deployment executor
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/lumi-updater
+ExecStart=/usr/local/bin/lumi-updater serve -dir ${LUMI_UPDATER_DIR} -project ${LUMI_UPDATER_PROJECT}
+Restart=always
+RestartSec=5
+TimeoutStopSec=90
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

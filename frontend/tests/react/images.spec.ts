@@ -38,6 +38,10 @@ test('React real image generation editing gallery cancellation and administrator
     png = fixturePNG()
   const wire = 'private-image-' + suffix,
     modelName = 'Lumi Image ' + suffix
+  const backgroundPrompt = Array.from(
+    { length: 24 },
+    (_, index) => `第 ${index + 1} 段：薄雾中的海边灯塔，暖色调胶片摄影，保留海面细节。`,
+  ).join('\n')
   let calls = 0,
     edits = 0,
     reusedReference = false
@@ -103,7 +107,7 @@ test('React real image generation editing gallery cancellation and administrator
         }),
       )
     }
-    if (prompt === 'background') setTimeout(finish, 2500)
+    if (prompt === backgroundPrompt) setTimeout(finish, 2500)
     else finish()
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
@@ -281,6 +285,7 @@ test('React real image generation editing gallery cancellation and administrator
       memberUser = record(registrationResult.user)
     await expect(member).toHaveURL(/\/chat$/)
     await member.getByLabel('消息内容', { exact: true }).fill('开始完整旅程')
+    await expect(member.getByRole('button', { name: '发送消息', exact: true })).toBeEnabled()
     await member.getByLabel('消息内容', { exact: true }).press('Enter')
     await expect(member.locator('.chat-message-assistant').last()).toContainText(
       '旅程中的第一段回答。',
@@ -321,7 +326,7 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(member.getByRole('button', { name: '选择模型', exact: true })).toContainText(
       modelName,
     )
-    const prompt = member.getByLabel('画面描述', { exact: true }),
+    const prompt = member.getByRole('textbox', { name: '画面描述', exact: true }),
       send = member.getByRole('button', { name: '开始生成', exact: true })
     await prompt.fill('image-only draft')
     await member
@@ -496,7 +501,29 @@ test('React real image generation editing gallery cancellation and administrator
     await task.getByRole('button', { name: '预览图片 1', exact: true }).click()
     let dialog = member.getByRole('dialog')
     await expect(dialog.getByRole('img')).toBeVisible()
-    await dialog.getByLabel('缩放', { exact: true }).selectOption('150')
+    const zoom = dialog.getByLabel('缩放', { exact: true })
+    if (!mobile) {
+      const image = dialog.getByRole('img')
+      const viewport = dialog.locator('[data-slot="image-preview-viewport"]')
+      expect(
+        await viewport.evaluate(
+          (element) =>
+            element.scrollWidth <= element.clientWidth + 1 &&
+            element.scrollHeight <= element.clientHeight + 1,
+        ),
+      ).toBe(true)
+      const fitted = await image.boundingBox()
+      if (!fitted) throw new Error('Missing image preview bounds')
+      await image.hover()
+      await member.mouse.wheel(0, -120)
+      await expect.poll(async () => Number(await zoom.inputValue())).toBeGreaterThan(100)
+      await expect
+        .poll(async () => (await image.boundingBox())?.width ?? 0)
+        .toBeGreaterThan(fitted.width)
+      await member.mouse.wheel(0, 120)
+      await expect(zoom).toHaveValue('100')
+    }
+    await zoom.selectOption('150')
     const download = member.waitForEvent('download')
     await dialog.getByRole('button', { name: '下载原图', exact: true }).click()
     expect((await download).suggestedFilename()).toBe('lumi-' + original.id + '.png')
@@ -518,6 +545,19 @@ test('React real image generation editing gallery cancellation and administrator
     )
     expect(edits).toBe(1)
     expect(reusedReference).toBe(true)
+    const referenceDialog = member.getByRole('dialog', { name: '预览图片', exact: true })
+    const submittedReference = member
+      .locator('.image-task')
+      .first()
+      .getByRole('button', { name: '预览参考图 1', exact: true })
+    if (mobile) await submittedReference.tap()
+    else await submittedReference.press('Enter')
+    await expect(referenceDialog.getByRole('img')).toHaveAttribute('width', String(original.width))
+    await expect(referenceDialog.getByLabel('缩放', { exact: true })).toHaveValue('100')
+    await member.keyboard.press('Escape')
+    await expect(referenceDialog).toBeHidden()
+    await expect(submittedReference).toBeFocused()
+
     // A library image and a fresh upload share one row of square thumbnails.
     const references = member.locator('.image-references')
     await member.getByRole('button', { name: '从已有图片选择', exact: true }).click()
@@ -547,6 +587,13 @@ test('React real image generation editing gallery cancellation and administrator
     expect(second).toMatchObject({ width: 64, height: 64 })
     expect(second.x).toBeGreaterThan(first.x)
     expect(second.y).toBe(first.y)
+    const uploadedReference = references.getByRole('button', { name: '预览参考图 2', exact: true })
+    if (mobile) await uploadedReference.tap()
+    else await uploadedReference.click()
+    await expect(referenceDialog.getByRole('img')).toBeVisible()
+    await referenceDialog.getByRole('button', { name: '关闭', exact: true }).click()
+    await expect(referenceDialog).toBeHidden()
+    await expect(uploadedReference).toBeFocused()
     const removeReference = references.getByRole('button', { name: '移除参考图', exact: true })
     await expect(removeReference).toHaveCount(2)
     await removeReference.first().click()
@@ -584,7 +631,7 @@ test('React real image generation editing gallery cancellation and administrator
       disconnected = true
       await route.abort('failed')
     })
-    await prompt.fill('background')
+    await prompt.fill(backgroundPrompt)
     await send.click()
     await expect(member.locator('.image-task')).toHaveCount(3)
     await member
@@ -604,6 +651,58 @@ test('React real image generation editing gallery cancellation and administrator
     expect(pollRequests).toBeGreaterThan(0)
     expect(calls).toBe(beforeBackground + 1)
     await member.unroute('**/api/v1/image-tasks/*/events')
+
+    if (!mobile) await member.getByRole('button', { name: '切换浅色主题', exact: true }).click()
+    const promptTask = member.locator('.image-task').first()
+    const promptTrigger = promptTask.getByRole('button', { name: '完整提示词', exact: true })
+    const fullPrompt = member.getByRole('dialog', { name: '完整提示词', exact: true })
+    const promptText = fullPrompt.getByRole('region', { name: '画面描述', exact: true })
+    await expect(promptTrigger).toHaveAttribute('aria-expanded', 'false')
+    expect(
+      await promptTrigger.locator('span').evaluate((element) => {
+        const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight)
+        return element.clientHeight <= 2 * lineHeight && element.scrollHeight > element.clientHeight
+      }),
+    ).toBe(true)
+    if (!mobile) {
+      await prompt.focus()
+      await promptTrigger.hover()
+      await expect(fullPrompt).toBeVisible()
+      await expect(prompt).toBeFocused()
+      await promptText.hover()
+      await member.mouse.wheel(0, 180)
+      await expect
+        .poll(() => promptText.evaluate((element) => element.scrollTop))
+        .toBeGreaterThan(0)
+      await promptTask.getByTestId('image-task-top-actions').hover()
+      await expect(fullPrompt).toBeHidden()
+      await expect(prompt).toBeFocused()
+      await promptTrigger.press('Enter')
+      await expect(promptText).toBeFocused()
+    } else {
+      await promptTrigger.tap()
+    }
+    await expect(fullPrompt).toBeVisible()
+    expect(await promptText.textContent()).toBe(backgroundPrompt)
+    expect(
+      await fullPrompt.evaluate((element) => {
+        const bounds = element.getBoundingClientRect()
+        return bounds.height <= 320 && bounds.left >= 0 && bounds.right <= innerWidth
+      }),
+    ).toBe(true)
+    await member.screenshot({
+      path: info.outputPath('image-task-prompt.png'),
+      animations: 'disabled',
+    })
+    await fullPrompt.getByRole('button', { name: '复制提示词', exact: true }).click()
+    await expect(fullPrompt.getByRole('status')).toHaveText('已复制')
+    // Windows stores clipboard line endings as CRLF.
+    const copiedPrompt = await member.evaluate(() => navigator.clipboard.readText())
+    expect(copiedPrompt.replaceAll('\r\n', '\n')).toBe(backgroundPrompt)
+    await member.keyboard.press('Escape')
+    await expect(fullPrompt).toBeHidden()
+    await expect(promptTrigger).toBeFocused()
+
     await prompt.fill('cancel')
     await send.click()
     const cancelTask = member.locator('.image-task').first()

@@ -33,5 +33,25 @@ cd -- "$target"
 docker compose up -d --wait postgres redis
 # No app has started: restore into a fresh database before automatic migrations can run.
 docker compose exec -T postgres sh -c 'exec pg_restore --exit-on-error --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < "$stage/database.dump"
+# A restored isolated instance has no live executor or operation journal.
+docker compose exec -T postgres sh -c 'exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
+DO $restore_deployment$
+BEGIN
+    IF to_regclass('deployment_jobs') IS NOT NULL THEN
+        DELETE FROM deployment_executor;
+        WITH interrupted AS (
+            UPDATE deployment_jobs
+            SET stage = 'failed', reason = 'DEPLOYMENT_SNAPSHOT_RESTORED',
+                updated_at = now(), finished_at = now()
+            WHERE finished_at IS NULL OR stage = 'recovery_required'
+            RETURNING id, actor_id, actor_ip
+        )
+        INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, "after", ip)
+        SELECT gen_random_uuid(), actor_id, 'deployment.snapshot_restored',
+               'deployment_job', id, '{"stage":"failed"}'::jsonb, actor_ip FROM interrupted;
+    END IF;
+END
+$restore_deployment$;
+SQL
 docker compose up -d --wait
 echo 'Restore complete. Verify readiness, login, credits and image downloads before switching traffic.'

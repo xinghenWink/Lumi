@@ -21,6 +21,7 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
 	"github.com/xinghenWink/Lumi/backend/internal/chat"
 	"github.com/xinghenWink/Lumi/backend/internal/credits"
+	"github.com/xinghenWink/Lumi/backend/internal/deployment"
 	"github.com/xinghenWink/Lumi/backend/internal/http/middleware"
 	"github.com/xinghenWink/Lumi/backend/internal/http/response"
 	"github.com/xinghenWink/Lumi/backend/internal/images"
@@ -34,6 +35,7 @@ import (
 )
 
 type Services struct {
+	Deployment    *deployment.Service
 	Metrics       *middleware.Metrics
 	Operations    *operations.Service
 	Mailer        *mailer.Service
@@ -105,6 +107,7 @@ func Routes(services *Services, security Security, logger *slog.Logger) func(*gi
 		h.imageRoutes(protected, admin)
 		h.m6Routes(protected, admin)
 		h.canvasRoutes(protected)
+		h.deploymentRoutes(admin)
 		engine.GET("/metrics", h.available, h.authenticate, h.adminOnly, h.metrics)
 		return nil
 	}

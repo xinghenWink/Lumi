@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/xinghenWink/Lumi/backend/internal/config"
+	"github.com/xinghenWink/Lumi/backend/internal/deployment"
 	"github.com/xinghenWink/Lumi/backend/internal/http/account"
 	"github.com/xinghenWink/Lumi/backend/internal/http/handler"
 	"github.com/xinghenWink/Lumi/backend/internal/http/router"
@@ -139,7 +140,18 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 		}()
 		health.Redis = cache.Ping
 	}
-	accounts, err := configureAccounts(startup, cfg, database, interactive, cache, logger)
+	var deploymentStore *deployment.Store
+	gated := false
+	if database != nil {
+		deploymentStore = deployment.NewStore(database)
+		gated, err = deploymentStore.TrafficBlocked(startup)
+		if err != nil {
+			return fmt.Errorf("read deployment state: %w", err)
+		}
+	}
+	gate := &deploymentGate{}
+	gate.open.Store(!gated)
+	accounts, err := configureAccounts(startup, cfg, database, interactive, cache, gated, logger)
 	if err != nil {
 		logger.Error("account service initialization failed")
 		return fmt.Errorf("initialize accounts: %w", err)
@@ -151,8 +163,10 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 			}
 		}()
 		// Settle expired work before account retention can remove its owner.
-		if err := accounts.Images.Recover(startup); err != nil {
-			return fmt.Errorf("recover image tasks before startup: %w", err)
+		if !gated {
+			if err := accounts.Images.Recover(startup); err != nil {
+				return fmt.Errorf("recover image tasks before startup: %w", err)
+			}
 		}
 	}
 	if cfg.DatabaseURL == "" || cfg.RedisURL == "" {
@@ -168,7 +182,7 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 		return fmt.Errorf("create router: %w", err)
 	}
 	server := &http.Server{
-		Addr: cfg.HTTPAddress, Handler: engine,
+		Addr: cfg.HTTPAddress, Handler: gate.wrap(engine),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 		// No WriteTimeout: future SSE responses can legitimately last minutes.
@@ -177,27 +191,28 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("listen for HTTP: %w", err)
 	}
-	serveResult := make(chan error, 1)
+	serveResult := make(chan error, 2)
 	if accounts != nil {
-		stopImages := startImageWorkers(ctx, accounts.Images)
-		defer stopImages()
-		textCtx, stopText := context.WithCancel(ctx)
-		textDone := make(chan struct{})
+		workerCtx, stopWorkers := context.WithCancel(ctx)
+		done := make(chan struct{})
+		defer func() { stopWorkers(); <-done }()
 		go func() {
-			defer close(textDone)
-			accounts.Canvas.WorkText(textCtx, accounts.Chat, logger)
+			defer close(done)
+			if gated {
+				if err := awaitDeployment(workerCtx, deploymentStore); err != nil {
+					return
+				}
+				recovery, cancel := context.WithTimeout(workerCtx, time.Minute)
+				err := accounts.Images.Recover(recovery)
+				cancel()
+				if err != nil {
+					serveResult <- fmt.Errorf("recover image tasks after deployment: %w", err)
+					return
+				}
+				gate.open.Store(true)
+			}
+			runApplicationWorkers(workerCtx, accounts, database, cache, logger)
 		}()
-		defer func() { stopText(); <-textDone }()
-		stopResume := accounts.Chat.EnableResume(ctx, cache)
-		defer stopResume()
-		stopOperations := startOperationJobs(ctx, database, cache, logger)
-		defer stopOperations()
-		stopMaintenance := startUserMaintenance(ctx, accounts.Users, logger)
-		defer stopMaintenance()
-		stopCalls := startCallMaintenance(ctx, accounts.Catalog, logger)
-		defer stopCalls()
-		stopChat := startChatMaintenance(ctx, accounts.Chat, logger)
-		defer stopChat()
 	}
 	go func() { serveResult <- server.Serve(listener) }()
 	logger.Info("server started", "address", cfg.HTTPAddress, "version", version)

@@ -1,19 +1,22 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Eye, EyeOff, MessageSquare, Sparkles } from 'lucide-react'
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react'
+import { Eye, EyeOff, MessageSquare } from 'lucide-react'
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { usePublicConfig } from '../features/auth/hooks'
-import { createChallenge } from '../features/auth/turnstile'
 import { useRuntime } from '../app/context'
 import { ApiNotice } from '../components/shared/ApiNotice'
+import { ImageGenerationIcon } from '../components/shared/ImageGenerationIcon'
 import { PageStatus } from '../components/shared/PageStatus'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { Checkbox } from '../components/ui/checkbox'
 import { Field, FieldGroup } from '../components/ui/field'
 import { Input } from '../components/ui/input'
 import { ApiError } from '../../api/transport'
 import { safeRedirect, validEmail, validPassword } from '../../features/accounts/utils'
+
+const TermsCheckbox = lazy(() =>
+  import('../components/ui/checkbox').then(({ Checkbox }) => ({ default: Checkbox })),
+)
 
 function AuthForm({ registering }: { registering: boolean }) {
   const { t, i18n } = useTranslation()
@@ -34,28 +37,41 @@ function AuthForm({ registering }: { registering: boolean }) {
   const [validation, setValidation] = useState('')
   const [notice, setNotice] = useState('')
   const container = useRef<HTMLDivElement>(null)
-  const challenge = useRef<ReturnType<typeof createChallenge> | null>(null)
+  type Challenge = ReturnType<typeof import('../features/auth/turnstile').createChallenge>
+  const challenge = useRef<(() => Promise<Challenge>) | null>(null)
   const key = config.data?.turnstile_site_key ?? ''
+  const challengeEnabled = registering && config.data?.turnstile_enabled === true
   useEffect(() => {
-    const widget = createChallenge(
-      () => container.current,
-      () => key,
-    )
-    challenge.current = widget
+    if (!challengeEnabled) return
+    let active = true
+    let widget: Challenge | undefined
+    challenge.current = async () => {
+      const { createChallenge } = await import('../features/auth/turnstile').catch(() => {
+        throw new ApiError('CHALLENGE_UNAVAILABLE')
+      })
+      if (!active) throw new ApiError('CHALLENGE_UNAVAILABLE')
+      widget ??= createChallenge(
+        () => container.current,
+        () => key,
+      )
+      return widget
+    }
     return () => {
-      widget.dispose()
+      active = false
+      widget?.dispose()
       challenge.current = null
     }
-  }, [key])
+  }, [challengeEnabled, key])
   useEffect(() => {
     if (seconds <= 0) return
     const timer = setTimeout(() => setSeconds((value) => Math.max(0, value - 1)), 1000)
     return () => clearTimeout(timer)
   }, [seconds])
   async function token(action: 'register' | 'send_code') {
-    if (!config.data?.turnstile_enabled) return undefined
+    if (!challengeEnabled) return undefined
     if (!challenge.current) throw new ApiError('CHALLENGE_UNAVAILABLE')
-    return challenge.current.token(action)
+    const widget = await challenge.current()
+    return widget.token(action)
   }
   async function sendCode() {
     setError(null)
@@ -265,14 +281,16 @@ function AuthForm({ registering }: { registering: boolean }) {
             ) : null}
             {registering ? (
               <div className="flex items-start gap-2.5 text-xs leading-6 text-muted-foreground">
-                <Checkbox
-                  className="mt-1"
-                  id="auth-terms"
-                  name="accept_terms"
-                  checked={agreed}
-                  onCheckedChange={(value) => setAgreed(value === true)}
-                  disabled={busy}
-                />
+                <Suspense fallback={<span aria-hidden="true" className="mt-1 size-4 shrink-0" />}>
+                  <TermsCheckbox
+                    className="mt-1"
+                    id="auth-terms"
+                    name="accept_terms"
+                    checked={agreed}
+                    onCheckedChange={(value) => setAgreed(value === true)}
+                    disabled={busy}
+                  />
+                </Suspense>
                 <label htmlFor="auth-terms">
                   {t('auth.agree')}{' '}
                   <a
@@ -327,9 +345,7 @@ export default function AuthPage() {
   return (
     <div className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-12 px-4 py-8 sm:px-8 sm:py-12 lg:grid-cols-[1fr_400px] lg:gap-20">
       <aside className="hidden flex-col gap-6 lg:flex">
-        <span className="grid size-12 place-items-center rounded-2xl bg-accent text-primary">
-          <Sparkles size={24} strokeWidth={1.6} />
-        </span>
+        <ImageGenerationIcon size={64} />
         <h2 className="max-w-md text-[40px] leading-[1.2] font-semibold tracking-tight text-balance">
           {t('auth.heroTitle')}
         </h2>
@@ -339,17 +355,21 @@ export default function AuthPage() {
         <div className="mt-2 grid max-w-md gap-3">
           {(
             [
-              [MessageSquare, 'auth.heroChat', 'auth.heroChatDescription'],
-              [Sparkles, 'auth.heroImage', 'auth.heroImageDescription'],
+              [
+                <span className="grid size-8 place-items-center rounded-lg bg-accent text-primary">
+                  <MessageSquare size={16} aria-hidden="true" />
+                </span>,
+                'auth.heroChat',
+                'auth.heroChatDescription',
+              ],
+              [<ImageGenerationIcon size={48} />, 'auth.heroImage', 'auth.heroImageDescription'],
             ] as const
-          ).map(([Icon, title, description]) => (
+          ).map(([icon, title, description]) => (
             <div
               key={title}
-              className="flex items-start gap-3 rounded-xl border border-border bg-card/60 p-4"
+              className="flex items-center gap-3 rounded-xl border border-border bg-card/60 p-4"
             >
-              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-primary">
-                <Icon size={16} />
-              </span>
+              <span className="grid size-12 shrink-0 place-items-center">{icon}</span>
               <div>
                 <strong className="text-sm font-medium">{t(title)}</strong>
                 <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{t(description)}</p>

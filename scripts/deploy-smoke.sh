@@ -7,6 +7,8 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 base=${SMOKE_BASE_URL:-http://127.0.0.1:8080}
 [[ -n ${LUMI_CURRENT_IMAGE:-} && -n ${LUMI_PREVIOUS_IMAGE:-} ]] || { echo 'Set distinct current and previous milestone image references.' >&2; exit 1; }
 [[ $LUMI_CURRENT_IMAGE != "$LUMI_PREVIOUS_IMAGE" ]] || { echo 'Rollback must use a distinct previous image.' >&2; exit 1; }
+verify_rollback=${LUMI_VERIFY_ROLLBACK:-1}
+[[ $verify_rollback == 0 || $verify_rollback == 1 ]] || exit 1
 workspace=$(mktemp -d)
 export COMPOSE_PROJECT_NAME="lumi-m7-smoke-$(openssl rand -hex 4)"
 unset DATABASE_URL REDIS_URL JWT_SECRET ENCRYPTION_KEY ADMIN_PASSWORD LUMI_IMAGE LUMI_VERSION
@@ -29,12 +31,22 @@ sed -i 's/^ADMIN_EMAIL=.*/ADMIN_EMAIL=smoke@lumi.test/' .env
 set_image() {
   printf 'services:\n  app:\n    image: %s\n' "$1" > docker-compose.override.yml
 }
+verify_release() {
+  local version=$1 commit=$2 schema=$3
+  if [[ -z $version && -z $commit && -z $schema ]]; then return; fi
+  curl --fail --silent "$base/api/version" | jq -e --arg version "$version" --arg commit "$commit" \
+    '.version == $version and .commit == $commit' >/dev/null
+  docker compose exec -T postgres sh -c 'exec psql -v ON_ERROR_STOP=1 -At -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL' | grep -qx "$schema"
+SELECT version_id FROM public.goose_db_version WHERE is_applied ORDER BY id DESC LIMIT 1;
+SQL
+}
 set_image "$LUMI_PREVIOUS_IMAGE"
 before=$(sha256sum .env)
 bash "$root/deploy/docker-deploy.sh" "$workspace/live"
 [[ $(sha256sum .env) == "$before" ]] || { echo 'Installer replaced credentials.' >&2; exit 1; }
 docker compose up -d --wait --wait-timeout 180
 curl --fail --silent "$base/readyz" >/dev/null
+verify_release "${LUMI_PREVIOUS_RELEASE:-}" "${LUMI_PREVIOUS_COMMIT:-}" "${LUMI_PREVIOUS_SCHEMA:-}"
 password=$(sed -n 's/^ADMIN_PASSWORD=//p' .env)
 login() {
   # Installer-generated smoke passwords are hexadecimal plus Aa1, so JSON quoting is unambiguous.
@@ -87,11 +99,17 @@ verify_data
 set_image "$LUMI_CURRENT_IMAGE"
 docker compose up -d --wait --wait-timeout 180
 verify_data
-set_image "$LUMI_PREVIOUS_IMAGE"
-docker compose up -d --wait --wait-timeout 180
-verify_data
-set_image "$LUMI_CURRENT_IMAGE"
-docker compose up -d --wait --wait-timeout 180
+verify_release "${LUMI_CURRENT_RELEASE:-}" "${LUMI_CURRENT_COMMIT:-}" "${LUMI_CURRENT_SCHEMA:-}"
+if [[ $verify_rollback == 1 ]]; then
+  set_image "$LUMI_PREVIOUS_IMAGE"
+  docker compose up -d --wait --wait-timeout 180
+  verify_data
+  verify_release "${LUMI_PREVIOUS_RELEASE:-}" "${LUMI_PREVIOUS_COMMIT:-}" "${LUMI_CURRENT_SCHEMA:-}"
+  set_image "$LUMI_CURRENT_IMAGE"
+  docker compose up -d --wait --wait-timeout 180
+  verify_data
+  verify_release "${LUMI_CURRENT_RELEASE:-}" "${LUMI_CURRENT_COMMIT:-}" "${LUMI_CURRENT_SCHEMA:-}"
+fi
 # Persist the effective image reference into the backed up compose, not just its override.
 sed -i "s|image: \${LUMI_IMAGE.*|image: $LUMI_CURRENT_IMAGE|" docker-compose.yml
 BACKUP_KEEP=2 bash "$workspace/live/backup.sh"
@@ -100,4 +118,4 @@ docker compose down --volumes
 bash "$workspace/live/restore.sh" "$archive" "$workspace/restored"
 cd -- "$workspace/restored"
 verify_data
-echo 'PASS: empty-directory deployment, idempotent setup, persistent restart, M6→M7 upgrade, M7→M6 rollback, coordinated backup and fresh restore; administrator login, credits and signed file bytes persist.'
+echo 'PASS: deployment, upgrade and fresh restore preserved administrator login, credits and original file bytes.'

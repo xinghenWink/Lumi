@@ -280,8 +280,9 @@ test('real vision, IME, protected blobs, reload and cursor replay survive a brow
     await input.press('Enter')
     await expect(answer).toContainText('Start 刷新恢复')
     let injectedRotation = false
+    const metadataPath = '/api/v1/files/' + file.id + '/metadata'
     await page.route(
-      '**/api/v1/files/*/metadata',
+      '**' + metadataPath,
       async (route) => {
         injectedRotation = true
         await route.fulfill({
@@ -292,15 +293,19 @@ test('real vision, IME, protected blobs, reload and cursor replay survive a brow
       },
       { times: 1 },
     )
+    // Bootstrap and the metadata retry can share a session refresh.
     const rotated = page.waitForResponse(
-      (response) => injectedRotation && response.url().endsWith('/api/v1/auth/refresh'),
+      (response) => response.ok() && response.url().endsWith('/api/v1/auth/refresh'),
+    )
+    const retriedMetadata = page.waitForResponse(
+      (response) => injectedRotation && response.ok() && response.url().endsWith(metadataPath),
     )
     const replay = page.waitForRequest(
       (incoming) => incoming.url().includes('/events?request_id=') && incoming.method() === 'GET',
     )
     await page.reload()
     await replay
-    expect((await rotated).ok()).toBe(true)
+    await Promise.all([rotated, retriedMetadata])
     await expect(page.locator('.chat-message-user img[src^="blob:"]')).toBeVisible()
     await expect(answer).toContainText('Start 刷新恢复')
     expect(calls.get('刷新恢复')).toBe(1)

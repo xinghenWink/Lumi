@@ -5,6 +5,7 @@ import { operations } from '../../../api/operations'
 import { useSession } from '../../features/auth/hooks'
 import { useOwnedMutation } from '../../features/accounts/owned-mutation'
 import { AdminPage } from '../../components/admin/AdminPage'
+import { DeploymentPanel } from '../../components/admin/DeploymentPanel'
 import { Panel } from '../../components/shared/Panel'
 import { ApiNotice } from '../../components/shared/ApiNotice'
 import { PageStatus } from '../../components/shared/PageStatus'
@@ -106,6 +107,7 @@ export default function SystemPage() {
           ) : null}
         </Panel>
       ) : null}
+      {data ? <DeploymentPanel key={user?.id} owner={user?.id} version={data.version} /> : null}
       <ModalDialog
         open={confirming}
         onOpenChange={setConfirming}

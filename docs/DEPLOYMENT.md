@@ -92,6 +92,33 @@ curl --fail http://127.0.0.1:8080/readyz
 
 核验登录、双桶余额、历史、原图下载与新任务。应用自动迁移且有 advisory lock。迁移只增不改；只有旧二进制兼容新 schema 时才能改回旧版本 / digest 后 `up -d --wait`。不兼容迁移须把备份恢复到另一台隔离实例，再切流量；不要执行 down 迁移或覆盖生产目录。M7 无新增迁移，演练使用 M6 `e9f87b2` 与 M7 两个实际不同镜像。
 
+## 后台版本管理
+
+「管理端 → 系统信息 → 版本管理」显示当前版本、GitHub 最新正式版、历史版本和上次查询时间。默认开启发布查询。启用宿主机执行器后，系统会根据当前镜像和数据库迁移状态显示可用的更新或回滚操作。
+
+托管部署仅支持可连接 GitHub/GHCR 的 Linux 单机 Docker Engine、Compose v2 和 systemd，使用项目自带的 PostgreSQL、Redis、`data/app` 和宿主机 `127.0.0.1:8080`。执行器按官方镜像 digest 操作，无需给应用挂载 Docker socket。私有 GHCR 凭据通过宿主机 root 的 Docker 登录配置提供。执行器按 Compose 项目标签核对目录和服务，要求部署目录、父目录、Compose、`.env` 和备份脚本由 root 持有，且其他用户没有写权限。
+
+已有实例先按手动升级流程备份并安装带版本管理的首个正式版本。下载同一版本的 `lumi-deploy.tar.gz` 和 `lumi-deploy.sha256`，核对文件后解包。把包内的新 `docker-compose.yml`、`backup.sh` 和 `restore.sh` 安装到现有目录，保留实例的 `.env` 和数据目录。使用标准 Compose 项目和基础配置启动服务后，从解包目录运行：
+
+```sh
+sha256sum -c lumi-deploy.sha256
+sudo bash install-updater.sh /opt/lumi lumi
+sudo lumi-updater status -dir /opt/lumi -project lumi
+```
+
+应用第一次执行托管切换时会将当前镜像 digest 固定到 `.env` 的 `LUMI_IMAGE_REF`。后续 Compose 启动以此值为准。需要做人工维护时，先停止执行器，再按部署手册调整该引用。操作会短暂停止应用，持续时间主要由 PostgreSQL 和图片备份所需时间决定。备份位于部署目录下的 `backups/lumi-deployment-<任务 ID>.tar.gz`，包含实例密钥。执行器会把任务、失败原因和终态保存在 PostgreSQL，并在新容器通过检查后恢复流量。
+
+更新失败且当前数据库仍满足已验证的回退条件时，执行器自动恢复原镜像。需要人工恢复时，在宿主机查询状态和日志：
+
+```sh
+sudo lumi-updater status -dir /opt/lumi -project lumi
+sudo journalctl -u lumi-updater -n 100
+```
+
+如果运维已让目标镜像或验证过的原镜像在兼容数据库上通过健康检查，可执行 `sudo lumi-updater resolve -dir /opt/lumi -project lumi` 解除任务锁。需要恢复快照时，按下节恢复到独立实例，再验证并切流量。源实例上当前没有发布清单的历史版本仍可从管理端查看发布说明，安装和切换走手动流程。
+
+正式 Release 的 `lumi-release.json` 由发布工作流在 amd64 与 arm64 镜像验收后生成。发布前在 `deploy/release-compatibility.json` 按目标标签声明允许验证的旧版本，例如 `{"v0.5.0":[{"version":"v0.4.0","rollback":true}]}`。两种架构都验证升级及声明的回滚路径，清单记录测试使用的 digest 和数据库迁移版本。发布清单为空路径时，该版本可作为后续版本的起点。已发布附件保持固定。
+
 ## 一致备份与恢复
 
 自动脚本只支持 Compose 内置 PostgreSQL / Redis、单应用实例和 `data/app`；外置数据库 / 多实例须由运营者协调暂停全部写入后备份，脚本会拒绝外置 URL。后台维护模式仍允许管理员和 worker 写入，不能代替停止应用。

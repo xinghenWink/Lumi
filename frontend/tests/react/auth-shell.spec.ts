@@ -61,9 +61,26 @@ test('real registration, deep links, role isolation, drawer focus, preferences a
   ).toBe(true)
   const memberEmail = `react-${randomUUID()}@lumi.test`,
     memberPassword = randomBytes(18).toString('base64url') + 'Aa1'
+  const mobile = info.project.name.includes('mobile')
+  const generationIcons = page.locator('img[data-slot="image-generation-icon"]')
   try {
     await page.goto('/create?draft=kept')
     await expect(page).toHaveURL(/\/login\?redirect=%2Fcreate%3Fdraft%3Dkept$/)
+    if (!mobile) {
+      await expect(generationIcons).toHaveCount(2)
+      for (const size of [48, 64]) {
+        const icon = generationIcons.and(page.locator(`[width="${size}"]`))
+        await expect(icon).toBeVisible()
+        await expect(icon).toHaveCSS('width', `${size}px`)
+        await expect
+          .poll(() => icon.evaluate((image: HTMLImageElement) => image.naturalWidth))
+          .toBeGreaterThan(0)
+      }
+      await page.screenshot({
+        path: info.outputPath('login-image-icons.png'),
+        animations: 'disabled',
+      })
+    }
     await page.getByRole('link', { name: '注册', exact: true }).click()
     await page.getByLabel('昵称', { exact: true }).fill('React 创作者')
     await page.getByLabel('邮箱地址', { exact: true }).fill(memberEmail)
@@ -72,6 +89,16 @@ test('real registration, deep links, role isolation, drawer focus, preferences a
     await page.getByRole('button', { name: '创建账号', exact: true }).click()
     await expect(page).toHaveURL(/\/create\?draft=kept$/)
     await expect(page.getByRole('heading', { name: '让想象成为画面', exact: true })).toBeVisible()
+    await expect(generationIcons).toBeInViewport({ ratio: 1 })
+    await expect(generationIcons).toHaveCSS('width', '128px')
+    await expect(generationIcons).toHaveCSS('height', '128px')
+    await expect
+      .poll(() => generationIcons.evaluate((image: HTMLImageElement) => image.naturalWidth))
+      .toBeGreaterThan(0)
+    await page.screenshot({
+      path: info.outputPath('image-empty-light.png'),
+      animations: 'disabled',
+    })
     const cookie = (await page.context().cookies()).find((entry) => entry.name === 'lumi_refresh')
     expect(cookie?.httpOnly).toBe(true)
     expect(cookie?.sameSite).toBe('Lax')
@@ -88,7 +115,6 @@ test('real registration, deep links, role isolation, drawer focus, preferences a
     await expect(page).toHaveURL(/\/chat$/)
     await expect(page.getByRole('heading', { name: '今天想创造什么？', exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: '管理后台', exact: true })).toHaveCount(0)
-    const mobile = info.project.name.includes('mobile')
     if (mobile) {
       const trigger = page.getByRole('button', { name: '打开导航菜单' })
       await trigger.click()
@@ -125,6 +151,14 @@ test('real registration, deep links, role isolation, drawer focus, preferences a
       fullPage: true,
       animations: 'disabled',
     })
+    await page.goto('/create')
+    await expect(generationIcons).toBeInViewport({ ratio: 1 })
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await page.screenshot({
+      path: info.outputPath('image-empty-dark.png'),
+      animations: 'disabled',
+    })
+    await page.goto('/chat')
     expect(
       (
         await request.put('/api/v1/admin/operations-settings', {

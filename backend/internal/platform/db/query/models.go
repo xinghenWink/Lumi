@@ -161,6 +161,34 @@ type CreditOperation struct {
 	CreatedAt   time.Time
 }
 
+type DeploymentExecutor struct {
+	Singleton     bool
+	Version       string
+	CommitSha     string
+	Digest        string
+	Platform      string
+	SchemaVersion int64
+	Reason        string
+	CheckedAt     time.Time
+}
+
+type DeploymentJob struct {
+	ID             uuid.UUID
+	ActorID        uuid.UUID
+	ActorIp        netip.Addr
+	IdempotencyKey string
+	Action         string
+	SourceVersion  string
+	SourceDigest   string
+	TargetVersion  string
+	TargetDigest   string
+	Stage          string
+	Reason         string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	FinishedAt     *time.Time
+}
+
 type File struct {
 	ID              uuid.UUID
 	UserID          uuid.UUID
