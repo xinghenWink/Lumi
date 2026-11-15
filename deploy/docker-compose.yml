@@ -8,7 +8,7 @@ x-logging: &logging
 
 services:
   app:
-    image: ${LUMI_IMAGE:-ghcr.io/xinghenwink/lumi}:${LUMI_VERSION:-edge}
+    image: ${LUMI_IMAGE_REF:-${LUMI_IMAGE:-ghcr.io/xinghenwink/lumi}:${LUMI_VERSION:-edge}}
     env_file: .env
     environment:
       APP_ENV: production

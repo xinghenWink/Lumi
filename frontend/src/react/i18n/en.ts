@@ -1,8 +1,10 @@
 import messages from '../../i18n/resources.en'
 import { catalog } from './catalog'
+import deployment from '../../i18n/deployment.en'
 
 export default {
   ...catalog(messages),
+  deployment,
   react: {
     title: 'What would you like to create today?',
     description: 'Give your ideas room to grow. Explore and create with Lumi.',

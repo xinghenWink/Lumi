@@ -73,7 +73,7 @@ jobs:
           - runner: ubuntu-24.04-arm
             architecture: arm64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+    timeout-minutes: 35
     permissions:
       contents: read
       packages: read
@@ -129,6 +129,20 @@ jobs:
               '.version == $version and .commit == $commit'
           curl --fail --silent --show-error http://127.0.0.1:8080/ | grep -q '<div id="app">'
           printf 'Verified %s@%s on linux/%s\n' "$IMAGE" "$DIGEST" "$EXPECTED_ARCHITECTURE" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify approved deployment transitions
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker compose --env-file deploy/.env -f deploy/docker-compose.yml -f "$RUNNER_TEMP/published-image.yml" down --volumes
+          bash scripts/verify-release-transitions.sh "$EXPECTED_VERSION" "$DIGEST" "$GITHUB_SHA" \
+            "$EXPECTED_ARCHITECTURE" "$RUNNER_TEMP/lumi-release.json"
+      - uses: actions/upload-artifact@v7.0.2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: lumi-release-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/lumi-release.json
+          retention-days: 7
       - name: Package the verified amd64 image for offline deployment
         if: matrix.architecture == 'amd64' && startsWith(github.ref, 'refs/tags/v')
         run: |
@@ -164,14 +178,31 @@ jobs:
     needs: [publish, verify-published]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     permissions:
       contents: write
       actions: read
     steps:
       - uses: actions/checkout@v7.0.1
-      - name: Package deployment tools
-        run: tar -C deploy -czf "$RUNNER_TEMP/lumi-deploy.tar.gz" docker-compose.yml .env.example docker-deploy.sh backup.sh restore.sh Caddyfile.example nginx.conf.example
+      - uses: actions/setup-go@v7.0.0
+        with:
+          go-version: '1.26.11'
+          cache-dependency-path: backend/go.sum
+      - name: Package deployment tools and verify architecture agreement
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for arch in amd64 arm64; do
+            gh run download "$GITHUB_RUN_ID" --name "lumi-release-$arch" --dir "$RUNNER_TEMP/manifest-$arch"
+            (cd backend && CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
+              -o "$RUNNER_TEMP/lumi-updater-linux-$arch" ./cmd/lumi-updater)
+          done
+          cmp "$RUNNER_TEMP/manifest-amd64/lumi-release.json" "$RUNNER_TEMP/manifest-arm64/lumi-release.json"
+          cp "$RUNNER_TEMP/manifest-amd64/lumi-release.json" "$RUNNER_TEMP/lumi-release.json"
+          tar -czf "$RUNNER_TEMP/lumi-deploy.tar.gz" -C deploy \
+            docker-compose.yml .env.example docker-deploy.sh backup.sh restore.sh Caddyfile.example nginx.conf.example \
+            install-updater.sh lumi-updater.service -C "$RUNNER_TEMP" lumi-updater-linux-amd64 lumi-updater-linux-arm64
+          (cd "$RUNNER_TEMP" && sha256sum lumi-deploy.tar.gz > lumi-deploy.sha256)
       - name: Prepare the release draft and verified deployment assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -182,6 +213,11 @@ jobs:
           if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
             gh release create "$RELEASE_TAG" --draft --generate-notes --verify-tag
           fi
-          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/lumi-deploy.tar.gz" --clobber
+          if [[ $(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft) != true ]]; then
+            echo 'Published release assets are immutable.'
+            exit 0
+          fi
+          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/lumi-deploy.tar.gz" \
+            "$RUNNER_TEMP/lumi-deploy.sha256" "$RUNNER_TEMP/lumi-release.json" --clobber
           gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/released-image/lumi-linux-amd64.tar.gz" \
             "$RUNNER_TEMP/released-image/lumi-linux-amd64.json" --clobber

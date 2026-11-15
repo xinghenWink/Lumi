@@ -14,16 +14,18 @@ const routes = {
   admin: {
     key: 'admin.console',
     async load() {
-      const [accounts, models, credits, operations] = await Promise.all([
+      const [accounts, models, credits, operations, deployment] = await Promise.all([
         import('../../i18n/accounts-admin.zh-CN'),
         import('../../i18n/catalog-admin.zh-CN'),
         loadCredits(),
         import('../../i18n/operations-admin.zh-CN'),
+        import('../../i18n/deployment.zh-CN'),
       ])
       return {
         default: {
           ...accounts.default,
           ...credits.default,
+          deployment: deployment.default,
           ops: { ...publicOperations.ops, ...operations.default },
           catalog: { ...publicModels.catalog, ...models.default.catalog },
         },

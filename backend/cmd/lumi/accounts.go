@@ -13,6 +13,7 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/chat"
 	"github.com/xinghenWink/Lumi/backend/internal/config"
 	"github.com/xinghenWink/Lumi/backend/internal/credits"
+	"github.com/xinghenWink/Lumi/backend/internal/deployment"
 	"github.com/xinghenWink/Lumi/backend/internal/http/account"
 	"github.com/xinghenWink/Lumi/backend/internal/images"
 	"github.com/xinghenWink/Lumi/backend/internal/media"
@@ -26,7 +27,7 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/user"
 )
 
-func configureAccounts(ctx context.Context, cfg config.Config, pool, interactive *pgxpool.Pool, cache *platformredis.Client, logger *slog.Logger) (*account.Services, error) {
+func configureAccounts(ctx context.Context, cfg config.Config, pool, interactive *pgxpool.Pool, cache *platformredis.Client, gated bool, logger *slog.Logger) (*account.Services, error) {
 	if pool == nil || interactive == nil || cache == nil {
 		return nil, nil
 	}
@@ -51,8 +52,10 @@ func configureAccounts(ctx context.Context, cfg config.Config, pool, interactive
 	}
 	billing := credits.New(pool, vault, cache, nil)
 	users := user.New(pool, passwords, billing)
-	if err := users.Bootstrap(ctx, cfg.AdminEmail, cfg.AdminPassword, cfg.Environment == "production"); err != nil {
-		return nil, fmt.Errorf("bootstrap administrator: %w", err)
+	if !gated {
+		if err := users.Bootstrap(ctx, cfg.AdminEmail, cfg.AdminPassword, cfg.Environment == "production"); err != nil {
+			return nil, fmt.Errorf("bootstrap administrator: %w", err)
+		}
 	}
 	sender := mailer.New(configuration, cfg.Environment, logger)
 	models := catalog.New(pool, vault, upstream.NetworkPolicy{AllowPrivate: cfg.UpstreamAllowPrivate}, logger)
@@ -62,8 +65,10 @@ func configureAccounts(ctx context.Context, cfg config.Config, pool, interactive
 	}
 	conversations := chat.New(interactive, models, cache)
 	conversations.SetFiles(files)
-	if err := models.Bootstrap(ctx, cfg.UpstreamBaseURL, cfg.UpstreamAPIKey); err != nil {
-		return nil, fmt.Errorf("bootstrap upstream: %w", err)
+	if !gated {
+		if err := models.Bootstrap(ctx, cfg.UpstreamBaseURL, cfg.UpstreamAPIKey); err != nil {
+			return nil, fmt.Errorf("bootstrap upstream: %w", err)
+		}
 	}
-	return &account.Services{Operations: operations.New(pool), Mailer: sender, PublicBaseURL: cfg.PublicBaseURL, Version: version, Commit: commit, BuildTime: buildTime, Auth: auth.New(interactive, passwords, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: models, Chat: conversations, Files: files, Images: images.New(pool, billing, models, files, cache, logger), Canvas: canvas.New(pool, files)}, nil
+	return &account.Services{Deployment: deployment.NewService(deployment.NewStore(pool), version, commit), Operations: operations.New(pool), Mailer: sender, PublicBaseURL: cfg.PublicBaseURL, Version: version, Commit: commit, BuildTime: buildTime, Auth: auth.New(interactive, passwords, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: models, Chat: conversations, Files: files, Images: images.New(pool, billing, models, files, cache, logger), Canvas: canvas.New(pool, files)}, nil
 }

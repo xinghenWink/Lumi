@@ -4726,6 +4726,176 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/admin/system/releases:
+    get:
+      summary: List official Lumi releases and deployment availability
+      operationId: listDeploymentReleases
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, maximum: 100, default: 1 }
+        - in: query
+          name: refresh
+          schema: { type: string, const: '1' }
+      responses:
+        '200':
+          description: Releases and the most recent deployment job. Stale results are read-only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentReleases'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/system/deployment-jobs:
+    post:
+      summary: Queue a verified application update or rollback
+      operationId: enqueueDeploymentJob
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: header, name: X-Lumi-CSRF, required: true, schema: { type: string, const: '1' } }
+        - {
+            in: header,
+            name: Idempotency-Key,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeploymentRequest'
+      responses:
+        '202':
+          description: Accepted, or replay of the same request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentJob'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Source or target changed, another deployment is active, or operation is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/admin/system/deployment-jobs/{id}:
+    get:
+      summary: Read a deployment job
+      operationId: getDeploymentJob
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Persisted deployment status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentJob'
+        '400':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/system/cleanup:
     post:
       summary: /api/v1/admin/system/cleanup
@@ -5330,6 +5500,103 @@ components:
         - last_message_at
         - created_at
         - busy
+    DeploymentAction:
+      type: string
+      enum: [update, rollback]
+    DeploymentRequest:
+      type: object
+      additionalProperties: false
+      required: [action, target_version, expected_current_digest]
+      properties:
+        action:
+          $ref: '#/components/schemas/DeploymentAction'
+        target_version:
+          type: string
+          pattern: '^v(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$'
+        expected_current_digest:
+          type: string
+          pattern: '^sha256:[a-f0-9]{64}$'
+    DeploymentJob:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          action,
+          source_version,
+          source_digest,
+          target_version,
+          target_digest,
+          stage,
+          reason,
+          created_at,
+          updated_at,
+          finished_at,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        action:
+          $ref: '#/components/schemas/DeploymentAction'
+        source_version: { type: string }
+        source_digest: { type: string }
+        target_version: { type: string }
+        target_digest: { type: string }
+        stage:
+          type: string
+          enum:
+            [
+              queued,
+              preflight,
+              stopping,
+              backup,
+              switching,
+              verifying,
+              reverting,
+              succeeded,
+              failed,
+              rolled_back,
+              recovery_required,
+            ]
+        reason: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+    DeploymentRelease:
+      type: object
+      additionalProperties: false
+      required: [version, name, notes, url, published_at, current, action, reason]
+      properties:
+        version: { type: string }
+        name: { type: string }
+        notes: { type: string }
+        url: { type: string, format: uri }
+        published_at: { type: string, format: date-time }
+        current: { type: boolean }
+        action: { type: string, enum: ['', update, rollback] }
+        reason: { type: string }
+    DeploymentReleases:
+      type: object
+      additionalProperties: false
+      required:
+        [current_digest, latest, items, checked_at, stale, next_page, executor_reason, recent_job]
+      properties:
+        current_digest: { type: string }
+        latest:
+          oneOf:
+            - $ref: '#/components/schemas/DeploymentRelease'
+            - { type: 'null' }
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeploymentRelease'
+        checked_at: { type: [string, 'null'], format: date-time }
+        stale: { type: boolean }
+        next_page: { type: integer, minimum: 0, maximum: 100 }
+        executor_reason: { type: string }
+        recent_job:
+          oneOf:
+            - $ref: '#/components/schemas/DeploymentJob'
+            - { type: 'null' }
     SystemInfo:
       type: object
       additionalProperties: false

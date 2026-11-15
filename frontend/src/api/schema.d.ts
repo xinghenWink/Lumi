@@ -1488,6 +1488,57 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/admin/system/releases': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List official Lumi releases and deployment availability */
+    get: operations['listDeploymentReleases']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/system/deployment-jobs': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Queue a verified application update or rollback */
+    post: operations['enqueueDeploymentJob']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/system/deployment-jobs/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Read a deployment job */
+    get: operations['getDeploymentJob']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/admin/system/cleanup': {
     parameters: {
       query?: never
@@ -1712,6 +1763,66 @@ export interface components {
       /** Format: date-time */
       created_at: string
       busy: boolean
+    }
+    /** @enum {string} */
+    DeploymentAction: 'update' | 'rollback'
+    DeploymentRequest: {
+      action: components['schemas']['DeploymentAction']
+      target_version: string
+      expected_current_digest: string
+    }
+    DeploymentJob: {
+      /** Format: uuid */
+      id: string
+      action: components['schemas']['DeploymentAction']
+      source_version: string
+      source_digest: string
+      target_version: string
+      target_digest: string
+      /** @enum {string} */
+      stage:
+        | 'queued'
+        | 'preflight'
+        | 'stopping'
+        | 'backup'
+        | 'switching'
+        | 'verifying'
+        | 'reverting'
+        | 'succeeded'
+        | 'failed'
+        | 'rolled_back'
+        | 'recovery_required'
+      reason: string
+      /** Format: date-time */
+      created_at: string
+      /** Format: date-time */
+      updated_at: string
+      /** Format: date-time */
+      finished_at: string | null
+    }
+    DeploymentRelease: {
+      version: string
+      name: string
+      notes: string
+      /** Format: uri */
+      url: string
+      /** Format: date-time */
+      published_at: string
+      current: boolean
+      /** @enum {string} */
+      action: '' | 'update' | 'rollback'
+      reason: string
+    }
+    DeploymentReleases: {
+      current_digest: string
+      latest: components['schemas']['DeploymentRelease'] | null
+      items: components['schemas']['DeploymentRelease'][]
+      /** Format: date-time */
+      checked_at: string | null
+      stale: boolean
+      next_page: number
+      executor_reason: string
+      recent_job: components['schemas']['DeploymentJob'] | null
     }
     SystemInfo: {
       version: string
@@ -7532,6 +7643,240 @@ export interface operations {
       }
       /** @description Request rejected */
       429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Request rejected */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  listDeploymentReleases: {
+    parameters: {
+      query?: {
+        page?: number
+        refresh?: '1'
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Releases and the most recent deployment job. Stale results are read-only. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeploymentReleases']
+        }
+      }
+      /** @description Request rejected */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Request rejected */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Request rejected */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Request rejected */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Request rejected */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  enqueueDeploymentJob: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+        'Idempotency-Key': string
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DeploymentRequest']
+      }
+    }
+    responses: {
+      /** @description Accepted, or replay of the same request */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeploymentJob']
+        }
+      }
+      /** @description Request rejected */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Request rejected */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Request rejected */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Source or target changed, another deployment is active, or operation is unavailable */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Request rejected */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Request rejected */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Request rejected */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  getDeploymentJob: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Persisted deployment status */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DeploymentJob']
+        }
+      }
+      /** @description Request rejected */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Request rejected */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Request rejected */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Request rejected */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Request rejected */
+      500: {
         headers: {
           [name: string]: unknown
         }
