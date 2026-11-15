@@ -10,12 +10,14 @@ export function ProtectedImage({
   alt,
   className = '',
   fallback,
+  renderImage,
 }: {
   file: ImageFile
   original?: boolean
   alt: string
   className?: string
   fallback?: ReactNode
+  renderImage?: (image: ReactNode) => ReactNode
 }) {
   const { t } = useTranslation()
   const { user } = useSession()
@@ -45,16 +47,20 @@ export function ProtectedImage({
       if (url) URL.revokeObjectURL(url)
     }
   }, [source, file, original, owner])
-  return result?.source === source && result.url ? (
-    <img
-      src={result.url}
-      alt={alt}
-      width={original ? file.width : file.thumbnail_width}
-      height={original ? file.height : file.thumbnail_height}
-      decoding="async"
-      className={className}
-    />
-  ) : fallback !== undefined ? (
+  if (result?.source === source && result.url) {
+    const image = (
+      <img
+        src={result.url}
+        alt={alt}
+        width={original ? file.width : file.thumbnail_width}
+        height={original ? file.height : file.thumbnail_height}
+        decoding="async"
+        className={className}
+      />
+    )
+    return renderImage ? renderImage(image) : image
+  }
+  return fallback !== undefined ? (
     fallback
   ) : result?.source === source && result.failed ? (
     <span role="status" className="flex flex-col items-center gap-2 text-xs text-muted-foreground">

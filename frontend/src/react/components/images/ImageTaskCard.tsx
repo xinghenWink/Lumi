@@ -14,6 +14,7 @@ import { ModalDialog } from '../ui/modal-dialog'
 import { Button } from '../ui/button'
 import { ProtectedImage } from './ProtectedImage'
 import { ImagePreview } from './ImagePreview'
+import { ImageTaskPrompt } from './ImageTaskPrompt'
 import { ReferenceChips } from './ReferenceChips'
 
 const tones = {
@@ -97,7 +98,11 @@ export const ImageTaskCard = memo(function ImageTaskCard({
     'size-7 rounded-lg text-foreground hover:bg-foreground/10 focus-visible:outline-offset-0'
   const references =
     task.content_visible && task.reference_file_ids.length ? (
-      <ReferenceChips ids={task.reference_file_ids} className="image-task-references justify-end" />
+      <ReferenceChips
+        ids={task.reference_file_ids}
+        className="image-task-references justify-end"
+        previewable={!admin}
+      />
     ) : null
 
   function taskActions(variant: 'ghost' | 'outline') {
@@ -138,9 +143,13 @@ export const ImageTaskCard = memo(function ImageTaskCard({
         )}
       >
         <div className={cn('min-w-0 flex-1', !admin && 'sm:col-start-1 sm:row-start-1')}>
-          <p className="text-sm leading-6 break-words whitespace-pre-wrap">
-            {task.content_visible ? task.prompt : t('images.hidden')}
-          </p>
+          {!admin && task.content_visible && task.prompt ? (
+            <ImageTaskPrompt prompt={task.prompt} />
+          ) : (
+            <p className="text-sm leading-6 break-words whitespace-pre-wrap">
+              {task.content_visible ? task.prompt : t('images.hidden')}
+            </p>
+          )}
           <p className="mt-1 text-2xs text-muted-foreground">{parameters}</p>
         </div>
         {admin ? (

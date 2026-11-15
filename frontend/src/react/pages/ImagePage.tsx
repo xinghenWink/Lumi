@@ -2,7 +2,6 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useStore } from 'zustand'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { images, type ImageFile, type ImageTask } from '../../api/images'
 import { ApiError } from '../../api/transport'
@@ -17,6 +16,7 @@ import { ImageComposer } from '../components/images/ImageComposer'
 import { ImageConversationActions } from '../components/images/ImageConversationActions'
 import { PageStatus } from '../components/shared/PageStatus'
 import { ApiNotice } from '../components/shared/ApiNotice'
+import { ImageGenerationIcon } from '../components/shared/ImageGenerationIcon'
 const ImageTaskList = lazy(() =>
   import('../components/images/ImageTaskList').then((module) => ({
     default: module.ImageTaskList,
@@ -176,10 +176,8 @@ function ImageWorkspace() {
             />
           </Suspense>
         ) : (
-          <section className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-5 py-8 text-center">
-            <span className="mb-5 grid size-12 place-items-center rounded-2xl bg-accent text-primary animate-rise-in">
-              <Sparkles size={24} strokeWidth={1.6} />
-            </span>
+          <section className="flex min-h-0 flex-1 flex-col items-center justify-center-safe overflow-y-auto px-5 py-8 text-center">
+            <ImageGenerationIcon size={128} className="mb-5 animate-rise-in" />
             <h1 className="text-[28px] leading-tight font-semibold tracking-tight text-balance sm:text-[32px]">
               {t('images.title')}
             </h1>

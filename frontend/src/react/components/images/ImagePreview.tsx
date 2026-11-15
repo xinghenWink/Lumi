@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type RefObject } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { ChevronLeft, ChevronRight, Copy, Download, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ImageFile } from '../../../api/images'
@@ -11,6 +11,9 @@ import { ProtectedImage } from './ProtectedImage'
 
 const control =
   'h-9 rounded-lg border border-white/15 bg-white/10 px-3 text-xs text-white shadow-none hover:bg-white/20 hover:text-white focus-visible:outline-white/80'
+const fitZoom = 100
+const minZoom = 50
+const maxZoom = 200
 
 /** Full-screen lightbox: arrows or keys move between results; 100% fits the screen. */
 export function ImagePreview({
@@ -36,13 +39,22 @@ export function ImagePreview({
     actions = useImageActions(),
     zoomField = useId()
   const [index, setIndex] = useState(initialIndex),
-    [zoom, setZoom] = useState(100)
+    [zoom, setZoom] = useState(fitZoom)
+  const [viewport, setViewport] = useState<HTMLDivElement | null>(null)
+  const frame = useRef<HTMLDivElement>(null),
+    currentZoom = useRef(fitZoom),
+    wheelAnchor = useRef<{ x: number; y: number; clientX: number; clientY: number } | null>(null)
   const file = files[index]
+  function selectZoom(value: number) {
+    wheelAnchor.current = null
+    currentZoom.current = value
+    setZoom(value)
+  }
   function move(direction: number) {
     if (files.length < 2) return
     const next = (index + direction + files.length) % files.length
     setIndex(next)
-    setZoom(100)
+    selectZoom(fitZoom)
     onNavigate?.(next)
   }
   useEffect(() => {
@@ -57,7 +69,54 @@ export function ImagePreview({
     window.addEventListener('keydown', listener)
     return () => window.removeEventListener('keydown', listener)
   })
+  useEffect(() => {
+    // The dialog mounts its portal after the preview component mounts.
+    if (!viewport) return
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey || !event.deltaY) return
+      event.preventDefault()
+      const unit =
+        event.deltaMode === WheelEvent.DOM_DELTA_LINE
+          ? 16
+          : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+            ? viewport.clientHeight
+            : 1
+      const next = Math.max(
+        minZoom,
+        Math.min(maxZoom, currentZoom.current * Math.exp(-event.deltaY * unit * 0.002)),
+      )
+      if (next === currentZoom.current) return
+      const bounds = frame.current?.getBoundingClientRect()
+      if (bounds?.width && bounds.height) {
+        wheelAnchor.current = {
+          x: Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)),
+          y: Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height)),
+          clientX: event.clientX,
+          clientY: event.clientY,
+        }
+      }
+      currentZoom.current = next
+      setZoom(next)
+    }
+    // Keep wheel zoom inside the preview without scrolling the surrounding viewport.
+    viewport.addEventListener('wheel', onWheel, { passive: false })
+    return () => viewport.removeEventListener('wheel', onWheel)
+  }, [viewport])
+  useLayoutEffect(() => {
+    const anchor = wheelAnchor.current
+    const bounds = frame.current?.getBoundingClientRect()
+    if (!anchor || !viewport || !bounds) return
+    wheelAnchor.current = null
+    viewport.scrollBy({
+      left: bounds.left + bounds.width * anchor.x - anchor.clientX,
+      top: bounds.top + bounds.height * anchor.y - anchor.clientY,
+      behavior: 'instant',
+    })
+  }, [viewport, zoom])
   const scale = zoom / 100
+  const percent = Math.round(zoom)
+  const zoomOptions = [...new Set([minZoom, fitZoom, 150, maxZoom, percent])].sort((a, b) => a - b)
+  const aspect = file && file.width > 0 && file.height > 0 ? file.width / file.height : 1
   return (
     <ModalDialog
       open
@@ -79,13 +138,18 @@ export function ImagePreview({
             ) : null}
             <span className="truncate">{parameters}</span>
           </div>
-          <div className="relative min-h-0 flex-1 overflow-auto overscroll-contain">
-            <div className="flex min-h-full min-w-full p-4 sm:px-16">
+          <div
+            ref={setViewport}
+            data-slot="image-preview-viewport"
+            className="relative min-h-0 flex-1 overflow-auto overscroll-contain [container-type:size] [overflow-anchor:none]"
+          >
+            <div className="flex w-max min-h-full min-w-full p-4">
               <div
+                ref={frame}
                 className="m-auto shrink-0"
                 style={{
-                  width: `calc(${scale} * (100vw - 2rem))`,
-                  height: `calc(${scale} * (100dvh - 12rem))`,
+                  width: `calc(${scale} * max(0px, min(100cqw - 2rem, (100cqh - 2rem) * ${aspect})))`,
+                  aspectRatio: aspect,
                 }}
               >
                 <ProtectedImage
@@ -140,10 +204,10 @@ export function ImagePreview({
                   id={zoomField}
                   aria-label={t('images.zoom')}
                   className="h-9 rounded-lg border border-white/15 bg-white/10 px-2.5 text-xs text-white [color-scheme:dark] focus-visible:outline-2 focus-visible:outline-white/80"
-                  value={zoom}
-                  onChange={(event) => setZoom(Number(event.target.value))}
+                  value={percent}
+                  onChange={(event) => selectZoom(Number(event.target.value))}
                 >
-                  {[50, 100, 150, 200].map((value) => (
+                  {zoomOptions.map((value) => (
                     <option key={value} value={value}>
                       {value}%
                     </option>

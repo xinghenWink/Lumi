@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Eye, EyeOff, MessageSquare, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, MessageSquare } from 'lucide-react'
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { usePublicConfig } from '../features/auth/hooks'
 import { createChallenge } from '../features/auth/turnstile'
 import { useRuntime } from '../app/context'
 import { ApiNotice } from '../components/shared/ApiNotice'
+import { ImageGenerationIcon } from '../components/shared/ImageGenerationIcon'
 import { PageStatus } from '../components/shared/PageStatus'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
@@ -327,9 +328,7 @@ export default function AuthPage() {
   return (
     <div className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-12 px-4 py-8 sm:px-8 sm:py-12 lg:grid-cols-[1fr_400px] lg:gap-20">
       <aside className="hidden flex-col gap-6 lg:flex">
-        <span className="grid size-12 place-items-center rounded-2xl bg-accent text-primary">
-          <Sparkles size={24} strokeWidth={1.6} />
-        </span>
+        <ImageGenerationIcon size={64} />
         <h2 className="max-w-md text-[40px] leading-[1.2] font-semibold tracking-tight text-balance">
           {t('auth.heroTitle')}
         </h2>
@@ -339,17 +338,21 @@ export default function AuthPage() {
         <div className="mt-2 grid max-w-md gap-3">
           {(
             [
-              [MessageSquare, 'auth.heroChat', 'auth.heroChatDescription'],
-              [Sparkles, 'auth.heroImage', 'auth.heroImageDescription'],
+              [
+                <span className="grid size-8 place-items-center rounded-lg bg-accent text-primary">
+                  <MessageSquare size={16} aria-hidden="true" />
+                </span>,
+                'auth.heroChat',
+                'auth.heroChatDescription',
+              ],
+              [<ImageGenerationIcon size={48} />, 'auth.heroImage', 'auth.heroImageDescription'],
             ] as const
-          ).map(([Icon, title, description]) => (
+          ).map(([icon, title, description]) => (
             <div
               key={title}
-              className="flex items-start gap-3 rounded-xl border border-border bg-card/60 p-4"
+              className="flex items-center gap-3 rounded-xl border border-border bg-card/60 p-4"
             >
-              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-primary">
-                <Icon size={16} />
-              </span>
+              <span className="grid size-12 shrink-0 place-items-center">{icon}</span>
               <div>
                 <strong className="text-sm font-medium">{t(title)}</strong>
                 <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{t(description)}</p>
