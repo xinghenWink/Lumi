@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Eye, EyeOff, MessageSquare } from 'lucide-react'
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -9,11 +9,14 @@ import { ImageGenerationIcon } from '../components/shared/ImageGenerationIcon'
 import { PageStatus } from '../components/shared/PageStatus'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { Checkbox } from '../components/ui/checkbox'
 import { Field, FieldGroup } from '../components/ui/field'
 import { Input } from '../components/ui/input'
 import { ApiError } from '../../api/transport'
 import { safeRedirect, validEmail, validPassword } from '../../features/accounts/utils'
+
+const TermsCheckbox = lazy(() =>
+  import('../components/ui/checkbox').then(({ Checkbox }) => ({ default: Checkbox })),
+)
 
 function AuthForm({ registering }: { registering: boolean }) {
   const { t, i18n } = useTranslation()
@@ -278,14 +281,16 @@ function AuthForm({ registering }: { registering: boolean }) {
             ) : null}
             {registering ? (
               <div className="flex items-start gap-2.5 text-xs leading-6 text-muted-foreground">
-                <Checkbox
-                  className="mt-1"
-                  id="auth-terms"
-                  name="accept_terms"
-                  checked={agreed}
-                  onCheckedChange={(value) => setAgreed(value === true)}
-                  disabled={busy}
-                />
+                <Suspense fallback={<span aria-hidden="true" className="mt-1 size-4 shrink-0" />}>
+                  <TermsCheckbox
+                    className="mt-1"
+                    id="auth-terms"
+                    name="accept_terms"
+                    checked={agreed}
+                    onCheckedChange={(value) => setAgreed(value === true)}
+                    disabled={busy}
+                  />
+                </Suspense>
                 <label htmlFor="auth-terms">
                   {t('auth.agree')}{' '}
                   <a
