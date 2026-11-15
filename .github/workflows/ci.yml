@@ -174,7 +174,7 @@ jobs:
   container:
     needs: [quality, react-candidate]
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -246,15 +246,6 @@ jobs:
           docker build --build-arg VERSION=previous -t lumi:previous "$RUNNER_TEMP/previous"
       - name: Rehearse installation, upgrade, rollback and backup restore
         run: sudo env LUMI_CURRENT_IMAGE=lumi:ci LUMI_PREVIOUS_IMAGE=lumi:previous bash scripts/deploy-smoke.sh
-      - uses: actions/setup-go@v7.0.0
-        with:
-          go-version: '1.26.11'
-          cache-dependency-path: backend/go.sum
-      - name: Exercise the native Compose deployment executor
-        run: |
-          docker build --build-arg VERSION=v99.1.0 --build-arg COMMIT="$GITHUB_SHA" -t lumi:managed-source .
-          docker build --build-arg VERSION=v99.2.0 --build-arg COMMIT="$GITHUB_SHA" -t lumi:managed-target .
-          sudo env "PATH=$PATH" bash scripts/managed-deployment-smoke.sh lumi:managed-source lumi:managed-target
       - name: Print container diagnostics
         if: failure()
         env:
@@ -273,3 +264,18 @@ jobs:
           if test -f deploy/.env; then
             docker compose --env-file deploy/.env -f deploy/docker-compose.yml down --volumes
           fi
+
+  managed-deployment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7.0.0
+        with:
+          go-version: '1.26.11'
+          cache-dependency-path: backend/go.sum
+      - name: Exercise the native Compose deployment executor
+        run: |
+          docker build --build-arg VERSION=v99.1.0 --build-arg COMMIT="$GITHUB_SHA" -t lumi:managed-source .
+          docker build --build-arg VERSION=v99.2.0 --build-arg COMMIT="$GITHUB_SHA" -t lumi:managed-target .
+          sudo env "PATH=$PATH" bash scripts/managed-deployment-smoke.sh lumi:managed-source lumi:managed-target

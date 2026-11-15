@@ -434,11 +434,17 @@ func (c *compose) Start(ctx context.Context, other, manifest deployment.Manifest
 	if err := c.checkImage(ctx, manifest, platform); err != nil {
 		return err
 	}
-	configured, err := c.run(ctx, 10*time.Second, "resolve Compose app image", c.composeArgs("config", "--images", "app")...)
+	configured, err := c.run(ctx, 10*time.Second, "resolve Compose app image", c.composeArgs("config", "--format", "json", "app")...)
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(string(configured)) != c.ref(manifest.Digest) {
+	var model struct {
+		Services map[string]struct{ Image string }
+	}
+	if err := json.Unmarshal(configured, &model); err != nil {
+		return fmt.Errorf("decode Compose service model: %w", err)
+	}
+	if model.Services["app"].Image != c.ref(manifest.Digest) {
 		return fmt.Errorf("configured Compose image pin changed")
 	}
 	if _, err := c.run(ctx, 155*time.Second, "start verified Compose app", c.composeArgs("up", "-d", "--no-deps", "--no-build",
