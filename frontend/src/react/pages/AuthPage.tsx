@@ -3,7 +3,6 @@ import { Eye, EyeOff, MessageSquare } from 'lucide-react'
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { usePublicConfig } from '../features/auth/hooks'
-import { createChallenge } from '../features/auth/turnstile'
 import { useRuntime } from '../app/context'
 import { ApiNotice } from '../components/shared/ApiNotice'
 import { ImageGenerationIcon } from '../components/shared/ImageGenerationIcon'
@@ -35,28 +34,41 @@ function AuthForm({ registering }: { registering: boolean }) {
   const [validation, setValidation] = useState('')
   const [notice, setNotice] = useState('')
   const container = useRef<HTMLDivElement>(null)
-  const challenge = useRef<ReturnType<typeof createChallenge> | null>(null)
+  type Challenge = ReturnType<typeof import('../features/auth/turnstile').createChallenge>
+  const challenge = useRef<(() => Promise<Challenge>) | null>(null)
   const key = config.data?.turnstile_site_key ?? ''
+  const challengeEnabled = registering && config.data?.turnstile_enabled === true
   useEffect(() => {
-    const widget = createChallenge(
-      () => container.current,
-      () => key,
-    )
-    challenge.current = widget
+    if (!challengeEnabled) return
+    let active = true
+    let widget: Challenge | undefined
+    challenge.current = async () => {
+      const { createChallenge } = await import('../features/auth/turnstile').catch(() => {
+        throw new ApiError('CHALLENGE_UNAVAILABLE')
+      })
+      if (!active) throw new ApiError('CHALLENGE_UNAVAILABLE')
+      widget ??= createChallenge(
+        () => container.current,
+        () => key,
+      )
+      return widget
+    }
     return () => {
-      widget.dispose()
+      active = false
+      widget?.dispose()
       challenge.current = null
     }
-  }, [key])
+  }, [challengeEnabled, key])
   useEffect(() => {
     if (seconds <= 0) return
     const timer = setTimeout(() => setSeconds((value) => Math.max(0, value - 1)), 1000)
     return () => clearTimeout(timer)
   }, [seconds])
   async function token(action: 'register' | 'send_code') {
-    if (!config.data?.turnstile_enabled) return undefined
+    if (!challengeEnabled) return undefined
     if (!challenge.current) throw new ApiError('CHALLENGE_UNAVAILABLE')
-    return challenge.current.token(action)
+    const widget = await challenge.current()
+    return widget.token(action)
   }
   async function sendCode() {
     setError(null)
