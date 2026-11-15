@@ -511,7 +511,7 @@ func writeAtomic(path string, data []byte) (result error) {
 		return fmt.Errorf("create managed deployment file: %w", err)
 	}
 	defer func() {
-		if err := os.Remove(temp.Name()); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := os.Remove(temp.Name()); err != nil && !errors.Is(err, os.ErrNotExist) { // #nosec G703 -- Remove only the work file allocated by CreateTemp.
 			result = errors.Join(result, fmt.Errorf("clean up temporary deployment file: %w", err))
 		}
 	}()
@@ -524,7 +524,7 @@ func writeAtomic(path string, data []byte) (result error) {
 	if err := os.Rename(temp.Name(), path); err != nil { // #nosec G703 -- Both files are in the enrolled root-owned directory.
 		return fmt.Errorf("publish managed deployment file: %w", err)
 	}
-	directory, err := os.Open(dir) // #nosec G304 -- enrolled root-owned directory.
+	directory, err := os.Open(dir) // #nosec G304 G703 -- Enrolled root-owned directory.
 	if err != nil {
 		return fmt.Errorf("open managed deployment directory: %w", err)
 	}
@@ -568,7 +568,7 @@ func (c *compose) LoadPlan(id uuid.UUID) (deployment.ExecutionPlan, error) {
 
 func (c *compose) lock(name string) (*os.File, error) {
 	path := filepath.Join(c.directory, name)
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0o600) // #nosec G304 -- fixed local lock name.
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0o600) // #nosec G304 G703 -- Fixed local lock name within the enrolled directory.
 	if err != nil {
 		return nil, fmt.Errorf("open deployment lock: %w", err)
 	}
