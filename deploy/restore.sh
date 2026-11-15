@@ -37,16 +37,16 @@ docker compose exec -T postgres sh -c 'exec pg_restore --exit-on-error --no-owne
 docker compose exec -T postgres sh -c 'exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
 DO $restore_deployment$
 BEGIN
-    IF to_regclass('public.deployment_jobs') IS NOT NULL THEN
-        DELETE FROM public.deployment_executor;
+    IF to_regclass('deployment_jobs') IS NOT NULL THEN
+        DELETE FROM deployment_executor;
         WITH interrupted AS (
-            UPDATE public.deployment_jobs
+            UPDATE deployment_jobs
             SET stage = 'failed', reason = 'DEPLOYMENT_SNAPSHOT_RESTORED',
                 updated_at = now(), finished_at = now()
             WHERE finished_at IS NULL OR stage = 'recovery_required'
             RETURNING id, actor_id, actor_ip
         )
-        INSERT INTO public.audit_logs (id, actor_id, action, target_type, target_id, "after", ip)
+        INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, "after", ip)
         SELECT gen_random_uuid(), actor_id, 'deployment.snapshot_restored',
                'deployment_job', id, '{"stage":"failed"}'::jsonb, actor_ip FROM interrupted;
     END IF;

@@ -49,8 +49,10 @@ archive=$(find backups -name 'lumi-deployment-*.tar.gz' -printf '%T@ %p\n' | sor
 COMPOSE_PROJECT_NAME=$project docker compose stop app
 COMPOSE_PROJECT_NAME=$project-restore bash restore.sh "$archive" "$fixture/restored"
 cd -- "$fixture/restored"
-COMPOSE_PROJECT_NAME=$project-restore docker compose exec -T postgres sh -c 'exec psql -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL' | grep -qx 'failed'
+restored_state=$(COMPOSE_PROJECT_NAME=$project-restore docker compose exec -T postgres sh -c 'exec psql -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
 SELECT stage FROM deployment_jobs WHERE reason='DEPLOYMENT_SNAPSHOT_RESTORED';
 SQL
-curl --fail --silent http://127.0.0.1:8080/ > /dev/null
+)
+[[ $restored_state == failed ]] || { echo 'The restored snapshot did not release its interrupted deployment.' >&2; exit 1; }
+curl --fail --silent --show-error http://127.0.0.1:8080/ > /dev/null
 echo 'PASS: managed updates, managed rollback, and isolated restore of an active-task backup.'
