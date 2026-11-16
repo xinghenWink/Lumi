@@ -35,6 +35,7 @@ interface PendingSubmission {
   input: ImageInput
   key: string
   create: boolean
+  source: 'draft' | 'task'
 }
 interface ImageState {
   active: string
@@ -281,10 +282,11 @@ export function createImageController(session: SessionService, client: QueryClie
   async function submit(
     id: string,
     input?: Omit<ImageInput, 'conversation_id'>,
+    source: PendingSubmission['source'] = 'draft',
   ): Promise<string | undefined> {
     const state = store.getState(),
       scope = imageSubmissionScope(state, id)
-    if (state.sending[scope]) return
+    if (state.sending[scope] || (source === 'task' && state.pending[scope])) return
     const replay = !!state.pending[scope]
     let submission = state.pending[scope]
     if (!submission) {
@@ -298,6 +300,7 @@ export function createImageController(session: SessionService, client: QueryClie
         },
         key: crypto.randomUUID(),
         create: !id,
+        source,
       }
     }
     const request = submission,
@@ -323,9 +326,10 @@ export function createImageController(session: SessionService, client: QueryClie
       if (!valid(owner, row.conversation_id)) return
       accept(row)
       store.setState((current) => {
-        const pending = { ...current.pending },
-          drafts = { ...current.drafts }
+        const pending = { ...current.pending }
         Reflect.deleteProperty(pending, scope)
+        if (request.source === 'task') return { pending, lastOpened: row.conversation_id }
+        const drafts = { ...current.drafts }
         const source = drafts[scope] ?? emptyImageDraft
         // Do not clear text or references replaced by another view during submission.
         if (
@@ -361,6 +365,28 @@ export function createImageController(session: SessionService, client: QueryClie
       if (valid(owner, request.input.conversation_id))
         store.setState((current) => ({ sending: { ...current.sending, [scope]: false } }))
     }
+  }
+  async function regenerate(task: ImageTask) {
+    if (
+      !task.content_visible ||
+      !task.prompt.trim() ||
+      !task.model_id ||
+      task.conversation_id !== store.getState().active
+    )
+      return
+    await submit(
+      task.conversation_id,
+      {
+        model_id: task.model_id,
+        prompt: task.prompt,
+        quality: task.quality,
+        size: task.size,
+        ratio: task.ratio,
+        n: task.n,
+        reference_file_ids: task.reference_file_ids,
+      },
+      'task',
+    )
   }
   async function cancel(task: ImageTask) {
     const owner = generation
@@ -417,6 +443,7 @@ export function createImageController(session: SessionService, client: QueryClie
     activate,
     draft,
     submit,
+    regenerate,
     cancel,
     update,
     remove,

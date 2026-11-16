@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useStore } from 'zustand'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -64,10 +64,15 @@ function ImageWorkspace() {
   const wide = useMediaQuery('(min-width: 1024px)')
   const available = models.query.data?.items,
     modelID = data.data?.conversation.model_id
+  const initializedModel = useRef<string | null>(null)
   const older = useMutation({ mutationFn: () => image.loadOlder(id) })
   const submitting = useStore(
     image.store,
     (state) => !!state.sending[imageSubmissionScope(state, id)],
+  )
+  const submitLocked = useStore(
+    image.store,
+    (state) => !!state.pending[imageSubmissionScope(state, id)],
   )
   const action = useMutation({
     mutationFn: async (
@@ -78,6 +83,8 @@ function ImageWorkspace() {
       if (value.kind === 'edit') {
         await addExistingReference(runtime, models, value.file, id, { requireActive: true })
       } else {
+        if (!models.items.some((model) => model.id === value.task.model_id))
+          throw new ApiError('IMAGE_MODEL_UNAVAILABLE')
         const results = await Promise.allSettled(
           value.task.reference_file_ids.map((reference) => images.file(reference)),
         )
@@ -89,6 +96,7 @@ function ImageWorkspace() {
           return
         if (image.store.getState().pending[imageSubmissionScope(image.store.getState(), id)])
           throw new ApiError('INVALID_INPUT')
+        initializedModel.current = id
         models.select(value.task.model_id)
         const references = results.flatMap((result) =>
           result.status === 'fulfilled' ? [result.value] : [],
@@ -108,18 +116,32 @@ function ImageWorkspace() {
     },
   })
   useEffect(() => {
+    initializedModel.current = null
     void image.open(id)
     return () => image.stopFollowing()
   }, [image, id])
   useEffect(() => {
-    if (modelID && available?.some((model) => model.id === modelID))
+    // Submission refreshes the saved conversation model. Seed the composer only when opening it.
+    if (
+      initializedModel.current !== id &&
+      modelID &&
+      available?.some((model) => model.id === modelID)
+    ) {
+      initializedModel.current = id
       runtime.modelStore.getState().select('image', modelID)
-  }, [runtime, modelID, available])
+    }
+  }, [runtime, id, modelID, available])
   const mutate = action.mutate,
     refetch = data.refetch
   const cancel = useCallback((task: ImageTask) => image.cancel(task), [image])
   const edit = useCallback((file: ImageFile) => mutate({ kind: 'edit', file }), [mutate])
   const reuse = useCallback((task: ImageTask) => mutate({ kind: 'reuse', task }), [mutate])
+  const regenerate = useCallback(
+    (task: ImageTask) => {
+      void image.regenerate(task)
+    },
+    [image],
+  )
   const changed = useCallback(() => {
     void refetch()
   }, [refetch])
@@ -171,6 +193,9 @@ function ImageWorkspace() {
               onOlder={() => older.mutateAsync().catch(() => undefined)}
               onCancel={cancel}
               onReuse={reuse}
+              onRegenerate={regenerate}
+              reuseDisabled={submitLocked || action.isPending || models.query.isPending}
+              regenerateDisabled={submitLocked || action.isPending}
               onEdit={edit}
               onChanged={changed}
             />

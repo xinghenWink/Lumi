@@ -12,7 +12,13 @@ import { useTranslation } from 'react-i18next'
 import { Sidebar } from './Sidebar'
 import { Button } from '../ui/button'
 
-export function MobileNavigation({ admin }: { admin: boolean }) {
+export function MobileNavigation({
+  admin,
+  onDesktopSearch,
+}: {
+  admin: boolean
+  onDesktopSearch(): void
+}) {
   const [open, setOpen] = useState(false)
   const searchOnOpen = useRef(false)
   const { t } = useTranslation()
@@ -29,18 +35,18 @@ export function MobileNavigation({ admin }: { admin: boolean }) {
     const listener = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'k') return
       event.preventDefault()
-      if (window.matchMedia('(max-width: 1023px)').matches && !open) {
+      if (window.matchMedia('(min-width: 1024px)').matches) {
+        onDesktopSearch()
+      } else if (!open) {
         searchOnOpen.current = true
         setOpen(true)
-        return
+      } else {
+        document.querySelector<HTMLInputElement>('.mobile-sidebar [data-history-search]')?.focus()
       }
-      document.querySelectorAll<HTMLInputElement>('[data-history-search]').forEach((input) => {
-        if (input.getClientRects().length) input.focus()
-      })
     }
     window.addEventListener('keydown', listener)
     return () => window.removeEventListener('keydown', listener)
-  }, [admin, open])
+  }, [admin, onDesktopSearch, open])
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>

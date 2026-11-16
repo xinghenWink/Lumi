@@ -94,6 +94,8 @@ export default {
     backWorkspace: '返回创作空间',
     openMenu: '打开导航菜单',
     closeMenu: '关闭导航菜单',
+    collapseSidebar: '收起侧栏',
+    expandSidebar: '展开侧栏',
     userMenu: '打开账户菜单',
     administration: '平台管理',
     theme: '外观',

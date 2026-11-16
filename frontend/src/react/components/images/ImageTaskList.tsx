@@ -29,6 +29,9 @@ export function ImageTaskList({
   onOlder,
   onCancel,
   onReuse,
+  onRegenerate,
+  reuseDisabled,
+  regenerateDisabled,
   onEdit,
   onChanged,
 }: {
@@ -39,6 +42,9 @@ export function ImageTaskList({
   onOlder(): Promise<void>
   onCancel(task: ImageTask): Promise<void>
   onReuse(task: ImageTask): void
+  onRegenerate(task: ImageTask): void
+  reuseDisabled: boolean
+  regenerateDisabled: boolean
   onEdit(file: ImageFile): void
   onChanged(): void
 }) {
@@ -72,6 +78,9 @@ export function ImageTaskList({
       task={task}
       onCancel={onCancel}
       onReuse={onReuse}
+      onRegenerate={onRegenerate}
+      reuseDisabled={reuseDisabled}
+      regenerateDisabled={regenerateDisabled}
       onEdit={onEdit}
       onChanged={onChanged}
     />

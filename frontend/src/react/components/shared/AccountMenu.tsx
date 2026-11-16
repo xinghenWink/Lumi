@@ -15,8 +15,15 @@ import { useSession } from '../../features/auth/hooks'
 import { useRuntime } from '../../app/context'
 import { ApiNotice } from './ApiNotice'
 import { UserAvatar } from './UserAvatar'
+import { cn } from '../../lib/utils'
 
-export function AccountMenu({ onNavigate }: { onNavigate?: (() => void) | undefined }) {
+export function AccountMenu({
+  compact = false,
+  onNavigate,
+}: {
+  compact?: boolean
+  onNavigate?: (() => void) | undefined
+}) {
   const { t } = useTranslation()
   const { user } = useSession()
   const runtime = useRuntime()
@@ -47,17 +54,27 @@ export function AccountMenu({ onNavigate }: { onNavigate?: (() => void) | undefi
           <Button
             type="button"
             variant="ghost"
-            className="h-auto w-full justify-start gap-2.5 rounded-xl p-1.5 text-left outline-none transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-muted/70"
+            className={cn(
+              'h-auto w-full rounded-xl text-left outline-none transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-muted/70',
+              compact ? 'justify-center p-1' : 'justify-start gap-2.5 p-1.5',
+            )}
             aria-label={t('nav.userMenu')}
+            title={compact ? t('nav.userMenu') : undefined}
           >
             <UserAvatar />
-            <span className="min-w-0 flex-1">
-              <strong className="block truncate text-[13px] font-medium">{user?.nickname}</strong>
-              <span className="block text-2xs text-muted-foreground">
-                {t(user?.role === 'admin' ? 'admin.users.admin' : 'admin.users.user')}
-              </span>
-            </span>
-            <MoreHorizontal size={16} className="text-muted-foreground" />
+            {compact ? null : (
+              <>
+                <span className="min-w-0 flex-1">
+                  <strong className="block truncate text-[13px] font-medium">
+                    {user?.nickname}
+                  </strong>
+                  <span className="block text-2xs text-muted-foreground">
+                    {t(user?.role === 'admin' ? 'admin.users.admin' : 'admin.users.user')}
+                  </span>
+                </span>
+                <MoreHorizontal size={16} className="text-muted-foreground" />
+              </>
+            )}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent

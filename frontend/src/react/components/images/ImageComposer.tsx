@@ -133,7 +133,7 @@ export function ImageComposer({
       }
     }
     const result = await controller.submit(conversationId, body)
-    if (result) await navigate('/create/' + result, { replace: true })
+    if (result && result !== conversationId) await navigate('/create/' + result, { replace: true })
   }
   const summary = options.quality
     ? [

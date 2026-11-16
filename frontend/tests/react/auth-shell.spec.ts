@@ -115,7 +115,11 @@ test('real registration, deep links, role isolation, drawer focus, preferences a
     await expect(page).toHaveURL(/\/chat$/)
     await expect(page.getByRole('heading', { name: '今天想创造什么？', exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: '管理后台', exact: true })).toHaveCount(0)
+    const sidebar = page.locator('.desktop-sidebar')
+    const collapse = sidebar.getByRole('button', { name: '收起侧栏', exact: true })
+    const expand = sidebar.getByRole('button', { name: '展开侧栏', exact: true })
     if (mobile) {
+      await expect(sidebar).toBeHidden()
       const trigger = page.getByRole('button', { name: '打开导航菜单' })
       await trigger.click()
       await expect(page.getByRole('dialog')).toBeVisible()
@@ -124,6 +128,27 @@ test('real registration, deep links, role isolation, drawer focus, preferences a
       await expect(trigger).toBeFocused()
       await page.keyboard.press('Control+k')
       await expect(page.getByRole('searchbox')).toBeFocused()
+    } else {
+      const search = sidebar.getByRole('searchbox')
+      await expect(collapse).toHaveAttribute('aria-expanded', 'true')
+      await collapse.press('Enter')
+      await expect(expand).toBeFocused()
+      await expect(expand).toHaveAttribute('aria-expanded', 'false')
+      await expect(sidebar).toHaveCSS('width', '64px')
+      await expect(search).toBeHidden()
+      for (const name of ['开启新创作', '对话', '生图', '画布', '我的图库', '积分与兑换'])
+        await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible()
+      await expect(sidebar.getByRole('button', { name: '打开账户菜单', exact: true })).toBeVisible()
+      await page.reload()
+      await expect(expand).toBeVisible()
+      await expand.press('Enter')
+      await expect(collapse).toBeFocused()
+      await expect(sidebar).toHaveCSS('width', '264px')
+      await search.fill('Saved history search')
+      await collapse.press('Space')
+      await page.keyboard.press('Control+k')
+      await expect(search).toBeFocused()
+      await expect(search).toHaveValue('Saved history search')
     }
     await openAccount(page)
     const menu = await page.getByRole('menu').boundingBox()
@@ -145,6 +170,15 @@ test('real registration, deep links, role isolation, drawer focus, preferences a
     await page.reload()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
     await expect(page.getByRole('heading', { name: '今天想创造什么？', exact: true })).toBeVisible()
+    if (!mobile) {
+      await collapse.press('Enter')
+      await expect(sidebar).toHaveCSS('width', '64px')
+      await page.screenshot({
+        path: info.outputPath('workspace-sidebar-collapsed-dark.png'),
+        animations: 'disabled',
+      })
+      await expand.press('Enter')
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.screenshot({
       path: info.outputPath('workspace-dark.png'),

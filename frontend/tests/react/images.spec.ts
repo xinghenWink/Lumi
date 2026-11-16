@@ -37,7 +37,8 @@ test('React real image generation editing gallery cancellation and administrator
     key = randomBytes(24).toString('base64url'),
     png = fixturePNG()
   const wire = 'private-image-' + suffix,
-    modelName = 'Lumi Image ' + suffix
+    modelName = 'Lumi Image ' + suffix,
+    alternateModelName = 'Alternate Image ' + suffix
   const backgroundPrompt = Array.from(
     { length: 24 },
     (_, index) => `第 ${index + 1} 段：薄雾中的海边灯塔，暖色调胶片摄影，保留海面细节。`,
@@ -129,6 +130,7 @@ test('React real image generation editing gallery cancellation and administrator
   observeErrors(member, errors)
   let adminToken = '',
     modelID = '',
+    alternateModelID = '',
     chatModelID = '',
     channelID = ''
   let oldPricing: Record<string, unknown> | undefined,
@@ -172,7 +174,7 @@ test('React real image generation editing gallery cancellation and administrator
       base_url: endpoint,
       api_key: key,
       timeout_chat_s: 10,
-      timeout_image_s: 15,
+      timeout_image_s: 30,
       proxy_url: '',
       enabled: true,
       priority: 0,
@@ -205,7 +207,7 @@ test('React real image generation editing gallery cancellation and administrator
         })
       ).id,
     )
-    const model = await api('POST', '/admin/models', {
+    const modelInput = {
       version: 0,
       display_name: modelName,
       type: 'image',
@@ -231,8 +233,15 @@ test('React real image generation editing gallery cancellation and administrator
           enabled: true,
         },
       ],
-    })
+    }
+    const model = await api('POST', '/admin/models', modelInput)
     modelID = String(model.id)
+    const alternateModel = await api('POST', '/admin/models', {
+      ...modelInput,
+      display_name: alternateModelName,
+      is_default: false,
+    })
+    alternateModelID = String(alternateModel.id)
     oldPricing = await api('GET', '/admin/pricing')
     if (!Array.isArray(oldPricing.rules)) throw new Error('Missing price rules')
     await api('PUT', '/admin/pricing', {
@@ -240,14 +249,16 @@ test('React real image generation editing gallery cancellation and administrator
       configuration: { ...record(oldPricing.configuration), signup_bonus_credits: 10 },
       rules: [
         ...oldPricing.rules,
-        ...(['generate', 'edit'] as const).flatMap((operation) =>
-          (['low', 'medium', 'high'] as const).map((quality) => ({
-            model_id: modelID,
-            operation,
-            quality,
-            credits_per_image: 10,
-            enabled: quality === 'medium',
-          })),
+        ...[modelID, alternateModelID].flatMap((model_id) =>
+          (['generate', 'edit'] as const).flatMap((operation) =>
+            (['low', 'medium', 'high'] as const).map((quality) => ({
+              model_id,
+              operation,
+              quality,
+              credits_per_image: 10,
+              enabled: quality === 'medium',
+            })),
+          ),
         ),
       ],
     })
@@ -258,7 +269,7 @@ test('React real image generation editing gallery cancellation and administrator
       ratio_sizes: { '1:1': '1024x1024', '3:2': '1536x1024' },
       per_user_concurrency: 1,
       global_concurrency: 2,
-      timeout_seconds: 15,
+      timeout_seconds: 30,
       split_requests: false,
       admin_can_view_content: false,
     })
@@ -703,21 +714,94 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(fullPrompt).toBeHidden()
     await expect(promptTrigger).toBeFocused()
 
+    const waitForSubmission = () =>
+      member.waitForResponse(
+        (response) =>
+          response.url().endsWith('/api/v1/image-tasks') && response.request().method() === 'POST',
+      )
+    const waitForSavedModel = (conversation: string, model: string) =>
+      member.waitForResponse(
+        async (response) =>
+          response.url().endsWith('/api/v1/image-conversations/' + conversation) &&
+          response.request().method() === 'GET' &&
+          response.ok() &&
+          record(await response.json()).model_id === model,
+      )
+    const taskWithID = (id: string) => member.locator(`.image-task[data-task-id="${id}"]`)
+    await member
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'rerun-reference.png', mimeType: 'image/png', buffer: png })
+    await expect(references.getByRole('img')).toHaveCount(1)
     await prompt.fill('cancel')
+    const sourceResponse = waitForSubmission()
     await send.click()
-    const cancelTask = member.locator('.image-task').first()
+    const source = parseTask(await (await sourceResponse).json())
+    const cancelTask = taskWithID(source.id)
     await expect(cancelTask.locator('.image-status')).toHaveText('生成中', { timeout: 15_000 })
+    const sourceActions = cancelTask.getByTestId('image-task-top-actions')
+    const cards = member.locator('.image-task')
+    const originalCount = await cards.count()
+    await sourceActions.getByRole('button', { name: '使用相同参数', exact: true }).click()
+    await expect(prompt).toHaveValue('cancel')
+    await expect(references.getByRole('img')).toHaveCount(1)
+    await expect(cards).toHaveCount(originalCount)
+    const modelPicker = member.getByRole('button', { name: '选择模型', exact: true })
+    await modelPicker.click()
+    await member.getByRole('menuitemradio', { name: alternateModelName, exact: true }).click()
+    await prompt.fill('reject')
+    const manualResponse = waitForSubmission()
+    const savedAlternateModel = waitForSavedModel(source.conversation_id, alternateModelID)
+    await send.click()
+    const manual = parseTask(await (await manualResponse).json())
+    expect(manual).toMatchObject({
+      model_id: alternateModelID,
+      prompt: 'reject',
+      reference_file_ids: source.reference_file_ids,
+    })
+    await savedAlternateModel
+    await expect(taskWithID(manual.id).locator('.image-status')).toHaveText('排队中')
+    await prompt.fill('Keep this draft')
+    const beforeRerun = await api('GET', '/me/credits', undefined, memberToken)
+    const rerunResponse = waitForSubmission()
+    const savedSourceModel = waitForSavedModel(source.conversation_id, modelID)
+    await sourceActions.getByRole('button', { name: '重新生成', exact: true }).click()
+    const rerun = parseTask(await (await rerunResponse).json())
+    expect(rerun.id).not.toBe(source.id)
+    expect(rerun).toMatchObject({
+      conversation_id: source.conversation_id,
+      model_id: source.model_id,
+      prompt: source.prompt,
+      operation: source.operation,
+      quality: source.quality,
+      size: source.size,
+      ratio: source.ratio,
+      n: source.n,
+      reference_file_ids: source.reference_file_ids,
+    })
+    expect((await api('GET', '/me/credits', undefined, memberToken)).total).toBe(
+      Number(beforeRerun.total) - rerun.total_cost,
+    )
+    await savedSourceModel
+    await expect(cards.first()).toHaveAttribute('data-task-id', rerun.id)
+    await expect(prompt).toHaveValue('Keep this draft')
+    await expect(modelPicker).toContainText(alternateModelName)
+    const rerunTask = taskWithID(rerun.id)
+    await expect(rerunTask.locator('.image-status')).toHaveText('排队中')
+    await expect(cancelTask.locator('.image-status')).toHaveText('生成中')
+    await member.screenshot({
+      path: info.outputPath('image-task-rerun-queued.png'),
+      animations: 'disabled',
+    })
+    await rerunTask.getByRole('button', { name: '取消任务', exact: true }).click()
+    await expect(rerunTask.locator('.image-status')).toHaveText('已取消')
+    await expect(cancelTask.locator('.image-status')).toHaveText('生成中')
     await cancelTask.getByRole('button', { name: '取消任务', exact: true }).click()
     await expect(cancelTask.locator('.image-status')).toHaveText('已取消', { timeout: 15_000 })
     await expect(cancelTask).toContainText('实际 0 积分')
     await expect(cancelTask).toContainText('已退 10 积分')
-    await prompt.fill('reject')
-    await send.click()
-    await expect(member.locator('.image-task').first().locator('.image-status')).toHaveText(
-      '生成失败',
-      { timeout: 20_000 },
-    )
-    await expect(member.locator('.image-task').first()).toContainText('已退 10 积分')
+    const manualTask = taskWithID(manual.id)
+    await expect(manualTask.locator('.image-status')).toHaveText('生成失败', { timeout: 20_000 })
+    await expect(manualTask).toContainText('已退 10 积分')
     const adminView = await api('GET', '/admin/image-tasks/' + firstID)
     expect(adminView.content_visible).toBe(false)
     expect(adminView.prompt).toBe('')
@@ -1020,6 +1104,7 @@ test('React real image generation editing gallery cancellation and administrator
       await api('PUT', '/admin/image-settings', { ...oldSettings, version: latest.version })
     }
     if (channelID) await api('DELETE', '/admin/upstreams/' + channelID)
+    if (alternateModelID) await api('DELETE', '/admin/models/' + alternateModelID)
     if (modelID) await api('DELETE', '/admin/models/' + modelID)
     if (chatModelID) await api('DELETE', '/admin/models/' + chatModelID)
     server.closeAllConnections()

@@ -926,7 +926,7 @@ export interface paths {
     put?: never
     /**
      * submitImageTask
-     * @description Charge and task creation are atomic. Identical key/input returns the same task; changed payload returns conflict. No references uses generation, otherwise edit. Estimates are not price locks; task stores actual accepted price.
+     * @description Charge and task creation are atomic. Identical key/input returns the same task; changed payload with the same key returns conflict. A new key creates a separate queued task even when the conversation and input match an existing task. No references uses generation, otherwise edit. Estimates are not price locks; task stores actual accepted price.
      */
     post: operations['submitImageTask']
     delete?: never
