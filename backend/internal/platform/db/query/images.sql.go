@@ -1216,30 +1216,33 @@ func (q *Queries) ListImageTaskItems(ctx context.Context, ids []uuid.UUID) ([]Li
 const listImageTasks = `-- name: ListImageTasks :many
 SELECT id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version FROM image_tasks WHERE ($1::uuid IS NULL OR user_id=$1::uuid)
 AND ($2::uuid IS NULL OR conversation_id=$2::uuid)
-AND ($3::text='' OR status=$3::text)
-AND ($4::text='' OR quality=$4::text)
-AND ($5::timestamptz IS NULL OR created_at>=$5::timestamptz)
-AND ($6::timestamptz IS NULL OR created_at<$6::timestamptz)
-AND ($7::timestamptz IS NULL OR (created_at,id)<($7::timestamptz,$8::uuid))
-ORDER BY created_at DESC,id DESC LIMIT $9
+AND ($3::text='' OR prompt ILIKE $3::text ESCAPE '\')
+AND ($4::text='' OR status=$4::text)
+AND ($5::text='' OR quality=$5::text)
+AND ($6::timestamptz IS NULL OR created_at>=$6::timestamptz)
+AND ($7::timestamptz IS NULL OR created_at<$7::timestamptz)
+AND ($8::timestamptz IS NULL OR (created_at,id)<($8::timestamptz,$9::uuid))
+ORDER BY created_at DESC,id DESC LIMIT $10
 `
 
 type ListImageTasksParams struct {
-	Owner        *uuid.UUID
-	Conversation *uuid.UUID
-	State        string
-	Quality      string
-	FromTime     *time.Time
-	UntilTime    *time.Time
-	BeforeTime   *time.Time
-	BeforeID     *uuid.UUID
-	PageLimit    int32
+	Owner         *uuid.UUID
+	Conversation  *uuid.UUID
+	SearchPattern string
+	State         string
+	Quality       string
+	FromTime      *time.Time
+	UntilTime     *time.Time
+	BeforeTime    *time.Time
+	BeforeID      *uuid.UUID
+	PageLimit     int32
 }
 
 func (q *Queries) ListImageTasks(ctx context.Context, arg ListImageTasksParams) ([]ImageTask, error) {
 	rows, err := q.db.Query(ctx, listImageTasks,
 		arg.Owner,
 		arg.Conversation,
+		arg.SearchPattern,
 		arg.State,
 		arg.Quality,
 		arg.FromTime,

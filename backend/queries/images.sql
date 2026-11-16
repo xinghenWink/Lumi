@@ -112,6 +112,7 @@ SELECT count(*)::integer FROM image_tasks WHERE status='queued' AND (created_at,
 -- name: ListImageTasks :many
 SELECT * FROM image_tasks WHERE (sqlc.narg(owner)::uuid IS NULL OR user_id=sqlc.narg(owner)::uuid)
 AND (sqlc.narg(conversation)::uuid IS NULL OR conversation_id=sqlc.narg(conversation)::uuid)
+AND (sqlc.arg(search_pattern)::text='' OR prompt ILIKE sqlc.arg(search_pattern)::text ESCAPE '\')
 AND (sqlc.arg(state)::text='' OR status=sqlc.arg(state)::text)
 AND (sqlc.arg(quality)::text='' OR quality=sqlc.arg(quality)::text)
 AND (sqlc.narg(from_time)::timestamptz IS NULL OR created_at>=sqlc.narg(from_time)::timestamptz)

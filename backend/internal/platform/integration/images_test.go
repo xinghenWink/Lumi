@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -583,5 +584,65 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 		if err := f.pool.QueryRow(f.ctx, "SELECT count(*) FROM audit_logs WHERE action='image.refund' AND target_id=$1", result.ID).Scan(&count); err != nil || count != 1 {
 			t.Fatalf("manual refund audit count=%d error=%v", count, err)
 		}
+	})
+	t.Run("owned task search combines filters before cursor pagination", func(t *testing.T) {
+		start := time.Date(2026, time.November, 17, 0, 0, 0, 0, time.UTC)
+		end := start.AddDate(0, 0, 1)
+		seed := func(prompt string, created time.Time, canceled bool) uuid.UUID {
+			t.Helper()
+			task := submit(prompt, 1)
+			if canceled {
+				if _, err := service.Cancel(f.ctx, actor, task.ID); err != nil {
+					t.Fatal(err)
+				}
+			} else if result := execute(task.ID); result.Status != "succeeded" {
+				t.Fatalf("search fixture ended in %s", result.Status)
+			}
+			if _, err := f.pool.Exec(f.ctx, "UPDATE image_tasks SET created_at=$1 WHERE id=$2", created, task.ID); err != nil {
+				t.Fatal(err)
+			}
+			return task.ID
+		}
+		oldest := seed(`海边 Lighthouse %_\ A`, start, false)
+		newest := seed(`海边 lighthouse %_\ B`, end.Add(-time.Second), false)
+		seed(`海边 lighthouse %_\ C`, end, false)
+		seed(`海边 lighthouse %_\ D`, start.Add(time.Hour), true)
+		seed(`海边 lighthouse xyz`, start.Add(2*time.Hour), false)
+
+		client := f.client(t)
+		token := f.login(t, client, member.Email, "Integration-password-1").AccessToken
+		params := url.Values{
+			"conversation_id": {conversation.ID.String()}, "search": {` 海边 LIGHTHOUSE %_\ `},
+			"state": {"succeeded"}, "quality": {"low"}, "limit": {"1"},
+			"from": {start.Format(time.RFC3339)}, "until": {end.Format(time.RFC3339)},
+		}
+		list := func(access string) reply {
+			return f.call(t, client, http.MethodGet, "/api/v1/image-tasks?"+params.Encode(), access, nil)
+		}
+		first := decodeReply[images.Page[images.Task]](t, list(token))
+		if len(first.Items) != 1 || first.Items[0].ID != newest || first.NextCursor == "" {
+			t.Fatalf("unexpected first page: %v", first)
+		}
+		params.Set("cursor", first.NextCursor)
+		second := decodeReply[images.Page[images.Task]](t, list(token))
+		if len(second.Items) != 1 || second.Items[0].ID != oldest || second.NextCursor != "" {
+			t.Fatalf("unexpected second page: %v", second)
+		}
+		params.Set("search", "海边")
+		expectStatus(t, list(token), http.StatusBadRequest)
+		params.Del("cursor")
+		params.Set("quality", "high")
+		filtered := decodeReply[images.Page[images.Task]](t, list(token))
+		if len(filtered.Items) != 0 {
+			t.Fatal("search ignored the quality filter")
+		}
+		outsider := creditMember(t, f, admin, 0)
+		outsiderToken := f.login(t, f.client(t), outsider.Email, "Integration-password-1").AccessToken
+		expectStatus(t, list(outsiderToken), http.StatusNotFound)
+		params.Set("search", strings.Repeat("图", 101))
+		expectStatus(t, list(token), http.StatusBadRequest)
+		params.Set("search", "海边")
+		params.Del("conversation_id")
+		expectStatus(t, list(token), http.StatusBadRequest)
 	})
 }

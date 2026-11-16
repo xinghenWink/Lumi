@@ -921,7 +921,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** listOwnedImageTasks */
+    /**
+     * listOwnedImageTasks
+     * @description List the caller's image tasks, newest first. When a search term is supplied, search prompts in the specified conversation. Pagination cursors are tied to the search and filters.
+     */
     get: operations['listOwnedImageTasks']
     put?: never
     /**
@@ -5117,6 +5120,8 @@ export interface operations {
         from?: string
         until?: string
         conversation_id?: string
+        /** @description Case-insensitive literal substring of the prompt. Leading and trailing whitespace is ignored. A nonempty search requires conversation_id. */
+        search?: string
       }
       header?: never
       path?: never

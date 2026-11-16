@@ -372,7 +372,11 @@ func filterKey(owner string, f Filter) string {
 		}
 		return id.String()
 	}
-	return pagination.Fingerprint(owner, id(f.Owner), id(f.Conversation), f.State, f.Quality, text(f.From), text(f.Until))
+	values := []string{owner, id(f.Owner), id(f.Conversation), f.State, f.Quality, text(f.From), text(f.Until)}
+	if f.Search != "" {
+		values = append(values, f.Search)
+	}
+	return pagination.Fingerprint(values...)
 }
 func (s *Service) List(ctx context.Context, actor user.Actor, f Filter, admin bool) (Page[Task], error) {
 	result := Page[Task]{Items: []Task{}}
@@ -380,9 +384,18 @@ func (s *Service) List(ctx context.Context, actor user.Actor, f Filter, admin bo
 		return result, err
 	}
 	visible := true
+	pattern := ""
 	if !admin {
 		f.Owner = &actor.ID
+		f.Search = strings.TrimSpace(f.Search)
+		if f.Search != "" {
+			if f.Conversation == nil || !validation.Text(f.Search, 1, 100) {
+				return result, problem.Invalid()
+			}
+			pattern = containsPattern(f.Search)
+		}
 	} else {
+		f.Search = ""
 		var err error
 		visible, err = s.adminAccess(ctx, actor, "image.list", nil)
 		if err != nil {
@@ -402,7 +415,11 @@ func (s *Service) List(ctx context.Context, actor user.Actor, f Filter, admin bo
 	if err != nil {
 		return result, err
 	}
-	rows, err := s.q.ListImageTasks(ctx, query.ListImageTasksParams{Owner: f.Owner, Conversation: f.Conversation, State: f.State, Quality: f.Quality, FromTime: f.From, UntilTime: f.Until, BeforeTime: cursor.Time, BeforeID: &cursor.ID, PageLimit: f.Limit + 1})
+	rows, err := s.q.ListImageTasks(ctx, query.ListImageTasksParams{
+		Owner: f.Owner, Conversation: f.Conversation, State: f.State, Quality: f.Quality,
+		SearchPattern: pattern, FromTime: f.From, UntilTime: f.Until, BeforeTime: cursor.Time,
+		BeforeID: &cursor.ID, PageLimit: f.Limit + 1,
+	})
 	if err != nil {
 		return result, fmt.Errorf("list image tasks: %w", err)
 	}

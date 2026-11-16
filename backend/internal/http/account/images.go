@@ -213,6 +213,9 @@ func (h *Handler) imageTaskList(c *gin.Context) {
 		h.fail(c, err)
 		return
 	}
+	if !admin {
+		f.Search = c.Query("search")
+	}
 	result, err := h.services.Images.List(c.Request.Context(), p.Actor, f, admin)
 	h.imageReply(c, result, err, 200)
 }

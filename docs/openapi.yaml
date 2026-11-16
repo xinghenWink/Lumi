@@ -2605,7 +2605,9 @@ paths:
     get:
       operationId: listOwnedImageTasks
       summary: listOwnedImageTasks
-      description: ''
+      description: >-
+        List the caller's image tasks, newest first. When a search term is supplied, search
+        prompts in the specified conversation. Pagination cursors are tied to the search and filters.
       security:
         - bearerAuth: []
       parameters:
@@ -2650,6 +2652,15 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: search
+          in: query
+          required: false
+          description: >-
+            Case-insensitive literal substring of the prompt. Leading and trailing whitespace
+            is ignored. A nonempty search requires conversation_id.
+          schema:
+            type: string
+            maxLength: 100
       responses:
         '200':
           description: Success

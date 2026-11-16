@@ -43,6 +43,8 @@ test('React real image generation editing gallery cancellation and administrator
     { length: 24 },
     (_, index) => `第 ${index + 1} 段：薄雾中的海边灯塔，暖色调胶片摄影，保留海面细节。`,
   ).join('\n')
+  const filteredLivePrompt = 'Live search result ' + suffix
+  let finishFilteredTask: (() => void) | undefined
   let calls = 0,
     edits = 0,
     reusedReference = false
@@ -108,7 +110,8 @@ test('React real image generation editing gallery cancellation and administrator
         }),
       )
     }
-    if (prompt === backgroundPrompt) setTimeout(finish, 2500)
+    if (prompt === filteredLivePrompt) finishFilteredTask = finish
+    else if (prompt === backgroundPrompt) setTimeout(finish, 2500)
     else finish()
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
@@ -695,12 +698,18 @@ test('React real image generation editing gallery cancellation and administrator
     }
     await expect(fullPrompt).toBeVisible()
     expect(await promptText.textContent()).toBe(backgroundPrompt)
-    expect(
-      await fullPrompt.evaluate((element) => {
-        const bounds = element.getBoundingClientRect()
-        return bounds.height <= 320 && bounds.left >= 0 && bounds.right <= innerWidth
-      }),
-    ).toBe(true)
+    await expect
+      .poll(() =>
+        fullPrompt.evaluate((element) => {
+          const bounds = element.getBoundingClientRect()
+          return {
+            height: bounds.height <= 320,
+            left: bounds.left >= 0,
+            right: bounds.right <= innerWidth,
+          }
+        }),
+      )
+      .toEqual({ height: true, left: true, right: true })
     await member.screenshot({
       path: info.outputPath('image-task-prompt.png'),
       animations: 'disabled',
@@ -979,6 +988,165 @@ test('React real image generation editing gallery cancellation and administrator
         { timeout: 60_000, intervals: [500] },
       )
       .toBe(60)
+
+    const galleryWorkspace = '/create/' + galleryConversation
+    const tasksURL = '**/api/v1/image-tasks?*'
+    await member.route(tasksURL, async (route) => {
+      const url = new URL(route.request().url())
+      if (
+        url.searchParams.size === 2 &&
+        url.searchParams.get('conversation_id') === galleryConversation
+      ) {
+        // Keep one real row in the initial history so the oldest task requires server search.
+        url.searchParams.set('limit', '1')
+      }
+      await route.continue({ url: url.toString() })
+    })
+    await member.goto(galleryWorkspace)
+    await expect(member.locator('.image-task')).toHaveCount(1)
+    await expect(member.locator('.image-task').first()).toContainText('gallery 14')
+    const searchTasks = member.getByRole('button', { name: '搜索当前会话', exact: true })
+    const filterTasks = member.getByRole('button', { name: '筛选当前会话', exact: true })
+    await searchTasks.click()
+    const searchBox = member.getByRole('searchbox', { name: '搜索当前会话', exact: true })
+    await expect(searchBox).toBeFocused()
+    await searchBox.fill('GALLERY 0')
+    await searchBox.press('Enter')
+    await expect(member.locator('.image-task')).toHaveCount(1)
+    await expect(member.locator('.image-task').first()).toContainText('gallery 0')
+    await filterTasks.click()
+    const filterPanel = member.getByRole('dialog', { name: '筛选当前会话' })
+    await filterPanel.getByRole('button', { name: '最近一周', exact: true }).click()
+    await filterPanel.getByLabel('状态', { exact: true }).selectOption('failed')
+    await filterPanel.getByLabel('质量', { exact: true }).selectOption('medium')
+    await member.screenshot({
+      path: info.outputPath('image-workspace-filter.png'),
+      animations: 'disabled',
+    })
+    await filterPanel.getByRole('button', { name: '应用筛选', exact: true }).click()
+    await expect(member.getByText('没有符合条件的创作')).toBeVisible()
+    await filterTasks.click()
+    await filterPanel.getByRole('button', { name: '清空筛选', exact: true }).click()
+    await expect(member.locator('.image-task').first()).toContainText('gallery 0')
+    await filterTasks.click()
+    await filterPanel.getByLabel('状态', { exact: true }).selectOption('succeeded')
+    await filterPanel.getByRole('button', { name: '应用筛选', exact: true }).click()
+    await expect(member.getByText('已应用筛选')).toBeVisible()
+
+    const liveConversation = randomUUID()
+    await api(
+      'POST',
+      '/image-conversations',
+      { id: liveConversation, model_id: modelID },
+      galleryToken,
+    )
+    const liveTask = parseTask(
+      await api(
+        'POST',
+        '/image-tasks',
+        {
+          conversation_id: liveConversation,
+          model_id: modelID,
+          prompt: filteredLivePrompt,
+          quality: 'medium',
+          size: '1024x1024',
+          ratio: '',
+          n: 1,
+          reference_file_ids: [],
+        },
+        galleryToken,
+        randomUUID(),
+      ),
+    )
+    await member.unroute(tasksURL)
+    // Load the new conversation in the sidebar and switch without reloading the React workspace.
+    await member.keyboard.press('Control+k')
+    const workHistory = member.locator(mobile ? '.mobile-sidebar' : '.desktop-sidebar')
+    const workHistorySearch = workHistory.getByRole('searchbox', {
+      name: '搜索生图会话',
+      exact: true,
+    })
+    await workHistorySearch.fill('Live search result')
+    await workHistorySearch.press('Enter')
+    await workHistory.locator(`a[href="/create/${liveConversation}"]`).click()
+    await expect(member.locator(`[data-task-id="${liveTask.id}"]`)).toBeVisible()
+    await expect(member.getByText('搜索词「GALLERY 0」')).toHaveCount(0)
+    await expect(member.getByText('已应用筛选')).toHaveCount(0)
+    await filterTasks.click()
+    await filterPanel.getByLabel('状态', { exact: true }).selectOption('succeeded')
+    await filterPanel.getByRole('button', { name: '应用筛选', exact: true }).click()
+    await expect(member.getByText('没有符合条件的创作')).toBeVisible()
+    await expect.poll(() => !!finishFilteredTask).toBe(true)
+    finishFilteredTask?.()
+    await expect(member.locator(`[data-task-id="${liveTask.id}"] .image-status`)).toHaveText(
+      '已完成',
+    )
+    // Keep the original gallery fixture size for its pagination and performance assertions.
+    const liveResult = parseTask(
+      await api('GET', '/image-tasks/' + liveTask.id, undefined, galleryToken),
+    )
+    const liveFile = liveResult.items[0]?.file
+    if (!liveFile) throw new Error('Missing live search result file')
+    await api('DELETE', '/me/images/' + liveFile.id, undefined, galleryToken)
+
+    await member.goto('/create')
+    const assets = member.getByRole('button', { name: '资产库', exact: true })
+    await expect(assets).toBeVisible()
+    const theme = member.getByRole('button', { name: '切换深色主题', exact: true })
+    if (await theme.isVisible()) await theme.click()
+    await expect(member.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await expect(searchTasks).toBeDisabled()
+    const assetRequests: string[] = []
+    const captureAsset = (request: import('@playwright/test').Request) => {
+      if (request.url().includes('/api/v1/files/'))
+        assetRequests.push(new URL(request.url()).pathname)
+    }
+    member.on('request', captureAsset)
+    await assets.click()
+    const assetPanel = member.getByRole(mobile ? 'dialog' : 'complementary', {
+      name: '资产库',
+      exact: true,
+    })
+    const tile = assetPanel.getByRole('button', { name: '预览图片', exact: true }).first()
+    await expect(tile).toBeVisible()
+    const assetNextPage = member.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return (
+        url.pathname.endsWith('/api/v1/me/images') &&
+        url.searchParams.has('cursor') &&
+        response.ok()
+      )
+    })
+    await assetPanel.getByRole('button', { name: '加载更多', exact: true }).click()
+    await assetNextPage
+    await assetPanel.locator('.image-gallery-scroll').evaluate((element) => {
+      element.scrollTop = 0
+    })
+    await expect(tile).toBeInViewport()
+    expect(assetRequests.length).toBeGreaterThan(0)
+    expect(assetRequests.every((url) => url.endsWith('/thumb'))).toBe(true)
+    expect(await member.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    )
+    await member.screenshot({
+      path: info.outputPath('image-workspace-assets.png'),
+      animations: 'disabled',
+    })
+    await tile.focus()
+    await member.keyboard.press('Enter')
+    const assetPreview = member.getByRole('dialog', { name: '预览图片', exact: true })
+    await expect(assetPreview.getByRole('img')).toBeVisible()
+    await expect(assetPreview.getByRole('button', { name: '下载原图' })).toBeVisible()
+    await expect(assetPreview.getByText(modelName, { exact: false }).first()).toBeVisible()
+    expect(assetRequests.some((url) => !url.endsWith('/thumb'))).toBe(true)
+    await member.keyboard.press('Escape')
+    await expect(assetPreview).toHaveCount(0)
+    await expect(tile).toBeFocused()
+    await member.keyboard.press('Escape')
+    await expect(assetPanel).toHaveCount(0)
+    await expect(assets).toBeFocused()
+    member.off('request', captureAsset)
+
     const requested: string[] = []
     member.on('request', (request) => {
       if (request.url().includes('/api/v1/files/')) requested.push(request.url())

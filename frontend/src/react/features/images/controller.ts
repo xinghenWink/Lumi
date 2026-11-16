@@ -82,6 +82,7 @@ export function createImageController(session: SessionService, client: QueryClie
   let identity = session.getSnapshot().user?.id ?? '',
     epoch = session.snapshot().epoch
   const key = (id: string) => ['user', identity, 'image-conversation', id] as const
+  const filteredKey = (id: string) => [...key(id), 'filtered-tasks'] as const
   const historyKey = () => ['user', identity, 'sidebar-history', 'image'] as const
   const valid = (owner: number, id: string) => owner === generation && !deleted.has(id)
   const snapshot = (id: string) => client.getQueryData<ImageSnapshot>(key(id))
@@ -112,6 +113,14 @@ export function createImageController(session: SessionService, client: QueryClie
     void client.invalidateQueries({ queryKey: ['user', identity, 'credit-ledger'] })
     void client.invalidateQueries({ queryKey: ['user', identity, 'credit-usage'] })
   }
+  function refreshFiles() {
+    void client.invalidateQueries({ queryKey: ['user', identity, 'image-gallery'] })
+    void client.invalidateQueries({ queryKey: ['user', identity, 'image-library'] })
+  }
+  function refreshHistory(id: string) {
+    void client.invalidateQueries({ queryKey: key(id) })
+    refreshFiles()
+  }
   function failure(id: string, error: unknown) {
     if (!deleted.has(id))
       store.setState((state) => ({ errors: { ...state.errors, [id || 'new']: error } }))
@@ -122,6 +131,7 @@ export function createImageController(session: SessionService, client: QueryClie
     const entries = client
       .getQueryCache()
       .findAll({ queryKey: ['user', identity, 'image-conversation'] })
+      .filter((entry) => entry.queryKey.length === 4)
     if (entries.length > 12) {
       const old = entries.find(
         (entry) =>
@@ -129,20 +139,24 @@ export function createImageController(session: SessionService, client: QueryClie
           entry.queryKey[3] !== store.getState().active &&
           !entry.getObserversCount(),
       )
-      if (old) client.removeQueries({ queryKey: old.queryKey, exact: true })
+      if (old) client.removeQueries({ queryKey: old.queryKey })
     }
   }
-  function accept(row: ImageTask) {
+  function accept(row: ImageTask, submitted = false) {
     if (deleted.has(row.conversation_id)) return
     const data = snapshot(row.conversation_id)
     if (!data) return
     const old = data.tasks.find((item) => item.id === row.id)
     if (old && old.version > row.version) return
-    put(row.conversation_id, { ...data, tasks: mergeTasks(data.tasks, [row]) })
+    if (old || submitted) {
+      put(row.conversation_id, { ...data, tasks: mergeTasks(data.tasks, [row]) })
+    }
+    if (old?.version !== row.version || old.queue_position !== row.queue_position) {
+      void client.invalidateQueries({ queryKey: filteredKey(row.conversation_id) })
+    }
     if (terminal(row.status) && (!old || !terminal(old.status))) {
       refreshFinancials()
-      void client.invalidateQueries({ queryKey: ['user', identity, 'image-gallery'] })
-      void client.invalidateQueries({ queryKey: ['user', identity, 'image-library'] })
+      refreshFiles()
       void client.invalidateQueries({ queryKey: historyKey() })
     }
   }
@@ -324,7 +338,7 @@ export function createImageController(session: SessionService, client: QueryClie
       }
       const row = await images.submit(request.input, request.key)
       if (!valid(owner, row.conversation_id)) return
-      accept(row)
+      accept(row, true)
       store.setState((current) => {
         const pending = { ...current.pending }
         Reflect.deleteProperty(pending, scope)
@@ -344,7 +358,7 @@ export function createImageController(session: SessionService, client: QueryClie
       })
       refreshFinancials()
       void client.invalidateQueries({ queryKey: historyKey() })
-      void client.invalidateQueries({ queryKey: key(row.conversation_id) })
+      void client.invalidateQueries({ queryKey: key(row.conversation_id), exact: true })
       if (currentView !== view) return
       store.setState({ active: row.conversation_id })
       follow(row)
@@ -406,7 +420,7 @@ export function createImageController(session: SessionService, client: QueryClie
     await images.removeConversation(id)
     if (!valid(owner, id)) return
     deleted.add(id)
-    client.removeQueries({ queryKey: key(id), exact: true })
+    client.removeQueries({ queryKey: key(id) })
     store.setState((current) => {
       const drafts = { ...current.drafts },
         pending = { ...current.pending },
@@ -438,6 +452,8 @@ export function createImageController(session: SessionService, client: QueryClie
   return {
     store,
     options,
+    filteredKey,
+    refreshHistory,
     snapshot,
     open,
     activate,

@@ -101,6 +101,7 @@ type Filter struct {
 	Owner                  *uuid.UUID
 	Conversation           *uuid.UUID
 	State, Quality, Cursor string
+	Search                 string
 	From, Until            *time.Time
 	Limit                  int32
 }

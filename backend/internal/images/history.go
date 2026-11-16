@@ -79,8 +79,7 @@ func (s *Service) Conversations(ctx context.Context, owner uuid.UUID, search, cu
 	if err != nil {
 		return result, err
 	}
-	escaped := strings.NewReplacer(`\`, `\\`, "%", "\\%", "_", "\\_").Replace(search)
-	rows, err := s.q.ListImageConversations(ctx, query.ListImageConversationsParams{UserID: owner, Search: "%" + escaped + "%", BeforeTime: point.Time, BeforePinned: prefix == "true", BeforeID: &point.ID, PageLimit: limit + 1})
+	rows, err := s.q.ListImageConversations(ctx, query.ListImageConversationsParams{UserID: owner, Search: containsPattern(search), BeforeTime: point.Time, BeforePinned: prefix == "true", BeforeID: &point.ID, PageLimit: limit + 1})
 	if err != nil {
 		return result, fmt.Errorf("list image conversations: %w", err)
 	}
@@ -98,6 +97,10 @@ func (s *Service) Conversations(ctx context.Context, owner uuid.UUID, search, cu
 		result.Items = append(result.Items, conversation(row))
 	}
 	return result, nil
+}
+func containsPattern(search string) string {
+	escaped := strings.NewReplacer(`\`, `\\`, "%", "\\%", "_", "\\_").Replace(search)
+	return "%" + escaped + "%"
 }
 func (s *Service) UpdateConversation(ctx context.Context, actor user.Actor, id uuid.UUID, title string, pin bool, version int64) (Conversation, error) {
 	title = strings.TrimSpace(title)
