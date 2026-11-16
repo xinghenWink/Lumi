@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Image as ImageIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -30,6 +30,7 @@ function GalleryResults({ filter }: { filter: string }) {
   const [deleting, setDeleting] = useState<string[] | null>(null),
     [batch, setBatch] = useState(false)
   const query = useImageGallery(filter)
+  const previewTrigger = useRef<HTMLButtonElement>(null)
   const items = query.data?.pages.flatMap((page) => page.items) ?? []
   const refresh = () => {
     void runtime.queryClient.invalidateQueries({ queryKey: ['user', user?.id, 'image-gallery'] })
@@ -110,7 +111,10 @@ function GalleryResults({ filter }: { filter: string }) {
               checked ? [...current, id] : current.filter((value) => value !== id),
             )
           }
-          onPreview={setPreview}
+          onPreview={(index, trigger) => {
+            previewTrigger.current = trigger
+            setPreview(index)
+          }}
           onDownload={(file) => {
             void actions.download(file)
           }}
@@ -141,6 +145,14 @@ function GalleryResults({ filter }: { filter: string }) {
           onClose={() => setPreview(null)}
           onEdit={(file) => edit.mutate(file)}
           onNavigate={setPreview}
+          returnFocus={previewTrigger}
+          editor={{
+            conversationId: '',
+            modelId: current.model_id,
+            quality: current.quality,
+            size: current.size,
+            ratio: current.ratio,
+          }}
         />
       ) : null}
       <ModalDialog

@@ -87,6 +87,7 @@ export default {
     sizeLimit: '最多 {count} 个尺寸',
     maxN: '每次最多图片数',
     supportsEdit: '支持改图',
+    supportsTransparentBackground: '已验证所有启用路由支持透明背景改图',
     maxReferences: '最多参考图数',
     responseFormat: '图片响应格式',
     base64: 'Base64 图片',

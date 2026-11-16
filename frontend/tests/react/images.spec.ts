@@ -512,8 +512,49 @@ test('React real image generation editing gallery cancellation and administrator
     await member.screenshot({ path: info.outputPath('images-light.png'), animations: 'disabled' })
     await member.getByRole('button', { name: '切换深色主题', exact: true }).click()
     await member.screenshot({ path: info.outputPath('images-dark.png'), animations: 'disabled' })
-    await task.getByRole('button', { name: '预览图片 1', exact: true }).click()
+    const resultPreview = task.getByRole('button', { name: '预览图片 1', exact: true })
+    await resultPreview.click()
     let dialog = member.getByRole('dialog')
+    await expect(dialog.getByRole('img')).toBeVisible()
+    await expect(dialog.getByRole('button', { name: '移除背景', exact: true })).toBeDisabled()
+    await dialog.getByRole('button', { name: '标注', exact: true }).click()
+    await dialog.getByRole('button', { name: '标注颜色', exact: true }).click()
+    await member.getByRole('menuitem', { name: '蓝色', exact: true }).click()
+    const overlay = dialog.locator('[data-slot="image-editor-overlay"]')
+    await overlay.press('Enter')
+    await overlay.press('Enter')
+    const centerAlpha = () =>
+      overlay.evaluate((element) => {
+        if (!(element instanceof HTMLCanvasElement)) throw new Error('Missing drawing canvas')
+        return element.getContext('2d')?.getImageData(element.width / 2, element.height / 2, 1, 1)
+          .data[3]
+      })
+    await expect.poll(centerAlpha).toBeGreaterThan(0)
+    await dialog.getByLabel('缩放', { exact: true }).selectOption('150')
+    await expect.poll(centerAlpha).toBeGreaterThan(0)
+    await dialog.getByLabel('缩放', { exact: true }).selectOption('100')
+    await dialog.getByRole('button', { name: '撤销', exact: true }).click()
+    await expect.poll(centerAlpha).toBe(0)
+    await dialog.getByRole('button', { name: '重做', exact: true }).click()
+    await expect.poll(centerAlpha).toBeGreaterThan(0)
+    await dialog.getByRole('button', { name: '添加评论', exact: true }).click()
+    await overlay.press('ArrowRight')
+    await overlay.press('Enter')
+    await dialog.getByLabel('添加评论', { exact: true }).fill('保留此处纹理')
+    await dialog.getByRole('button', { name: '保存修改', exact: true }).click()
+    await dialog.getByRole('button', { name: /保留此处纹理/ }).click()
+    await dialog.getByLabel('添加评论', { exact: true }).fill('保留此处颜色')
+    await dialog.getByRole('button', { name: '保存修改', exact: true }).click()
+    await expect(dialog.getByRole('button', { name: /保留此处颜色/ })).toBeVisible()
+    await member.screenshot({
+      path: info.outputPath('image-editor-dark.png'),
+      animations: 'disabled',
+    })
+    await member.keyboard.press('Escape')
+    const discard = member.getByRole('dialog', { name: '丢弃未提交的修改？' })
+    await discard.getByRole('button', { name: '丢弃修改' }).click()
+    await expect(resultPreview).toBeFocused()
+    await resultPreview.click()
     await expect(dialog.getByRole('img')).toBeVisible()
     const zoom = dialog.getByLabel('缩放', { exact: true })
     if (!mobile) {
@@ -567,6 +608,7 @@ test('React real image generation editing gallery cancellation and administrator
     if (mobile) await submittedReference.tap()
     else await submittedReference.press('Enter')
     await expect(referenceDialog.getByRole('img')).toHaveAttribute('width', String(original.width))
+    await expect(referenceDialog.getByRole('button', { name: '标注', exact: true })).toBeVisible()
     await expect(referenceDialog.getByLabel('缩放', { exact: true })).toHaveValue('100')
     await member.keyboard.press('Escape')
     await expect(referenceDialog).toBeHidden()
@@ -605,6 +647,7 @@ test('React real image generation editing gallery cancellation and administrator
     if (mobile) await uploadedReference.tap()
     else await uploadedReference.click()
     await expect(referenceDialog.getByRole('img')).toBeVisible()
+    await expect(referenceDialog.getByRole('button', { name: '擦除', exact: true })).toBeVisible()
     await referenceDialog.getByRole('button', { name: '关闭', exact: true }).click()
     await expect(referenceDialog).toBeHidden()
     await expect(uploadedReference).toBeFocused()
@@ -1132,6 +1175,7 @@ test('React real image generation editing gallery cancellation and administrator
     const assetPreview = member.getByRole('dialog', { name: '预览图片', exact: true })
     await expect(assetPreview.getByRole('img')).toBeVisible()
     await expect(assetPreview.getByRole('button', { name: '下载原图' })).toBeVisible()
+    await expect(assetPreview.getByRole('button', { name: '擦除', exact: true })).toBeVisible()
     await expect(assetPreview.getByText(modelName, { exact: false }).first()).toBeVisible()
     expect(assetRequests.some((url) => !url.endsWith('/thumb'))).toBe(true)
     await member.keyboard.press('Escape')
@@ -1258,6 +1302,51 @@ test('React real image generation editing gallery cancellation and administrator
     )
     if (!Array.isArray(refundAudit.items)) throw new Error('Missing real refund audit')
     expect(refundAudit.items).toHaveLength(1)
+
+    await member.getByRole('button', { name: '切换浅色主题', exact: true }).click()
+    await bounded.first().getByRole('button', { name: '预览图片', exact: true }).click()
+    const galleryEditor = member.getByRole('dialog', { name: '预览图片', exact: true })
+    await expect(galleryEditor.getByRole('img')).toBeVisible()
+    await galleryEditor.getByRole('button', { name: '调整大小', exact: true }).click()
+    const ratios = member.getByRole('menu', { name: '调整大小' })
+    await expect(ratios.getByRole('menuitem')).toHaveCount(1)
+    await ratios.getByRole('menuitem', { name: '正方形 1:1' }).click()
+    await expect(galleryEditor.getByRole('button', { name: '调整大小 1:1' })).toBeVisible()
+    await galleryEditor.getByRole('button', { name: '添加评论', exact: true }).click()
+    const galleryOverlay = galleryEditor.locator('[data-slot="image-editor-overlay"]')
+    if (mobile) await galleryOverlay.tap()
+    else await galleryOverlay.click()
+    await galleryEditor.getByLabel('添加评论', { exact: true }).fill('将此处改成浅蓝色')
+    await galleryEditor.getByRole('button', { name: '保存修改', exact: true }).click()
+    await expect(galleryEditor.getByText(/预计 \d+ 积分/)).toBeVisible()
+    await member.screenshot({
+      path: info.outputPath('image-editor-light.png'),
+      animations: 'disabled',
+    })
+    const requests: { key?: string; body: string | null }[] = []
+    await member.route('**/api/v1/image-tasks', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue()
+      const key = route.request().headers()['idempotency-key']
+      requests.push({ ...(key ? { key } : {}), body: route.request().postData() })
+      const response = await route.fetch()
+      if (requests.length === 1 && response.ok()) await route.abort('failed')
+      else await route.fulfill({ response })
+    })
+    await galleryEditor.getByRole('button', { name: '提交改图', exact: true }).click()
+    await expect(galleryEditor.getByRole('alert')).toContainText('网络')
+    await galleryEditor.getByRole('button', { name: '重试', exact: true }).click()
+    await expect(member).toHaveURL(/\/create\/[0-9a-f-]+$/)
+    await expect(member.locator('.image-task .image-status')).toHaveText('已完成', {
+      timeout: 20_000,
+    })
+    expect(requests).toHaveLength(2)
+    expect(requests[0]?.key).toBeTruthy()
+    expect(requests[1]).toEqual(requests[0])
+    expect(JSON.parse(requests[0]?.body ?? '{}')).toMatchObject({
+      n: 1,
+      edit_options: { action: 'markup', guide_file_id: expect.any(String) },
+    })
+    await member.unroute('**/api/v1/image-tasks')
     expect(errors).toEqual([])
   } finally {
     await memberContext.close()

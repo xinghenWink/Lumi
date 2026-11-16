@@ -59,7 +59,8 @@ type Reference struct {
 }
 type EditRequest struct {
 	ImageRequest
-	References []Reference
+	References            []Reference
+	TransparentBackground bool
 }
 type ImageResult struct {
 	Data          []byte
@@ -343,6 +344,10 @@ func (c *Client) EditImages(ctx context.Context, input EditRequest) (results []I
 	}
 	var body bytes.Buffer
 	contentType := "application/json"
+	background, output := "", ""
+	if input.TransparentBackground {
+		background, output = "transparent", "png"
+	}
 	if c.connection.EditFormat == "json" {
 		images := make([]map[string]string, 0, len(input.References))
 		for _, reference := range input.References {
@@ -350,14 +355,20 @@ func (c *Client) EditImages(ctx context.Context, input EditRequest) (results []I
 		}
 		if err := json.NewEncoder(&body).Encode(struct {
 			ImageRequest
-			Images []map[string]string `json:"images"`
-			Format string              `json:"response_format"`
-		}{input.ImageRequest, images, "b64_json"}); err != nil {
+			Images       []map[string]string `json:"images"`
+			Format       string              `json:"response_format"`
+			Background   string              `json:"background,omitempty"`
+			OutputFormat string              `json:"output_format,omitempty"`
+		}{input.ImageRequest, images, "b64_json", background, output}); err != nil {
 			return nil, fmt.Errorf("encode edit request: %w", err)
 		}
 	} else {
 		writer := multipart.NewWriter(&body)
-		for name, value := range map[string]string{"model": input.Model, "prompt": input.Prompt, "quality": input.Quality, "size": input.Size, "n": strconv.Itoa(input.Count), "response_format": "b64_json"} {
+		fields := map[string]string{"model": input.Model, "prompt": input.Prompt, "quality": input.Quality, "size": input.Size, "n": strconv.Itoa(input.Count), "response_format": "b64_json"}
+		if input.TransparentBackground {
+			fields["background"], fields["output_format"] = background, output
+		}
+		for name, value := range fields {
 			if err := writer.WriteField(name, value); err != nil {
 				return nil, fmt.Errorf("encode edit field: %w", err)
 			}

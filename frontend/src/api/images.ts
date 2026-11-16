@@ -6,6 +6,7 @@ type S = components['schemas']
 export type ImageFile = S['ImageFile']
 export type ImageTask = S['ImageTask']
 export type ImageInput = S['ImageTaskInput']
+export type ImageEditOptions = S['ImageEditOptions']
 export type ImageConversation = S['ImageConversation']
 export type ImageConfiguration = S['ImageConfiguration']
 export type ImageResolutionPreset = S['ImageResolutionPreset']
@@ -44,7 +45,7 @@ export function parseFile(v: unknown): ImageFile {
   }
   return {
     id: str(d.id),
-    kind: choice(d.kind, ['upload', 'generated', 'thumbnail', 'avatar']),
+    kind: choice(d.kind, ['upload', 'generated', 'thumbnail', 'avatar', 'edit_guide']),
     mime: choice(d.mime, ['image/png']),
     size: num(d.size),
     width: num(d.width),
@@ -116,6 +117,7 @@ export function parseImageConfiguration(v: unknown): ImageConfiguration {
 }
 export function parseTask(v: unknown): ImageTask {
   const d = record(v)
+  const edit = d.edit_options === undefined ? undefined : record(d.edit_options)
   return {
     id: str(d.id),
     user_id: str(d.user_id),
@@ -129,6 +131,14 @@ export function parseTask(v: unknown): ImageTask {
     ratio: str(d.ratio),
     n: num(d.n),
     reference_file_ids: list(d.reference_file_ids, str),
+    ...(edit
+      ? {
+          edit_options: {
+            action: choice(edit.action, ['markup', 'erase', 'remove_background', 'resize']),
+            ...(edit.guide_file_id === undefined ? {} : { guide_file_id: str(edit.guide_file_id) }),
+          },
+        }
+      : {}),
     unit_price: num(d.unit_price),
     total_cost: num(d.total_cost),
     refunded_cost: num(d.refunded_cost),
@@ -266,10 +276,14 @@ export const images = {
   cancel: (id: string) => authorized(task(id) + '/cancel', parseTask, { method: 'POST' }),
   events: async (id: string, signal: AbortSignal, onTask: (task: ImageTask) => void) =>
     consumeImageEvents(await authorizedResponse(task(id) + '/events', { signal }), onTask),
-  upload: (file: File, signal?: AbortSignal, avatar = false) => {
+  upload: (
+    file: File,
+    signal?: AbortSignal,
+    kind: 'upload' | 'avatar' | 'edit_guide' = 'upload',
+  ) => {
     const form = new FormData()
     form.append('file', file)
-    return authorized(root + '/files' + (avatar ? '?kind=avatar' : ''), parseFile, {
+    return authorized(root + '/files' + (kind === 'upload' ? '' : '?kind=' + kind), parseFile, {
       method: 'POST',
       form,
       ...signalOptions(signal),

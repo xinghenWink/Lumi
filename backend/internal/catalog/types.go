@@ -52,17 +52,18 @@ type Channel struct {
 	UpdatedAt           time.Time  `json:"updated_at"`
 }
 type Capabilities struct {
-	UseSizePresets     bool     `json:"use_size_presets,omitempty"`
-	ReasoningEffort    bool     `json:"reasoning_effort,omitempty"`
-	Vision             bool     `json:"vision"`
-	Stream             bool     `json:"stream"`
-	MaxContextTokens   int32    `json:"max_context_tokens"`
-	Qualities          []string `json:"qualities"`
-	Sizes              []string `json:"sizes"`
-	MaxN               int32    `json:"max_n"`
-	SupportsEdit       bool     `json:"supports_edit"`
-	MaxReferenceImages int32    `json:"max_reference_images"`
-	ResponseFormat     string   `json:"response_format"`
+	UseSizePresets                bool     `json:"use_size_presets,omitempty"`
+	ReasoningEffort               bool     `json:"reasoning_effort,omitempty"`
+	Vision                        bool     `json:"vision"`
+	Stream                        bool     `json:"stream"`
+	MaxContextTokens              int32    `json:"max_context_tokens"`
+	Qualities                     []string `json:"qualities"`
+	Sizes                         []string `json:"sizes"`
+	MaxN                          int32    `json:"max_n"`
+	SupportsEdit                  bool     `json:"supports_edit"`
+	SupportsTransparentBackground bool     `json:"supports_transparent_background,omitempty"`
+	MaxReferenceImages            int32    `json:"max_reference_images"`
+	ResponseFormat                string   `json:"response_format"`
 }
 type RouteInput struct {
 	UpstreamID        uuid.UUID `json:"upstream_id"`

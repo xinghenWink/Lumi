@@ -49,7 +49,7 @@ func (s *Service) ImageTargetTx(ctx context.Context, q *query.Queries, id uuid.U
 }
 
 // RoutedImages retries only explicit refusals, never an ambiguous image write timeout.
-func (s *Service) RoutedImages(ctx context.Context, id uuid.UUID, input upstream.ImageRequest, refs []upstream.Reference) ([]upstream.ImageResult, *upstream.Client, error) {
+func (s *Service) RoutedImages(ctx context.Context, id uuid.UUID, input upstream.EditRequest) ([]upstream.ImageResult, *upstream.Client, error) {
 	targets, err := s.routeTargets(ctx, id)
 	if err != nil {
 		return nil, nil, err
@@ -68,10 +68,10 @@ func (s *Service) RoutedImages(ctx context.Context, id uuid.UUID, input upstream
 		request := input
 		request.Model = target.UpstreamModelName
 		var results []upstream.ImageResult
-		if len(refs) > 0 {
-			results, err = client.EditImages(ctx, upstream.EditRequest{ImageRequest: request, References: refs})
+		if len(request.References) > 0 {
+			results, err = client.EditImages(ctx, request)
 		} else {
-			results, err = client.GenerateImages(ctx, request)
+			results, err = client.GenerateImages(ctx, request.ImageRequest)
 		}
 		if err == nil {
 			return results, client, nil

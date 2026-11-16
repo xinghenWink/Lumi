@@ -110,6 +110,7 @@ export default {
     sizeLimit: 'Up to {count} sizes',
     maxN: 'Maximum images per request',
     supportsEdit: 'Image editing',
+    supportsTransparentBackground: 'Transparent edits verified on all enabled routes',
     maxReferences: 'Maximum reference images',
     responseFormat: 'Image response format',
     base64: 'Base64 image',

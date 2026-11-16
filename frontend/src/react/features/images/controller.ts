@@ -35,7 +35,7 @@ interface PendingSubmission {
   input: ImageInput
   key: string
   create: boolean
-  source: 'draft' | 'task'
+  source: 'draft' | 'task' | 'editor'
 }
 interface ImageState {
   active: string
@@ -300,7 +300,13 @@ export function createImageController(session: SessionService, client: QueryClie
   ): Promise<string | undefined> {
     const state = store.getState(),
       scope = imageSubmissionScope(state, id)
-    if (state.sending[scope] || (source === 'task' && state.pending[scope])) return
+    const pending = state.pending[scope]
+    if (
+      state.sending[scope] ||
+      (pending &&
+        (source === 'task' || (source === 'editor' && (input || pending.source !== 'editor'))))
+    )
+      return
     const replay = !!state.pending[scope]
     let submission = state.pending[scope]
     if (!submission) {
@@ -342,7 +348,7 @@ export function createImageController(session: SessionService, client: QueryClie
       store.setState((current) => {
         const pending = { ...current.pending }
         Reflect.deleteProperty(pending, scope)
-        if (request.source === 'task') return { pending, lastOpened: row.conversation_id }
+        if (request.source !== 'draft') return { pending, lastOpened: row.conversation_id }
         const drafts = { ...current.drafts }
         const source = drafts[scope] ?? emptyImageDraft
         // Do not clear text or references replaced by another view during submission.
@@ -398,6 +404,7 @@ export function createImageController(session: SessionService, client: QueryClie
         ratio: task.ratio,
         n: task.n,
         reference_file_ids: task.reference_file_ids,
+        ...(task.edit_options ? { edit_options: task.edit_options } : {}),
       },
       'task',
     )

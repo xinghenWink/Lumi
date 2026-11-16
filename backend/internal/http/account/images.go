@@ -305,7 +305,7 @@ func (h *Handler) imageUpload(c *gin.Context) {
 	limit := cfg.MaxUploadBytes
 	if kind == "avatar" {
 		limit = 2 << 20
-	} else if kind != "upload" {
+	} else if kind != "upload" && kind != "edit_guide" {
 		h.fail(c, problem.Invalid())
 		return
 	}

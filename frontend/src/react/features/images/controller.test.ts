@@ -79,6 +79,32 @@ afterEach(() => {
 })
 
 describe('React image submission and subscription compatibility', () => {
+  it('keeps the composer draft and replays the complete editor request after a lost response', async () => {
+    await controller.open('c')
+    controller.draft('c', { prompt: 'composer draft', references: ['other'] })
+    const editor = {
+      ...input,
+      n: 1,
+      reference_file_ids: ['source'],
+      edit_options: { action: 'markup' as const, guide_file_id: 'guide' },
+    }
+    const submit = vi
+      .spyOn(images, 'submit')
+      .mockRejectedValueOnce(new Error('lost'))
+      .mockResolvedValue({ ...task, ...editor, operation: 'edit' })
+    await controller.submit('c', editor, 'editor')
+    await controller.submit('c', { ...editor, prompt: 'new edit' }, 'editor')
+    expect(submit).toHaveBeenCalledTimes(1)
+    await controller.submit('c', undefined, 'editor')
+    expect(submit.mock.calls[1]).toEqual(submit.mock.calls[0])
+    expect(controller.store.getState().drafts.c).toMatchObject({
+      prompt: 'composer draft',
+      references: ['other'],
+    })
+    await controller.regenerate({ ...task, ...editor, operation: 'edit' })
+    expect(submit.mock.calls[2]?.[0]).toEqual(submit.mock.calls[0]?.[0])
+    expect(submit.mock.calls[2]?.[1]).not.toBe(submit.mock.calls[0]?.[1])
+  })
   it('replays the exact task body and key after a lost accepted response', async () => {
     const create = vi.spyOn(images, 'create').mockImplementation(async (id) => ({ ...row, id }))
     const submit = vi

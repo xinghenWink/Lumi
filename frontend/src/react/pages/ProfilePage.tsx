@@ -67,7 +67,7 @@ function ProfileForm({ user }: { user: User }) {
     controller.current?.abort()
     const current = new AbortController()
     controller.current = current
-    const result = await images.upload(file, current.signal, true)
+    const result = await images.upload(file, current.signal, 'avatar')
     check()
     if (current.signal.aborted) return
     const profile = runtime.session.getSnapshot().user

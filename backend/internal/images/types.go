@@ -52,14 +52,19 @@ type Configuration struct {
 	Version             int64              `json:"version"`
 }
 type Input struct {
-	ConversationID   uuid.UUID   `json:"conversation_id"`
-	ModelID          uuid.UUID   `json:"model_id"`
-	Prompt           string      `json:"prompt"`
-	Quality          string      `json:"quality"`
-	Size             string      `json:"size"`
-	Ratio            string      `json:"ratio"`
-	Count            int32       `json:"n"`
-	ReferenceFileIDs []uuid.UUID `json:"reference_file_ids"`
+	ConversationID   uuid.UUID    `json:"conversation_id"`
+	ModelID          uuid.UUID    `json:"model_id"`
+	Prompt           string       `json:"prompt"`
+	Quality          string       `json:"quality"`
+	Size             string       `json:"size"`
+	Ratio            string       `json:"ratio"`
+	Count            int32        `json:"n"`
+	ReferenceFileIDs []uuid.UUID  `json:"reference_file_ids"`
+	EditOptions      *EditOptions `json:"edit_options,omitempty"`
+}
+type EditOptions struct {
+	Action      string     `json:"action"`
+	GuideFileID *uuid.UUID `json:"guide_file_id,omitempty"`
 }
 type Item struct {
 	Position  int32       `json:"position"`
@@ -69,33 +74,34 @@ type Item struct {
 	ErrorCode string      `json:"error_code"`
 }
 type Task struct {
-	ID               uuid.UUID   `json:"id"`
-	UserID           uuid.UUID   `json:"user_id"`
-	ConversationID   uuid.UUID   `json:"conversation_id"`
-	ModelID          uuid.UUID   `json:"model_id"`
-	ModelName        string      `json:"model_name"`
-	Operation        string      `json:"operation"`
-	Prompt           string      `json:"prompt"`
-	Quality          string      `json:"quality"`
-	Size             string      `json:"size"`
-	Ratio            string      `json:"ratio"`
-	Count            int32       `json:"n"`
-	ReferenceFileIDs []uuid.UUID `json:"reference_file_ids"`
-	UnitPrice        int64       `json:"unit_price"`
-	TotalCost        int64       `json:"total_cost"`
-	RefundedCost     int64       `json:"refunded_cost"`
-	ActualCost       int64       `json:"actual_cost"`
-	Status           string      `json:"status"`
-	SuccessfulImages int32       `json:"successful_images"`
-	QueuePosition    int32       `json:"queue_position"`
-	CancelRequested  bool        `json:"cancel_requested"`
-	ErrorCode        string      `json:"error_code"`
-	StartedAt        *time.Time  `json:"started_at"`
-	FinishedAt       *time.Time  `json:"finished_at"`
-	CreatedAt        time.Time   `json:"created_at"`
-	Version          int64       `json:"version"`
-	Items            []Item      `json:"items"`
-	ContentVisible   bool        `json:"content_visible"`
+	ID               uuid.UUID    `json:"id"`
+	UserID           uuid.UUID    `json:"user_id"`
+	ConversationID   uuid.UUID    `json:"conversation_id"`
+	ModelID          uuid.UUID    `json:"model_id"`
+	ModelName        string       `json:"model_name"`
+	Operation        string       `json:"operation"`
+	Prompt           string       `json:"prompt"`
+	Quality          string       `json:"quality"`
+	Size             string       `json:"size"`
+	Ratio            string       `json:"ratio"`
+	Count            int32        `json:"n"`
+	ReferenceFileIDs []uuid.UUID  `json:"reference_file_ids"`
+	EditOptions      *EditOptions `json:"edit_options,omitempty"`
+	UnitPrice        int64        `json:"unit_price"`
+	TotalCost        int64        `json:"total_cost"`
+	RefundedCost     int64        `json:"refunded_cost"`
+	ActualCost       int64        `json:"actual_cost"`
+	Status           string       `json:"status"`
+	SuccessfulImages int32        `json:"successful_images"`
+	QueuePosition    int32        `json:"queue_position"`
+	CancelRequested  bool         `json:"cancel_requested"`
+	ErrorCode        string       `json:"error_code"`
+	StartedAt        *time.Time   `json:"started_at"`
+	FinishedAt       *time.Time   `json:"finished_at"`
+	CreatedAt        time.Time    `json:"created_at"`
+	Version          int64        `json:"version"`
+	Items            []Item       `json:"items"`
+	ContentVisible   bool         `json:"content_visible"`
 }
 type Filter struct {
 	Owner                  *uuid.UUID

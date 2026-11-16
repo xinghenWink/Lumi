@@ -229,6 +229,11 @@ export function ImageComposer({
       disabled={locked}
       compact
       previewable
+      editor={{
+        conversationId,
+        ...(options.model ? { modelId: options.model.id } : {}),
+        ...(options.quality ? { quality: options.quality } : {}),
+      }}
       className="image-references"
       onRemove={(value) =>
         patch({ references: draft.references.filter((reference) => reference !== value) })

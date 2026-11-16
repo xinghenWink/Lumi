@@ -324,7 +324,7 @@ function ImageWorkspace({ id }: { id: string }) {
             ) : null
           }
         >
-          <ImageAssetPanel docked={dockAssets} onClose={closeAssets} />
+          <ImageAssetPanel docked={dockAssets} onClose={closeAssets} conversationId={id} />
         </Suspense>
       ) : null}
     </div>

@@ -11,6 +11,7 @@ import { cn } from '../../lib/utils'
 import { Attachment, AttachmentAction, AttachmentMedia } from '../ui/attachment'
 import { ProtectedImage } from '../images/ProtectedImage'
 import { ReferencePreviewButton } from '../images/ReferencePreviewButton'
+import type { ImageEditorTarget } from '../../features/images/editor'
 
 const chip =
   'group relative size-16 shrink-0 gap-0 overflow-hidden p-0 rounded-xl border border-border bg-muted shadow-xs animate-rise-in'
@@ -22,6 +23,7 @@ function Committed({
   position,
   preview,
   previewable,
+  editor,
   disabled,
   onRemove,
   className,
@@ -30,6 +32,7 @@ function Committed({
   position: number
   preview: string | undefined
   previewable: boolean
+  editor?: ImageEditorTarget
   disabled: boolean
   onRemove: ((id: string) => void) | undefined
   className: string
@@ -44,7 +47,7 @@ function Committed({
   const file = query.data
   const renderImage = (image: ReactNode) =>
     previewable && file ? (
-      <ReferencePreviewButton file={file} position={position}>
+      <ReferencePreviewButton file={file} position={position} {...(editor ? { editor } : {})}>
         {image}
       </ReferencePreviewButton>
     ) : (
@@ -152,6 +155,7 @@ export function ReferenceTray({
   disabled = false,
   compact = false,
   previewable = false,
+  editor,
   onRemove,
   onRetry,
   onCancel,
@@ -164,6 +168,7 @@ export function ReferenceTray({
   disabled?: boolean
   compact?: boolean
   previewable?: boolean
+  editor?: ImageEditorTarget
   onRemove?: (id: string) => void
   onRetry?: (key: string) => void
   onCancel?: (key: string) => void
@@ -181,6 +186,7 @@ export function ReferenceTray({
           position={index + 1}
           preview={previews?.get(id)}
           previewable={previewable}
+          {...(editor ? { editor } : {})}
           disabled={disabled}
           className={chipClass}
           onRemove={onRemove}

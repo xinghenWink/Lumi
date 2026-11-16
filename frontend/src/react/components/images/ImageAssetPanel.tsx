@@ -10,7 +10,15 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from '.
 import { GalleryGrid } from './GalleryGrid'
 import { ImagePreview } from './ImagePreview'
 
-export default function ImageAssetPanel({ docked, onClose }: { docked: boolean; onClose(): void }) {
+export default function ImageAssetPanel({
+  docked,
+  onClose,
+  conversationId,
+}: {
+  docked: boolean
+  onClose(): void
+  conversationId: string
+}) {
   const { t } = useTranslation()
   const query = useImageGallery()
   const items = query.data?.pages.flatMap((page) => page.items) ?? []
@@ -75,6 +83,13 @@ export default function ImageAssetPanel({ docked, onClose }: { docked: boolean; 
       prompt={preview.prompt}
       parameters={[preview.model_name, preview.size, t('images.' + preview.quality)].join(' · ')}
       returnFocus={previewTrigger}
+      editor={{
+        conversationId,
+        modelId: preview.model_id,
+        quality: preview.quality,
+        size: preview.size,
+        ratio: preview.ratio,
+      }}
       onClose={() => {
         if (!previewTrigger.current?.isConnected) previewTrigger.current = closeButton.current
         setPreview(null)

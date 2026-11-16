@@ -87,10 +87,14 @@ func (s *Service) saveItem(ctx context.Context, task query.ImageTask, position i
 			raw, err = client.FetchImage(ctx, result.URL)
 		}
 		if err == nil {
-			prepared, err = s.files.Prepare(ctx, task.UserID, &task.ID, "generated", raw, 20<<20)
+			prepared, err = s.files.PrepareImageResult(ctx, task.UserID, task.ID, raw, resultCheck(ctx, task.EditAction, task.Ratio))
 		}
 		if err != nil {
 			code = "IMAGE_RESULT_INVALID"
+			var failure *problem.Error
+			if errors.As(err, &failure) && (failure.Code == "IMAGE_RESULT_NOT_TRANSPARENT" || failure.Code == "IMAGE_RESULT_RATIO_MISMATCH") {
+				code = failure.Code
+			}
 		} else {
 			ready = true
 		}
@@ -257,13 +261,24 @@ func (s *Service) Execute(ctx context.Context, task query.ImageTask) {
 			}
 		}
 	}()
-	_, client, remote, err := s.catalog.ImageTarget(work, task.ModelID)
+	model, client, remote, err := s.catalog.ImageTarget(work, task.ModelID)
 	code := ""
 	if err != nil {
 		code = "IMAGE_MODEL_UNAVAILABLE"
 	} else {
-		refs := make([]upstream.Reference, 0, len(task.ReferenceFileIds))
-		for _, id := range task.ReferenceFileIds {
+		fileIDs := task.ReferenceFileIds
+		if task.EditGuideFileID != nil {
+			fileIDs = []uuid.UUID{*task.EditGuideFileID}
+		}
+		transparent := task.EditAction == editRemoveBackground
+		if transparent && !model.Capabilities.SupportsTransparentBackground {
+			code = "IMAGE_BACKGROUND_UNSUPPORTED"
+		}
+		refs := make([]upstream.Reference, 0, len(fileIDs))
+		for _, id := range fileIDs {
+			if code != "" {
+				break
+			}
 			data, err := s.files.Reference(work, task.UserID, id)
 			if err != nil {
 				code = "FILE_NOT_FOUND"
@@ -272,11 +287,14 @@ func (s *Service) Execute(ctx context.Context, task query.ImageTask) {
 			refs = append(refs, upstream.Reference{Name: id.String() + ".png", MIME: "image/png", Data: data})
 		}
 		if code == "" {
-			request := upstream.ImageRequest{Model: remote, Prompt: task.Prompt, Quality: task.Quality, Size: task.Size, Count: int(task.ImageCount)}
+			request := upstream.EditRequest{
+				ImageRequest: upstream.ImageRequest{Model: remote, Prompt: editPrompt(task.EditAction, task.Prompt), Quality: task.Quality, Size: task.Size, Count: int(task.ImageCount)},
+				References:   refs, TransparentBackground: transparent,
+			}
 			run := func(position int32, count int) {
 				input := request
 				input.Count = count
-				results, resultClient, callErr := s.catalog.RoutedImages(work, task.ModelID, input, refs)
+				results, resultClient, callErr := s.catalog.RoutedImages(work, task.ModelID, input)
 				if resultClient != nil {
 					defer resultClient.Close()
 				}

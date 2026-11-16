@@ -38,6 +38,9 @@ func validSize(value string) bool {
 	return true
 }
 func validCapabilities(kind string, c Capabilities) bool {
+	if c.SupportsTransparentBackground && (kind != "image" || !c.SupportsEdit) {
+		return false
+	}
 	if kind == "chat" {
 		return c.MaxContextTokens >= 1 && c.MaxContextTokens <= 1000000
 	}

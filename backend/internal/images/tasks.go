@@ -50,7 +50,7 @@ func validateInput(input Input, c Configuration, model catalog.PublicModel) erro
 		}
 		seen[id] = true
 	}
-	return nil
+	return validateEditOptions(input, model)
 }
 func shortTitle(text string) string {
 	text = strings.TrimSpace(strings.Split(strings.Split(text, "\n")[0], "。")[0])
@@ -173,6 +173,9 @@ func (s *Service) submit(ctx context.Context, actor user.Actor, key string, requ
 				return problem.New("FILE_TOO_LARGE", 413)
 			}
 		}
+		if err := validateEditGuide(ctx, q, actor.ID, input.EditOptions, refs, cfg.MaxUploadBytes); err != nil {
+			return err
+		}
 		if err := s.queue.Ping(ctx); err != nil {
 			return problem.New("DEPENDENCY_UNAVAILABLE", 503)
 		}
@@ -210,7 +213,12 @@ func (s *Service) submit(ctx context.Context, actor user.Actor, key string, requ
 				return fmt.Errorf("save image conversation turn: %w", err)
 			}
 		}
-		task, err = q.CreateImageTask(ctx, query.CreateImageTaskParams{ID: id, UserID: actor.ID, ConversationID: input.ConversationID, MessageID: messageID, UserMessageID: userID, Operation: operation, ModelID: input.ModelID, ModelName: model.DisplayName, Prompt: input.Prompt, Params: params, Quality: input.Quality, Size: input.Size, Ratio: input.Ratio, ImageCount: input.Count, ReferenceFileIds: input.ReferenceFileIDs, ChargeID: charge.ID, UnitPrice: charge.Quote.UnitPrice, TotalCost: charge.Quote.TotalCost, IdempotencyKey: key, RequestHash: hash, SplitRequests: cfg.SplitRequests, TimeoutSeconds: cfg.TimeoutSeconds, QueueTimeout: cfg.QueueTimeoutSeconds})
+		insert := query.CreateImageTaskParams{ID: id, UserID: actor.ID, ConversationID: input.ConversationID, MessageID: messageID, UserMessageID: userID, Operation: operation, ModelID: input.ModelID, ModelName: model.DisplayName, Prompt: input.Prompt, Params: params, Quality: input.Quality, Size: input.Size, Ratio: input.Ratio, ImageCount: input.Count, ReferenceFileIds: input.ReferenceFileIDs, ChargeID: charge.ID, UnitPrice: charge.Quote.UnitPrice, TotalCost: charge.Quote.TotalCost, IdempotencyKey: key, RequestHash: hash, SplitRequests: cfg.SplitRequests, TimeoutSeconds: cfg.TimeoutSeconds, QueueTimeout: cfg.QueueTimeoutSeconds}
+		if input.EditOptions != nil {
+			insert.EditAction = input.EditOptions.Action
+			insert.EditGuideFileID = input.EditOptions.GuideFileID
+		}
+		task, err = q.CreateImageTask(ctx, insert)
 		if err != nil {
 			return fmt.Errorf("create charged image task: %w", err)
 		}
@@ -296,6 +304,9 @@ func (s *Service) views(ctx context.Context, rows []query.ImageTask, viewer uuid
 		if content {
 			view.Prompt = row.Prompt
 			view.ReferenceFileIDs = append(view.ReferenceFileIDs, row.ReferenceFileIds...)
+			if row.EditAction != "" {
+				view.EditOptions = &EditOptions{Action: row.EditAction, GuideFileID: row.EditGuideFileID}
+			}
 		}
 		if view.Items == nil {
 			view.Items = []Item{}

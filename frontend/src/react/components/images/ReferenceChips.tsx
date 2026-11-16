@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { images } from '../../../api/images'
 import { useSession } from '../../features/auth/hooks'
+import type { ImageEditorTarget } from '../../features/images/editor'
 import { cn } from '../../lib/utils'
 import { ProtectedImage } from './ProtectedImage'
 import { ReferencePreviewButton } from './ReferencePreviewButton'
@@ -12,10 +13,12 @@ function ReferenceFile({
   id,
   position,
   previewable,
+  editor,
 }: {
   id: string
   position: number
   previewable: boolean
+  editor?: ImageEditorTarget
 }) {
   const { user } = useSession(),
     { t } = useTranslation()
@@ -33,7 +36,11 @@ function ReferenceFile({
       {...(previewable
         ? {
             renderImage: (image: ReactNode) => (
-              <ReferencePreviewButton file={file} position={position}>
+              <ReferencePreviewButton
+                file={file}
+                position={position}
+                {...(editor ? { editor } : {})}
+              >
                 {image}
               </ReferencePreviewButton>
             ),
@@ -54,10 +61,12 @@ export function ReferenceChips({
   ids,
   className = 'image-task-references',
   previewable = true,
+  editor,
 }: {
   ids: readonly string[]
   className?: string
   previewable?: boolean
+  editor?: ImageEditorTarget
 }) {
   return (
     <div className={cn('flex flex-wrap gap-1.5', className)}>
@@ -66,7 +75,12 @@ export function ReferenceChips({
           key={id}
           className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg border border-border bg-muted"
         >
-          <ReferenceFile id={id} position={index + 1} previewable={previewable} />
+          <ReferenceFile
+            id={id}
+            position={index + 1}
+            previewable={previewable}
+            {...(editor ? { editor } : {})}
+          />
         </div>
       ))}
     </div>

@@ -264,6 +264,8 @@ type ImageTask struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	Version          int64
+	EditAction       string
+	EditGuideFileID  *uuid.UUID
 }
 
 type ImageTaskItem struct {

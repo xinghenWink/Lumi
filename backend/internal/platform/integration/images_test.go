@@ -48,6 +48,14 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 	if err := png.Encode(&bitmap, img); err != nil {
 		t.Fatal(err)
 	}
+	var guideBitmap, opaqueBitmap bytes.Buffer
+	img.SetNRGBA(1, 0, color.NRGBA{G: 235, A: 255})
+	if err := png.Encode(&guideBitmap, img); err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(&opaqueBitmap, image.NewGray(image.Rect(0, 0, 32, 24))); err != nil {
+		t.Fatal(err)
+	}
 	var calls, edits, downloads atomic.Int32
 	key := "images-fixture-only"
 	var server *httptest.Server
@@ -72,6 +80,8 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			Prompt string `json:"prompt"`
 			Count  int    `json:"n"`
 		}
+		var guideFound bool
+		var background, output string
 		if r.URL.Path == "/v1/images/edits" {
 			edits.Add(1)
 			r.Body = http.MaxBytesReader(w, r.Body, 20<<20)
@@ -98,9 +108,20 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 				}
 				if part.FormName() == "image" {
 					references++
+					decoded, decodeErr := png.Decode(bytes.NewReader(data))
+					if decodeErr == nil {
+						_, green, _, _ := decoded.At(1, 0).RGBA()
+						guideFound = green == 235*257
+					}
 				}
 				if part.FormName() == "prompt" {
 					input.Prompt = string(data)
+				}
+				switch part.FormName() {
+				case "background":
+					background = string(data)
+				case "output_format":
+					output = string(data)
 				}
 			}
 			input.Count = 1
@@ -110,6 +131,14 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			}
 		} else if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			w.WriteHeader(400)
+			return
+		}
+		if strings.Contains(input.Prompt, "guide request") && !guideFound {
+			w.WriteHeader(422)
+			return
+		}
+		if strings.Contains(input.Prompt, "background fixture") && (background != "transparent" || output != "png") {
+			w.WriteHeader(422)
 			return
 		}
 		callIndex := calls.Add(1)
@@ -137,6 +166,9 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			if input.Prompt == "invalid" {
 				item = map[string]string{"b64_json": base64.StdEncoding.EncodeToString([]byte("<svg/>"))}
 			}
+			if strings.Contains(input.Prompt, "reject background fixture") {
+				item = map[string]string{"b64_json": base64.StdEncoding.EncodeToString(opaqueBitmap.Bytes())}
+			}
 			data = append(data, item)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -149,7 +181,7 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	model, err := f.services.Catalog.SaveModel(f.ctx, admin, uuid.Nil, catalog.ModelInput{DisplayName: "平台图片", Type: "image", Enabled: true, Capabilities: catalog.Capabilities{Qualities: []string{"low"}, Sizes: []string{"1024x1024", "auto"}, MaxN: 4, SupportsEdit: true, MaxReferenceImages: 4, ResponseFormat: "b64_json"}, Routes: []catalog.RouteInput{{UpstreamID: channel.ID, UpstreamModelName: "private-image-model", Weight: 1, Enabled: true}}})
+	model, err := f.services.Catalog.SaveModel(f.ctx, admin, uuid.Nil, catalog.ModelInput{DisplayName: "平台图片", Type: "image", Enabled: true, Capabilities: catalog.Capabilities{Qualities: []string{"low"}, Sizes: []string{"1024x1024", "auto"}, MaxN: 4, SupportsEdit: true, SupportsTransparentBackground: true, MaxReferenceImages: 4, ResponseFormat: "b64_json"}, Routes: []catalog.RouteInput{{UpstreamID: channel.ID, UpstreamModelName: "private-image-model", Weight: 1, Enabled: true}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,6 +378,91 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			t.Fatal(err)
 		}
 		execute(task.ID)
+	})
+	t.Run("editor guides are private and edit results are validated before settlement", func(t *testing.T) {
+		source, err := f.services.Files.Upload(f.ctx, actor, "upload", bitmap.Bytes(), 10<<20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		guide, err := f.services.Files.Upload(f.ctx, actor, "edit_guide", guideBitmap.Bytes(), 10<<20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		library, err := service.ReferenceLibrary(f.ctx, actor.ID, "", 50)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range library.Items {
+			if item.ID == guide.ID {
+				t.Fatal("private guide leaked into reference library")
+			}
+		}
+		request := input("guide request", 1)
+		request.ReferenceFileIDs = []uuid.UUID{source.ID}
+		request.EditOptions = &images.EditOptions{Action: "markup", GuideFileID: &guide.ID}
+		outsider := creditMember(t, f, admin, 0)
+		outsiderRow, err := query.New(f.pool).GetUserByEmail(f.ctx, outsider.Email)
+		if err != nil {
+			t.Fatal(err)
+		}
+		foreign, err := f.services.Files.Upload(f.ctx, user.Actor{ID: outsider.ID, TokenVersion: outsiderRow.TokenVersion}, "edit_guide", guideBitmap.Bytes(), 10<<20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, invalidID := range []uuid.UUID{partial.Items[0].File.ID, foreign.ID} {
+			request.EditOptions.GuideFileID = &invalidID
+			if _, err := service.Submit(f.ctx, actor, uuid.NewString(), request); creditCode(err) != "FILE_NOT_FOUND" {
+				t.Fatalf("invalid guide accepted: %v", err)
+			}
+		}
+		request.EditOptions.GuideFileID = &guide.ID
+		previous := creditBalance(t, f, actor.ID)
+		key := uuid.NewString()
+		task, err := service.Submit(f.ctx, actor, key, request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		replay, err := service.Submit(f.ctx, actor, key, request)
+		if err != nil || replay.ID != task.ID {
+			t.Fatalf("editor task not replayed: %v", err)
+		}
+		if err := service.DeleteFile(f.ctx, actor, guide.ID, false); creditCode(err) != "FILE_IN_USE" {
+			t.Fatalf("queued guide was not protected: %v", err)
+		}
+		if _, err := f.pool.Exec(f.ctx, "UPDATE files SET created_at=now()-interval '2 days' WHERE id=ANY($1::uuid[])", []uuid.UUID{guide.ID, foreign.ID}); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.services.Files.Cleanup(f.ctx, 0); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.services.Files.Get(f.ctx, outsider.ID, foreign.ID); creditCode(err) != "FILE_NOT_FOUND" {
+			t.Fatalf("unused guide was not cleaned up: %v", err)
+		}
+		finished := execute(task.ID)
+		if finished.Status != "succeeded" || finished.EditOptions == nil || *finished.EditOptions.GuideFileID != guide.ID ||
+			len(finished.ReferenceFileIDs) != 1 || finished.ReferenceFileIDs[0] != source.ID {
+			t.Fatalf("edit task lost input or did not send the guide: %+v", finished)
+		}
+		if after := creditBalance(t, f, actor.ID); previous.Total-after.Total != finished.ActualCost {
+			t.Fatal("editor replay did not settle exactly once")
+		}
+		for _, scenario := range []struct{ action, prompt, ratio, status, code string }{
+			{"remove_background", "background fixture", "", "succeeded", ""},
+			{"remove_background", "reject background fixture", "", "failed", "IMAGE_RESULT_NOT_TRANSPARENT"},
+			{"resize", "resize fixture", "1:1", "failed", "IMAGE_RESULT_RATIO_MISMATCH"},
+		} {
+			request.Prompt, request.Ratio = scenario.prompt, scenario.ratio
+			request.EditOptions = &images.EditOptions{Action: scenario.action}
+			task, err := service.Submit(f.ctx, actor, uuid.NewString(), request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result := execute(task.ID)
+			if result.Status != scenario.status || result.ErrorCode != scenario.code ||
+				(scenario.code != "" && result.RefundedCost != result.TotalCost) {
+				t.Fatalf("unexpected %s result: %+v", scenario.action, result)
+			}
+		}
 	})
 	t.Run("stop and recovery refund once and preserve healthy leases", func(t *testing.T) {
 		task := submit("slow", 1)
