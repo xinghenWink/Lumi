@@ -698,18 +698,13 @@ test('React real image generation editing gallery cancellation and administrator
     }
     await expect(fullPrompt).toBeVisible()
     expect(await promptText.textContent()).toBe(backgroundPrompt)
-    await expect
-      .poll(() =>
-        fullPrompt.evaluate((element) => {
-          const bounds = element.getBoundingClientRect()
-          return {
-            height: bounds.height <= 320,
-            left: bounds.left >= 0,
-            right: bounds.right <= innerWidth,
-          }
-        }),
-      )
-      .toEqual({ height: true, left: true, right: true })
+    expect(
+      await fullPrompt.evaluate((element) => {
+        const bounds = element.getBoundingClientRect()
+        // A fractional Radix transform can introduce rounding error on mobile Chrome.
+        return Math.round(bounds.height) <= 320 && bounds.left >= 0 && bounds.right <= innerWidth
+      }),
+    ).toBe(true)
     await member.screenshot({
       path: info.outputPath('image-task-prompt.png'),
       animations: 'disabled',
