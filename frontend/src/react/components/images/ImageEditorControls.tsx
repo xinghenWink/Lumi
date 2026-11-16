@@ -124,6 +124,7 @@ function EditorForm({
   const [modelID, setModelID] = useState('')
   const [quality, setQuality] = useState<ImageInput['quality'] | ''>(target.quality ?? '')
   const work = useRef<AbortController>(null)
+  const [menuPortal, setMenuPortal] = useState<HTMLDivElement | null>(null)
   useEffect(() => () => work.current?.abort(), [])
 
   const models = useModels('image')
@@ -345,7 +346,7 @@ function EditorForm({
                 {draft.mode === 'resize' && draft.ratio ? ' ' + draft.ratio : ''}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" container={menuPortal}>
               {ratios.map((ratio) => (
                 <DropdownMenuItem
                   key={ratio}
@@ -417,7 +418,7 @@ function EditorForm({
                       />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
+                  <DropdownMenuContent align="start" container={menuPortal}>
                     {colors.map(({ value, label }) => (
                       <DropdownMenuItem key={value} onSelect={() => draft.setColor(value)}>
                         <span
@@ -619,6 +620,7 @@ function EditorForm({
         {tooLarge ? <ApiNotice error={new ApiError('FILE_TOO_LARGE')} /> : null}
         <ApiNotice error={error ?? submitError ?? options.error} />
       </div>
+      <div ref={setMenuPortal} />
     </div>
   )
 }

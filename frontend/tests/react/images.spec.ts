@@ -1308,7 +1308,7 @@ test('React real image generation editing gallery cancellation and administrator
     const galleryEditor = member.getByRole('dialog', { name: '预览图片', exact: true })
     await expect(galleryEditor.getByRole('img')).toBeVisible()
     await galleryEditor.getByRole('button', { name: '调整大小', exact: true }).click()
-    const ratios = member.getByRole('menu', { name: '调整大小' })
+    const ratios = galleryEditor.getByRole('menu', { name: '调整大小' })
     await expect(ratios.getByRole('menuitem')).toHaveCount(1)
     await ratios.getByRole('menuitem', { name: '正方形 1:1' }).click()
     await expect(galleryEditor.getByRole('button', { name: '调整大小 1:1' })).toBeVisible()
