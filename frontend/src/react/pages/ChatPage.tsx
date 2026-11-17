@@ -10,13 +10,13 @@ import { useModels } from '../features/catalog/models'
 import { useChatTurnActions } from '../features/chat/actions'
 import { ChatComposer } from '../components/chat/ChatComposer'
 import { ModeTabs } from '../components/chat/ModeTabs'
-import { ConversationActions } from '../components/chat/ConversationActions'
 import { ApiNotice } from '../components/shared/ApiNotice'
 import { BrandMark } from '../components/shared/BrandMark'
 import { PageStatus } from '../components/shared/PageStatus'
 import { ModalDialog } from '../components/ui/modal-dialog'
 import { Button } from '../components/ui/button'
 import { textareaClass } from '../components/ui/field'
+const ConversationActions = lazy(() => import('../components/chat/ConversationActions'))
 const MessageList = lazy(() =>
   import('../components/chat/MessageList').then((module) => ({ default: module.MessageList })),
 )
@@ -76,7 +76,9 @@ export default function ChatPage() {
             <span className="truncate text-xs text-muted-foreground">
               {data.data.conversation.title || t('chat.untitled')}
             </span>
-            <ConversationActions row={data.data.conversation} />
+            <Suspense fallback={null}>
+              <ConversationActions row={data.data.conversation} />
+            </Suspense>
           </div>
         ) : null}
       </div>
