@@ -9,7 +9,7 @@ import { useSession } from '../../features/auth/hooks'
 import { ApiNotice } from './ApiNotice'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
-import { ConversationActions } from '../chat/ConversationActions'
+const ConversationActions = lazy(() => import('../chat/ConversationActions'))
 const ImageConversationActions = lazy(() =>
   import('../images/ImageConversationActions').then((module) => ({
     default: module.ImageConversationActions,
@@ -72,13 +72,13 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
             {row.title || t(image ? 'images.untitled' : 'chat.untitled')}
           </span>
         </Link>
-        {image ? (
-          <Suspense fallback={null}>
+        <Suspense fallback={null}>
+          {image ? (
             <ImageConversationActions row={row} />
-          </Suspense>
-        ) : (
-          <ConversationActions row={{ ...row, busy: row.busy ?? false }} />
-        )}
+          ) : (
+            <ConversationActions row={{ ...row, busy: row.busy ?? false }} />
+          )}
+        </Suspense>
       </div>
     )
   }

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ImageFile } from '../../../api/images'
+import type { ImageEditorTarget } from '../../features/images/editor'
 import { Button } from '../ui/button'
 
 const ImagePreview = lazy(() =>
@@ -11,10 +12,12 @@ export function ReferencePreviewButton({
   file,
   position,
   children,
+  editor,
 }: {
   file: ImageFile
   position: number
   children: ReactNode
+  editor?: ImageEditorTarget
 }) {
   const { t } = useTranslation()
   const trigger = useRef<HTMLButtonElement>(null)
@@ -43,6 +46,7 @@ export function ReferencePreviewButton({
             parameters={t('images.references')}
             onClose={() => setOpen(false)}
             returnFocus={trigger}
+            {...(editor ? { editor } : {})}
           />
         </Suspense>
       ) : null}

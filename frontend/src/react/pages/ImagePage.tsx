@@ -1,22 +1,27 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useStore } from 'zustand'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { images, type ImageFile, type ImageTask } from '../../api/images'
+import { images, terminal, type ImageFile, type ImageTask } from '../../api/images'
 import { ApiError } from '../../api/transport'
 import { useImageController } from '../features/images/use-image-controller'
 import { useRuntime } from '../app/context'
 import { useModels } from '../features/catalog/models'
 import { imageSubmissionScope } from '../features/images/controller'
 import { addExistingReference } from '../features/images/references'
+import { emptyTaskFilters, taskFilterQuery } from '../features/images/task-filters'
 import { useMediaQuery } from '../lib/media'
 import { ModeTabs } from '../components/chat/ModeTabs'
 import { ImageComposer } from '../components/images/ImageComposer'
 import { ImageConversationActions } from '../components/images/ImageConversationActions'
+import { ImageWorkspaceTools } from '../components/images/ImageWorkspaceTools'
 import { PageStatus } from '../components/shared/PageStatus'
 import { ApiNotice } from '../components/shared/ApiNotice'
 import { ImageGenerationIcon } from '../components/shared/ImageGenerationIcon'
+import { Button } from '../components/ui/button'
+
+const ImageAssetPanel = lazy(() => import('../components/images/ImageAssetPanel'))
 const ImageTaskList = lazy(() =>
   import('../components/images/ImageTaskList').then((module) => ({
     default: module.ImageTaskList,
@@ -31,6 +36,7 @@ const suggestions = [
 ] as const
 
 export default function ImagePage() {
+  const { id = '' } = useParams()
   const runtime = useRuntime()
   const [error, setError] = useState<unknown>()
   const [image, setImage] = useState(() => runtime.imageController)
@@ -50,24 +56,55 @@ export default function ImagePage() {
     }
   }, [error, image, runtime])
   if (!image) return <PageStatus error={error} retry={() => setError(undefined)} />
-  return <ImageWorkspace />
+  return <ImageWorkspace key={id} id={id} />
 }
 
-function ImageWorkspace() {
-  const { id = '' } = useParams(),
-    runtime = useRuntime(),
+function ImageWorkspace({ id }: { id: string }) {
+  const runtime = useRuntime(),
     { t } = useTranslation()
   const image = useImageController(),
     models = useModels('image'),
     data = useQuery(image.options(id))
   // Desktop is a studio with a persistent parameter panel; smaller screens dock the composer.
   const wide = useMediaQuery('(min-width: 1024px)')
+  const dockAssets = useMediaQuery('(min-width: 1440px)')
+  const assetsTrigger = useRef<HTMLButtonElement>(null)
+  const [assetsOpen, setAssetsOpen] = useState(false)
+  const [keyword, setKeyword] = useState('')
+  const [filters, setFilters] = useState(emptyTaskFilters)
+  const criteria = taskFilterQuery(keyword, filters)
+  const results = useInfiniteQuery({
+    queryKey: [...image.filteredKey(id), criteria],
+    enabled: !!id && !!criteria && data.isSuccess,
+    initialPageParam: '',
+    queryFn: ({ pageParam, signal }) => {
+      const params = new URLSearchParams(criteria)
+      params.set('conversation_id', id)
+      params.set('limit', '50')
+      if (pageParam) params.set('cursor', pageParam)
+      return images.tasks(params, false, signal)
+    },
+    getNextPageParam: (page) => page.next_cursor || undefined,
+    refetchInterval: (query) => {
+      // The controller follows live tasks from the unfiltered history.
+      const followed = new Set(data.data?.tasks.map((task) => task.id))
+      const needsRefresh = query.state.data?.pages.some((page) =>
+        page.items.some((task) => !terminal(task.status) && !followed.has(task.id)),
+      )
+      return needsRefresh ? 3000 : false
+    },
+  })
   const available = models.query.data?.items,
     modelID = data.data?.conversation.model_id
+  const initializedModel = useRef<string | null>(null)
   const older = useMutation({ mutationFn: () => image.loadOlder(id) })
   const submitting = useStore(
     image.store,
     (state) => !!state.sending[imageSubmissionScope(state, id)],
+  )
+  const submitLocked = useStore(
+    image.store,
+    (state) => !!state.pending[imageSubmissionScope(state, id)],
   )
   const action = useMutation({
     mutationFn: async (
@@ -78,6 +115,8 @@ function ImageWorkspace() {
       if (value.kind === 'edit') {
         await addExistingReference(runtime, models, value.file, id, { requireActive: true })
       } else {
+        if (!models.items.some((model) => model.id === value.task.model_id))
+          throw new ApiError('IMAGE_MODEL_UNAVAILABLE')
         const results = await Promise.allSettled(
           value.task.reference_file_ids.map((reference) => images.file(reference)),
         )
@@ -89,6 +128,7 @@ function ImageWorkspace() {
           return
         if (image.store.getState().pending[imageSubmissionScope(image.store.getState(), id)])
           throw new ApiError('INVALID_INPUT')
+        initializedModel.current = id
         models.select(value.task.model_id)
         const references = results.flatMap((result) =>
           result.status === 'fulfilled' ? [result.value] : [],
@@ -108,21 +148,39 @@ function ImageWorkspace() {
     },
   })
   useEffect(() => {
+    initializedModel.current = null
     void image.open(id)
     return () => image.stopFollowing()
   }, [image, id])
   useEffect(() => {
-    if (modelID && available?.some((model) => model.id === modelID))
+    // Submission refreshes the saved conversation model. Seed the composer only when opening it.
+    if (
+      initializedModel.current !== id &&
+      modelID &&
+      available?.some((model) => model.id === modelID)
+    ) {
+      initializedModel.current = id
       runtime.modelStore.getState().select('image', modelID)
-  }, [runtime, modelID, available])
+    }
+  }, [runtime, id, modelID, available])
   const mutate = action.mutate,
     refetch = data.refetch
   const cancel = useCallback((task: ImageTask) => image.cancel(task), [image])
   const edit = useCallback((file: ImageFile) => mutate({ kind: 'edit', file }), [mutate])
   const reuse = useCallback((task: ImageTask) => mutate({ kind: 'reuse', task }), [mutate])
+  const regenerate = useCallback(
+    (task: ImageTask) => {
+      void image.regenerate(task)
+    },
+    [image],
+  )
   const changed = useCallback(() => {
-    void refetch()
-  }, [refetch])
+    image.refreshHistory(id)
+  }, [image, id])
+  function closeAssets() {
+    setAssetsOpen(false)
+    requestAnimationFrame(() => assetsTrigger.current?.focus({ preventScroll: true }))
+  }
   function suggest(prompt: string) {
     image.draft(id, { prompt })
     requestAnimationFrame(() => {
@@ -132,6 +190,10 @@ function ImageWorkspace() {
     })
   }
   const composer = !id || !data.isError
+  const tasks = criteria
+    ? (results.data?.pages.flatMap((page) => page.items).reverse() ?? [])
+    : (data.data?.tasks ?? [])
+  const historyError = criteria ? (results.data ? results.error : undefined) : older.error
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden">
       {wide && composer ? (
@@ -140,41 +202,89 @@ function ImageWorkspace() {
         </aside>
       ) : null}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-3 sm:px-6">
+        <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 px-3 py-1 sm:gap-x-3 sm:px-6">
           <ModeTabs />
-          {data.data ? (
-            <div className="flex min-w-0 items-center gap-1">
-              <span className="truncate text-xs text-muted-foreground">
-                {data.data.conversation.title || t('images.untitled')}
-              </span>
-              <ImageConversationActions row={data.data.conversation} />
-            </div>
-          ) : null}
+          <div className="ml-auto flex items-center gap-1">
+            <ImageWorkspaceTools
+              disabled={!data.data}
+              search={keyword}
+              filters={filters}
+              assetsOpen={assetsOpen}
+              assetsDialog={!dockAssets}
+              assetsTrigger={assetsTrigger}
+              onSearch={setKeyword}
+              onFilter={setFilters}
+              onAssetsToggle={() => (assetsOpen ? closeAssets() : setAssetsOpen(true))}
+            />
+            {data.data ? (
+              <div className="flex min-w-0 items-center gap-1">
+                <span className="hidden max-w-40 truncate px-1.5 text-xs text-muted-foreground sm:block xl:max-w-52">
+                  {data.data.conversation.title || t('images.untitled')}
+                </span>
+                <ImageConversationActions row={data.data.conversation} />
+              </div>
+            ) : null}
+          </div>
         </div>
-        {action.error || older.error ? (
+        {criteria ? (
+          <div
+            className="mx-auto flex w-full max-w-5xl shrink-0 items-center gap-2 px-4 py-1 text-xs text-muted-foreground sm:px-6"
+            aria-live="polite"
+          >
+            {keyword ? (
+              <span className="min-w-0 truncate" title={keyword}>
+                {t('images.searchActive', { keyword })}
+              </span>
+            ) : null}
+            {keyword ? (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setKeyword('')}>
+                {t('images.clearSearch')}
+              </Button>
+            ) : null}
+            {Object.values(filters).some(Boolean) ? (
+              <span className="shrink-0">{t('images.filterActive')}</span>
+            ) : null}
+          </div>
+        ) : null}
+        {action.error || historyError ? (
           <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
-            <ApiNotice error={action.error || older.error} />
+            <ApiNotice error={action.error || historyError} />
           </div>
         ) : null}
         {id && data.isPending ? (
           <PageStatus />
         ) : id && data.isError ? (
-          <PageStatus error={data.error} retry={changed} />
-        ) : data.data?.tasks.length ? (
+          <PageStatus error={data.error} retry={() => void refetch()} />
+        ) : criteria && !results.data ? (
+          <PageStatus error={results.error} retry={() => void results.refetch()} />
+        ) : tasks.length ? (
           <Suspense fallback={<PageStatus />}>
             <ImageTaskList
-              key={id}
-              tasks={data.data.tasks}
-              older={!!data.data.nextCursor}
-              loading={older.isPending}
-              submitting={submitting}
-              onOlder={() => older.mutateAsync().catch(() => undefined)}
+              key={criteria}
+              tasks={tasks}
+              older={criteria ? !!results.hasNextPage : !!data.data?.nextCursor}
+              loading={criteria ? results.isFetching : older.isPending}
+              submitting={!criteria && submitting}
+              onOlder={async () => {
+                if (criteria) await results.fetchNextPage()
+                else await older.mutateAsync().catch(() => undefined)
+              }}
               onCancel={cancel}
               onReuse={reuse}
+              onRegenerate={regenerate}
+              reuseDisabled={submitLocked || action.isPending || models.query.isPending}
+              regenerateDisabled={submitLocked || action.isPending}
               onEdit={edit}
               onChanged={changed}
             />
           </Suspense>
+        ) : criteria ? (
+          <p
+            role="status"
+            className="grid flex-1 place-content-center px-4 text-sm text-muted-foreground"
+          >
+            {t('images.noMatchingTasks')}
+          </p>
         ) : (
           <section className="flex min-h-0 flex-1 flex-col items-center justify-center-safe overflow-y-auto px-5 py-8 text-center">
             <ImageGenerationIcon size={128} className="mb-5 animate-rise-in" />
@@ -204,6 +314,19 @@ function ImageWorkspace() {
           <ImageComposer key={id || 'new'} conversationId={id} layout="dock" />
         ) : null}
       </div>
+      {assetsOpen ? (
+        <Suspense
+          fallback={
+            dockAssets ? (
+              <aside className="flex w-[360px] shrink-0 border-l border-border">
+                <PageStatus />
+              </aside>
+            ) : null
+          }
+        >
+          <ImageAssetPanel docked={dockAssets} onClose={closeAssets} conversationId={id} />
+        </Suspense>
+      ) : null}
     </div>
   )
 }

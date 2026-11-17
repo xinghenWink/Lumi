@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,6 +48,14 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 	if err := png.Encode(&bitmap, img); err != nil {
 		t.Fatal(err)
 	}
+	var guideBitmap, opaqueBitmap bytes.Buffer
+	img.SetNRGBA(1, 0, color.NRGBA{G: 235, A: 255})
+	if err := png.Encode(&guideBitmap, img); err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(&opaqueBitmap, image.NewGray(image.Rect(0, 0, 32, 24))); err != nil {
+		t.Fatal(err)
+	}
 	var calls, edits, downloads atomic.Int32
 	key := "images-fixture-only"
 	var server *httptest.Server
@@ -71,6 +80,8 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			Prompt string `json:"prompt"`
 			Count  int    `json:"n"`
 		}
+		var guideFound bool
+		var background, output string
 		if r.URL.Path == "/v1/images/edits" {
 			edits.Add(1)
 			r.Body = http.MaxBytesReader(w, r.Body, 20<<20)
@@ -97,9 +108,20 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 				}
 				if part.FormName() == "image" {
 					references++
+					decoded, decodeErr := png.Decode(bytes.NewReader(data))
+					if decodeErr == nil {
+						_, green, _, _ := decoded.At(1, 0).RGBA()
+						guideFound = green == 235*257
+					}
 				}
 				if part.FormName() == "prompt" {
 					input.Prompt = string(data)
+				}
+				switch part.FormName() {
+				case "background":
+					background = string(data)
+				case "output_format":
+					output = string(data)
 				}
 			}
 			input.Count = 1
@@ -109,6 +131,14 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			}
 		} else if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			w.WriteHeader(400)
+			return
+		}
+		if strings.Contains(input.Prompt, "guide request") && !guideFound {
+			w.WriteHeader(422)
+			return
+		}
+		if strings.Contains(input.Prompt, "background fixture") && (background != "transparent" || output != "png") {
+			w.WriteHeader(422)
 			return
 		}
 		callIndex := calls.Add(1)
@@ -136,6 +166,9 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			if input.Prompt == "invalid" {
 				item = map[string]string{"b64_json": base64.StdEncoding.EncodeToString([]byte("<svg/>"))}
 			}
+			if strings.Contains(input.Prompt, "reject background fixture") {
+				item = map[string]string{"b64_json": base64.StdEncoding.EncodeToString(opaqueBitmap.Bytes())}
+			}
 			data = append(data, item)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -148,7 +181,7 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	model, err := f.services.Catalog.SaveModel(f.ctx, admin, uuid.Nil, catalog.ModelInput{DisplayName: "平台图片", Type: "image", Enabled: true, Capabilities: catalog.Capabilities{Qualities: []string{"low"}, Sizes: []string{"1024x1024", "auto"}, MaxN: 4, SupportsEdit: true, MaxReferenceImages: 4, ResponseFormat: "b64_json"}, Routes: []catalog.RouteInput{{UpstreamID: channel.ID, UpstreamModelName: "private-image-model", Weight: 1, Enabled: true}}})
+	model, err := f.services.Catalog.SaveModel(f.ctx, admin, uuid.Nil, catalog.ModelInput{DisplayName: "平台图片", Type: "image", Enabled: true, Capabilities: catalog.Capabilities{Qualities: []string{"low"}, Sizes: []string{"1024x1024", "auto"}, MaxN: 4, SupportsEdit: true, SupportsTransparentBackground: true, MaxReferenceImages: 4, ResponseFormat: "b64_json"}, Routes: []catalog.RouteInput{{UpstreamID: channel.ID, UpstreamModelName: "private-image-model", Weight: 1, Enabled: true}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -345,6 +378,91 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			t.Fatal(err)
 		}
 		execute(task.ID)
+	})
+	t.Run("editor guides are private and edit results are validated before settlement", func(t *testing.T) {
+		source, err := f.services.Files.Upload(f.ctx, actor, "upload", bitmap.Bytes(), 10<<20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		guide, err := f.services.Files.Upload(f.ctx, actor, "edit_guide", guideBitmap.Bytes(), 10<<20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		library, err := service.ReferenceLibrary(f.ctx, actor.ID, "", 50)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range library.Items {
+			if item.ID == guide.ID {
+				t.Fatal("private guide leaked into reference library")
+			}
+		}
+		request := input("guide request", 1)
+		request.ReferenceFileIDs = []uuid.UUID{source.ID}
+		request.EditOptions = &images.EditOptions{Action: "markup", GuideFileID: &guide.ID}
+		outsider := creditMember(t, f, admin, 0)
+		outsiderRow, err := query.New(f.pool).GetUserByEmail(f.ctx, outsider.Email)
+		if err != nil {
+			t.Fatal(err)
+		}
+		foreign, err := f.services.Files.Upload(f.ctx, user.Actor{ID: outsider.ID, TokenVersion: outsiderRow.TokenVersion}, "edit_guide", guideBitmap.Bytes(), 10<<20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, invalidID := range []uuid.UUID{partial.Items[0].File.ID, foreign.ID} {
+			request.EditOptions.GuideFileID = &invalidID
+			if _, err := service.Submit(f.ctx, actor, uuid.NewString(), request); creditCode(err) != "FILE_NOT_FOUND" {
+				t.Fatalf("invalid guide accepted: %v", err)
+			}
+		}
+		request.EditOptions.GuideFileID = &guide.ID
+		previous := creditBalance(t, f, actor.ID)
+		key := uuid.NewString()
+		task, err := service.Submit(f.ctx, actor, key, request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		replay, err := service.Submit(f.ctx, actor, key, request)
+		if err != nil || replay.ID != task.ID {
+			t.Fatalf("editor task not replayed: %v", err)
+		}
+		if err := service.DeleteFile(f.ctx, actor, guide.ID, false); creditCode(err) != "FILE_IN_USE" {
+			t.Fatalf("queued guide was not protected: %v", err)
+		}
+		if _, err := f.pool.Exec(f.ctx, "UPDATE files SET created_at=now()-interval '2 days' WHERE id=ANY($1::uuid[])", []uuid.UUID{guide.ID, foreign.ID}); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.services.Files.Cleanup(f.ctx, 0); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.services.Files.Get(f.ctx, outsider.ID, foreign.ID); creditCode(err) != "FILE_NOT_FOUND" {
+			t.Fatalf("unused guide was not cleaned up: %v", err)
+		}
+		finished := execute(task.ID)
+		if finished.Status != "succeeded" || finished.EditOptions == nil || *finished.EditOptions.GuideFileID != guide.ID ||
+			len(finished.ReferenceFileIDs) != 1 || finished.ReferenceFileIDs[0] != source.ID {
+			t.Fatalf("edit task lost input or did not send the guide: %+v", finished)
+		}
+		if after := creditBalance(t, f, actor.ID); previous.Total-after.Total != finished.ActualCost {
+			t.Fatal("editor replay did not settle exactly once")
+		}
+		for _, scenario := range []struct{ action, prompt, ratio, status, code string }{
+			{"remove_background", "background fixture", "", "succeeded", ""},
+			{"remove_background", "reject background fixture", "", "failed", "IMAGE_RESULT_NOT_TRANSPARENT"},
+			{"resize", "resize fixture", "1:1", "failed", "IMAGE_RESULT_RATIO_MISMATCH"},
+		} {
+			request.Prompt, request.Ratio = scenario.prompt, scenario.ratio
+			request.EditOptions = &images.EditOptions{Action: scenario.action}
+			task, err := service.Submit(f.ctx, actor, uuid.NewString(), request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result := execute(task.ID)
+			if result.Status != scenario.status || result.ErrorCode != scenario.code ||
+				(scenario.code != "" && result.RefundedCost != result.TotalCost) {
+				t.Fatalf("unexpected %s result: %+v", scenario.action, result)
+			}
+		}
 	})
 	t.Run("stop and recovery refund once and preserve healthy leases", func(t *testing.T) {
 		task := submit("slow", 1)
@@ -583,5 +701,65 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 		if err := f.pool.QueryRow(f.ctx, "SELECT count(*) FROM audit_logs WHERE action='image.refund' AND target_id=$1", result.ID).Scan(&count); err != nil || count != 1 {
 			t.Fatalf("manual refund audit count=%d error=%v", count, err)
 		}
+	})
+	t.Run("owned task search combines filters before cursor pagination", func(t *testing.T) {
+		start := time.Date(2026, time.November, 17, 0, 0, 0, 0, time.UTC)
+		end := start.AddDate(0, 0, 1)
+		seed := func(prompt string, created time.Time, canceled bool) uuid.UUID {
+			t.Helper()
+			task := submit(prompt, 1)
+			if canceled {
+				if _, err := service.Cancel(f.ctx, actor, task.ID); err != nil {
+					t.Fatal(err)
+				}
+			} else if result := execute(task.ID); result.Status != "succeeded" {
+				t.Fatalf("search fixture ended in %s", result.Status)
+			}
+			if _, err := f.pool.Exec(f.ctx, "UPDATE image_tasks SET created_at=$1 WHERE id=$2", created, task.ID); err != nil {
+				t.Fatal(err)
+			}
+			return task.ID
+		}
+		oldest := seed(`海边 Lighthouse %_\ A`, start, false)
+		newest := seed(`海边 lighthouse %_\ B`, end.Add(-time.Second), false)
+		seed(`海边 lighthouse %_\ C`, end, false)
+		seed(`海边 lighthouse %_\ D`, start.Add(time.Hour), true)
+		seed(`海边 lighthouse xyz`, start.Add(2*time.Hour), false)
+
+		client := f.client(t)
+		token := f.login(t, client, member.Email, "Integration-password-1").AccessToken
+		params := url.Values{
+			"conversation_id": {conversation.ID.String()}, "search": {` 海边 LIGHTHOUSE %_\ `},
+			"state": {"succeeded"}, "quality": {"low"}, "limit": {"1"},
+			"from": {start.Format(time.RFC3339)}, "until": {end.Format(time.RFC3339)},
+		}
+		list := func(access string) reply {
+			return f.call(t, client, http.MethodGet, "/api/v1/image-tasks?"+params.Encode(), access, nil)
+		}
+		first := decodeReply[images.Page[images.Task]](t, list(token))
+		if len(first.Items) != 1 || first.Items[0].ID != newest || first.NextCursor == "" {
+			t.Fatalf("unexpected first page: %v", first)
+		}
+		params.Set("cursor", first.NextCursor)
+		second := decodeReply[images.Page[images.Task]](t, list(token))
+		if len(second.Items) != 1 || second.Items[0].ID != oldest || second.NextCursor != "" {
+			t.Fatalf("unexpected second page: %v", second)
+		}
+		params.Set("search", "海边")
+		expectStatus(t, list(token), http.StatusBadRequest)
+		params.Del("cursor")
+		params.Set("quality", "high")
+		filtered := decodeReply[images.Page[images.Task]](t, list(token))
+		if len(filtered.Items) != 0 {
+			t.Fatal("search ignored the quality filter")
+		}
+		outsider := creditMember(t, f, admin, 0)
+		outsiderToken := f.login(t, f.client(t), outsider.Email, "Integration-password-1").AccessToken
+		expectStatus(t, list(outsiderToken), http.StatusNotFound)
+		params.Set("search", strings.Repeat("图", 101))
+		expectStatus(t, list(token), http.StatusBadRequest)
+		params.Set("search", "海边")
+		params.Del("conversation_id")
+		expectStatus(t, list(token), http.StatusBadRequest)
 	})
 }

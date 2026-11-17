@@ -133,7 +133,7 @@ export function ImageComposer({
       }
     }
     const result = await controller.submit(conversationId, body)
-    if (result) await navigate('/create/' + result, { replace: true })
+    if (result && result !== conversationId) await navigate('/create/' + result, { replace: true })
   }
   const summary = options.quality
     ? [
@@ -229,6 +229,11 @@ export function ImageComposer({
       disabled={locked}
       compact
       previewable
+      editor={{
+        conversationId,
+        ...(options.model ? { modelId: options.model.id } : {}),
+        ...(options.quality ? { quality: options.quality } : {}),
+      }}
       className="image-references"
       onRemove={(value) =>
         patch({ references: draft.references.filter((reference) => reference !== value) })

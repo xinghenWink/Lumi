@@ -6,9 +6,9 @@
 
 Lumi 把流式聊天、生图与改图、积分兑换和管理后台整合到一个站点。前端嵌入 Go 二进制，配合 PostgreSQL、Redis 和持久文件目录运行，通过 OpenAI 兼容上游调用模型，适合部署自己的 AI 创作服务。
 
-本源码对应 **[v0.3.1](https://github.com/xinghenWink/Lumi/releases/tag/v0.3.1)**。本版本新增后台版本管理，改善生图提示词查看和参考图预览。正式镜像支持 `linux/amd64` 和 `linux/arm64`。产品仍在 0.x 阶段，见 [版本策略](docs/VERSIONING.md)。
+本源码对应 **[v0.3.2](https://github.com/xinghenWink/Lumi/releases/tag/v0.3.2)**。本版本新增可收起侧栏、生图工作区搜索与素材筛选、重新生成和全屏图像编辑，修复聊天回复的标签渲染。正式镜像支持 `linux/amd64` 和 `linux/arm64`。产品仍在 0.x 阶段，见 [版本策略](docs/VERSIONING.md)。
 
-从 v0.2.0 升级时，应用会自动执行前向迁移 00009 至 00013。升级前备份数据库、图片和密钥，停用旧应用后再启动新版。升级步骤见 [部署手册](docs/DEPLOYMENT.md#升级回滚)。
+从 v0.3.1 升级时，应用会自动执行前向迁移 00015 和 00016。升级前备份数据库、图片和密钥，停用旧应用后再启动新版。升级步骤见 [部署手册](docs/DEPLOYMENT.md#升级回滚)。
 
 [功能](#功能) · [技术与架构](#技术与架构) · [快速部署](#快速部署) · [首次配置](#首次配置) · [运维](#运维) · [本地开发](#本地开发) · [文档](#文档)
 
@@ -29,6 +29,12 @@ Lumi 把流式聊天、生图与改图、积分兑换和管理后台整合到一
 生图任务卡片最多显示两行提示词。悬浮、点击或用键盘打开摘要，可在浮层中滚动查看和复制全文。
 
 点击生图输入区或任务卡片上的参考图缩略图可预览原图。鼠标在预览画面上滚轮向上放大、向下缩小，也可使用底部的缩放菜单。
+
+排队中、生成中和已结束的生图任务均可点击「使用相同参数」，将参数填回工作台编辑。点击「重新生成」会按原参数在同一会话创建独立计费的排队任务，原任务和当前草稿都会保留。
+
+生图工作台右上角可按提示词搜索当前会话的全部任务，并按 UTC 日期、状态和质量筛选。点击「资产库」可在右侧浏览「我的图库」的全部生成图片，点击缩略图查看原图及生成参数。
+
+桌面工作区可点击左上角的侧栏按钮，切换完整侧栏和图标栏。按 Ctrl+K 或 Cmd+K 可展开侧栏并聚焦历史搜索。
 
 登录后可在工作区或管理后台右上角的主题按钮左侧切换简体中文和 English。语言选择保存在账号资料中，也可在个人资料中修改。
 
@@ -68,7 +74,7 @@ Lumi 提供平台和管理能力，上游推理服务需要单独准备。默认
 
 ```sh
 curl --fail --location \
-  https://github.com/xinghenWink/Lumi/releases/download/v0.3.1/lumi-deploy.tar.gz \
+  https://github.com/xinghenWink/Lumi/releases/download/v0.3.2/lumi-deploy.tar.gz \
   --output lumi-deploy.tar.gz
 sudo install -d -m 700 /opt/lumi
 sudo tar -xzf lumi-deploy.tar.gz -C /opt/lumi
@@ -80,7 +86,7 @@ sudoedit /opt/lumi/.env
 
 ```dotenv
 LUMI_IMAGE=ghcr.io/xinghenwink/lumi
-LUMI_VERSION=v0.3.1
+LUMI_VERSION=v0.3.2
 ADMIN_EMAIL=admin@example.com
 PUBLIC_BASE_URL=https://lumi.example.com
 COOKIE_SECURE=true

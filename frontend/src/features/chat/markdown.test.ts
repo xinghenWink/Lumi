@@ -188,6 +188,89 @@ describe('safe incremental markdown', () => {
     expect(element.textContent).not.toMatch(/<row|<box|<text|\{#each|UnknownWidget|i===/)
   })
 
+  it.each([false, true])(
+    'renders indented component content as Markdown (complete: %s)',
+    async (complete) => {
+      const source = [
+        '## 两天行程总览',
+        '<box>',
+        '  <row>',
+        '    <badge color="success">DAY 1</badge>',
+        '    **西湖经典路线**',
+        '    <ul>',
+        '      <li>**09:00 — 西湖断桥残雪** 从断桥开始。</li>',
+        '      <li>',
+        '        **10:00 — 白堤** 沿湖散步。',
+        '      </li>',
+        '    </ul>',
+        '    <card>',
+        '      <AsyncImage query="杭州龙井虾仁 杭帮菜" aspectRatio="5:4" width="100%"/>',
+        '      **龙井虾仁**',
+        '      清香鲜嫩，杭州代表菜。 <Cite ref="turn23news2"/>',
+        '    </card>',
+        '    <text>**{schoolName}**</text>',
+        '    <text><strong>{schoolName}</strong></text>',
+        '    Guizhou University · GZU',
+        '  </row>',
+        '</box>',
+      ].join('\n')
+      const sources = [{ url: 'https://example.com/report', title: 'Report', ref: 'turn23news2' }]
+      const element = await renderReply(source, complete, sources)
+      expect(element.querySelector('.chat-reply-badge')?.textContent).toBe('DAY 1')
+      expect(element.querySelector('.chat-illustration-prompt')?.textContent).toBe(
+        '杭州龙井虾仁 杭帮菜',
+      )
+      expect(element.querySelector('.chat-citation')?.textContent).toBe('Report')
+      expect([...element.querySelectorAll('strong')].map((item) => item.textContent)).toEqual([
+        '西湖经典路线',
+        '09:00 — 西湖断桥残雪',
+        '10:00 — 白堤',
+        '龙井虾仁',
+      ])
+      expect(element.querySelectorAll('ul')).toHaveLength(1)
+      expect(element.querySelectorAll('li')).toHaveLength(2)
+      expect(element.querySelector('pre')).toBeNull()
+      expect(element.textContent).toContain('Guizhou University · GZU')
+      expect(element.textContent).not.toMatch(/AsyncImage|<\uE000|\*\*|schoolName/)
+      expect(parseAssistantReply(source, complete, sources).copy).toContain(
+        '- **09:00 — 西湖断桥残雪**',
+      )
+    },
+  )
+
+  it('preserves Markdown list nesting and literal code inside an indented layout', async () => {
+    const source = [
+      '<box>',
+      '    - **行程**',
+      '      - **西湖**',
+      '',
+      '    ```html',
+      '      <AsyncImage query="literal"/>',
+      '    ```',
+      '',
+      '        <badge>indented example</badge>',
+      '',
+      '    **正文**',
+      '</box>',
+    ].join('\n')
+    const element = await renderReply(source, true)
+    expect(element.querySelector('li ul li strong')?.textContent).toBe('西湖')
+    expect(
+      [...element.querySelectorAll('pre code')].map((item) => item.textContent?.trimEnd()),
+    ).toEqual(['  <AsyncImage query="literal"/>', '<badge>indented example</badge>'])
+    expect(element.querySelector('.chat-illustration, .chat-reply-badge')).toBeNull()
+  })
+
+  it('keeps earlier layout content visible when an illustration tag is still incomplete', async () => {
+    const source = '<box>\n    **已生成的行程**\n\n    <AsyncImage query="杭州西湖'
+    for (const complete of [false, true]) {
+      const element = await renderReply(source, complete)
+      expect(element.querySelector('strong')?.textContent).toBe('已生成的行程')
+      expect(element.querySelector('pre')).toBeNull()
+      expect(element.textContent).not.toContain('AsyncImage')
+    }
+  })
+
   it('never exposes a partial known inline tag and leaves reasoning out of message copy', () => {
     const source =
       'Answer. <Cite\n refs={["turn1search2"]}/> <badge color="warning">Pending</badge>'

@@ -791,7 +791,7 @@ export interface paths {
     put?: never
     /**
      * uploadImageFile
-     * @description One multipart file, magic/decoded dimension checks, PNG re-encoding and WebP thumbnail. Upload <=10MiB and 24 million pixels; avatar <=2MiB.
+     * @description One multipart file, magic/decoded dimension checks, PNG re-encoding and WebP thumbnail. Upload and private edit guides <=10MiB and 24 million pixels; avatar <=2MiB.
      */
     post: operations['uploadImageFile']
     delete?: never
@@ -921,12 +921,15 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** listOwnedImageTasks */
+    /**
+     * listOwnedImageTasks
+     * @description List the caller's image tasks, newest first. When a search term is supplied, search prompts in the specified conversation. Pagination cursors are tied to the search and filters.
+     */
     get: operations['listOwnedImageTasks']
     put?: never
     /**
      * submitImageTask
-     * @description Charge and task creation are atomic. Identical key/input returns the same task; changed payload returns conflict. No references uses generation, otherwise edit. Estimates are not price locks; task stores actual accepted price.
+     * @description Charge and task creation are atomic. Identical key/input returns the same task; changed payload with the same key returns conflict. A new key creates a separate queued task even when the conversation and input match an existing task. No references uses generation, otherwise edit. Estimates are not price locks; task stores actual accepted price.
      */
     post: operations['submitImageTask']
     delete?: never
@@ -2479,6 +2482,8 @@ export interface components {
       sizes: string[]
       max_n: number
       supports_edit: boolean
+      /** @description All enabled routes of this image model have been verified to support transparent edit output. */
+      supports_transparent_background?: boolean
       max_reference_images: number
       /** @enum {string} */
       response_format: '' | 'b64_json' | 'url'
@@ -2695,7 +2700,7 @@ export interface components {
       /** Format: uuid */
       id: string
       /** @enum {string} */
-      kind: 'upload' | 'generated' | 'thumbnail' | 'avatar'
+      kind: 'upload' | 'generated' | 'thumbnail' | 'avatar' | 'edit_guide'
       /** @constant */
       mime: 'image/png'
       /** Format: int64 */
@@ -2768,6 +2773,15 @@ export interface components {
       /** @description Exact width and height sent to the provider, in pixels. */
       size: string
     }
+    ImageEditOptions: {
+      /** @enum {string} */
+      action: 'markup' | 'erase' | 'remove_background' | 'resize'
+      /**
+       * Format: uuid
+       * @description Required for markup and erase. Owned edit guide PNG with the same dimensions as the source.
+       */
+      guide_file_id?: string
+    }
     ImageTaskInput: {
       /**
        * Format: uuid
@@ -2784,6 +2798,8 @@ export interface components {
       /** Format: int64 */
       n: number
       reference_file_ids: string[]
+      /** @description Requires one source image and one result. Resize requires an enabled editor aspect ratio. */
+      edit_options?: components['schemas']['ImageEditOptions']
     }
     ImageTaskItem: {
       /** Format: int64 */
@@ -2815,6 +2831,8 @@ export interface components {
       /** Format: int64 */
       n: number
       reference_file_ids: string[]
+      /** @description Present only when edit options exist and the viewer can see task content. */
+      edit_options?: components['schemas']['ImageEditOptions']
       /** Format: int64 */
       unit_price: number
       /** Format: int64 */
@@ -4838,7 +4856,7 @@ export interface operations {
   uploadImageFile: {
     parameters: {
       query?: {
-        kind?: 'upload' | 'avatar'
+        kind?: 'upload' | 'avatar' | 'edit_guide'
       }
       header: {
         Origin: string
@@ -5117,6 +5135,8 @@ export interface operations {
         from?: string
         until?: string
         conversation_id?: string
+        /** @description Case-insensitive literal substring of the prompt. Leading and trailing whitespace is ignored. A nonempty search requires conversation_id. */
+        search?: string
       }
       header?: never
       path?: never

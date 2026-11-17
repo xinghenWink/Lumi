@@ -94,6 +94,8 @@ export default {
     backWorkspace: 'Back to workspace',
     openMenu: 'Open navigation',
     closeMenu: 'Close navigation',
+    collapseSidebar: 'Collapse sidebar',
+    expandSidebar: 'Expand sidebar',
     userMenu: 'Open account menu',
     administration: 'Platform management',
     theme: 'Appearance',

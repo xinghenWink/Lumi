@@ -278,7 +278,21 @@ export function ModelEditor({
                 <CheckField
                   label={t('catalog.supportsEdit')}
                   checked={form.capabilities.supports_edit}
-                  onChange={(supports_edit) => changeCaps({ supports_edit })}
+                  onChange={(supports_edit) =>
+                    changeCaps(
+                      supports_edit
+                        ? { supports_edit }
+                        : { supports_edit, supports_transparent_background: false },
+                    )
+                  }
+                />
+                <CheckField
+                  label={t('catalog.supportsTransparentBackground')}
+                  checked={form.capabilities.supports_transparent_background ?? false}
+                  disabled={!form.capabilities.supports_edit}
+                  onChange={(supports_transparent_background) =>
+                    changeCaps({ supports_transparent_background })
+                  }
                 />
                 <NumberField
                   label={t('catalog.maxReferences')}

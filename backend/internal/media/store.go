@@ -163,11 +163,19 @@ func validateImage(raw []byte) (image.Config, error) {
 	return cfg, nil
 }
 func (s *Store) Prepare(ctx context.Context, owner uuid.UUID, task *uuid.UUID, kind string, raw []byte, limit int64) (query.InsertImageFileParams, error) {
+	return s.prepare(ctx, owner, task, kind, raw, limit, nil)
+}
+
+func (s *Store) PrepareImageResult(ctx context.Context, owner, task uuid.UUID, raw []byte, check func(image.Image) error) (query.InsertImageFileParams, error) {
+	return s.prepare(ctx, owner, &task, "generated", raw, 20<<20, check)
+}
+
+func (s *Store) prepare(ctx context.Context, owner uuid.UUID, task *uuid.UUID, kind string, raw []byte, limit int64, check func(image.Image) error) (query.InsertImageFileParams, error) {
 	var result query.InsertImageFileParams
 	if err := ctx.Err(); err != nil {
 		return result, err
 	}
-	if (kind != "upload" && kind != "generated" && kind != "avatar") || limit < 1 || limit > 20<<20 || len(raw) == 0 || int64(len(raw)) > limit {
+	if (kind != "upload" && kind != "generated" && kind != "avatar" && kind != "edit_guide") || limit < 1 || limit > 20<<20 || len(raw) == 0 || int64(len(raw)) > limit {
 		return result, problem.New("FILE_TOO_LARGE", 413)
 	}
 	select {
@@ -185,6 +193,11 @@ func (s *Store) Prepare(ctx context.Context, owner uuid.UUID, task *uuid.UUID, k
 	}
 	if err := ctx.Err(); err != nil {
 		return result, err
+	}
+	if check != nil {
+		if err := check(decoded); err != nil {
+			return result, err
+		}
 	}
 	bounds := decoded.Bounds()
 	width, height := bounds.Dx(), bounds.Dy()

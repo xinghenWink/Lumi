@@ -4,10 +4,13 @@ import {
   Image,
   LayoutGrid,
   MessageSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Shield,
   Workflow,
 } from 'lucide-react'
+import { useId } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -22,26 +25,37 @@ import {
   SidebarMenuItem,
 } from '../ui/sidebar'
 import { Separator } from '../ui/separator'
+import { Button } from '../ui/button'
 import { BrandMark } from './BrandMark'
 import { AccountMenu } from './AccountMenu'
 import { CreditBadge } from './CreditBadge'
 import { HistorySidebar } from './HistorySidebar'
 import { adminGroups } from '../../features/accounts/navigation'
 import { useSession } from '../../features/auth/hooks'
+import { cn } from '../../lib/utils'
 
 const navigationItem =
   'min-h-9 text-[13px] aria-[current=page]:bg-card aria-[current=page]:font-medium aria-[current=page]:shadow-xs aria-[current=page]:[&_svg]:text-primary'
 
 export function Sidebar({
   admin = false,
+  collapsed = false,
   onNavigate,
+  onToggle,
 }: {
   admin?: boolean
+  collapsed?: boolean
   onNavigate?: () => void
+  onToggle?: () => void
 }) {
   const { t } = useTranslation()
   const { user } = useSession()
   const path = useLocation().pathname
+  const historyId = useId()
+  const toggleLabel = t(collapsed ? 'nav.expandSidebar' : 'nav.collapseSidebar')
+  const ToggleIcon = collapsed ? PanelLeftOpen : PanelLeftClose
+  const compactLabel = collapsed ? 'sr-only' : undefined
+  const linkClass = cn(navigationItem, collapsed && 'justify-center px-0')
   const fresh = path.startsWith('/create')
     ? '/create'
     : path.startsWith('/canvas')
@@ -57,13 +71,31 @@ export function Sidebar({
   return (
     <SidebarFrame className="px-3 pt-4 pb-3">
       <SidebarHeader className="gap-0 p-0">
-        <Link
-          to="/chat"
-          onClick={onNavigate}
-          className="mb-5 flex h-10 items-center rounded-lg px-1.5"
-        >
-          <BrandMark />
-        </Link>
+        <div className={cn('mb-5 flex h-10 items-center gap-2', collapsed && 'justify-center')}>
+          {collapsed ? null : (
+            <Link
+              to="/chat"
+              onClick={onNavigate}
+              className="flex h-10 min-w-0 flex-1 items-center rounded-lg px-1.5"
+            >
+              <BrandMark />
+            </Link>
+          )}
+          {onToggle ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label={toggleLabel}
+              aria-expanded={!collapsed}
+              aria-controls={historyId}
+              title={toggleLabel}
+              onClick={onToggle}
+            >
+              <ToggleIcon size={18} aria-hidden="true" />
+            </Button>
+          ) : null}
+        </div>
         {admin ? (
           <Link
             to="/chat"
@@ -77,12 +109,16 @@ export function Sidebar({
           <Link
             to={fresh}
             onClick={onNavigate}
-            className="mb-4 flex h-10 items-center gap-2 rounded-xl border border-input bg-card px-3 text-[13px] font-medium shadow-xs transition-[border-color,box-shadow] hover:border-primary/40 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className={cn(
+              'mb-4 flex h-10 items-center gap-2 rounded-xl border border-input bg-card text-[13px] font-medium shadow-xs transition-[border-color,box-shadow] hover:border-primary/40 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+              collapsed ? 'justify-center' : 'px-3',
+            )}
+            title={collapsed ? t('react.newCreation') : undefined}
           >
             <span className="grid size-5 place-items-center rounded-md bg-primary text-primary-foreground">
               <Plus size={13} strokeWidth={2.4} />
             </span>
-            {t('react.newCreation')}
+            <span className={compactLabel}>{t('react.newCreation')}</span>
           </Link>
         )}
       </SidebarHeader>
@@ -118,20 +154,24 @@ export function Sidebar({
             <SidebarMenu>
               {links.map(({ to, key, icon: Icon }) => (
                 <SidebarMenuItem key={to}>
-                  <SidebarMenuButton asChild className={navigationItem}>
-                    <NavLink to={to} onClick={onNavigate}>
+                  <SidebarMenuButton asChild className={linkClass}>
+                    <NavLink to={to} onClick={onNavigate} title={collapsed ? t(key) : undefined}>
                       <Icon size={16} />
-                      {t(key)}
+                      <span className={compactLabel}>{t(key)}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
               {user?.role === 'admin' ? (
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild className={navigationItem}>
-                    <Link to="/admin" onClick={onNavigate}>
+                  <SidebarMenuButton asChild className={linkClass}>
+                    <Link
+                      to="/admin"
+                      onClick={onNavigate}
+                      title={collapsed ? t('nav.admin') : undefined}
+                    >
                       <Shield size={16} />
-                      {t('nav.admin')}
+                      <span className={compactLabel}>{t('nav.admin')}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -139,12 +179,16 @@ export function Sidebar({
             </SidebarMenu>
           )}
         </nav>
-        {!admin ? <HistorySidebar onNavigate={onNavigate} /> : null}
+        {!admin ? (
+          <div id={historyId} className={collapsed ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}>
+            <HistorySidebar onNavigate={onNavigate} />
+          </div>
+        ) : null}
       </SidebarContent>
       <SidebarFooter className="mt-3 shrink-0 gap-0 p-0">
         <Separator className="mb-3" />
-        {!admin ? <CreditBadge onNavigate={onNavigate} /> : null}
-        <AccountMenu onNavigate={onNavigate} />
+        {!admin && !collapsed ? <CreditBadge onNavigate={onNavigate} /> : null}
+        <AccountMenu compact={collapsed} onNavigate={onNavigate} />
       </SidebarFooter>
     </SidebarFrame>
   )

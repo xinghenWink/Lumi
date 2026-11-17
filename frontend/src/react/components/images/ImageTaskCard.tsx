@@ -1,6 +1,16 @@
 import { memo, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Copy, Download, Info, Plus, RotateCcw, Trash2, X } from 'lucide-react'
+import {
+  Copy,
+  Download,
+  Info,
+  Pencil,
+  Plus,
+  RotateCcw,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { images, terminal, type ImageFile, type ImageTask } from '../../../api/images'
 import { ApiError } from '../../../api/transport'
@@ -49,6 +59,9 @@ export const ImageTaskCard = memo(function ImageTaskCard({
   admin = false,
   onCancel,
   onReuse,
+  onRegenerate,
+  reuseDisabled = false,
+  regenerateDisabled = false,
   onEdit,
   onChanged,
 }: {
@@ -56,6 +69,9 @@ export const ImageTaskCard = memo(function ImageTaskCard({
   admin?: boolean
   onCancel?: (task: ImageTask) => Promise<void>
   onReuse?: (task: ImageTask) => void
+  onRegenerate?: (task: ImageTask) => void
+  reuseDisabled?: boolean
+  regenerateDisabled?: boolean
   onEdit?: (file: ImageFile) => void
   onChanged(): void
 }) {
@@ -66,11 +82,23 @@ export const ImageTaskCard = memo(function ImageTaskCard({
     [details, setDetails] = useState(false),
     [deleting, setDeleting] = useState<string | null>(null)
   const detailsTrigger = useRef<HTMLButtonElement>(null)
+  const previewTrigger = useRef<HTMLButtonElement>(null)
   const files = task.items.flatMap((item) => (item.file ? [item.file] : []))
   // One ratio per task keeps result tiles in a row the same height, including failed slots.
   const aspect = taskAspect(task, files[0])
   const tone = statusTone(task.status)
   const done = terminal(task.status)
+  const canReuse = !admin && task.content_visible
+  const editor =
+    canReuse && onEdit
+      ? {
+          conversationId: task.conversation_id,
+          modelId: task.model_id,
+          quality: task.quality,
+          size: task.size,
+          ratio: task.ratio,
+        }
+      : undefined
   const parameters = [
     task.model_name,
     t('images.' + task.quality),
@@ -102,14 +130,33 @@ export const ImageTaskCard = memo(function ImageTaskCard({
         ids={task.reference_file_ids}
         className="image-task-references justify-end"
         previewable={!admin}
+        {...(editor ? { editor } : {})}
       />
     ) : null
 
   function taskActions(variant: 'ghost' | 'outline') {
     return (
       <>
-        {!admin && done && onReuse ? (
-          <Button type="button" variant={variant} size="sm" onClick={() => onReuse(task)}>
+        {canReuse && (variant === 'outline' || done) && onReuse ? (
+          <Button
+            type="button"
+            variant={variant}
+            size="sm"
+            disabled={reuseDisabled}
+            onClick={() => onReuse(task)}
+          >
+            <SlidersHorizontal size={13} />
+            {t('images.reuseParameters')}
+          </Button>
+        ) : null}
+        {canReuse && variant === 'outline' && onRegenerate ? (
+          <Button
+            type="button"
+            variant={variant}
+            size="sm"
+            disabled={regenerateDisabled}
+            onClick={() => onRegenerate(task)}
+          >
             <RotateCcw size={13} />
             {t('images.regenerate')}
           </Button>
@@ -133,16 +180,18 @@ export const ImageTaskCard = memo(function ImageTaskCard({
 
   return (
     <article
-      className="image-task border-b border-border py-6 last:border-0"
+      className="image-task @container/image-task border-b border-border py-6 last:border-0"
       data-task-id={task.id}
     >
       <header
         className={cn(
           'mb-4 gap-3',
-          admin ? 'flex items-start' : 'grid sm:grid-cols-[minmax(0,1fr)_14rem]',
+          admin
+            ? 'flex items-start'
+            : 'grid @min-[38rem]/image-task:grid-cols-[minmax(0,1fr)_18rem]',
         )}
       >
-        <div className={cn('min-w-0 flex-1', !admin && 'sm:col-start-1 sm:row-start-1')}>
+        <div className="min-w-0 flex-1">
           {!admin && task.content_visible && task.prompt ? (
             <ImageTaskPrompt prompt={task.prompt} />
           ) : (
@@ -155,7 +204,7 @@ export const ImageTaskCard = memo(function ImageTaskCard({
         {admin ? (
           references
         ) : (
-          <div className="row-start-1 flex flex-col items-end gap-2 sm:col-start-2">
+          <div className="flex min-w-0 flex-col items-end gap-2">
             {references}
             <div
               data-testid="image-task-top-actions"
@@ -209,11 +258,15 @@ export const ImageTaskCard = memo(function ImageTaskCard({
                     alt={t('images.result', { index: item.position + 1 })}
                     className="size-full object-cover animate-fade-in"
                   />
-                  <button
+                  <Button
                     type="button"
-                    className="absolute inset-0 cursor-zoom-in focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                    variant="ghost"
+                    className="absolute inset-0 size-full cursor-zoom-in rounded-none p-0 hover:bg-transparent focus-visible:-outline-offset-2"
                     aria-label={t('images.preview') + ' ' + (item.position + 1)}
-                    onClick={() => setPreview(files.findIndex((file) => file.id === item.file?.id))}
+                    onClick={(event) => {
+                      previewTrigger.current = event.currentTarget
+                      setPreview(files.findIndex((file) => file.id === item.file?.id))
+                    }}
                   />
                   <div className="image-result-actions reveal-on-hover absolute top-2 right-2 flex items-center gap-0.5 rounded-xl bg-background/85 p-0.5 shadow-sm backdrop-blur">
                     <Button
@@ -252,6 +305,21 @@ export const ImageTaskCard = memo(function ImageTaskCard({
                         }}
                       >
                         <Plus size={15} />
+                      </Button>
+                    ) : null}
+                    {editor ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={action}
+                        aria-label={t('images.editor.open')}
+                        title={t('images.editor.open')}
+                        onClick={(event) => {
+                          previewTrigger.current = event.currentTarget
+                          setPreview(files.findIndex((file) => file.id === item.file?.id))
+                        }}
+                      >
+                        <Pencil size={14} aria-hidden="true" />
                       </Button>
                     ) : null}
                     <Button
@@ -338,6 +406,8 @@ export const ImageTaskCard = memo(function ImageTaskCard({
           prompt={task.prompt}
           parameters={parameters}
           onClose={() => setPreview(null)}
+          returnFocus={previewTrigger}
+          {...(editor ? { editor } : {})}
           {...(!admin && onEdit ? { onEdit } : {})}
         />
       ) : null}

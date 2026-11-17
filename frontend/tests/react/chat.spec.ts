@@ -62,6 +62,9 @@ test('React real streaming history stop editing isolation and bounded rendering'
     '\n\n- <Link ref="turn123news16" title="查看报告"/>' +
     '\n- <Link ref="turn123news2" title="仅有标题的报告"/>' +
     '\n\n<row>{#each ["100ms","200ms","900ms"] as t,i}<box><text color={i===2?"green":"default"}>{t}</text></box>{/each}</row>' +
+    '\n\n<box>\n  <row>\n    <badge color="warning">行程预览</badge>\n' +
+    '    <AsyncImage query="杭州龙井虾仁" aspectRatio="5:4"/>\n    **龙井虾仁**\n' +
+    '    <ul>\n      <li>**09:00 — 西湖断桥** 从断桥开始。</li>\n    </ul>\n  </row>\n</box>' +
     '\n\n<think>观测草稿</think>'
   const server = createServer(async (request, response) => {
     const receivedAt = Date.now()
@@ -346,6 +349,7 @@ test('React real streaming history stop editing isolation and bounded rendering'
       '海岸地形',
       '查看报告',
       '仅有标题的报告',
+      '09:00 — 西湖断桥 从断桥开始。',
     ])
     await expect(answer).not.toContainText(/CodeBlock|radio-group|DIL\.useState|GenUI\./)
     await expect(answer.locator('script,img,input,[onclick]')).toHaveCount(0)
@@ -353,6 +357,11 @@ test('React real streaming history stop editing isolation and bounded rendering'
     await expect(answer.getByRole('link', { name: '查看报告' })).toHaveAttribute('href', sourceURL)
     await expect(answer.getByText('来源不可用', { exact: true })).toBeVisible()
     await expect(answer.locator('.chat-reply-badge[data-tone="success"]')).toHaveText('观测完成')
+    await expect(answer.locator('.chat-reply-badge[data-tone="warning"]')).toHaveText('行程预览')
+    await expect(answer.locator('.chat-illustration-prompt')).toHaveText('杭州龙井虾仁')
+    await expect(answer.locator('li strong')).toHaveText('09:00 — 西湖断桥')
+    await expect(answer.locator('pre')).toHaveCount(1)
+    await expect(answer).not.toContainText(/AsyncImage|\uE000|\uE001/)
     await expect(answer).toContainText(/100ms\s+200ms\s+900ms/)
     await expect(answer.getByText('观测草稿')).toBeHidden()
     const reasoning = answer.getByText('思考过程', { exact: true })
@@ -416,8 +425,13 @@ test('React real streaming history stop editing isolation and bounded rendering'
       path: info.outputPath('chat-sources-dark.png'),
       animations: 'disabled',
     })
+    await answer.locator('.chat-illustration').scrollIntoViewIfNeeded()
+    await expect(answer.getByRole('button', { name: '生成这张图', exact: true })).toBeInViewport()
+    await page.screenshot({ path: info.outputPath('chat-layout-dark.png'), animations: 'disabled' })
     await page.reload()
     await expect(answer.locator('.shiki')).toBeVisible()
+    await expect(answer.locator('.chat-illustration-prompt')).toHaveText('杭州龙井虾仁')
+    await expect(answer.locator('li strong')).toHaveText('09:00 — 西湖断桥')
     await expect(answer.getByRole('link', { name: '灯塔报告' })).toHaveAttribute('href', sourceURL)
     await expect(answer.getByText('仅有标题的报告', { exact: true })).toBeVisible()
     await expect(answer).not.toContainText(/CodeBlock|radio-group|DIL\.useState|GenUI\./)

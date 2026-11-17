@@ -79,6 +79,32 @@ afterEach(() => {
 })
 
 describe('React image submission and subscription compatibility', () => {
+  it('keeps the composer draft and replays the complete editor request after a lost response', async () => {
+    await controller.open('c')
+    controller.draft('c', { prompt: 'composer draft', references: ['other'] })
+    const editor = {
+      ...input,
+      n: 1,
+      reference_file_ids: ['source'],
+      edit_options: { action: 'markup' as const, guide_file_id: 'guide' },
+    }
+    const submit = vi
+      .spyOn(images, 'submit')
+      .mockRejectedValueOnce(new Error('lost'))
+      .mockResolvedValue({ ...task, ...editor, operation: 'edit' })
+    await controller.submit('c', editor, 'editor')
+    await controller.submit('c', { ...editor, prompt: 'new edit' }, 'editor')
+    expect(submit).toHaveBeenCalledTimes(1)
+    await controller.submit('c', undefined, 'editor')
+    expect(submit.mock.calls[1]).toEqual(submit.mock.calls[0])
+    expect(controller.store.getState().drafts.c).toMatchObject({
+      prompt: 'composer draft',
+      references: ['other'],
+    })
+    await controller.regenerate({ ...task, ...editor, operation: 'edit' })
+    expect(submit.mock.calls[2]?.[0]).toEqual(submit.mock.calls[0]?.[0])
+    expect(submit.mock.calls[2]?.[1]).not.toBe(submit.mock.calls[0]?.[1])
+  })
   it('replays the exact task body and key after a lost accepted response', async () => {
     const create = vi.spyOn(images, 'create').mockImplementation(async (id) => ({ ...row, id }))
     const submit = vi
@@ -131,6 +157,88 @@ describe('React image submission and subscription compatibility', () => {
     expect(controller.store.getState().active).toBe('other')
     expect(controller.store.getState().drafts.c?.prompt).toBe('replacement')
     expect(controller.store.getState().drafts.other?.prompt).toBe('other draft')
+  })
+  it('appends one independent task per accepted regeneration using the source parameters', async () => {
+    const source: ImageTask = {
+      ...task,
+      status: 'running',
+      operation: 'edit',
+      ratio: '3:2',
+      reference_file_ids: ['first-reference', 'second-reference'],
+    }
+    vi.mocked(images.tasks).mockResolvedValue({ items: [source], next_cursor: '' })
+    const waiting = deferred<ImageTask>()
+    const second = { ...source, id: 't2', status: 'queued' as const }
+    const third = { ...second, id: 't3' }
+    const submit = vi
+      .spyOn(images, 'submit')
+      .mockReturnValueOnce(waiting.promise)
+      .mockResolvedValueOnce(third)
+    const cancel = vi.spyOn(images, 'cancel')
+    await controller.open('c')
+    controller.draft('c', { prompt: source.prompt, references: source.reference_file_ids })
+    const draft = controller.store.getState().drafts.c
+    const first = controller.regenerate(source)
+    await controller.regenerate(source)
+    expect(submit).toHaveBeenCalledTimes(1)
+    const body = {
+      ...input,
+      conversation_id: 'c',
+      ratio: '3:2',
+      reference_file_ids: source.reference_file_ids,
+    }
+    expect(submit).toHaveBeenNthCalledWith(1, body, expect.any(String))
+    waiting.resolve(second)
+    await first
+    await controller.regenerate(source)
+    expect(submit).toHaveBeenNthCalledWith(2, body, expect.any(String))
+    expect(submit.mock.calls[1]?.[1]).not.toBe(submit.mock.calls[0]?.[1])
+    expect(controller.snapshot('c')?.tasks).toEqual([source, second, third])
+    expect(controller.store.getState().drafts.c).toBe(draft)
+    expect(cancel).not.toHaveBeenCalled()
+    expect(vi.mocked(images.events).mock.calls.map(([id]) => id)).toEqual(['t', 't2', 't3'])
+  })
+  it('replays an unconfirmed regeneration with the same key and preserves the draft', async () => {
+    const submit = vi
+      .spyOn(images, 'submit')
+      .mockRejectedValueOnce(new Error('lost response'))
+      .mockResolvedValueOnce({ ...task, id: 't2' })
+    await controller.open('c')
+    controller.draft('c', { prompt: task.prompt, n: task.n })
+    const draft = controller.store.getState().drafts.c
+    await controller.regenerate(task)
+    await controller.regenerate(task)
+    expect(submit).toHaveBeenCalledTimes(1)
+    await controller.submit('c')
+    expect(submit.mock.calls[1]).toEqual(submit.mock.calls[0])
+    expect(controller.store.getState().pending.c).toBeUndefined()
+    expect(controller.store.getState().drafts.c).toBe(draft)
+    expect(controller.snapshot('c')?.tasks.map(({ id }) => id)).toEqual(['t', 't2'])
+  })
+  it('preserves the source and draft when a regeneration is rejected or resolves after navigation', async () => {
+    const rejection = new ApiError('INSUFFICIENT_CREDITS', 409)
+    const waiting = deferred<ImageTask>()
+    const submit = vi
+      .spyOn(images, 'submit')
+      .mockRejectedValueOnce(rejection)
+      .mockReturnValueOnce(waiting.promise)
+    await controller.open('c')
+    controller.draft('c', { prompt: 'my draft' })
+    await controller.regenerate(task)
+    expect(controller.store.getState().errors.c).toBe(rejection)
+    expect(controller.store.getState().pending.c).toBeUndefined()
+    expect(controller.snapshot('c')?.tasks).toEqual([task])
+    const next = controller.regenerate(task)
+    expect(submit.mock.calls[1]?.[1]).not.toBe(submit.mock.calls[0]?.[1])
+    controller.activate('other')
+    controller.draft('other', { prompt: 'other draft' })
+    waiting.resolve({ ...task, id: 't2' })
+    await next
+    expect(controller.store.getState().active).toBe('other')
+    expect(controller.store.getState().drafts.c?.prompt).toBe('my draft')
+    expect(controller.store.getState().drafts.other?.prompt).toBe('other draft')
+    expect(controller.snapshot('c')?.tasks.map(({ id }) => id)).toEqual(['t', 't2'])
+    expect(images.events).toHaveBeenCalledTimes(1)
   })
   it('ignores stale SSE versions and refreshes authoritative credits when a task settles', async () => {
     let event!: (row: ImageTask) => void

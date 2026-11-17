@@ -120,13 +120,15 @@ const privateTags = new Set(
   ),
 )
 const reasoning = new Set(['think', 'thinking', 'reason', 'reasoning', 'thought'])
-const options = new Set(['radio', 'checkbox', 'option', 'list-item', 'li'])
+const options = new Set(['radio', 'checkbox', 'option'])
+const listItems = new Set(['list-item', 'li'])
 const known = new Set([
   ...blocks,
   ...Object.keys(formatting),
   ...privateTags,
   ...reasoning,
   ...options,
+  ...listItems,
   'codeblock',
   'asyncimage',
   'cite',
@@ -296,12 +298,15 @@ export function parseAssistantReply(
     depth: number,
     bindings: ReadonlyMap<string, string>,
     root: boolean,
+    listItem = false,
   ): Fragment {
     const markdown: string[] = [],
       copy: string[] = []
+    const layouts: { name: string; margin?: string }[] = []
+    if (listItem) layouts.push({ name: '' })
     let pos = 0,
       start = 0,
-      nesting = 0
+      lineStart = 0
     let fence = '',
       blank = true,
       indentedCode = false,
@@ -319,20 +324,37 @@ export function parseAssistantReply(
       pos = start = end
     }
     while (pos < text.length) {
-      const char = text[pos]
-      const at = root && !nesting && !fence ? positions.get(pos) : undefined
+      const at = root && !layouts.length && !fence ? positions.get(pos) : undefined
       if (at) {
         const found = citation([], at)
         replace(pos, found.markdown, found.copy)
       }
       if (pos === 0 || text[pos - 1] === '\n') {
+        lineStart = pos
         const nextLine = text.indexOf('\n', pos)
         const lineEnd = nextLine < 0 ? text.length : nextLine + 1
-        const line = text.slice(pos, lineEnd).replace(/\r?\n$/, '')
+        let line = text.slice(pos, lineEnd).replace(/\r?\n$/, '')
+        const layout = layouts.at(-1)
+        if (layout) {
+          const indent = /^[ \t]*/.exec(line)?.[0] ?? ''
+          const trimmed = line.slice(indent.length)
+          // Remove the component's formatting indent and leave relative Markdown indentation in place.
+          if (trimmed && !(listItem && pos === 0)) layout.margin ??= indent
+          const margin = layout.margin ?? ''
+          const offset = indent.startsWith(margin)
+            ? margin.length
+            : margin.startsWith(indent)
+              ? indent.length
+              : 0
+          if (offset) {
+            replace(pos + offset, '')
+            line = line.slice(offset)
+          }
+        }
         const nextFence = advanceMarkdownFence(line.replace(/^(?: {0,3}>[ \t]?)+/, ''), fence)
         const indented = /^(?: {4}| *\t)/.test(line)
         const code: boolean =
-          !nesting && (blank || indentedCode) && (indented || (indentedCode && !line.trim()))
+          (blank || indentedCode) && (indented || (indentedCode && !line.trim()))
         if (fence || nextFence || code) {
           fence = nextFence
           indentedCode = code
@@ -342,6 +364,7 @@ export function parseAssistantReply(
         indentedCode = false
         blank = !line.trim()
       }
+      const char = text[pos]
       if (char === '\\' && /[!-/:-@[-\x60{-~]/.test(text[pos + 1] ?? '')) {
         pos += 2
         continue
@@ -466,8 +489,22 @@ export function parseAssistantReply(
           continue
         }
         const variable = /^\{([A-Za-z_]\w*)\}/.exec(text.slice(pos))
-        if (variable?.[1] && (bindings.has(variable[1]) || nesting > 0 || depth > 0)) {
-          replace(pos + variable[0].length, escapeMarkdown(bindings.get(variable[1]) ?? ''))
+        if (variable?.[1] && (bindings.has(variable[1]) || layouts.length || depth > 0)) {
+          const value = escapeMarkdown(bindings.get(variable[1]) ?? '')
+          const end = pos + variable[0].length
+          const emphasis = /^(\*{1,3}|_{1,3}|~~)(?![*_~])/.exec(text.slice(end, end + 4))?.[0]
+          if (
+            !value &&
+            emphasis &&
+            pos - emphasis.length >= start &&
+            text.slice(pos - emphasis.length, pos) === emphasis &&
+            !/[*_~\\]/.test(text[pos - emphasis.length - 1] ?? '')
+          ) {
+            pos -= emphasis.length
+            replace(end + emphasis.length, '')
+          } else {
+            replace(end, value)
+          }
           continue
         }
         if (
@@ -609,23 +646,53 @@ export function parseAssistantReply(
         const thought = scan(text.slice(end, bodyEnd), depth + 1, new Map(), false).markdown.trim()
         if (thought) parts.push({ kind: 'reasoning', source: thought })
         pos = start = last ? last.index + last[0].length : bodyEnd
-      } else if (options.has(name)) {
+      } else if (options.has(name) || listItems.has(name)) {
         const last = close()
         const raw = last
-          ? text.slice(end, last.index).trim()
+          ? text.slice(end, last.index)
           : (attributes.get('label') ?? attributes.get('title') ?? '')
-        const variable = /^\{([A-Za-z_]\w*)\}$/.exec(raw)?.[1]
-        const label = escapeMarkdown(variable ? (bindings.get(variable) ?? '') : raw)
-        replace(last ? last.index + last[0].length : end, !closing && label ? '\n- ' + label : '')
+        const next = last ? last.index + last[0].length : end
+        if (last && listItems.has(name) && depth < 8) {
+          const body = scan(raw, depth + 1, bindings, false, true)
+          const prefix = /^[ \t]*$/.test(text.slice(lineStart, pos)) ? '' : '\n'
+          const asItem = (value: string) => {
+            const content = value.trim().replace(/\r?\n(?=[^\r\n])/g, '\n  ')
+            return content ? prefix + '- ' + content : ''
+          }
+          replace(next, asItem(body.markdown), asItem(body.copy))
+        } else {
+          const variable = /^\{([A-Za-z_]\w*)\}$/.exec(raw.trim())?.[1]
+          const label = escapeMarkdown(variable ? (bindings.get(variable) ?? '') : raw)
+          replace(next, !closing && label ? '\n- ' + label : '')
+        }
       } else if (Object.hasOwn(formatting, name)) {
-        replace(end, formatting[name] ?? '')
+        if (!closing && !selfClosing) {
+          const empty = /^\s*(?:\{([A-Za-z_]\w*)\}\s*)?<\//.exec(text.slice(end))
+          const last = empty ? readReplyTag(text, end + empty[0].length - 2) : undefined
+          if (
+            last?.name === name &&
+            !last.incomplete &&
+            (!empty?.[1] ||
+              ((layouts.length || depth > 0 || bindings.has(empty[1])) &&
+                !bindings.get(empty[1])?.trim()))
+          ) {
+            replace(last.end, '')
+            continue
+          }
+        }
+        replace(end, selfClosing ? '' : (formatting[name] ?? ''))
       } else if (name === 'img' || name === 'image' || name === 'icon') {
         replace(end, escapeMarkdown(attributes.get('alt') ?? attributes.get('title') ?? ''))
       } else if (name === 'br' || name === 'hr' || name === 'divider') {
         replace(end, name === 'br' ? '\n' : '\n\n---\n\n')
       } else if (blocks.has(name)) {
-        if (closing) nesting = Math.max(0, nesting - 1)
-        else if (!selfClosing) nesting++
+        if (closing) {
+          let opened = layouts.length - 1
+          while (opened >= 0 && layouts[opened]?.name !== name) opened--
+          if (opened >= 0) layouts.length = opened
+        } else if (!selfClosing) {
+          layouts.push({ name })
+        }
         const heading = /^h([1-6])$/.exec(name)?.[1]
         replace(end, heading && !closing ? '\n\n' + '#'.repeat(Number(heading)) + ' ' : '\n')
       } else {
@@ -633,7 +700,7 @@ export function parseAssistantReply(
         replace(end, title ? escapeMarkdown(title) + (selfClosing ? '' : ' ') : '')
       }
     }
-    const atEnd = root && !nesting && !fence ? positions.get(text.length) : undefined
+    const atEnd = root && !layouts.length && !fence ? positions.get(text.length) : undefined
     if (atEnd && !/[<>$\x60]/.test(text.slice(text.lastIndexOf('\n') + 1))) {
       const found = citation([], atEnd)
       replace(pos, found.markdown, found.copy)

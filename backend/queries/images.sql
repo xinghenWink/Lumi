@@ -14,9 +14,11 @@ VALUES($1,$2,$3,$4,$5,$6,'image/png',$7,$8,$9,$10,$11,$12) RETURNING *;
 -- name: GetImageFile :one
 SELECT * FROM files WHERE id=$1 AND deleted_at IS NULL;
 -- name: GetImageReferenceFiles :many
-SELECT * FROM files WHERE id=ANY(sqlc.arg(ids)::uuid[]) AND user_id=$1 AND deleted_at IS NULL AND kind IN ('upload','generated');
+SELECT * FROM files WHERE id=ANY(sqlc.arg(ids)::uuid[]) AND user_id=$1 AND deleted_at IS NULL AND kind IN ('upload','generated') FOR SHARE;
+-- name: GetImageEditGuide :one
+SELECT * FROM files WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL AND kind='edit_guide' FOR SHARE;
 -- name: ImageFileInUse :one
-SELECT EXISTS(SELECT 1 FROM image_tasks WHERE status IN ('queued','running') AND sqlc.arg(file_id)::uuid=ANY(reference_file_ids));
+SELECT EXISTS(SELECT 1 FROM image_tasks WHERE status IN ('queued','running') AND (sqlc.arg(file_id)::uuid=ANY(reference_file_ids) OR sqlc.arg(file_id)::uuid=edit_guide_file_id));
 -- name: ListImageReferenceLibrary :many
 SELECT * FROM files WHERE user_id=$1 AND deleted_at IS NULL AND kind IN ('upload','generated')
 AND (sqlc.narg(before_time)::timestamptz IS NULL OR (created_at,id)<(sqlc.narg(before_time)::timestamptz,sqlc.narg(before_id)::uuid))
@@ -35,15 +37,20 @@ SELECT EXISTS(SELECT 1 FROM files WHERE path=$1 OR thumbnail_path=$1);
 -- name: SetUserAvatar :exec
 UPDATE users SET avatar_file_id=$2,updated_at=now() WHERE id=$1 AND deleted_at IS NULL;
 -- name: ExpireImageFiles :execrows
-UPDATE files f SET deleted_at=now() WHERE f.deleted_at IS NULL
+WITH expired AS (
+SELECT f.id FROM files f WHERE f.deleted_at IS NULL
 AND (NOT EXISTS(SELECT 1 FROM users u WHERE u.id=f.user_id)
  OR (f.kind='generated' AND sqlc.arg(retention_days)::integer>0 AND f.created_at<now()-make_interval(days=>sqlc.arg(retention_days)::integer))
  OR (f.kind='upload' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE f.id=ANY(t.reference_file_ids))
   AND NOT EXISTS(SELECT 1 FROM canvas_files cf JOIN canvases c ON c.id=cf.canvas_id WHERE cf.file_id=f.id AND c.deleted_at IS NULL))
+ OR (f.kind='edit_guide' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE t.edit_guide_file_id=f.id))
  OR (f.kind='avatar' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM users u WHERE u.avatar_file_id=f.id)))
-AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE t.status IN ('queued','running') AND f.id=ANY(t.reference_file_ids));
+AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE t.status IN ('queued','running') AND (f.id=ANY(t.reference_file_ids) OR f.id=t.edit_guide_file_id))
+FOR UPDATE OF f SKIP LOCKED)
+UPDATE files f SET deleted_at=now() FROM expired WHERE f.id=expired.id;
 -- name: RedactPurgedImageOwners :exec
-UPDATE image_tasks SET prompt='',reference_file_ids='{}',error_message='' WHERE (prompt<>'' OR cardinality(reference_file_ids)>0) AND NOT EXISTS(SELECT 1 FROM users WHERE users.id=image_tasks.user_id);
+UPDATE image_tasks SET prompt='',reference_file_ids='{}',error_message='',edit_action='',edit_guide_file_id=NULL
+WHERE (prompt<>'' OR cardinality(reference_file_ids)>0 OR edit_action<>'') AND NOT EXISTS(SELECT 1 FROM users WHERE users.id=image_tasks.user_id);
 -- name: CreateImageConversation :one
 INSERT INTO conversations(id,user_id,type,model_id) VALUES($1,$2,'image',$3) ON CONFLICT DO NOTHING RETURNING *;
 -- name: GetImageConversation :one
@@ -72,8 +79,8 @@ SELECT * FROM image_tasks WHERE id=$1;
 -- name: LockImageTask :one
 SELECT * FROM image_tasks WHERE id=$1 FOR UPDATE;
 -- name: CreateImageTask :one
-INSERT INTO image_tasks(id,user_id,conversation_id,message_id,user_message_id,operation,model_id,model_name,prompt,params,quality,size,ratio,image_count,reference_file_ids,charge_id,unit_price,total_cost,idempotency_key,request_hash,split_requests,timeout_seconds,queue_deadline)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,now()+make_interval(secs=>sqlc.arg(queue_timeout)::integer)) RETURNING *;
+INSERT INTO image_tasks(id,user_id,conversation_id,message_id,user_message_id,operation,model_id,model_name,prompt,params,quality,size,ratio,image_count,reference_file_ids,charge_id,unit_price,total_cost,idempotency_key,request_hash,split_requests,timeout_seconds,edit_action,edit_guide_file_id,queue_deadline)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,now()+make_interval(secs=>sqlc.arg(queue_timeout)::integer)) RETURNING *;
 -- name: CreateImageTaskItem :exec
 INSERT INTO image_task_items(task_id,position) VALUES($1,$2);
 -- name: ListImageTaskItems :many
@@ -112,6 +119,7 @@ SELECT count(*)::integer FROM image_tasks WHERE status='queued' AND (created_at,
 -- name: ListImageTasks :many
 SELECT * FROM image_tasks WHERE (sqlc.narg(owner)::uuid IS NULL OR user_id=sqlc.narg(owner)::uuid)
 AND (sqlc.narg(conversation)::uuid IS NULL OR conversation_id=sqlc.narg(conversation)::uuid)
+AND (sqlc.arg(search_pattern)::text='' OR prompt ILIKE sqlc.arg(search_pattern)::text ESCAPE '\')
 AND (sqlc.arg(state)::text='' OR status=sqlc.arg(state)::text)
 AND (sqlc.arg(quality)::text='' OR quality=sqlc.arg(quality)::text)
 AND (sqlc.narg(from_time)::timestamptz IS NULL OR created_at>=sqlc.narg(from_time)::timestamptz)

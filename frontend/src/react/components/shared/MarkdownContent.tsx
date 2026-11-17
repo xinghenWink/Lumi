@@ -8,6 +8,8 @@ import {
 } from '../../../features/chat/markdown'
 import { parseAssistantReply, type ReplyDecoration } from '../../../features/chat/reply-markup'
 
+const emptyDecorations: readonly ReplyDecoration[] = []
+
 const MarkdownBlock = memo(function MarkdownBlock({
   source,
   complete,
@@ -32,7 +34,7 @@ const MarkdownBlock = memo(function MarkdownBlock({
         pending: t('react.illustrationPending'),
         ...(actionable ? { action: t('react.illustrationGenerate') } : {}),
       },
-      decorations ? { decorations, unavailable: t('chat.sourceUnavailable') } : undefined,
+      decorations?.length ? { decorations, unavailable: t('chat.sourceUnavailable') } : undefined,
     )
       .then((rendered) => {
         if (live) setHTML(rendered)
@@ -79,7 +81,7 @@ export const MarkdownContent = memo(function MarkdownContent({
     [assistant, content, complete, sources, t],
   )
   const sections = reply?.parts ?? [{ kind: 'markdown', source: content }]
-  const decorations = reply?.decorations
+  const decorations = reply?.decorations.length ? reply.decorations : reply && emptyDecorations
   function sectionBlocks(source: string) {
     return partitionMarkdown(source, complete).map((part) => (
       <MarkdownBlock
@@ -87,7 +89,7 @@ export const MarkdownContent = memo(function MarkdownContent({
         source={part.source}
         complete={part.complete}
         actionable={!!onIllustration}
-        decorations={decorations?.length ? decorations : undefined}
+        decorations={decorations}
       />
     ))
   }

@@ -17,7 +17,7 @@ type Action =
   | { kind: 'delete' }
   | { kind: 'pin' }
   | { kind: 'export'; format: 'json' | 'markdown' }
-export function ConversationActions({ row }: { row: Conversation }) {
+export default function ConversationActions({ row }: { row: Conversation }) {
   const { t } = useTranslation()
   const runtime = useRuntime(),
     navigate = useNavigate(),

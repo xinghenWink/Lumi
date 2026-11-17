@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useInfiniteQuery, useMutation } from '@tanstack/react-query'
+import { useRef, useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import { Image as ImageIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -10,6 +10,7 @@ import { useSession } from '../features/auth/hooks'
 import { useModels } from '../features/catalog/models'
 import { addExistingReference } from '../features/images/references'
 import { useImageActions } from '../features/images/actions'
+import { defaultGalleryFilter, useImageGallery } from '../features/images/use-image-gallery'
 import { ImageFilters } from '../components/images/ImageFilters'
 import { GalleryGrid } from '../components/images/GalleryGrid'
 import { ImagePreview } from '../components/images/ImagePreview'
@@ -28,17 +29,8 @@ function GalleryResults({ filter }: { filter: string }) {
     [preview, setPreview] = useState<number | null>(null)
   const [deleting, setDeleting] = useState<string[] | null>(null),
     [batch, setBatch] = useState(false)
-  const query = useInfiniteQuery({
-    queryKey: ['user', user?.id, 'image-gallery', filter],
-    enabled: !!user,
-    initialPageParam: '',
-    queryFn: ({ pageParam, signal }) => {
-      const params = new URLSearchParams(filter)
-      if (pageParam) params.set('cursor', pageParam)
-      return images.gallery(params, signal)
-    },
-    getNextPageParam: (last) => last.next_cursor || undefined,
-  })
+  const query = useImageGallery(filter)
+  const previewTrigger = useRef<HTMLButtonElement>(null)
   const items = query.data?.pages.flatMap((page) => page.items) ?? []
   const refresh = () => {
     void runtime.queryClient.invalidateQueries({ queryKey: ['user', user?.id, 'image-gallery'] })
@@ -119,7 +111,10 @@ function GalleryResults({ filter }: { filter: string }) {
               checked ? [...current, id] : current.filter((value) => value !== id),
             )
           }
-          onPreview={setPreview}
+          onPreview={(index, trigger) => {
+            previewTrigger.current = trigger
+            setPreview(index)
+          }}
           onDownload={(file) => {
             void actions.download(file)
           }}
@@ -150,6 +145,14 @@ function GalleryResults({ filter }: { filter: string }) {
           onClose={() => setPreview(null)}
           onEdit={(file) => edit.mutate(file)}
           onNavigate={setPreview}
+          returnFocus={previewTrigger}
+          editor={{
+            conversationId: '',
+            modelId: current.model_id,
+            quality: current.quality,
+            size: current.size,
+            ratio: current.ratio,
+          }}
         />
       ) : null}
       <ModalDialog
@@ -181,7 +184,7 @@ function GalleryResults({ filter }: { filter: string }) {
 export default function ImageGalleryPage() {
   const { t } = useTranslation(),
     { user } = useSession()
-  const [filter, setFilter] = useState('limit=40')
+  const [filter, setFilter] = useState(defaultGalleryFilter)
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden px-4 pt-6 sm:px-8">
       <header className="mb-5 shrink-0">
