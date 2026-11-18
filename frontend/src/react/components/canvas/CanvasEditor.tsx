@@ -19,6 +19,7 @@ import { ModalDialog } from '../ui/modal-dialog'
 import { CanvasViewport } from './CanvasViewport'
 import type { CreateMenuAnchor } from './CanvasCreateMenu'
 import { ThemeToggle } from '../shared/ThemeToggle'
+import { AnnouncementButton } from '../shared/AnnouncementButton'
 import { CanvasToolbar, SelectionBar, ZoomControls } from './CanvasControls'
 import { CanvasMiniMap } from './CanvasMiniMap'
 import { GeneratorInspector } from './GeneratorInspector'
@@ -216,6 +217,7 @@ export function CanvasEditor({ rejected }: { rejected: Rejections | null }) {
         <div className="ml-auto flex min-w-0 items-center gap-2">
           <SaveState />
           <ThemeToggle />
+          <AnnouncementButton />
         </div>
       </div>
       <ConflictBanner />

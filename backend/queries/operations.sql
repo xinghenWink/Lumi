@@ -47,7 +47,7 @@ ORDER BY created_at DESC,id DESC LIMIT sqlc.arg(page_limit);
 -- name: GetAnnouncement :one
 SELECT * FROM announcements WHERE id=$1 FOR UPDATE;
 -- name: CreateAnnouncement :one
-INSERT INTO announcements(id,content,starts_at,ends_at,enabled) VALUES($1,$2,$3,$4,$5) RETURNING *;
+INSERT INTO announcements(id,content,starts_at,ends_at,enabled,github_release_tag) VALUES($1,$2,$3,$4,$5,$6) RETURNING *;
 -- name: UpdateAnnouncement :one
 UPDATE announcements SET content=$2,starts_at=$3,ends_at=$4,enabled=$5,version=version+1 WHERE id=$1 AND version=$6 RETURNING *;
 -- name: DeleteAnnouncement :exec

@@ -259,3 +259,51 @@ func TestM6AnnouncementsDashboardAndReconciliation(t *testing.T) {
 		t.Fatalf("reconciliation=%+v error=%v", run, err)
 	}
 }
+
+func TestAnnouncementReleaseImportPermissionsAndSource(t *testing.T) {
+	f := newAccountFixture(t)
+	client := f.client(t)
+	admin := f.login(t, client, f.adminEmail, f.adminPassword)
+	member := creditMember(t, f, creditActor(t, f), 0)
+	memberClient := f.client(t)
+	memberAuth := f.login(t, memberClient, member.Email, "Integration-password-1")
+	const releases = "/api/v1/admin/announcements/github-releases"
+	expectStatus(t, f.call(t, client, "GET", releases, "", nil), 401)
+	expectStatus(t, f.call(t, memberClient, "GET", releases, memberAuth.AccessToken, nil), 403)
+	// The account fixture has no deployment service. An administrator reaches the source handler.
+	expectStatus(t, f.call(t, client, "GET", releases, admin.AccessToken, nil), 503)
+
+	const adminPath = "/api/v1/admin/announcements"
+	const memberPath = "/api/v1/announcements"
+	start := time.Now().UTC().Add(-time.Minute)
+	legacy := f.call(t, client, "POST", adminPath, admin.AccessToken, operations.Announcement{
+		Content: "Manual announcement", StartsAt: start, Enabled: true,
+	})
+	expectStatus(t, legacy, 200)
+	if row := decodeReply[operations.Announcement](t, legacy); row.GitHubReleaseTag != "" {
+		t.Fatalf("expected a manual announcement: %+v", row)
+	}
+	input := operations.Announcement{
+		Content: "## v0.5.0\n\n- Feature\n\t- Details", StartsAt: start, Enabled: true, GitHubReleaseTag: "v0.5.0",
+	}
+	created := f.call(t, client, "POST", adminPath, admin.AccessToken, input)
+	expectStatus(t, created, 200)
+	imported := decodeReply[operations.Announcement](t, created)
+	if imported.GitHubReleaseTag != input.GitHubReleaseTag || imported.Content != input.Content {
+		t.Fatalf("imported announcement: %+v", imported)
+	}
+	input.Content, input.Version, input.GitHubReleaseTag = "Edited\n\n**announcement**", imported.Version, ""
+	updated := f.call(t, client, "PUT", adminPath+"/"+imported.ID.String(), admin.AccessToken, input)
+	expectStatus(t, updated, 200)
+	if row := decodeReply[operations.Announcement](t, updated); row.GitHubReleaseTag != imported.GitHubReleaseTag || row.Version != imported.Version+1 {
+		t.Fatalf("edited announcement: %+v", row)
+	}
+	visible := f.call(t, memberClient, "GET", memberPath, memberAuth.AccessToken, nil)
+	expectStatus(t, visible, 200)
+	items := decodeReply[operations.Page[operations.Announcement]](t, visible).Items
+	if len(items) != 2 || items[0].ID != imported.ID || items[0].Content != input.Content {
+		t.Fatalf("visible announcements: %+v", items)
+	}
+	input.Content = "Invalid\x00character"
+	expectStatus(t, f.call(t, client, "POST", adminPath, admin.AccessToken, input), 400)
+}

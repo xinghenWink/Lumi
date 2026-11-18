@@ -43,6 +43,7 @@ func (h *Handler) m6Routes(protected, admin *gin.RouterGroup) {
 	admin.GET("/conversations", h.adminChats)
 	admin.GET("/conversations/:id/messages", h.adminChatContent)
 	admin.GET("/announcements", h.announcements)
+	admin.GET("/announcements/github-releases", h.announcementReleases)
 	admin.POST("/announcements", h.csrf, h.adminLimit, h.saveAnnouncement)
 	admin.PUT("/announcements/:id", h.csrf, h.adminLimit, h.saveAnnouncement)
 	admin.DELETE("/announcements/:id", h.csrf, h.adminLimit, h.deleteAnnouncement)

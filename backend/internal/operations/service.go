@@ -5,11 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
+	"github.com/xinghenWink/Lumi/backend/internal/deployment"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/pagination"
@@ -33,17 +37,18 @@ type Page[T any] struct {
 	NextCursor string `json:"next_cursor"`
 }
 type Announcement struct {
-	ID        uuid.UUID  `json:"id"`
-	Content   string     `json:"content"`
-	StartsAt  time.Time  `json:"starts_at"`
-	EndsAt    *time.Time `json:"ends_at"`
-	Enabled   bool       `json:"enabled"`
-	Version   int64      `json:"version"`
-	CreatedAt time.Time  `json:"created_at"`
+	ID               uuid.UUID  `json:"id"`
+	Content          string     `json:"content"`
+	StartsAt         time.Time  `json:"starts_at"`
+	EndsAt           *time.Time `json:"ends_at"`
+	Enabled          bool       `json:"enabled"`
+	Version          int64      `json:"version"`
+	CreatedAt        time.Time  `json:"created_at"`
+	GitHubReleaseTag string     `json:"github_release_tag,omitempty"`
 }
 
 func announcement(r query.Announcement) Announcement {
-	return Announcement{ID: r.ID, Content: r.Content, StartsAt: r.StartsAt, EndsAt: r.EndsAt, Enabled: r.Enabled, Version: r.Version, CreatedAt: r.CreatedAt}
+	return Announcement{ID: r.ID, Content: r.Content, StartsAt: r.StartsAt, EndsAt: r.EndsAt, Enabled: r.Enabled, Version: r.Version, CreatedAt: r.CreatedAt, GitHubReleaseTag: r.GithubReleaseTag.String}
 }
 func (s *Service) Announcements(ctx context.Context, active bool, cursor string, limit int32) (Page[Announcement], error) {
 	result := Page[Announcement]{Items: []Announcement{}}
@@ -72,8 +77,22 @@ func (s *Service) Announcements(ctx context.Context, active bool, cursor string,
 	}
 	return result, nil
 }
+func validAnnouncementContent(content string) bool {
+	if content == "" || !utf8.ValidString(content) || utf8.RuneCountInString(content) > 10000 {
+		return false
+	}
+	for _, character := range content {
+		if unicode.IsControl(character) && character != '\n' && character != '\r' && character != '\t' {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *Service) SaveAnnouncement(ctx context.Context, actor user.Actor, id uuid.UUID, input Announcement, remove bool) (Announcement, error) {
-	if !remove && (!validation.Text(input.Content, 1, 10000) || input.StartsAt.IsZero() || (input.EndsAt != nil && !input.EndsAt.After(input.StartsAt))) {
+	if !remove && (!validAnnouncementContent(input.Content) || input.StartsAt.IsZero() ||
+		(input.EndsAt != nil && !input.EndsAt.After(input.StartsAt)) ||
+		(input.GitHubReleaseTag != "" && !deployment.Stable(input.GitHubReleaseTag))) {
 		return Announcement{}, problem.Invalid()
 	}
 	var result Announcement
@@ -106,7 +125,10 @@ func (s *Service) SaveAnnouncement(ctx context.Context, actor user.Actor, id uui
 			if err != nil {
 				return err
 			}
-			saved, err = q.CreateAnnouncement(ctx, query.CreateAnnouncementParams{ID: id, Content: input.Content, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Enabled: input.Enabled})
+			saved, err = q.CreateAnnouncement(ctx, query.CreateAnnouncementParams{
+				ID: id, Content: input.Content, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Enabled: input.Enabled,
+				GithubReleaseTag: pgtype.Text{String: input.GitHubReleaseTag, Valid: input.GitHubReleaseTag != ""},
+			})
 		} else {
 			saved, err = q.UpdateAnnouncement(ctx, query.UpdateAnnouncementParams{ID: id, Content: input.Content, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Enabled: input.Enabled, Version: input.Version})
 		}

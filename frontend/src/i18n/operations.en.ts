@@ -147,5 +147,7 @@ export default {
     CONTENT_BLOCKED: 'The prompt contains a blocked term. Please edit it.',
     SESSION_NOT_FOUND: 'This device is already signed out.',
     ANNOUNCEMENT_NOT_FOUND: 'This announcement no longer exists.',
+    ANNOUNCEMENT_GITHUB_UNAVAILABLE:
+      'GitHub releases are temporarily unavailable. Try again shortly.',
   },
 }

@@ -1,6 +1,7 @@
 import { authorized, authorizedResponse } from './protected'
 import { ApiError, record, noContent, request } from './transport'
 import { parseMessage } from './chat'
+import type { components } from './schema'
 
 export interface Preferences {
   theme: 'light' | 'dark' | 'system'
@@ -25,7 +26,10 @@ export interface Announcement {
   enabled: boolean
   version: number
   created_at: string
+  github_release_tag?: string
 }
+type AnnouncementReleasePage = components['schemas']['AnnouncementReleasePage']
+export type AnnouncementRelease = AnnouncementReleasePage['items'][number]
 export interface OperationsSettings {
   maintenance: boolean
   turnstile_enabled: boolean
@@ -124,6 +128,33 @@ export function parseAnnouncement(v: unknown): Announcement {
     enabled: boolean(d.enabled),
     version: integer(d.version),
     created_at: text(d.created_at),
+    ...(d.github_release_tag === undefined
+      ? {}
+      : { github_release_tag: releaseTag(d.github_release_tag) }),
+  }
+}
+function releaseTag(value: unknown): string {
+  const tag = text(value)
+  if (!/^v(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/.test(tag))
+    throw new ApiError('RESPONSE_INVALID')
+  return tag
+}
+function parseAnnouncementReleases(value: unknown): AnnouncementReleasePage {
+  const data = record(value)
+  return {
+    items: array(data.items, (value) => {
+      const release = record(value)
+      const publishedAt = text(release.published_at)
+      if (!Number.isFinite(Date.parse(publishedAt))) throw new ApiError('RESPONSE_INVALID')
+      return {
+        version: releaseTag(release.version),
+        name: text(release.name),
+        notes: text(release.notes),
+        published_at: publishedAt,
+      }
+    }),
+    next_page: integer(data.next_page),
+    stale: boolean(data.stale),
   }
 }
 export function parseOperations(v: unknown): OperationsSettings {
@@ -233,19 +264,22 @@ export const operations = {
     authorized('/api/v1/me', noContent, { method: 'DELETE', body: { email, password } }),
   dashboard: (days: number, signal?: AbortSignal) =>
     authorized('/api/v1/admin/dashboard?days=' + days, parseDashboard, readOptions(signal)),
-  announcements: (admin = false, cursor = '', signal?: AbortSignal) =>
+  announcements: (admin = false, cursor = '', signal?: AbortSignal, limit = 100) =>
     authorized(
       '/api/v1/' +
         (admin ? 'admin/' : '') +
-        'announcements?limit=100&cursor=' +
+        `announcements?limit=${limit}&cursor=` +
         encodeURIComponent(cursor),
       (v) => page(v, parseAnnouncement),
       readOptions(signal),
     ),
-  saveAnnouncement: (
-    body: Pick<Announcement, 'content' | 'starts_at' | 'ends_at' | 'enabled' | 'version'>,
-    id?: string,
-  ) =>
+  announcementReleases: (page: number, refresh: boolean, signal?: AbortSignal) =>
+    authorized(
+      `/api/v1/admin/announcements/github-releases?page=${page}${refresh ? '&refresh=1' : ''}`,
+      parseAnnouncementReleases,
+      readOptions(signal),
+    ),
+  saveAnnouncement: (body: components['schemas']['AnnouncementInput'], id?: string) =>
     authorized(
       '/api/v1/admin/announcements' + (id ? '/' + encodeURIComponent(id) : ''),
       parseAnnouncement,

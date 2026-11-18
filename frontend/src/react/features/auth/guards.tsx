@@ -8,6 +8,9 @@ import { safeRedirect } from '../../../features/accounts/utils'
 import { useRuntime } from '../../app/context'
 import { Button } from '../../components/ui/button'
 import { ApiNotice } from '../../components/shared/ApiNotice'
+import { Announcements } from '../../components/shared/Announcements'
+import { RuntimePreferences } from '../../components/shared/RuntimePreferences'
+import { announcementSessionId } from '../announcements/dismissal'
 
 export function GuestBoundary() {
   const session = useSession()
@@ -65,7 +68,17 @@ export function SessionBoundary() {
         </Button>
       </section>
     )
-  return <Outlet />
+  const sessionId = announcementSessionId(session.token)
+  return (
+    <Announcements
+      key={`${session.user.id}:${session.epoch}:${sessionId ?? ''}`}
+      userId={session.user.id}
+      sessionId={sessionId}
+    >
+      <RuntimePreferences />
+      <Outlet />
+    </Announcements>
+  )
 }
 
 export function AdminBoundary() {
