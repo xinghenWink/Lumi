@@ -45,22 +45,49 @@ type Announcement struct {
 	Version          int64      `json:"version"`
 	CreatedAt        time.Time  `json:"created_at"`
 	GitHubReleaseTag string     `json:"github_release_tag,omitempty"`
+	AnnouncementType string     `json:"announcement_type"`
+	DisplayMode      string     `json:"display_mode"`
 }
 
+const (
+	announcementDaily        = "daily"
+	announcementSystemUpdate = "system_update"
+	announcementStandalone   = "standalone"
+	announcementHistory      = "history"
+)
+
+type AnnouncementScope uint8
+
+const (
+	ActiveAnnouncements AnnouncementScope = iota
+	AdminAnnouncements
+	AnnouncementFeed
+)
+
 func announcement(r query.Announcement) Announcement {
-	return Announcement{ID: r.ID, Content: r.Content, StartsAt: r.StartsAt, EndsAt: r.EndsAt, Enabled: r.Enabled, Version: r.Version, CreatedAt: r.CreatedAt, GitHubReleaseTag: r.GithubReleaseTag.String}
+	return Announcement{
+		ID: r.ID, Content: r.Content, StartsAt: r.StartsAt, EndsAt: r.EndsAt, Enabled: r.Enabled,
+		Version: r.Version, CreatedAt: r.CreatedAt, GitHubReleaseTag: r.GithubReleaseTag.String,
+		AnnouncementType: r.AnnouncementType, DisplayMode: r.DisplayMode,
+	}
 }
-func (s *Service) Announcements(ctx context.Context, active bool, cursor string, limit int32) (Page[Announcement], error) {
+func (s *Service) Announcements(ctx context.Context, scope AnnouncementScope, cursor string, limit int32) (Page[Announcement], error) {
 	result := Page[Announcement]{Items: []Announcement{}}
 	if limit < 1 || limit > 100 {
 		return result, problem.Invalid()
 	}
-	key := pagination.Fingerprint("announcements", fmt.Sprint(active))
+	admin := scope == AdminAnnouncements
+	key := pagination.Fingerprint("announcements", fmt.Sprint(!admin))
+	if scope == AnnouncementFeed {
+		key = pagination.Fingerprint("announcements", "history")
+	}
 	point, err := pagination.Decode(cursor, key)
 	if err != nil {
 		return result, err
 	}
-	rows, err := s.q.ListAnnouncements(ctx, query.ListAnnouncementsParams{ActiveOnly: active, CursorTime: point.Time, CursorID: point.ID, PageLimit: limit + 1})
+	rows, err := s.q.ListAnnouncements(ctx, query.ListAnnouncementsParams{
+		AdminView: admin, IncludeHistory: scope == AnnouncementFeed, CursorTime: point.Time, CursorID: point.ID, PageLimit: limit + 1,
+	})
 	if err != nil {
 		return result, fmt.Errorf("list announcements: %w", err)
 	}
@@ -92,7 +119,9 @@ func validAnnouncementContent(content string) bool {
 func (s *Service) SaveAnnouncement(ctx context.Context, actor user.Actor, id uuid.UUID, input Announcement, remove bool) (Announcement, error) {
 	if !remove && (!validAnnouncementContent(input.Content) || input.StartsAt.IsZero() ||
 		(input.EndsAt != nil && !input.EndsAt.After(input.StartsAt)) ||
-		(input.GitHubReleaseTag != "" && !deployment.Stable(input.GitHubReleaseTag))) {
+		(input.GitHubReleaseTag != "" && !deployment.Stable(input.GitHubReleaseTag)) ||
+		(input.AnnouncementType != "" && input.AnnouncementType != announcementDaily && input.AnnouncementType != announcementSystemUpdate) ||
+		(input.DisplayMode != "" && input.DisplayMode != announcementStandalone && input.DisplayMode != announcementHistory)) {
 		return Announcement{}, problem.Invalid()
 	}
 	var result Announcement
@@ -114,6 +143,12 @@ func (s *Service) SaveAnnouncement(ctx context.Context, actor user.Actor, id uui
 			if !remove && old.Version != input.Version {
 				return problem.New("CONFIGURATION_CONFLICT", 409)
 			}
+			if input.AnnouncementType == "" {
+				input.AnnouncementType = old.AnnouncementType
+			}
+			if input.DisplayMode == "" {
+				input.DisplayMode = old.DisplayMode
+			}
 		}
 		var err error
 		action := "announcement.save"
@@ -121,6 +156,18 @@ func (s *Service) SaveAnnouncement(ctx context.Context, actor user.Actor, id uui
 			err = q.DeleteAnnouncement(ctx, id)
 			action = "announcement.delete"
 		} else if id == uuid.Nil {
+			if input.AnnouncementType == "" {
+				input.AnnouncementType = announcementDaily
+				if input.GitHubReleaseTag != "" {
+					input.AnnouncementType = announcementSystemUpdate
+				}
+			}
+			if input.DisplayMode == "" {
+				input.DisplayMode = announcementStandalone
+				if input.AnnouncementType == announcementSystemUpdate {
+					input.DisplayMode = announcementHistory
+				}
+			}
 			id, err = validation.NewID()
 			if err != nil {
 				return err
@@ -128,9 +175,13 @@ func (s *Service) SaveAnnouncement(ctx context.Context, actor user.Actor, id uui
 			saved, err = q.CreateAnnouncement(ctx, query.CreateAnnouncementParams{
 				ID: id, Content: input.Content, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Enabled: input.Enabled,
 				GithubReleaseTag: pgtype.Text{String: input.GitHubReleaseTag, Valid: input.GitHubReleaseTag != ""},
+				AnnouncementType: input.AnnouncementType, DisplayMode: input.DisplayMode,
 			})
 		} else {
-			saved, err = q.UpdateAnnouncement(ctx, query.UpdateAnnouncementParams{ID: id, Content: input.Content, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Enabled: input.Enabled, Version: input.Version})
+			saved, err = q.UpdateAnnouncement(ctx, query.UpdateAnnouncementParams{
+				ID: id, Content: input.Content, StartsAt: input.StartsAt, EndsAt: input.EndsAt, Enabled: input.Enabled,
+				Version: input.Version, AnnouncementType: input.AnnouncementType, DisplayMode: input.DisplayMode,
+			})
 		}
 		if err != nil {
 			return fmt.Errorf("save announcement: %w", err)

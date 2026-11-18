@@ -21,6 +21,8 @@ type Announcement struct {
 	Version          int64
 	CreatedAt        time.Time
 	GithubReleaseTag pgtype.Text
+	AnnouncementType string
+	DisplayMode      string
 }
 
 type AuditLog struct {

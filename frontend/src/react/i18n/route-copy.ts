@@ -14,17 +14,19 @@ const routes = {
   admin: {
     key: 'admin.console',
     async load() {
-      const [accounts, models, credits, operations, deployment] = await Promise.all([
+      const [accounts, models, credits, operations, deployment, announcements] = await Promise.all([
         import('../../i18n/accounts-admin.zh-CN'),
         import('../../i18n/catalog-admin.zh-CN'),
         loadCredits(),
         import('../../i18n/operations-admin.zh-CN'),
         import('../../i18n/deployment.zh-CN'),
+        import('../../i18n/announcements.zh-CN'),
       ])
       return {
         default: {
           ...accounts.default,
           ...credits.default,
+          ...announcements.default,
           deployment: deployment.default,
           ops: { ...publicOperations.ops, ...operations.default },
           catalog: { ...publicModels.catalog, ...models.default.catalog },
@@ -33,6 +35,10 @@ const routes = {
     },
   },
   credits: { key: 'credits.title', load: loadCredits },
+  announcements: {
+    key: 'announcement.title',
+    load: () => import('../../i18n/announcements.zh-CN'),
+  },
   legal: { key: 'legal.termsTitle', load: () => import('../../i18n/legal.zh-CN') },
 } as const
 

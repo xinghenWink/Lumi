@@ -41,15 +41,18 @@ DELETE FROM verification_codes WHERE expires_at<now()-interval '1 day';
 -- name: CleanupSessions :exec
 DELETE FROM user_sessions WHERE family_id IN (SELECT family_id FROM user_sessions GROUP BY family_id HAVING max(expires_at)<now()-interval '1 day');
 -- name: ListAnnouncements :many
-SELECT * FROM announcements WHERE (NOT sqlc.arg(active_only)::boolean OR (enabled AND starts_at<=now() AND (ends_at IS NULL OR ends_at>now())))
+SELECT * FROM announcements WHERE (sqlc.arg(admin_view)::boolean OR (enabled AND starts_at<=now()
+AND (ends_at IS NULL OR ends_at>now() OR (sqlc.arg(include_history)::boolean AND display_mode='history'))))
 AND (sqlc.narg(cursor_time)::timestamptz IS NULL OR (created_at,id)<(sqlc.narg(cursor_time),sqlc.arg(cursor_id)::uuid))
 ORDER BY created_at DESC,id DESC LIMIT sqlc.arg(page_limit);
 -- name: GetAnnouncement :one
 SELECT * FROM announcements WHERE id=$1 FOR UPDATE;
 -- name: CreateAnnouncement :one
-INSERT INTO announcements(id,content,starts_at,ends_at,enabled,github_release_tag) VALUES($1,$2,$3,$4,$5,$6) RETURNING *;
+INSERT INTO announcements(id,content,starts_at,ends_at,enabled,github_release_tag,announcement_type,display_mode)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *;
 -- name: UpdateAnnouncement :one
-UPDATE announcements SET content=$2,starts_at=$3,ends_at=$4,enabled=$5,version=version+1 WHERE id=$1 AND version=$6 RETURNING *;
+UPDATE announcements SET content=$2,starts_at=$3,ends_at=$4,enabled=$5,announcement_type=$6,display_mode=$7,version=version+1
+WHERE id=$1 AND version=$8 RETURNING *;
 -- name: DeleteAnnouncement :exec
 DELETE FROM announcements WHERE id=$1;
 -- name: AcquireCircuitProbe :execrows

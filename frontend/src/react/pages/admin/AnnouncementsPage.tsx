@@ -1,7 +1,12 @@
 import { lazy, Suspense, useEffect, useId, useRef, useState, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Download, Plus } from 'lucide-react'
-import { operations, type Announcement } from '../../../api/operations'
+import {
+  announcements,
+  type Announcement,
+  type AnnouncementDisplayMode,
+  type AnnouncementType,
+} from '../../../api/announcements'
 import { ApiError } from '../../../api/transport'
 import { useRuntime } from '../../app/context'
 import { useSession } from '../../features/auth/hooks'
@@ -15,10 +20,12 @@ import { ApiNotice } from '../../components/shared/ApiNotice'
 import { CursorControls } from '../../components/shared/CursorControls'
 import { PageStatus } from '../../components/shared/PageStatus'
 import { Button } from '../../components/ui/button'
+import { ChoiceGroup } from '../../components/ui/choice-group'
 import { Field } from '../../components/ui/field'
 import { Input } from '../../components/ui/input'
 import { ModalDialog } from '../../components/ui/modal-dialog'
 import { Textarea } from '../../components/ui/textarea'
+import { announcementTypeKey } from '../../features/announcements/presentation'
 import {
   announcementCharacterLimit,
   announcementReleaseURL,
@@ -30,6 +37,11 @@ const Markdown = lazy(() =>
     default: module.MarkdownContent,
   })),
 )
+const displayModeKey = {
+  standalone: 'ops.announcementStandalone',
+  history: 'ops.announcementHistoryMode',
+} as const satisfies Record<AnnouncementDisplayMode, string>
+
 function AnnouncementEditor({
   row,
   fromGitHub,
@@ -50,6 +62,13 @@ function AnnouncementEditor({
   const [draft, setDraft] = useState<ReturnType<typeof releaseDraft> | null>(null)
   const picking = fromGitHub && !draft
   const source = row?.github_release_tag ?? draft?.tag
+  const [type, setType] = useState<AnnouncementType>(
+    row?.announcement_type ?? (fromGitHub ? 'system_update' : 'daily'),
+  )
+  const [selectedMode, setMode] = useState<AnnouncementDisplayMode | null>(
+    row?.display_mode ?? null,
+  )
+  const displayMode = selectedMode ?? (type === 'system_update' ? 'history' : 'standalone')
   const [form, setForm] = useState({
     content: row?.content ?? '',
     starts: (row?.starts_at ?? new Date().toISOString()).slice(0, 16),
@@ -69,13 +88,15 @@ function AnnouncementEditor({
       (end && (!Number.isFinite(end.getTime()) || end <= start))
     )
       throw new ApiError('INVALID_INPUT')
-    await operations.saveAnnouncement(
+    await announcements.save(
       {
         content: form.content,
         starts_at: start.toISOString(),
         ends_at: end?.toISOString() ?? null,
         enabled: form.enabled,
         version: row?.version ?? 0,
+        announcement_type: type,
+        display_mode: displayMode,
         ...(draft ? { github_release_tag: draft.tag } : {}),
       },
       row?.id,
@@ -113,6 +134,31 @@ function AnnouncementEditor({
         >
           <fieldset className="grid min-w-0 gap-4" disabled={save.isPending}>
             {source ? <ReleaseSource tag={source} /> : null}
+            <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+              <ChoiceGroup<AnnouncementType>
+                label={t('ops.announcementType')}
+                value={type}
+                options={[
+                  { value: 'system_update', label: t(announcementTypeKey.system_update) },
+                  { value: 'daily', label: t(announcementTypeKey.daily) },
+                ]}
+                onChange={setType}
+                disabled={save.isPending}
+              />
+              <ChoiceGroup<AnnouncementDisplayMode>
+                label={t('ops.announcementDisplayMode')}
+                value={displayMode}
+                options={[
+                  { value: 'standalone', label: t(displayModeKey.standalone) },
+                  { value: 'history', label: t(displayModeKey.history) },
+                ]}
+                onChange={setMode}
+                disabled={save.isPending}
+              />
+            </div>
+            {displayMode === 'history' ? (
+              <p className="text-xs text-muted-foreground">{t('ops.announcementHistoryHint')}</p>
+            ) : null}
             <Field id={id + '-content'} label={t('ops.content')}>
               <Textarea
                 ref={contentField}
@@ -201,7 +247,7 @@ export default function AnnouncementsPage() {
     [notice, setNotice] = useState(false)
   const query = useCursorQuery(
     ['user', user?.id, 'admin-announcements'],
-    (cursor, signal) => operations.announcements(true, cursor, signal),
+    (cursor, signal) => announcements.list('admin', cursor, signal),
     !!user,
   )
   function changed() {
@@ -213,7 +259,7 @@ export default function AnnouncementsPage() {
   }
   const remove = useOwnedMutation(user?.id, async (check) => {
     if (!deleting) return
-    await operations.deleteAnnouncement(deleting.id)
+    await announcements.remove(deleting.id)
     check()
     setDeleting(null)
     query.reset()
@@ -273,6 +319,10 @@ export default function AnnouncementsPage() {
         <div className="space-y-4">
           {query.data?.items.map((row) => (
             <Panel key={row.id} className="ops-section">
+              <p className="mb-3 text-xs font-medium text-muted-foreground">
+                {t(announcementTypeKey[row.announcement_type])} ·{' '}
+                {t(displayModeKey[row.display_mode])}
+              </p>
               <Suspense
                 fallback={<p className="whitespace-pre-wrap break-words text-sm">{row.content}</p>}
               >

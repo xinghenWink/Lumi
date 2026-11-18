@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { operations } from '../../../api/operations'
+import { userPreferences } from '../../../api/preferences'
 import { useRuntime } from '../../app/context'
 import { useSession } from '../../features/auth/hooks'
 
@@ -10,7 +10,7 @@ export function RuntimePreferences() {
   const preferences = useQuery({
     queryKey: ['user', user?.id, 'preferences'],
     enabled: !!user,
-    queryFn: ({ signal }) => operations.preferences(signal),
+    queryFn: ({ signal }) => userPreferences.get(signal),
     staleTime: Infinity,
   })
   useEffect(() => {

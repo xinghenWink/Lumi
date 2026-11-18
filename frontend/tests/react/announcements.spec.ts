@@ -48,6 +48,8 @@ test('imports a GitHub release as editable Markdown and publishes it explicitly'
     const field = editor.getByLabel('公告内容（Markdown）', { exact: true })
     await expect(field).toHaveValue('## v1.2.3\n\n- First update\n- Second update')
     await expect(field).toBeFocused()
+    await expect(editor.getByRole('radio', { name: '系统更新', exact: true })).toBeChecked()
+    await expect(editor.getByRole('radio', { name: '历史展示', exact: true })).toBeChecked()
     await expect(page.locator('.ops-section').filter({ hasText: 'Selected release' })).toHaveCount(
       0,
     )
@@ -62,6 +64,8 @@ test('imports a GitHub release as editable Markdown and publishes it explicitly'
     const row = record(await response.json())
     id = String(row.id)
     expect(row.github_release_tag).toBe(version)
+    expect(row.announcement_type).toBe('system_update')
+    expect(row.display_mode).toBe('history')
     const card = page.locator('.ops-section').filter({ hasText: published })
     await expect(card.getByRole('link', { name: `GitHub 来源版本 ${version}` })).toHaveAttribute(
       'href',
@@ -77,6 +81,83 @@ test('imports a GitHub release as editable Markdown and publishes it explicitly'
     })
   } finally {
     if (id) await f.api('DELETE', '/admin/announcements/' + id)
+  }
+})
+
+test('presents system update history newest first and keeps standalone notices separate', async ({
+  page,
+  baseURL,
+}, info) => {
+  const f = await adminFixture(page, baseURL)
+  const ids: string[] = []
+  const oldTitle = 'Older update ' + randomUUID()
+  const latestTitle = 'Latest update ' + randomUUID()
+  const dailyTitle = 'Daily notice ' + randomUUID()
+  try {
+    const older = await f.api('POST', '/admin/announcements', {
+      announcement_type: 'system_update',
+      display_mode: 'history',
+      starts_at: new Date(Date.now() - 120_000).toISOString(),
+      ends_at: new Date(Date.now() - 60_000).toISOString(),
+      content: `## ${oldTitle}\n\n${Array.from({ length: 12 }, (_, index) => `- Change ${index + 1}`).join('\n')}`,
+      enabled: true,
+      version: 0,
+    })
+    ids.push(String(older.id))
+    await page.goto('/admin/announcements')
+    await page.getByRole('button', { name: '新增公告', exact: true }).click()
+    const editor = page.getByRole('dialog', { name: '新增公告' })
+    const type = editor.getByRole('radiogroup', { name: '公告类型' })
+    const mode = editor.getByRole('radiogroup', { name: '展示方式' })
+    const historyChoice = mode.getByRole('radio', { name: '历史展示' })
+    const standalone = mode.getByRole('radio', { name: '单独展示' })
+    await expect(type.getByRole('radio', { name: '日常', exact: true })).toBeChecked()
+    await expect(standalone).toBeChecked()
+    await type.getByRole('radio', { name: '系统更新', exact: true }).check()
+    await expect(historyChoice).toBeChecked()
+    await standalone.check()
+    await historyChoice.check()
+    await editor.getByLabel('公告内容（Markdown）', { exact: true }).fill(`## ${latestTitle}`)
+    const saved = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/admin/announcements') && response.request().method() === 'POST',
+    )
+    await editor.getByRole('button', { name: '保存修改', exact: true }).click()
+    const latest = await saved
+    expect(latest.ok()).toBe(true)
+    const row = record(await latest.json())
+    ids.push(String(row.id))
+    expect(row.announcement_type).toBe('system_update')
+    expect(row.display_mode).toBe('history')
+    await expect(editor).toHaveCount(0)
+    const daily = await f.api('POST', '/admin/announcements', {
+      content: dailyTitle,
+      starts_at: new Date(Date.now() - 60_000).toISOString(),
+      ends_at: null,
+      enabled: true,
+      version: 0,
+    })
+    ids.push(String(daily.id))
+
+    await page.getByRole('button', { name: '公告', exact: true }).click()
+    const notice = page.getByRole('dialog', { name: '系统公告' })
+    const history = notice.getByRole('region', { name: '系统更新历史' })
+    const entries = history.getByRole('list').first().locator(':scope > li')
+    await expect(entries).toHaveCount(2)
+    await expect(entries.nth(0)).toContainText(latestTitle)
+    await expect(entries.nth(1)).toContainText(oldTitle)
+    await expect(notice.getByRole('article')).toContainText(dailyTitle)
+    await expect(history).not.toContainText(dailyTitle)
+    await history.getByText('Change 12', { exact: true }).scrollIntoViewIfNeeded()
+    await expect(history.getByText('Change 12', { exact: true })).toBeInViewport()
+    await expect(notice.getByRole('button', { name: '当前关闭' })).toBeVisible()
+    await noOverflow(page)
+    await page.screenshot({
+      path: info.outputPath('announcement-history.png'),
+      animations: 'disabled',
+    })
+  } finally {
+    for (const id of ids) await f.api('DELETE', '/admin/announcements/' + id)
   }
 })
 

@@ -229,7 +229,7 @@ func TestM6AnnouncementsDashboardAndReconciliation(t *testing.T) {
 	if _, err := service.SaveAnnouncement(f.ctx, actor, uuid.Nil, operations.Announcement{Content: "Expired", StartsAt: now, EndsAt: &end, Enabled: true}, false); err != nil {
 		t.Fatal(err)
 	}
-	page, err := service.Announcements(f.ctx, true, "", 20)
+	page, err := service.Announcements(f.ctx, operations.ActiveAnnouncements, "", 20)
 	if err != nil || len(page.Items) != 1 || page.Items[0].ID != visible.ID {
 		t.Fatalf("active announcements=%+v error=%v", page, err)
 	}
@@ -280,7 +280,7 @@ func TestAnnouncementReleaseImportPermissionsAndSource(t *testing.T) {
 		Content: "Manual announcement", StartsAt: start, Enabled: true,
 	})
 	expectStatus(t, legacy, 200)
-	if row := decodeReply[operations.Announcement](t, legacy); row.GitHubReleaseTag != "" {
+	if row := decodeReply[operations.Announcement](t, legacy); row.GitHubReleaseTag != "" || row.AnnouncementType != "daily" || row.DisplayMode != "standalone" {
 		t.Fatalf("expected a manual announcement: %+v", row)
 	}
 	input := operations.Announcement{
@@ -289,13 +289,13 @@ func TestAnnouncementReleaseImportPermissionsAndSource(t *testing.T) {
 	created := f.call(t, client, "POST", adminPath, admin.AccessToken, input)
 	expectStatus(t, created, 200)
 	imported := decodeReply[operations.Announcement](t, created)
-	if imported.GitHubReleaseTag != input.GitHubReleaseTag || imported.Content != input.Content {
+	if imported.GitHubReleaseTag != input.GitHubReleaseTag || imported.Content != input.Content || imported.AnnouncementType != "system_update" || imported.DisplayMode != "history" {
 		t.Fatalf("imported announcement: %+v", imported)
 	}
 	input.Content, input.Version, input.GitHubReleaseTag = "Edited\n\n**announcement**", imported.Version, ""
 	updated := f.call(t, client, "PUT", adminPath+"/"+imported.ID.String(), admin.AccessToken, input)
 	expectStatus(t, updated, 200)
-	if row := decodeReply[operations.Announcement](t, updated); row.GitHubReleaseTag != imported.GitHubReleaseTag || row.Version != imported.Version+1 {
+	if row := decodeReply[operations.Announcement](t, updated); row.GitHubReleaseTag != imported.GitHubReleaseTag || row.Version != imported.Version+1 || row.AnnouncementType != imported.AnnouncementType || row.DisplayMode != imported.DisplayMode {
 		t.Fatalf("edited announcement: %+v", row)
 	}
 	visible := f.call(t, memberClient, "GET", memberPath, memberAuth.AccessToken, nil)
@@ -306,4 +306,58 @@ func TestAnnouncementReleaseImportPermissionsAndSource(t *testing.T) {
 	}
 	input.Content = "Invalid\x00character"
 	expectStatus(t, f.call(t, client, "POST", adminPath, admin.AccessToken, input), 400)
+}
+
+func TestAnnouncementHistoryVisibilityAndPagination(t *testing.T) {
+	f := newAccountFixture(t)
+	client := f.client(t)
+	token := f.login(t, client, f.adminEmail, f.adminPassword).AccessToken
+	const adminPath = "/api/v1/admin/announcements"
+	const activePath = "/api/v1/announcements"
+	const feedPath = activePath + "?include_history=1&limit=2"
+	now := time.Now().UTC()
+	started, ended := now.Add(-2*time.Hour), now.Add(-time.Hour)
+
+	create := func(content, kind, mode string, start time.Time, end *time.Time, enabled bool) operations.Announcement {
+		t.Helper()
+		response := f.call(t, client, "POST", adminPath, token, operations.Announcement{
+			Content: content, StartsAt: start, EndsAt: end, Enabled: enabled,
+			AnnouncementType: kind, DisplayMode: mode,
+		})
+		expectStatus(t, response, 200)
+		return decodeReply[operations.Announcement](t, response)
+	}
+	older := create("Older system release", "system_update", "history", started, &ended, true)
+	create("Expired standalone release", "system_update", "standalone", started, &ended, true)
+	create("Future system release", "system_update", "history", now.Add(time.Hour), nil, true)
+	create("Disabled system release", "system_update", "history", started, nil, false)
+	latest := create("Latest system release", "system_update", "history", started, nil, true)
+	daily := create("Daily notice", "daily", "standalone", started, nil, true)
+
+	active := f.call(t, client, "GET", activePath, token, nil)
+	expectStatus(t, active, 200)
+	result := decodeReply[operations.Page[operations.Announcement]](t, active)
+	if len(result.Items) != 2 || result.Items[0].ID != daily.ID || result.Items[1].ID != latest.ID {
+		t.Fatalf("active announcements: %+v", result.Items)
+	}
+	first := f.call(t, client, "GET", feedPath, token, nil)
+	expectStatus(t, first, 200)
+	result = decodeReply[operations.Page[operations.Announcement]](t, first)
+	if len(result.Items) != 2 || result.Items[0].ID != daily.ID || result.Items[1].ID != latest.ID || result.NextCursor == "" {
+		t.Fatalf("first history page: %+v", result)
+	}
+	next := f.call(t, client, "GET", feedPath+"&cursor="+result.NextCursor, token, nil)
+	expectStatus(t, next, 200)
+	expectStatus(t, f.call(t, client, "GET", activePath+"?cursor="+result.NextCursor, token, nil), 400)
+	result = decodeReply[operations.Page[operations.Announcement]](t, next)
+	if len(result.Items) != 1 || result.Items[0].ID != older.ID || result.NextCursor != "" {
+		t.Fatalf("second history page: %+v", result)
+	}
+	for _, fields := range []struct{ kind, mode string }{{"billing", "history"}, {"daily", "both"}} {
+		invalid := operations.Announcement{
+			Content: "Invalid notice", StartsAt: started, Enabled: true,
+			AnnouncementType: fields.kind, DisplayMode: fields.mode,
+		}
+		expectStatus(t, f.call(t, client, "POST", adminPath, token, invalid), 400)
+	}
 }

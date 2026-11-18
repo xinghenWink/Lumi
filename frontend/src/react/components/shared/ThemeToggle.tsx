@@ -3,7 +3,7 @@ import { useStore } from 'zustand'
 import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useRuntime } from '../../app/context'
-import { operations } from '../../../api/operations'
+import { userPreferences } from '../../../api/preferences'
 import { ApiError } from '../../../api/transport'
 import { effectiveTheme, type Theme } from '../../stores/theme'
 import { Button } from '../ui/button'
@@ -16,9 +16,9 @@ export function ThemeToggle() {
     scope: { id: 'appearance' },
     mutationFn: async ({ theme, epoch }: { theme: Theme; epoch: number }) => {
       if (runtime.session.snapshot().epoch !== epoch) throw new ApiError('AUTH_REQUIRED', 401)
-      const preferences = await operations.preferences()
+      const preferences = await userPreferences.get()
       if (runtime.session.snapshot().epoch !== epoch) throw new ApiError('AUTH_REQUIRED', 401)
-      const saved = await operations.savePreferences({ ...preferences, theme })
+      const saved = await userPreferences.save({ ...preferences, theme })
       const state = runtime.session.getSnapshot()
       if (state.epoch === epoch)
         runtime.queryClient.setQueryData(['user', state.user?.id, 'preferences'], saved)

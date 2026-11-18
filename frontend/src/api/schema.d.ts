@@ -1922,6 +1922,10 @@ export interface components {
       next_page: number
       stale: boolean
     }
+    /** @enum {string} */
+    AnnouncementType: 'system_update' | 'daily'
+    /** @enum {string} */
+    AnnouncementDisplayMode: 'standalone' | 'history'
     AnnouncementPage: {
       items: components['schemas']['Announcement'][]
       next_cursor: string
@@ -1936,6 +1940,10 @@ export interface components {
       version: number
       /** @description Optional source tag recorded at creation and retained on edits. */
       github_release_tag?: components['schemas']['AnnouncementReleaseTag']
+      /** @description Defaults to system_update for GitHub imports and daily otherwise. An omitted field is preserved on edits. */
+      announcement_type?: components['schemas']['AnnouncementType']
+      /** @description Defaults to history for system updates and standalone for daily announcements. An omitted field is preserved on edits. */
+      display_mode?: components['schemas']['AnnouncementDisplayMode']
     }
     Announcement: {
       /** Format: uuid */
@@ -1950,6 +1958,8 @@ export interface components {
       /** Format: date-time */
       created_at: string
       github_release_tag?: components['schemas']['AnnouncementReleaseTag']
+      announcement_type: components['schemas']['AnnouncementType']
+      display_mode: components['schemas']['AnnouncementDisplayMode']
     }
     DeviceList: {
       items: components['schemas']['Device'][]
@@ -6250,6 +6260,8 @@ export interface operations {
       query?: {
         cursor?: string
         limit?: number
+        /** @description Include enabled historical announcements that have started, including entries past their end time. */
+        include_history?: '1'
       }
       header?: never
       path?: never

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
-import { operations } from '../../../api/operations'
+import { useQuery } from '@tanstack/react-query'
+import { hasActiveAnnouncement } from '../../../api/announcement-activity'
 import { AnnouncementsContext } from '../../features/announcements/context'
 
 const AnnouncementDialog = lazy(() => import('./AnnouncementDialog'))
@@ -17,15 +17,14 @@ export function Announcements({
   const [view, setView] = useState<'checking' | 'open' | 'closed'>('checking')
   const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null)
   const controls = useMemo(() => ({ setTrigger, open: () => setView('open') }), [])
-  const query = useInfiniteQuery({
-    queryKey: ['user', userId, 'announcements'],
-    initialPageParam: '',
-    queryFn: ({ signal, pageParam }) => operations.announcements(false, pageParam, signal, 20),
-    getNextPageParam: (lastPage) => lastPage.next_cursor || undefined,
+  const activeQuery = useQuery({
+    queryKey: ['user', userId, 'announcements', 'active'],
+    queryFn: ({ signal }) => hasActiveAnnouncement(signal),
+    enabled: view === 'checking',
     refetchInterval: 30_000,
   })
-  const hasItems = (query.data?.pages[0]?.items.length ?? 0) > 0
-  const loaded = query.isSuccess
+  const hasItems = activeQuery.data === true
+  const loaded = activeQuery.isSuccess
 
   useEffect(() => {
     if (!trigger || !loaded || view !== 'checking') return
@@ -56,7 +55,6 @@ export function Announcements({
       {view === 'open' ? (
         <Suspense fallback={null}>
           <AnnouncementDialog
-            query={query}
             trigger={trigger}
             userId={userId}
             token={token}

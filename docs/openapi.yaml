@@ -3650,6 +3650,10 @@ paths:
           schema:
             type: integer
             minimum: 0
+        - name: include_history
+          in: query
+          description: Include enabled historical announcements that have started, including entries past their end time.
+          schema: { type: string, const: '1' }
       responses:
         '200':
           description: Success
@@ -5915,6 +5919,12 @@ components:
         stale:
           type: boolean
       required: [items, next_page, stale]
+    AnnouncementType:
+      type: string
+      enum: [system_update, daily]
+    AnnouncementDisplayMode:
+      type: string
+      enum: [standalone, history]
     AnnouncementPage:
       type: object
       additionalProperties: false
@@ -5952,6 +5962,12 @@ components:
         github_release_tag:
           description: Optional source tag recorded at creation and retained on edits.
           $ref: '#/components/schemas/AnnouncementReleaseTag'
+        announcement_type:
+          description: Defaults to system_update for GitHub imports and daily otherwise. An omitted field is preserved on edits.
+          $ref: '#/components/schemas/AnnouncementType'
+        display_mode:
+          description: Defaults to history for system updates and standalone for daily announcements. An omitted field is preserved on edits.
+          $ref: '#/components/schemas/AnnouncementDisplayMode'
       required:
         - content
         - starts_at
@@ -5987,6 +6003,10 @@ components:
           format: date-time
         github_release_tag:
           $ref: '#/components/schemas/AnnouncementReleaseTag'
+        announcement_type:
+          $ref: '#/components/schemas/AnnouncementType'
+        display_mode:
+          $ref: '#/components/schemas/AnnouncementDisplayMode'
       required:
         - id
         - content
@@ -5995,6 +6015,8 @@ components:
         - enabled
         - version
         - created_at
+        - announcement_type
+        - display_mode
     DeviceList:
       type: object
       additionalProperties: false

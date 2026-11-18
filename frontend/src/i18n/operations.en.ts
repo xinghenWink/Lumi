@@ -34,6 +34,12 @@ export default {
     successRate: 'Success rate',
     latency: 'Average latency (ms)',
     addAnnouncement: 'Add announcement',
+    announcementType: 'Announcement type',
+    announcementDisplayMode: 'Display mode',
+    announcementStandalone: 'Standalone',
+    announcementHistoryMode: 'History',
+    announcementHistoryHint:
+      'Entries of this type appear newest first. They stay in history after ending and disappear when disabled.',
     announcementImport: 'Import from GitHub',
     announcementChooseRelease: 'Choose a stable release, then edit the release notes.',
     announcementReleaseEmpty: 'There are no stable releases on this page.',

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { announcementSessionId, dismissAnnouncement, isAnnouncementDismissed } from './dismissal'
 import { announcementCharacterLimit, releaseDraft } from './release'
+import { announcementSections } from './presentation'
+import type { Announcement } from '../../../api/announcements'
 
 const family = '019a0000-0000-7000-8000-000000000001'
 const nextFamily = '019a0000-0000-7000-8000-000000000002'
@@ -54,4 +56,30 @@ describe('GitHub announcement draft', () => {
     expect(Array.from(draft.content)).toHaveLength(announcementCharacterLimit)
     expect(draft.content.endsWith('🌟…')).toBe(true)
   })
+})
+
+it('keeps both kinds of histories separate and retains standalone entries', () => {
+  const base = {
+    starts_at: '2026-11-18T00:00:00Z',
+    ends_at: null,
+    enabled: true,
+    content: 'Notice',
+    version: 1,
+    created_at: '2026-11-18T00:00:00Z',
+  }
+  const latest: Announcement = {
+    ...base,
+    id: 'latest',
+    announcement_type: 'system_update',
+    display_mode: 'history',
+  }
+  const standalone: Announcement = { ...latest, id: 'standalone', display_mode: 'standalone' }
+  const daily: Announcement = { ...latest, id: 'daily', announcement_type: 'daily' }
+  const older: Announcement = { ...latest, id: 'older' }
+
+  expect(announcementSections([latest, standalone, daily, older])).toEqual([
+    { mode: 'history', type: 'system_update', items: [latest, older] },
+    { mode: 'standalone', item: standalone },
+    { mode: 'history', type: 'daily', items: [daily] },
+  ])
 })

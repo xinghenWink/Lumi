@@ -1,15 +1,13 @@
 import { authorized, authorizedResponse } from './protected'
 import { ApiError, record, noContent, request } from './transport'
 import { parseMessage } from './chat'
-import type { components } from './schema'
 
-export interface Preferences {
-  theme: 'light' | 'dark' | 'system'
-  instructions: string
-  image_quality: 'low' | 'medium' | 'high'
-  image_ratio: string
-  image_count: number
-}
+import { integer, text } from './response-fields'
+import { userPreferences } from './preferences'
+
+export { integer, text } from './response-fields'
+export { parsePreferences, type Preferences } from './preferences'
+
 export interface Device {
   id: string
   device: string
@@ -17,16 +15,6 @@ export interface Device {
   user_agent: string
   created_at: string
   expires_at: string
-}
-export interface Announcement {
-  id: string
-  content: string
-  starts_at: string
-  ends_at: string | null
-  enabled: boolean
-  version: number
-  created_at: string
-  github_release_tag?: string
 }
 export interface OperationsSettings {
   maintenance: boolean
@@ -81,15 +69,6 @@ export interface Page<T> {
   items: T[]
   next_cursor: string
 }
-export const text = (v: unknown): string => {
-  if (typeof v !== 'string') throw new ApiError('RESPONSE_INVALID')
-  return v
-}
-export const integer = (v: unknown): number => {
-  if (typeof v !== 'number' || !Number.isSafeInteger(v) || v < 0)
-    throw new ApiError('RESPONSE_INVALID')
-  return v
-}
 export const boolean = (v: unknown): boolean => {
   if (typeof v !== 'boolean') throw new ApiError('RESPONSE_INVALID')
   return v
@@ -101,41 +80,6 @@ export function array<T>(v: unknown, parse: (x: unknown) => T): T[] {
 function page<T>(v: unknown, parse: (x: unknown) => T): Page<T> {
   const d = record(v)
   return { items: array(d.items, parse), next_cursor: text(d.next_cursor) }
-}
-export function parsePreferences(v: unknown): Preferences {
-  const d = record(v),
-    theme = text(d.theme),
-    quality = text(d.image_quality)
-  if (!['light', 'dark', 'system'].includes(theme) || !['low', 'medium', 'high'].includes(quality))
-    throw new ApiError('RESPONSE_INVALID')
-  return {
-    theme: theme as Preferences['theme'],
-    instructions: text(d.instructions),
-    image_quality: quality as Preferences['image_quality'],
-    image_ratio: text(d.image_ratio),
-    image_count: integer(d.image_count),
-  }
-}
-export function parseAnnouncement(v: unknown): Announcement {
-  const d = record(v)
-  return {
-    id: text(d.id),
-    content: text(d.content),
-    starts_at: text(d.starts_at),
-    ends_at: d.ends_at === null ? null : text(d.ends_at),
-    enabled: boolean(d.enabled),
-    version: integer(d.version),
-    created_at: text(d.created_at),
-    ...(d.github_release_tag === undefined
-      ? {}
-      : { github_release_tag: announcementReleaseTag(d.github_release_tag) }),
-  }
-}
-export function announcementReleaseTag(value: unknown): string {
-  const tag = text(value)
-  if (!/^v(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/.test(tag))
-    throw new ApiError('RESPONSE_INVALID')
-  return tag
 }
 export function parseOperations(v: unknown): OperationsSettings {
   const d = record(v)
@@ -207,10 +151,8 @@ export async function downloadResponse(response: Response, filename: string) {
 }
 const readOptions = (signal?: AbortSignal) => (signal ? { signal } : {})
 export const operations = {
-  preferences: (signal?: AbortSignal) =>
-    authorized('/api/v1/me/preferences', parsePreferences, signal ? { signal } : {}),
-  savePreferences: (body: Preferences) =>
-    authorized('/api/v1/me/preferences', parsePreferences, { method: 'PUT', body }),
+  preferences: userPreferences.get,
+  savePreferences: userPreferences.save,
   devices: (cursor = '', signal?: AbortSignal) =>
     authorized(
       '/api/v1/me/sessions?limit=50&cursor=' + encodeURIComponent(cursor),
@@ -244,25 +186,6 @@ export const operations = {
     authorized('/api/v1/me', noContent, { method: 'DELETE', body: { email, password } }),
   dashboard: (days: number, signal?: AbortSignal) =>
     authorized('/api/v1/admin/dashboard?days=' + days, parseDashboard, readOptions(signal)),
-  announcements: (admin = false, cursor = '', signal?: AbortSignal, limit = 100) =>
-    authorized(
-      '/api/v1/' +
-        (admin ? 'admin/' : '') +
-        `announcements?limit=${limit}&cursor=` +
-        encodeURIComponent(cursor),
-      (v) => page(v, parseAnnouncement),
-      readOptions(signal),
-    ),
-  saveAnnouncement: (body: components['schemas']['AnnouncementInput'], id?: string) =>
-    authorized(
-      '/api/v1/admin/announcements' + (id ? '/' + encodeURIComponent(id) : ''),
-      parseAnnouncement,
-      { method: id ? 'PUT' : 'POST', body },
-    ),
-  deleteAnnouncement: (id: string) =>
-    authorized('/api/v1/admin/announcements/' + encodeURIComponent(id), noContent, {
-      method: 'DELETE',
-    }),
   settings: (signal?: AbortSignal) =>
     authorized('/api/v1/admin/operations-settings', parseOperations, readOptions(signal)),
   saveSettings: (value: OperationsSettings, secret?: string) => {
