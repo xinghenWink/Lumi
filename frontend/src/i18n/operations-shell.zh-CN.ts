@@ -63,5 +63,6 @@ export default {
     CONTENT_BLOCKED: '提示词包含站点限制的内容，请修改后重试。',
     SESSION_NOT_FOUND: '该登录设备已退出。',
     ANNOUNCEMENT_NOT_FOUND: '该公告不存在。',
+    ANNOUNCEMENT_GITHUB_UNAVAILABLE: '暂时无法获取 GitHub 版本，请稍后重试。',
   },
 }

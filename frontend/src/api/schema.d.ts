@@ -1427,6 +1427,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/admin/announcements/github-releases': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List published stable Lumi releases for announcement drafts */
+    get: operations['listAnnouncementGitHubReleases']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/admin/announcements/{id}': {
     parameters: {
       query?: never
@@ -1898,6 +1915,23 @@ export interface components {
       circuit_seconds: number
       sensitive_words: string[]
     }
+    AnnouncementReleaseTag: string
+    AnnouncementReleasePage: {
+      items: {
+        version: components['schemas']['AnnouncementReleaseTag']
+        name: string
+        notes: string
+        /** Format: date-time */
+        published_at: string
+      }[]
+      /** @description The next page number, or zero at the end. */
+      next_page: number
+      stale: boolean
+    }
+    /** @enum {string} */
+    AnnouncementType: 'system_update' | 'daily'
+    /** @enum {string} */
+    AnnouncementDisplayMode: 'standalone' | 'history'
     AnnouncementPage: {
       items: components['schemas']['Announcement'][]
       next_cursor: string
@@ -1910,6 +1944,12 @@ export interface components {
       ends_at: string | null
       enabled: boolean
       version: number
+      /** @description Optional source tag recorded at creation and retained on edits. */
+      github_release_tag?: components['schemas']['AnnouncementReleaseTag']
+      /** @description Defaults to system_update for GitHub imports and daily otherwise. An omitted field is preserved on edits. */
+      announcement_type?: components['schemas']['AnnouncementType']
+      /** @description Defaults to history for system updates and standalone for daily announcements. An omitted field is preserved on edits. */
+      display_mode?: components['schemas']['AnnouncementDisplayMode']
     }
     Announcement: {
       /** Format: uuid */
@@ -1923,6 +1963,9 @@ export interface components {
       version: number
       /** Format: date-time */
       created_at: string
+      github_release_tag?: components['schemas']['AnnouncementReleaseTag']
+      announcement_type: components['schemas']['AnnouncementType']
+      display_mode: components['schemas']['AnnouncementDisplayMode']
     }
     DeviceList: {
       items: components['schemas']['Device'][]
@@ -6223,6 +6266,8 @@ export interface operations {
       query?: {
         cursor?: string
         limit?: number
+        /** @description Include enabled historical announcements that have started, including entries past their end time. */
+        include_history?: '1'
       }
       header?: never
       path?: never
@@ -7163,6 +7208,65 @@ export interface operations {
         }
       }
       /** @description Request rejected */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+    }
+  }
+  listAnnouncementGitHubReleases: {
+    parameters: {
+      query?: {
+        page?: number
+        refresh?: '1'
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Release page with a flag indicating cached data from an unavailable upstream. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AnnouncementReleasePage']
+        }
+      }
+      /** @description Invalid pagination or refresh parameter */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description Administrator access required */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Error']
+        }
+      }
+      /** @description GitHub is unavailable and no cached page is available. */
       503: {
         headers: {
           [name: string]: unknown

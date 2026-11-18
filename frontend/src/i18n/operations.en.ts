@@ -34,6 +34,22 @@ export default {
     successRate: 'Success rate',
     latency: 'Average latency (ms)',
     addAnnouncement: 'Add announcement',
+    announcementType: 'Announcement type',
+    announcementDisplayMode: 'Display mode',
+    announcementStandalone: 'Standalone',
+    announcementHistoryMode: 'History',
+    announcementHistoryHint:
+      'Entries of this type appear newest first. They stay in history after ending and disappear when disabled.',
+    announcementImport: 'Import from GitHub',
+    announcementChooseRelease: 'Choose a stable release, then edit the release notes.',
+    announcementReleaseEmpty: 'There are no stable releases on this page.',
+    announcementReleaseStale:
+      'GitHub is temporarily unavailable. Showing the last fetched releases.',
+    announcementReleaseSource: 'GitHub release {version}',
+    announcementPublish: 'Publish announcement',
+    announcementTooLong: 'An announcement can contain at most {limit} characters.',
+    announcementTruncated:
+      'The release notes exceeded {limit} characters and were shortened. Review before publishing.',
     content: 'Content (Markdown)',
     startsAt: 'Starts at (UTC)',
     endsAt: 'Ends at (UTC, optional)',
@@ -147,5 +163,7 @@ export default {
     CONTENT_BLOCKED: 'The prompt contains a blocked term. Please edit it.',
     SESSION_NOT_FOUND: 'This device is already signed out.',
     ANNOUNCEMENT_NOT_FOUND: 'This announcement no longer exists.',
+    ANNOUNCEMENT_GITHUB_UNAVAILABLE:
+      'GitHub releases are temporarily unavailable. Try again shortly.',
   },
 }

@@ -4,7 +4,7 @@ import { record } from '../../src/api/transport'
 import { adminFixture, noOverflow } from './admin-helpers'
 import { observeErrors } from '../browser-errors'
 
-test('real announcement CRUD, optimistic conflicts, active banners and dashboard ranges', async ({
+test('real announcement CRUD, optimistic conflicts, active notices and dashboard ranges', async ({
   page,
   baseURL,
 }, info) => {
@@ -14,6 +14,8 @@ test('real announcement CRUD, optimistic conflicts, active banners and dashboard
     second = 'Second ' + randomUUID()
   observeErrors(page, errors)
   const ids: string[] = []
+  const announcementButton = page.getByRole('button', { name: '公告', exact: true })
+  const announcements = page.getByRole('dialog', { name: '系统公告' })
   try {
     await page.goto('/admin/announcements')
     await page.getByRole('button', { name: '新增公告', exact: true }).click()
@@ -29,7 +31,9 @@ test('real announcement CRUD, optimistic conflicts, active banners and dashboard
     const row = record(await (await created).json())
     ids.push(String(row.id))
     await expect(dialog).not.toBeVisible()
-    await expect(page.locator('.ops-announcements')).toContainText(first)
+    await announcementButton.click()
+    await expect(announcements).toContainText(first)
+    await announcements.getByRole('button', { name: '当前关闭' }).click()
     const extra = await f.api('POST', '/admin/announcements', {
       content: second,
       starts_at: new Date(Date.now() - 60_000).toISOString(),
@@ -39,8 +43,10 @@ test('real announcement CRUD, optimistic conflicts, active banners and dashboard
     })
     ids.push(String(extra.id))
     await page.reload()
-    await expect(page.locator('.ops-announcements')).toContainText(first)
-    await expect(page.locator('.ops-announcements')).toContainText(second)
+    await announcementButton.click()
+    await expect(announcements).toContainText(first)
+    await expect(announcements).toContainText(second)
+    await announcements.getByRole('button', { name: '当前关闭' }).click()
     const card = page.locator('.ops-section').filter({ hasText: first })
     await card.getByRole('button', { name: '编辑', exact: true }).click()
     dialog = page.getByRole('dialog')
@@ -66,7 +72,10 @@ test('real announcement CRUD, optimistic conflicts, active banners and dashboard
     await dialog.getByLabel('启用', { exact: true }).uncheck()
     await dialog.getByRole('button', { name: '保存修改', exact: true }).click()
     await expect(dialog).not.toBeVisible()
-    await expect(page.locator('.ops-announcements')).not.toContainText(first)
+    await announcementButton.click()
+    await expect(announcements).toContainText(second)
+    await expect(announcements).not.toContainText(first)
+    await announcements.getByRole('button', { name: '当前关闭' }).click()
     const stored = await f.api('GET', '/admin/announcements')
     expect(
       (stored.items as unknown[]).map(record).find((item) => item.id === row.id)?.version,

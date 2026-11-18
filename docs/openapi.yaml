@@ -3656,6 +3656,10 @@ paths:
           schema:
             type: integer
             minimum: 0
+        - name: include_history
+          in: query
+          description: Include enabled historical announcements that have started, including entries past their end time.
+          schema: { type: string, const: '1' }
       responses:
         '200':
           description: Success
@@ -4371,6 +4375,50 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AnnouncementInput'
+  /api/v1/admin/announcements/github-releases:
+    get:
+      summary: List published stable Lumi releases for announcement drafts
+      operationId: listAnnouncementGitHubReleases
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, maximum: 100, default: 1 }
+        - in: query
+          name: refresh
+          schema: { type: string, const: '1' }
+      responses:
+        '200':
+          description: Release page with a flag indicating cached data from an unavailable upstream.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnouncementReleasePage'
+        '400':
+          description: Invalid pagination or refresh parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Administrator access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: GitHub is unavailable and no cached page is available.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/admin/announcements/{id}:
     put:
       summary: /api/v1/admin/announcements/{id}
@@ -5848,6 +5896,41 @@ components:
         - circuit_failures
         - circuit_seconds
         - sensitive_words
+    AnnouncementReleaseTag:
+      type: string
+      pattern: '^v(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$'
+    AnnouncementReleasePage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              version:
+                $ref: '#/components/schemas/AnnouncementReleaseTag'
+              name:
+                type: string
+              notes:
+                type: string
+              published_at:
+                type: string
+                format: date-time
+            required: [version, name, notes, published_at]
+        next_page:
+          type: integer
+          description: The next page number, or zero at the end.
+        stale:
+          type: boolean
+      required: [items, next_page, stale]
+    AnnouncementType:
+      type: string
+      enum: [system_update, daily]
+    AnnouncementDisplayMode:
+      type: string
+      enum: [standalone, history]
     AnnouncementPage:
       type: object
       additionalProperties: false
@@ -5882,6 +5965,15 @@ components:
         version:
           type: integer
           minimum: 0
+        github_release_tag:
+          description: Optional source tag recorded at creation and retained on edits.
+          $ref: '#/components/schemas/AnnouncementReleaseTag'
+        announcement_type:
+          description: Defaults to system_update for GitHub imports and daily otherwise. An omitted field is preserved on edits.
+          $ref: '#/components/schemas/AnnouncementType'
+        display_mode:
+          description: Defaults to history for system updates and standalone for daily announcements. An omitted field is preserved on edits.
+          $ref: '#/components/schemas/AnnouncementDisplayMode'
       required:
         - content
         - starts_at
@@ -5915,6 +6007,12 @@ components:
         created_at:
           type: string
           format: date-time
+        github_release_tag:
+          $ref: '#/components/schemas/AnnouncementReleaseTag'
+        announcement_type:
+          $ref: '#/components/schemas/AnnouncementType'
+        display_mode:
+          $ref: '#/components/schemas/AnnouncementDisplayMode'
       required:
         - id
         - content
@@ -5923,6 +6021,8 @@ components:
         - enabled
         - version
         - created_at
+        - announcement_type
+        - display_mode
     DeviceList:
       type: object
       additionalProperties: false

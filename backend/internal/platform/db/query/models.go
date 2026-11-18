@@ -9,16 +9,20 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Announcement struct {
-	ID        uuid.UUID
-	Content   string
-	StartsAt  time.Time
-	EndsAt    *time.Time
-	Enabled   bool
-	Version   int64
-	CreatedAt time.Time
+	ID               uuid.UUID
+	Content          string
+	StartsAt         time.Time
+	EndsAt           *time.Time
+	Enabled          bool
+	Version          int64
+	CreatedAt        time.Time
+	GithubReleaseTag pgtype.Text
+	AnnouncementType string
+	DisplayMode      string
 }
 
 type AuditLog struct {

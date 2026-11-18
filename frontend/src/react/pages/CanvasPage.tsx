@@ -21,7 +21,6 @@ import { PageStatus } from '../components/shared/PageStatus'
 import { DropLayer } from '../components/shared/DropLayer'
 import { ModalDialog } from '../components/ui/modal-dialog'
 import { Button } from '../components/ui/button'
-import { RuntimeBanner } from '../components/shared/RuntimeBanner'
 
 function Workspace({ canvas }: { canvas: Canvas }) {
   const client = useQueryClient()
@@ -95,7 +94,6 @@ function Workspace({ canvas }: { canvas: Canvas }) {
         id="main-content"
         className="flex h-dvh flex-col overflow-hidden bg-background text-foreground"
       >
-        <RuntimeBanner />
         <DropLayer>
           <CanvasEditor rejected={rejected} />
         </DropLayer>

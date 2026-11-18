@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { parsePreferences, parseOperations, parseAnnouncement } from '../../api/operations'
+import { parsePreferences, parseOperations } from '../../api/operations'
+import { parseAnnouncement } from '../../api/announcements'
 import zh from '../../i18n/operations.zh-CN'
 import en from '../../i18n/operations.en'
 describe('M6 public contracts', () => {

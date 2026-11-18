@@ -27,7 +27,7 @@ describe('shared translation compatibility', () => {
     for (const [file, source] of Object.entries(sources)) {
       if (file.endsWith('.test.ts') || typeof source !== 'string') continue
       for (const match of source.matchAll(
-        /['"]((?:react|nav|app|auth|common|chat|images|credits|ops|legal|notFound|errors|welcome|admin|settings|audit|catalog|canvas)\.[A-Za-z]\w*(?:\.[A-Za-z]\w*)*)['"]/g,
+        /['"]((?:announcement|react|nav|app|auth|common|chat|images|credits|ops|legal|notFound|errors|welcome|admin|settings|audit|catalog|canvas)\.[A-Za-z]\w*(?:\.[A-Za-z]\w*)*)['"]/g,
       ))
         if (match[1]) keys.add(match[1])
     }
@@ -35,6 +35,7 @@ describe('shared translation compatibility', () => {
       const language = await createAppI18n(locale)
       // Canvas copy is loaded by the canvas routes rather than with the shell.
       await loadCanvasCatalog(language, locale)
+      await loadRouteCopy(language, 'announcements')
       await loadRouteCopy(language, 'admin')
       await loadRouteCopy(language, 'legal')
       for (const key of keys) expect(language.exists(key), `${locale}: ${key}`).toBe(true)

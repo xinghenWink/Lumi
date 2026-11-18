@@ -12,6 +12,7 @@ export default {
     switchLight: '切换浅色主题',
     switchDark: '切换深色主题',
     version: 'Lumi · {version}',
+    announcementButton: '公告',
     adminOverview: '工作台',
     adminUsers: '用户与财务',
     adminAI: 'AI 服务',
