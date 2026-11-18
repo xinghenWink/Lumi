@@ -97,6 +97,7 @@ function ImageWorkspace({ id }: { id: string }) {
   const available = models.query.data?.items,
     modelID = data.data?.conversation.model_id
   const initializedModel = useRef<string | null>(null)
+  const restoredModel = useStore(image.store, (state) => state.restoredModel)
   const older = useMutation({ mutationFn: () => image.loadOlder(id) })
   const submitting = useStore(
     image.store,
@@ -148,12 +149,18 @@ function ImageWorkspace({ id }: { id: string }) {
     },
   })
   useEffect(() => {
-    initializedModel.current = null
     void image.open(id)
     return () => image.stopFollowing()
   }, [image, id])
   useEffect(() => {
     // Submission refreshes the saved conversation model. Seed the composer only when opening it.
+    if (restoredModel?.conversationId === id && available) {
+      initializedModel.current = id
+      if (available.some((model) => model.id === restoredModel.modelId))
+        runtime.modelStore.getState().select('image', restoredModel.modelId)
+      image.clearRestoredModel()
+      return
+    }
     if (
       initializedModel.current !== id &&
       modelID &&
@@ -162,7 +169,7 @@ function ImageWorkspace({ id }: { id: string }) {
       initializedModel.current = id
       runtime.modelStore.getState().select('image', modelID)
     }
-  }, [runtime, id, modelID, available])
+  }, [runtime, image, id, modelID, available, restoredModel])
   const mutate = action.mutate,
     refetch = data.refetch
   const cancel = useCallback((task: ImageTask) => image.cancel(task), [image])
@@ -324,7 +331,23 @@ function ImageWorkspace({ id }: { id: string }) {
             ) : null
           }
         >
-          <ImageAssetPanel docked={dockAssets} onClose={closeAssets} conversationId={id} />
+          <ImageAssetPanel
+            docked={dockAssets}
+            onClose={closeAssets}
+            conversationId={id}
+            onWorkspace={(kind) => {
+              if (kind === 'regenerate') {
+                setKeyword('')
+                setFilters(emptyTaskFilters)
+                closeAssets()
+              } else {
+                setAssetsOpen(false)
+                requestAnimationFrame(() => {
+                  document.querySelector<HTMLTextAreaElement>('.image-composer textarea')?.focus()
+                })
+              }
+            }}
+          />
         </Suspense>
       ) : null}
     </div>

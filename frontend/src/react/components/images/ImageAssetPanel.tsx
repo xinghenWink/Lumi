@@ -8,16 +8,19 @@ import { PageStatus } from '../shared/PageStatus'
 import { Button } from '../ui/button'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from '../ui/sheet'
 import { GalleryGrid } from './GalleryGrid'
+import type { GalleryTaskAction } from './GalleryTaskDetails'
 import { ImagePreview } from './ImagePreview'
 
 export default function ImageAssetPanel({
   docked,
   onClose,
   conversationId,
+  onWorkspace,
 }: {
   docked: boolean
   onClose(): void
   conversationId: string
+  onWorkspace(kind: GalleryTaskAction): void
 }) {
   const { t } = useTranslation()
   const query = useImageGallery()
@@ -83,6 +86,11 @@ export default function ImageAssetPanel({
       prompt={preview.prompt}
       parameters={[preview.model_name, preview.size, t('images.' + preview.quality)].join(' · ')}
       returnFocus={previewTrigger}
+      galleryDetails={{
+        taskIdForFile: () => preview.task_id,
+        conversationId,
+        onWorkspace,
+      }}
       editor={{
         conversationId,
         modelId: preview.model_id,

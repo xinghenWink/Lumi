@@ -1178,6 +1178,18 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(assetPreview.getByRole('button', { name: '擦除', exact: true })).toBeVisible()
     await expect(assetPreview.getByText(modelName, { exact: false }).first()).toBeVisible()
     expect(assetRequests.some((url) => !url.endsWith('/thumb'))).toBe(true)
+    const detailsTrigger = assetPreview.getByRole('button', { name: '任务详情', exact: true })
+    await detailsTrigger.click()
+    const assetTaskDetails = member.getByRole('dialog', { name: '任务详情', exact: true })
+    await expect(assetTaskDetails.getByText(modelName, { exact: false })).toBeVisible()
+    await expect(
+      assetTaskDetails.getByRole('button', { name: '重新编辑', exact: true }),
+    ).toBeEnabled()
+    await expect(
+      assetTaskDetails.getByRole('button', { name: '重新生成', exact: true }),
+    ).toBeEnabled()
+    await member.keyboard.press('Escape')
+    await expect(detailsTrigger).toBeFocused()
     await member.keyboard.press('Escape')
     await expect(assetPreview).toHaveCount(0)
     await expect(tile).toBeFocused()

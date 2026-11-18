@@ -929,7 +929,7 @@ export interface paths {
     put?: never
     /**
      * submitImageTask
-     * @description Charge and task creation are atomic. Identical key/input returns the same task; changed payload with the same key returns conflict. A new key creates a separate queued task even when the conversation and input match an existing task. No references uses generation, otherwise edit. Estimates are not price locks; task stores actual accepted price.
+     * @description Charge and task creation are atomic. Identical key/input returns the same task; changed payload with the same key returns conflict. A new key creates a separate queued task even when the conversation and input match an existing task. No references uses generation, otherwise edit. Estimates are not price locks; task stores actual accepted price. To regenerate from an owned historical task, reuse its original inputs including ordered references and edit options with the destination image conversation and a new idempotency key. Retry unconfirmed submissions with the same body and key.
      */
     post: operations['submitImageTask']
     delete?: never
@@ -945,7 +945,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** getOwnedImageTask */
+    /**
+     * getOwnedImageTask
+     * @description Returns an owned image task with its original submission parameters, ordered reference file IDs, and saved edit options when present. Gallery items link to this operation through their task_id.
+     */
     get: operations['getOwnedImageTask']
     put?: never
     post?: never
@@ -1002,7 +1005,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** listImageGallery */
+    /**
+     * listImageGallery
+     * @description Each generated image includes the task_id of its original task.
+     */
     get: operations['listImageGallery']
     put?: never
     post?: never

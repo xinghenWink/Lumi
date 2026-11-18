@@ -1,4 +1,17 @@
+import type { TFunction } from 'i18next'
 import type { ImageTask } from '../../../api/images'
+
+export function taskParameters(task: ImageTask, t: TFunction) {
+  return [
+    task.model_name,
+    t('images.' + task.quality),
+    task.size,
+    task.ratio,
+    t('react.imageCount', { count: task.n }),
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
 
 const pair = (value: string, separator: string) => {
   const [width, height] = value.split(separator).map(Number)

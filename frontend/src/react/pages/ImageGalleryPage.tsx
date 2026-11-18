@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query'
 import { Image as ImageIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { images, type ImageFile } from '../../api/images'
+import { images, type GalleryItem, type ImageFile } from '../../api/images'
 import { operations } from '../../api/operations'
 import { useRuntime } from '../app/context'
 import { useSession } from '../features/auth/hooks'
@@ -26,7 +26,7 @@ function GalleryResults({ filter }: { filter: string }) {
     navigate = useNavigate(),
     actions = useImageActions()
   const [selected, setSelected] = useState<string[]>([]),
-    [preview, setPreview] = useState<number | null>(null)
+    [preview, setPreview] = useState<{ items: GalleryItem[]; index: number } | null>(null)
   const [deleting, setDeleting] = useState<string[] | null>(null),
     [batch, setBatch] = useState(false)
   const query = useImageGallery(filter)
@@ -58,7 +58,7 @@ function GalleryResults({ filter }: { filter: string }) {
     },
   })
   const busy = removal.isPending || download.isPending || edit.isPending
-  const current = preview === null ? undefined : items[preview]
+  const current = preview?.items[preview.index]
   return (
     <>
       <ApiNotice
@@ -113,7 +113,7 @@ function GalleryResults({ filter }: { filter: string }) {
           }
           onPreview={(index, trigger) => {
             previewTrigger.current = trigger
-            setPreview(index)
+            setPreview({ items, index })
           }}
           onDownload={(file) => {
             void actions.download(file)
@@ -134,18 +134,22 @@ function GalleryResults({ filter }: { filter: string }) {
           }}
         />
       )}
-      {preview !== null && current ? (
+      {preview && current ? (
         <ImagePreview
-          files={items.map((item) => item.file)}
-          initialIndex={preview}
+          files={preview.items.map((item) => item.file)}
+          initialIndex={preview.index}
           prompt={current.prompt}
           parameters={[current.model_name, current.size, t('images.' + current.quality)].join(
             ' · ',
           )}
           onClose={() => setPreview(null)}
           onEdit={(file) => edit.mutate(file)}
-          onNavigate={setPreview}
+          onNavigate={(index) => setPreview({ ...preview, index })}
           returnFocus={previewTrigger}
+          galleryDetails={{
+            taskIdForFile: (id) => preview.items.find((item) => item.file.id === id)?.task_id,
+            onWorkspace: () => setPreview(null),
+          }}
           editor={{
             conversationId: '',
             modelId: current.model_id,
