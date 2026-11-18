@@ -6,9 +6,9 @@
 
 Lumi 把流式聊天、生图与改图、积分兑换和管理后台整合到一个站点。前端嵌入 Go 二进制，配合 PostgreSQL、Redis 和持久文件目录运行，通过 OpenAI 兼容上游调用模型，适合部署自己的 AI 创作服务。
 
-本源码对应 **[v0.3.2](https://github.com/xinghenWink/Lumi/releases/tag/v0.3.2)**。本版本新增可收起侧栏、生图工作区搜索与素材筛选、重新生成和全屏图像编辑，修复聊天回复的标签渲染。正式镜像支持 `linux/amd64` 和 `linux/arm64`。产品仍在 0.x 阶段，见 [版本策略](docs/VERSIONING.md)。
+本源码对应 **[v0.3.3](https://github.com/xinghenWink/Lumi/releases/tag/v0.3.3)**。本版本新增分类公告和 GitHub Release 导入，支持从图库查看和复用生图任务，并修复聊天回复中的标签、重复片段和参考图移除按钮的显示问题。正式镜像支持 `linux/amd64` 和 `linux/arm64`。产品仍在 0.x 阶段，见 [版本策略](docs/VERSIONING.md)。
 
-从 v0.3.1 升级时，应用会自动执行前向迁移 00015 和 00016。升级前备份数据库、图片和密钥，停用旧应用后再启动新版。升级步骤见 [部署手册](docs/DEPLOYMENT.md#升级回滚)。
+从 v0.3.2 升级时，应用会自动执行前向迁移 00017 和 00018，保存公告来源版本、类型和展示方式。升级前备份数据库、图片和密钥，停用旧应用后再启动新版。升级步骤见 [部署手册](docs/DEPLOYMENT.md#升级回滚)。
 
 [功能](#功能) · [技术与架构](#技术与架构) · [快速部署](#快速部署) · [首次配置](#首次配置) · [运维](#运维) · [本地开发](#本地开发) · [文档](#文档)
 
@@ -76,7 +76,7 @@ Lumi 提供平台和管理能力，上游推理服务需要单独准备。默认
 
 ```sh
 curl --fail --location \
-  https://github.com/xinghenWink/Lumi/releases/download/v0.3.2/lumi-deploy.tar.gz \
+  https://github.com/xinghenWink/Lumi/releases/download/v0.3.3/lumi-deploy.tar.gz \
   --output lumi-deploy.tar.gz
 sudo install -d -m 700 /opt/lumi
 sudo tar -xzf lumi-deploy.tar.gz -C /opt/lumi
@@ -88,7 +88,7 @@ sudoedit /opt/lumi/.env
 
 ```dotenv
 LUMI_IMAGE=ghcr.io/xinghenwink/lumi
-LUMI_VERSION=v0.3.2
+LUMI_VERSION=v0.3.3
 ADMIN_EMAIL=admin@example.com
 PUBLIC_BASE_URL=https://lumi.example.com
 COOKIE_SECURE=true
