@@ -46,7 +46,13 @@ export function resolveImageOptions(
     // Keep custom mappings with the same ratio. Older approximate mappings remain valid over the API.
     const [w = 0, h = 0] = size.split('x').map(Number)
     const [a = 0, b = 0] = ratio.split(':').map(Number)
-    if (presets.length && (!w || !h || Math.abs(w * b - h * a) > Math.max(a, b))) continue
+    const restoredMapping = draft.ratio === ratio && draft.size === size && size !== 'auto'
+    if (
+      !restoredMapping &&
+      presets.length &&
+      (!w || !h || Math.abs(w * b - h * a) > Math.max(a, b))
+    )
+      continue
     const options = ratioOptions.get(ratio) ?? []
     if (!options.includes(size)) options.push(size)
     ratioOptions.set(ratio, options)

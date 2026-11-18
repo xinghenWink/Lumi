@@ -1,10 +1,9 @@
 import { Check, Copy, Pencil, RefreshCw } from 'lucide-react'
-import { lazy, memo, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, memo, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { Message } from '../../../api/chat'
 import type { Illustration } from '../../../features/chat/markdown'
-import { parseAssistantReply } from '../../../features/chat/reply-markup'
 import { ApiNotice } from '../shared/ApiNotice'
 import { BrandMark } from '../shared/BrandMark'
 import { useRuntime } from '../../app/context'
@@ -52,6 +51,12 @@ export const MessageCard = memo(function MessageCard({
 }) {
   const { t, i18n } = useTranslation()
   const [copied, setCopied] = useState(false)
+  const [copyReady, setCopyReady] = useState(false)
+  const assistantCopy = useRef<string | undefined>(undefined)
+  const prepareCopy = useCallback((value: string) => {
+    if (assistantCopy.current === undefined) setCopyReady(true)
+    assistantCopy.current = value
+  }, [])
   const [illustrationError, setIllustrationError] = useState<unknown>()
   const runtime = useRuntime(),
     navigate = useNavigate()
@@ -96,16 +101,12 @@ export const MessageCard = memo(function MessageCard({
           className="size-8 rounded-lg"
           aria-label={t(copied ? 'chat.copied' : 'chat.copy')}
           title={t(copied ? 'chat.copied' : 'chat.copy')}
+          disabled={!user && !copyReady}
           onClick={() => {
+            const text = user ? content : assistantCopy.current
+            if (text === undefined) return
             void navigator.clipboard
-              .writeText(
-                user
-                  ? content
-                  : parseAssistantReply(content, !streaming, message.meta.sources, {
-                      unavailable: t('chat.sourceUnavailable'),
-                      sources: t('chat.sources'),
-                    }).copy,
-              )
+              .writeText(text)
               .then(() => setCopied(true))
               .catch(() => setCopied(false))
           }}
@@ -192,6 +193,7 @@ export const MessageCard = memo(function MessageCard({
                     complete={!streaming}
                     sources={message.meta.sources}
                     onIllustration={illustrate}
+                    onCopyPrepared={prepareCopy}
                   />
                 </Suspense>
               ) : streaming ? (

@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify'
 import type { HighlighterCore } from 'shiki/core'
 import {
   advanceMarkdownFence,
+  readIllustrationQueries,
   readReplyTag,
   replyDecorationIndex,
   type ReplyDecoration,
@@ -53,15 +54,16 @@ const illustrationName = '<AsyncImage'
 const illustrationRatios = new Set(['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16'])
 // Some upstream models emit JSX-style <AsyncImage query="…" aspectRatio="16:9"/> placeholders.
 export function parseIllustration(attributes: string): Illustration {
-  return illustrationFrom(readReplyTag('<AsyncImage' + attributes + '>', 0)?.attributes)
+  const tag = readReplyTag('<AsyncImage' + attributes + '>', 0)
+  const prompt = tag ? readIllustrationQueries(tag)[0] : ''
+  return illustrationFrom(prompt ?? '', tag?.attributes.get('aspectratio'))
 }
-function illustrationFrom(values: Map<string, string> | undefined): Illustration {
-  const prompt = (values?.get('query') ?? values?.get('prompt') ?? values?.get('alt') ?? '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 2000)
-  const ratio = (values?.get('aspectratio') ?? '').replace(/\s+/g, '').replace('/', ':')
-  return { prompt, ratio: /^\d{1,2}:\d{1,2}$/.test(ratio) ? ratio : '' }
+function illustrationFrom(prompt: string, aspectRatio = ''): Illustration {
+  const ratio = aspectRatio.replace(/\s+/g, '').replace('/', ':')
+  return {
+    prompt: prompt.replace(/\s+/g, ' ').trim().slice(0, 2000),
+    ratio: /^\d{1,2}:\d{1,2}$/.test(ratio) ? ratio : '',
+  }
 }
 function illustrationHTML(
   escape: (value: string) => string,
@@ -222,12 +224,19 @@ export async function renderMarkdown(
     if (state.src.charCodeAt(state.pos) !== 0x3c) return false
     const rest = state.src.slice(state.pos, state.posMax)
     const tag = rest.startsWith(illustrationName) ? readReplyTag(state.src, state.pos) : undefined
-    if (tag?.name === 'asyncimage' && !tag.incomplete && tag.end <= state.posMax) {
+    if (
+      tag &&
+      (tag.name === 'asyncimage' || tag.name === 'asyncimagegroup') &&
+      !tag.incomplete &&
+      tag.end <= state.posMax
+    ) {
       if (!silent) {
-        const item = illustrationFrom(tag.attributes)
-        const token = state.push('lumi_illustration', '', 0)
-        token.attrSet('prompt', item.prompt)
-        token.attrSet('ratio', item.ratio)
+        for (const query of readIllustrationQueries(tag)) {
+          const item = illustrationFrom(query, tag.attributes.get('aspectratio'))
+          const token = state.push('lumi_illustration', '', 0)
+          token.attrSet('prompt', item.prompt)
+          token.attrSet('ratio', item.ratio)
+        }
       }
       state.pos = tag.end
       return true

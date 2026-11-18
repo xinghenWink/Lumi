@@ -20,10 +20,10 @@ export function PageStatus({ error, retry }: { error?: unknown; retry?: () => vo
           ) : null}
         </>
       ) : (
-        <p className="flex items-center justify-center gap-2 py-10 text-center text-sm text-muted-foreground">
+        <div className="flex items-center justify-center gap-2 py-10 text-center text-sm text-muted-foreground">
           <Skeleton aria-hidden="true" className="size-4 rounded-full bg-primary/25" />
           {t('common.loading')}
-        </p>
+        </div>
       )}
     </div>
   )

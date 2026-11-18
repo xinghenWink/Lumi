@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ChatSource } from '../../../api/chat'
 import {
@@ -58,6 +58,7 @@ export const MarkdownContent = memo(function MarkdownContent({
   content,
   complete = true,
   onIllustration,
+  onCopyPrepared,
   assistant = false,
   sources,
 }: {
@@ -65,6 +66,7 @@ export const MarkdownContent = memo(function MarkdownContent({
   complete?: boolean
   /** Enables the generate button on model-suggested illustrations. */
   onIllustration?: (illustration: Illustration) => void
+  onCopyPrepared?: (text: string) => void
   assistant?: boolean
   sources?: readonly ChatSource[] | undefined
 }) {
@@ -82,6 +84,10 @@ export const MarkdownContent = memo(function MarkdownContent({
   )
   const sections = reply?.parts ?? [{ kind: 'markdown', source: content }]
   const decorations = reply?.decorations.length ? reply.decorations : reply && emptyDecorations
+  const copyText = reply?.copy
+  useLayoutEffect(() => {
+    if (copyText !== undefined) onCopyPrepared?.(copyText)
+  }, [copyText, onCopyPrepared])
   function sectionBlocks(source: string) {
     return partitionMarkdown(source, complete).map((part) => (
       <MarkdownBlock

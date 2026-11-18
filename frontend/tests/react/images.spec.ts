@@ -653,6 +653,35 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(uploadedReference).toBeFocused()
     const removeReference = references.getByRole('button', { name: '移除参考图', exact: true })
     await expect(removeReference).toHaveCount(2)
+    if (!mobile) {
+      const action = removeReference.nth(1)
+      const html = member.locator('html')
+      const initialTheme = (await html.getAttribute('data-theme')) === 'dark' ? 'dark' : 'light'
+      async function selectTheme(theme: 'light' | 'dark') {
+        if ((await html.getAttribute('data-theme')) !== theme) {
+          const name = theme === 'light' ? '切换浅色主题' : '切换深色主题'
+          await member.getByRole('button', { name, exact: true }).click()
+        }
+        await expect(html).toHaveAttribute('data-theme', theme)
+      }
+      for (const colorScheme of ['light', 'dark'] as const) {
+        await selectTheme(colorScheme)
+        const theme = await member.locator('body').evaluate((body) => {
+          const { backgroundColor, color } = getComputedStyle(body)
+          return { backgroundColor, color }
+        })
+        await member.mouse.move(0, 0)
+        await uploadedReference.focus()
+        await member.keyboard.press('Tab')
+        await expect(action).toBeFocused()
+        await expect(action).toHaveCSS('background-color', theme.color)
+        await expect(action.locator('svg')).toHaveCSS('stroke', theme.backgroundColor)
+        await action.hover()
+        await expect(action).toHaveCSS('background-color', theme.color)
+        await expect(action.locator('svg')).toHaveCSS('stroke', theme.backgroundColor)
+      }
+      await selectTheme(initialTheme)
+    }
     await removeReference.first().click()
     await removeReference.click()
     // Files dropped anywhere in the workspace, or pasted outside a text field, become references.
@@ -1178,6 +1207,18 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(assetPreview.getByRole('button', { name: '擦除', exact: true })).toBeVisible()
     await expect(assetPreview.getByText(modelName, { exact: false }).first()).toBeVisible()
     expect(assetRequests.some((url) => !url.endsWith('/thumb'))).toBe(true)
+    const detailsTrigger = assetPreview.getByRole('button', { name: '任务详情', exact: true })
+    await detailsTrigger.click()
+    const assetTaskDetails = member.getByRole('dialog', { name: '任务详情', exact: true })
+    await expect(assetTaskDetails.getByText(modelName, { exact: false })).toBeVisible()
+    await expect(
+      assetTaskDetails.getByRole('button', { name: '重新编辑', exact: true }),
+    ).toBeEnabled()
+    await expect(
+      assetTaskDetails.getByRole('button', { name: '重新生成', exact: true }),
+    ).toBeEnabled()
+    await member.keyboard.press('Escape')
+    await expect(detailsTrigger).toBeFocused()
     await member.keyboard.press('Escape')
     await expect(assetPreview).toHaveCount(0)
     await expect(tile).toBeFocused()

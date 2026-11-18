@@ -43,6 +43,7 @@ func (h *Handler) m6Routes(protected, admin *gin.RouterGroup) {
 	admin.GET("/conversations", h.adminChats)
 	admin.GET("/conversations/:id/messages", h.adminChatContent)
 	admin.GET("/announcements", h.announcements)
+	admin.GET("/announcements/github-releases", h.announcementReleases)
 	admin.POST("/announcements", h.csrf, h.adminLimit, h.saveAnnouncement)
 	admin.PUT("/announcements/:id", h.csrf, h.adminLimit, h.saveAnnouncement)
 	admin.DELETE("/announcements/:id", h.csrf, h.adminLimit, h.deleteAnnouncement)
@@ -224,7 +225,17 @@ func (h *Handler) announcements(c *gin.Context) {
 		h.fail(c, err)
 		return
 	}
-	v, err := h.services.Operations.Announcements(c.Request.Context(), !admin, c.Query("cursor"), limit)
+	scope := operations.ActiveAnnouncements
+	if admin {
+		scope = operations.AdminAnnouncements
+	} else if history := c.Query("include_history"); history != "" {
+		if history != "1" {
+			h.fail(c, problem.Invalid())
+			return
+		}
+		scope = operations.AnnouncementFeed
+	}
+	v, err := h.services.Operations.Announcements(c.Request.Context(), scope, c.Query("cursor"), limit)
 	h.imageReply(c, v, err, 200)
 }
 func (h *Handler) saveAnnouncement(c *gin.Context) {

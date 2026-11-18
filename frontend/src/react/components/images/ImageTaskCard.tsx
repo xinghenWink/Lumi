@@ -15,8 +15,12 @@ import { useTranslation } from 'react-i18next'
 import { images, terminal, type ImageFile, type ImageTask } from '../../../api/images'
 import { ApiError } from '../../../api/transport'
 import { useImageActions } from '../../features/images/actions'
-import { elapsedSeconds, statusTone, taskAspect } from '../../features/images/presentation'
-import { useTime } from '../../features/accounts/time'
+import {
+  elapsedSeconds,
+  statusTone,
+  taskAspect,
+  taskParameters,
+} from '../../features/images/presentation'
 import { useNow } from '../../lib/ticker'
 import { cn } from '../../lib/utils'
 import { ApiNotice } from '../shared/ApiNotice'
@@ -25,6 +29,7 @@ import { Button } from '../ui/button'
 import { ProtectedImage } from './ProtectedImage'
 import { ImagePreview } from './ImagePreview'
 import { ImageTaskPrompt } from './ImageTaskPrompt'
+import { ImageTaskDetails } from './ImageTaskDetails'
 import { ReferenceChips } from './ReferenceChips'
 
 const tones = {
@@ -76,7 +81,6 @@ export const ImageTaskCard = memo(function ImageTaskCard({
   onChanged(): void
 }) {
   const { t } = useTranslation(),
-    time = useTime(),
     actions = useImageActions()
   const [preview, setPreview] = useState<number | null>(null),
     [details, setDetails] = useState(false),
@@ -99,15 +103,7 @@ export const ImageTaskCard = memo(function ImageTaskCard({
           ratio: task.ratio,
         }
       : undefined
-  const parameters = [
-    task.model_name,
-    t('images.' + task.quality),
-    task.size,
-    task.ratio,
-    t('react.imageCount', { count: task.n }),
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  const parameters = taskParameters(task, t)
   const removal = useMutation({
     mutationFn: async () => {
       if (deleting) await images.removeFile(deleting, admin)
@@ -418,37 +414,7 @@ export const ImageTaskCard = memo(function ImageTaskCard({
         description={parameters}
         returnFocus={detailsTrigger}
       >
-        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 text-xs">
-          {[
-            ['images.task', task.id],
-            ['images.user', task.user_id],
-            ['images.created', time(task.created_at)],
-            [
-              'images.operation',
-              t(task.operation === 'edit' ? 'images.editOperation' : 'images.generate'),
-            ],
-            ['images.status', t('images.' + task.status)],
-          ].map(([label, value]) => (
-            <div className="contents" key={label}>
-              <dt className="text-muted-foreground">{t(label ?? '')}</dt>
-              <dd className="break-all">{value}</dd>
-            </div>
-          ))}
-        </dl>
-        <p className="mt-4 text-xs tabular-nums">
-          {t('images.actual', { cost: task.actual_cost })} ·{' '}
-          {t('images.refund', { cost: task.refunded_cost })}
-        </p>
-        {task.started_at && task.finished_at ? (
-          <p className="mt-2 text-xs text-muted-foreground">
-            {t('images.duration', {
-              seconds: Math.max(
-                0,
-                (Date.parse(task.finished_at) - Date.parse(task.started_at)) / 1000,
-              ).toFixed(1),
-            })}
-          </p>
-        ) : null}
+        <ImageTaskDetails task={task} />
       </ModalDialog>
       <ModalDialog
         open={!!deleting}

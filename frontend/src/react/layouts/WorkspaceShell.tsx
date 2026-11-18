@@ -8,7 +8,7 @@ import { LanguageSwitcher } from '../components/shared/LanguageSwitcher'
 import { ThemeToggle } from '../components/shared/ThemeToggle'
 import { routeTitle } from '../features/accounts/navigation'
 import { usePublicConfig } from '../features/auth/hooks'
-import { RuntimeBanner } from '../components/shared/RuntimeBanner'
+import { AnnouncementButton } from '../components/shared/AnnouncementButton'
 import { DropLayer } from '../components/shared/DropLayer'
 import { cn } from '../lib/utils'
 
@@ -97,8 +97,8 @@ export function ShellLayout({ admin }: { admin: boolean }) {
           <span className="min-w-0 flex-1 truncate text-xs font-medium">{t(title)}</span>
           <LanguageSwitcher />
           <ThemeToggle />
+          <AnnouncementButton />
         </header>
-        <RuntimeBanner />
         <SidebarInset
           id="main-content"
           className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto"

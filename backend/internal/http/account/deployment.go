@@ -21,14 +21,36 @@ func (h *Handler) releases(c *gin.Context) {
 		h.fail(c, problem.New("DEPENDENCY_UNAVAILABLE", http.StatusServiceUnavailable))
 		return
 	}
+	page, refresh, err := releasePageArguments(c)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	result, err := h.services.Deployment.Releases(c.Request.Context(), page, refresh)
+	h.imageReply(c, result, err, http.StatusOK)
+}
+
+func (h *Handler) announcementReleases(c *gin.Context) {
+	if h.services.Deployment == nil {
+		h.fail(c, problem.New("ANNOUNCEMENT_GITHUB_UNAVAILABLE", http.StatusServiceUnavailable))
+		return
+	}
+	page, refresh, err := releasePageArguments(c)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	result, err := h.services.Deployment.AnnouncementReleases(c.Request.Context(), page, refresh)
+	h.imageReply(c, result, err, http.StatusOK)
+}
+
+func releasePageArguments(c *gin.Context) (int, bool, error) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 	refresh := c.Query("refresh")
 	if err != nil || refresh != "" && refresh != "1" {
-		h.fail(c, problem.Invalid())
-		return
+		return 0, false, problem.Invalid()
 	}
-	result, err := h.services.Deployment.Releases(c.Request.Context(), page, refresh == "1")
-	h.imageReply(c, result, err, http.StatusOK)
+	return page, refresh == "1", nil
 }
 
 func (h *Handler) enqueueDeployment(c *gin.Context) {

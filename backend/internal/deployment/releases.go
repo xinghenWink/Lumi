@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/xinghenWink/Lumi/backend/internal/platform/problem"
 )
 
 const (
@@ -40,6 +42,39 @@ type Release struct {
 	Draft       bool      `json:"draft"`
 	Prerelease  bool      `json:"prerelease"`
 	Assets      []Asset   `json:"assets"`
+}
+
+type AnnouncementRelease struct {
+	Version     string    `json:"version"`
+	Name        string    `json:"name"`
+	Notes       string    `json:"notes"`
+	PublishedAt time.Time `json:"published_at"`
+}
+
+type AnnouncementReleasePage struct {
+	Items    []AnnouncementRelease `json:"items"`
+	NextPage int                   `json:"next_page"`
+	Stale    bool                  `json:"stale"`
+}
+
+func (s *Service) AnnouncementReleases(ctx context.Context, page int, refresh bool) (AnnouncementReleasePage, error) {
+	if page < 1 || page > maxPage {
+		return AnnouncementReleasePage{}, problem.Invalid()
+	}
+	releases, entry, err := s.releases.list(ctx, page, refresh)
+	if err != nil {
+		return AnnouncementReleasePage{}, fmt.Errorf("list releases for announcements: %w", problem.New("ANNOUNCEMENT_GITHUB_UNAVAILABLE", http.StatusServiceUnavailable))
+	}
+	result := AnnouncementReleasePage{Items: make([]AnnouncementRelease, 0, len(releases)), Stale: entry.stale}
+	if entry.more && page < maxPage {
+		result.NextPage = page + 1
+	}
+	for _, release := range releases {
+		result.Items = append(result.Items, AnnouncementRelease{
+			Version: release.Version, Name: release.Name, Notes: release.Notes, PublishedAt: release.PublishedAt,
+		})
+	}
+	return result, nil
 }
 
 func (r Release) stable() bool {

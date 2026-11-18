@@ -56,8 +56,10 @@ test('M6 dashboard, preferences, announcements, exports and system information',
     throw new Error('Invalid announcement')
   try {
     await page.goto('/admin/dashboard')
+    const announcementDialog = page.getByRole('dialog', { name: '系统公告' })
+    await expect(announcementDialog).toContainText(name)
+    await announcementDialog.getByRole('button', { name: '当前关闭' }).click()
     await expect(page.getByRole('heading', { name: '数据看板', exact: true })).toBeVisible()
-    await expect(page.locator('.ops-announcements')).toContainText(name)
     await expect(page.getByRole('heading', { name: '每日趋势（UTC）' })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.screenshot({

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const acquireCircuitProbe = `-- name: AcquireCircuitProbe :execrows
@@ -297,15 +298,19 @@ func (q *Queries) CountUpstreams(ctx context.Context) (int32, error) {
 }
 
 const createAnnouncement = `-- name: CreateAnnouncement :one
-INSERT INTO announcements(id,content,starts_at,ends_at,enabled) VALUES($1,$2,$3,$4,$5) RETURNING id, content, starts_at, ends_at, enabled, version, created_at
+INSERT INTO announcements(id,content,starts_at,ends_at,enabled,github_release_tag,announcement_type,display_mode)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, content, starts_at, ends_at, enabled, version, created_at, github_release_tag, announcement_type, display_mode
 `
 
 type CreateAnnouncementParams struct {
-	ID       uuid.UUID
-	Content  string
-	StartsAt time.Time
-	EndsAt   *time.Time
-	Enabled  bool
+	ID               uuid.UUID
+	Content          string
+	StartsAt         time.Time
+	EndsAt           *time.Time
+	Enabled          bool
+	GithubReleaseTag pgtype.Text
+	AnnouncementType string
+	DisplayMode      string
 }
 
 func (q *Queries) CreateAnnouncement(ctx context.Context, arg CreateAnnouncementParams) (Announcement, error) {
@@ -315,6 +320,9 @@ func (q *Queries) CreateAnnouncement(ctx context.Context, arg CreateAnnouncement
 		arg.StartsAt,
 		arg.EndsAt,
 		arg.Enabled,
+		arg.GithubReleaseTag,
+		arg.AnnouncementType,
+		arg.DisplayMode,
 	)
 	var i Announcement
 	err := row.Scan(
@@ -325,6 +333,9 @@ func (q *Queries) CreateAnnouncement(ctx context.Context, arg CreateAnnouncement
 		&i.Enabled,
 		&i.Version,
 		&i.CreatedAt,
+		&i.GithubReleaseTag,
+		&i.AnnouncementType,
+		&i.DisplayMode,
 	)
 	return i, err
 }
@@ -535,7 +546,7 @@ func (q *Queries) DueSelfDeletedUsers(ctx context.Context) ([]User, error) {
 }
 
 const getAnnouncement = `-- name: GetAnnouncement :one
-SELECT id, content, starts_at, ends_at, enabled, version, created_at FROM announcements WHERE id=$1 FOR UPDATE
+SELECT id, content, starts_at, ends_at, enabled, version, created_at, github_release_tag, announcement_type, display_mode FROM announcements WHERE id=$1 FOR UPDATE
 `
 
 func (q *Queries) GetAnnouncement(ctx context.Context, id uuid.UUID) (Announcement, error) {
@@ -549,6 +560,9 @@ func (q *Queries) GetAnnouncement(ctx context.Context, id uuid.UUID) (Announceme
 		&i.Enabled,
 		&i.Version,
 		&i.CreatedAt,
+		&i.GithubReleaseTag,
+		&i.AnnouncementType,
+		&i.DisplayMode,
 	)
 	return i, err
 }
@@ -610,21 +624,24 @@ func (q *Queries) InvalidatePasswordResets(ctx context.Context, userID uuid.UUID
 }
 
 const listAnnouncements = `-- name: ListAnnouncements :many
-SELECT id, content, starts_at, ends_at, enabled, version, created_at FROM announcements WHERE (NOT $1::boolean OR (enabled AND starts_at<=now() AND (ends_at IS NULL OR ends_at>now())))
-AND ($2::timestamptz IS NULL OR (created_at,id)<($2,$3::uuid))
-ORDER BY created_at DESC,id DESC LIMIT $4
+SELECT id, content, starts_at, ends_at, enabled, version, created_at, github_release_tag, announcement_type, display_mode FROM announcements WHERE ($1::boolean OR (enabled AND starts_at<=now()
+AND (ends_at IS NULL OR ends_at>now() OR ($2::boolean AND display_mode='history'))))
+AND ($3::timestamptz IS NULL OR (created_at,id)<($3,$4::uuid))
+ORDER BY created_at DESC,id DESC LIMIT $5
 `
 
 type ListAnnouncementsParams struct {
-	ActiveOnly bool
-	CursorTime *time.Time
-	CursorID   uuid.UUID
-	PageLimit  int32
+	AdminView      bool
+	IncludeHistory bool
+	CursorTime     *time.Time
+	CursorID       uuid.UUID
+	PageLimit      int32
 }
 
 func (q *Queries) ListAnnouncements(ctx context.Context, arg ListAnnouncementsParams) ([]Announcement, error) {
 	rows, err := q.db.Query(ctx, listAnnouncements,
-		arg.ActiveOnly,
+		arg.AdminView,
+		arg.IncludeHistory,
 		arg.CursorTime,
 		arg.CursorID,
 		arg.PageLimit,
@@ -644,6 +661,9 @@ func (q *Queries) ListAnnouncements(ctx context.Context, arg ListAnnouncementsPa
 			&i.Enabled,
 			&i.Version,
 			&i.CreatedAt,
+			&i.GithubReleaseTag,
+			&i.AnnouncementType,
+			&i.DisplayMode,
 		); err != nil {
 			return nil, err
 		}
@@ -900,16 +920,19 @@ func (q *Queries) SetMessageReferences(ctx context.Context, arg SetMessageRefere
 }
 
 const updateAnnouncement = `-- name: UpdateAnnouncement :one
-UPDATE announcements SET content=$2,starts_at=$3,ends_at=$4,enabled=$5,version=version+1 WHERE id=$1 AND version=$6 RETURNING id, content, starts_at, ends_at, enabled, version, created_at
+UPDATE announcements SET content=$2,starts_at=$3,ends_at=$4,enabled=$5,announcement_type=$6,display_mode=$7,version=version+1
+WHERE id=$1 AND version=$8 RETURNING id, content, starts_at, ends_at, enabled, version, created_at, github_release_tag, announcement_type, display_mode
 `
 
 type UpdateAnnouncementParams struct {
-	ID       uuid.UUID
-	Content  string
-	StartsAt time.Time
-	EndsAt   *time.Time
-	Enabled  bool
-	Version  int64
+	ID               uuid.UUID
+	Content          string
+	StartsAt         time.Time
+	EndsAt           *time.Time
+	Enabled          bool
+	AnnouncementType string
+	DisplayMode      string
+	Version          int64
 }
 
 func (q *Queries) UpdateAnnouncement(ctx context.Context, arg UpdateAnnouncementParams) (Announcement, error) {
@@ -919,6 +942,8 @@ func (q *Queries) UpdateAnnouncement(ctx context.Context, arg UpdateAnnouncement
 		arg.StartsAt,
 		arg.EndsAt,
 		arg.Enabled,
+		arg.AnnouncementType,
+		arg.DisplayMode,
 		arg.Version,
 	)
 	var i Announcement
@@ -930,6 +955,9 @@ func (q *Queries) UpdateAnnouncement(ctx context.Context, arg UpdateAnnouncement
 		&i.Enabled,
 		&i.Version,
 		&i.CreatedAt,
+		&i.GithubReleaseTag,
+		&i.AnnouncementType,
+		&i.DisplayMode,
 	)
 	return i, err
 }

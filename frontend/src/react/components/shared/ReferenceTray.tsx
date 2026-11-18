@@ -16,7 +16,7 @@ import type { ImageEditorTarget } from '../../features/images/editor'
 const chip =
   'group relative size-16 shrink-0 gap-0 overflow-hidden p-0 rounded-xl border border-border bg-muted shadow-xs animate-rise-in'
 const corner =
-  'absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-foreground/75 text-background shadow-sm transition-[opacity,background-color] hover:bg-foreground focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40'
+  'absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-foreground/75 text-background shadow-sm transition-[opacity,background-color] hover:bg-foreground hover:text-background focus-visible:bg-foreground focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40'
 
 function Committed({
   id,

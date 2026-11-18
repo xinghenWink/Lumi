@@ -72,6 +72,10 @@ export default {
     reserved: '{cost} credits reserved',
     reuseParameters: 'Reuse parameters',
     regenerate: 'Regenerate',
+    reedit: 'Edit again',
+    replaceHistoryDraft:
+      'Editing again will replace the unsent prompt and references in this workspace.',
+    confirmHistoryReuse: 'Continue',
     edit: 'Use as reference',
     editor: {
       open: 'Edit image',
@@ -210,6 +214,11 @@ export default {
     IMAGE_TASK_NOT_FOUND: 'Task not found or inaccessible',
     IMAGE_CONVERSATION_NOT_FOUND: 'Image conversation not found',
     IMAGE_MODEL_UNAVAILABLE: 'Image model is unavailable',
+    IMAGE_HISTORY_PARAMETERS_UNAVAILABLE:
+      'The original quality, size, aspect ratio, or image count is no longer supported by the model.',
+    IMAGE_SUBMISSION_PENDING:
+      'This workspace has an unconfirmed submission. Retry it in the workspace first.',
+    IMAGE_DRAFT_CHANGED: 'The conversation or draft changed. Start the action again.',
     IMAGE_RESULT_INVALID: 'Invalid upstream image; credits refunded',
     IMAGE_RESULT_NOT_TRANSPARENT:
       'The result needs a transparent background and a visible subject. Credits refunded.',

@@ -433,7 +433,7 @@ type Adapter interface {
 
 | 分组 | 配置项 |
 | --- | --- |
-| 站点 | 名称、Logo、Favicon、公告（登录后顶部横幅，支持 Markdown）、页脚、联系方式、服务条款与隐私政策链接 |
+| 站点 | 名称、Logo、Favicon、公告（登录后弹窗，支持 Markdown，右上角可再次打开）、页脚、联系方式、服务条款与隐私政策链接 |
 | 注册与安全 | 开放注册、邮箱验证、域名白/黑名单、Turnstile、每 IP 注册上限、登录失败锁定参数 |
 | 邮件 | SMTP 主机/端口/账号/加密方式/发件人，“发送测试邮件”按钮 |
 | 聊天 | 每分钟/每日上限、上下文条数与 token 上限、全局 system prompt、标题生成所用模型 |
@@ -445,7 +445,12 @@ type Adapter interface {
 ### 12.7 其它后台功能
 
 - **F-ADM-17（P0）**：审计日志：谁、何时、做了什么（用户/积分/兑换码/设置/上游）、对象、变更前后（敏感字段脱敏）、IP；可筛选；保留 180 天。
-- **F-ADM-18（P1）**：公告管理（可多条，支持起止时间）。
+- **F-ADM-18（P1）**：公告管理（可多条，支持起止时间）。每条公告可选择「系统更新」或「日常」，并可选择「单独展示」或「历史展示」。系统更新默认历史展示，日常默认单独展示。管理员可导入 Lumi GitHub 正式 Release 的更新说明，在编辑器确认发布，后台保留来源版本。
+
+登录后的首次公告加载会自动展示生效公告。选择「当前关闭」后，同一登录中的页面切换和刷新都保留关闭状态。选择「今日关闭」后，同一浏览器中的该账号当天重新登录也保留关闭状态，至浏览器当地午夜失效。两种方式均可通过右上角「公告」按钮重新查看。
+
+弹窗中的历史公告按类型归组，并按新增时间从新到旧排列，向下滚动可查看较早的记录。历史公告在生效后保留至停用或删除，结束时间决定其何时停止触发自动弹窗。单独展示的公告在生效期内作为独立条目显示。已有 GitHub 公告归入系统更新历史，其他已有公告归为日常单独展示。
+
 - **F-ADM-19（P1）**：系统信息页：版本、构建时间、运行时长、DB/Redis 状态、图片目录占用、一键清理过期图片。
 
 ### 12.8 后台定时任务（`jobs` 模块）
@@ -478,13 +483,14 @@ type Adapter interface {
 | `settings` | `key`、`value`（JSONB）、`updated_by`、`updated_at` |  |
 | `audit_logs` | `id`、`actor_id`、`action`、`target_type`、`target_id`、`before`、`after`、`ip`、`created_at` | `(actor_id, created_at)`、`(target_type, target_id)` |
 | `upstream_calls` | `id`、`upstream_id`、`model`、`kind`、`latency_ms`、`status`、`error_summary`、`request_id`、`created_at` | 保留 30 天 |
-| `announcements`（P1） | `id`、`content`、`starts_at`、`ends_at`、`enabled` |  |
+| `announcements`（P1） | `id`、`content`、`starts_at`、`ends_at`、`enabled`、`announcement_type`、`display_mode`、可选 `github_release_tag` |  |
 
 ## 14. API 清单（前缀 `/api/v1`，完整定义写入 `docs/openapi.yaml`）
 
 | 分组 | 方法与路径 | 说明 |
 | --- | --- | --- |
-| 公共 | `GET /public/config` | 站点名、注册开关、Turnstile site key、公告 |
+| 公共 | `GET /public/config` | 站点名、注册开关、Turnstile site key |
+| 公告 | `GET /announcements` | 登录后读取当前生效的公告，弹窗通过 `include_history=1` 同时读取历史公告 |
 | 认证 | `POST /auth/register`、`/auth/login`、`/auth/refresh`、`/auth/logout`、`/auth/send-code`、`/auth/forgot-password`、`/auth/reset-password` |  |
 | 我的 | `GET/PATCH /me`、`POST /me/password`、`GET /me/sessions`、`DELETE /me/sessions/{id}` |  |
 | 积分 | `GET /me/credits`、`GET /me/credits/ledger`、`GET /me/credits/stats`、`POST /me/redeem`、`GET /me/redeem-records` | 兑换需 `Idempotency-Key` |
@@ -501,7 +507,7 @@ type Adapter interface {
 | 后台-上游 | `CRUD /admin/upstreams`、`POST /admin/upstreams/{id}/test`、`POST /admin/upstreams/{id}/sync-models` |  |
 | 后台-模型 | `CRUD /admin/models`、`PUT /admin/models/{id}/routes` |  |
 | 后台-任务 | `GET /admin/image-tasks`、`GET /admin/image-tasks/{id}`、`POST /admin/image-tasks/{id}/refund`（P1） |  |
-| 后台-系统 | `GET/PUT /admin/settings/{group}`、`GET /admin/audit-logs`、`CRUD /admin/announcements`、`GET /admin/system` |  |
+| 后台-系统 | `GET/PUT /admin/settings/{group}`、`GET /admin/audit-logs`、`CRUD /admin/announcements`、`GET /admin/announcements/github-releases`、`GET /admin/system` |  |
 | 运维 | `GET /healthz`、`GET /readyz`、`GET /api/version` | 不带前缀 |
 
 ## 15. 非功能要求

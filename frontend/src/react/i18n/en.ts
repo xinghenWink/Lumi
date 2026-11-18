@@ -5,6 +5,17 @@ import deployment from '../../i18n/deployment.en'
 export default {
   ...catalog(messages),
   deployment,
+  announcement: {
+    title: 'System announcements',
+    description: 'Read system notices and announcement history.',
+    systemUpdate: 'System updates',
+    daily: 'General',
+    history: '{type} history',
+    empty: 'There are no current announcements.',
+    more: 'Load more announcements',
+    closeToday: 'Dismiss for today',
+    closeCurrent: 'Dismiss for this login',
+  },
   react: {
     title: 'What would you like to create today?',
     description: 'Give your ideas room to grow. Explore and create with Lumi.',
@@ -14,6 +25,7 @@ export default {
     switchLight: 'Switch to light theme',
     switchDark: 'Switch to dark theme',
     version: 'Lumi · {version}',
+    announcementButton: 'Announcements',
     adminOverview: 'Overview',
     adminUsers: 'Users & finance',
     adminAI: 'AI services',
