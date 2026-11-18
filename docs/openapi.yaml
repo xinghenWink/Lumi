@@ -2679,6 +2679,9 @@ paths:
         payload with the same key returns conflict. A new key creates a separate queued task even
         when the conversation and input match an existing task. No references uses generation,
         otherwise edit. Estimates are not price locks; task stores actual accepted price.
+        To regenerate from an owned historical task, reuse its original inputs including
+        ordered references and edit options with the destination image conversation and a
+        new idempotency key. Retry unconfirmed submissions with the same body and key.
       security:
         - bearerAuth: []
       parameters:
@@ -2719,7 +2722,10 @@ paths:
     get:
       operationId: getOwnedImageTask
       summary: getOwnedImageTask
-      description: ''
+      description: >
+        Returns an owned image task with its original submission parameters, ordered
+        reference file IDs, and saved edit options when present. Gallery items link
+        to this operation through their task_id.
       security:
         - bearerAuth: []
       parameters:
@@ -2803,7 +2809,7 @@ paths:
     get:
       operationId: listImageGallery
       summary: listImageGallery
-      description: ''
+      description: Each generated image includes the task_id of its original task.
       security:
         - bearerAuth: []
       parameters:

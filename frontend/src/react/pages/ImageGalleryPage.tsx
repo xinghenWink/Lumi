@@ -146,6 +146,10 @@ function GalleryResults({ filter }: { filter: string }) {
           onEdit={(file) => edit.mutate(file)}
           onNavigate={setPreview}
           returnFocus={previewTrigger}
+          galleryDetails={{
+            taskIdForFile: (id) => items.find((item) => item.file.id === id)?.task_id,
+            onWorkspace: () => setPreview(null),
+          }}
           editor={{
             conversationId: '',
             modelId: current.model_id,

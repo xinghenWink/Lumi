@@ -215,6 +215,38 @@ describe('React image submission and subscription compatibility', () => {
     expect(controller.store.getState().drafts.c).toBe(draft)
     expect(controller.snapshot('c')?.tasks.map(({ id }) => id)).toEqual(['t', 't2'])
   })
+  it('regenerates from an unrelated conversation into a new workspace with an exact retry', async () => {
+    const edit = {
+      ...task,
+      operation: 'edit' as const,
+      n: 1,
+      reference_file_ids: ['reference'],
+      edit_options: { action: 'erase' as const, guide_file_id: 'guide' },
+    }
+    const create = vi.spyOn(images, 'create').mockImplementation(async (id) => ({ ...row, id }))
+    const submit = vi
+      .spyOn(images, 'submit')
+      .mockRejectedValueOnce(new ApiError('NETWORK_ERROR'))
+      .mockImplementationOnce(async (body) => ({ ...edit, ...body, id: 'new-task' }))
+    controller.draft('', { prompt: 'keep new draft' })
+    const draft = controller.store.getState().drafts.new
+    await Promise.all([controller.regenerateInto(edit, ''), controller.regenerateInto(edit, '')])
+    expect(submit).toHaveBeenCalledTimes(1)
+    const target = controller.store.getState().pending.new?.input.conversation_id ?? ''
+    expect(target).not.toBe(edit.conversation_id)
+    expect(submit.mock.calls[0]?.[0]).toEqual({
+      ...input,
+      conversation_id: target,
+      n: 1,
+      reference_file_ids: ['reference'],
+      edit_options: edit.edit_options,
+    })
+    expect(await controller.submit('')).toBe(target)
+    expect(submit.mock.calls[1]).toEqual(submit.mock.calls[0])
+    expect(create).toHaveBeenCalledTimes(1)
+    expect(controller.snapshot(target)?.tasks.map(({ id }) => id)).toEqual(['new-task'])
+    expect(controller.store.getState().drafts.new).toBe(draft)
+  })
   it('preserves the source and draft when a regeneration is rejected or resolves after navigation', async () => {
     const rejection = new ApiError('INSUFFICIENT_CREDITS', 409)
     const waiting = deferred<ImageTask>()

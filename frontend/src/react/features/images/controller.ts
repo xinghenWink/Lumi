@@ -40,6 +40,7 @@ interface PendingSubmission {
 interface ImageState {
   active: string
   lastOpened: string
+  restoredModel: { conversationId: string; modelId: string } | null
   drafts: Record<string, ImageDraft>
   pending: Record<string, PendingSubmission>
   sending: Record<string, boolean>
@@ -48,6 +49,7 @@ interface ImageState {
 const emptyState = (): ImageState => ({
   active: '',
   lastOpened: '',
+  restoredModel: null,
   drafts: {},
   pending: {},
   sending: {},
@@ -272,6 +274,18 @@ export function createImageController(session: SessionService, client: QueryClie
       },
     }))
   }
+  function restoreDraft(id: string, value: ImageDraft, modelId: string) {
+    store.setState((state) => ({
+      drafts: { ...state.drafts, [id || 'new']: value },
+      restoredModel: { conversationId: id, modelId },
+    }))
+  }
+  function clearRestoredModel() {
+    store.setState({ restoredModel: null })
+  }
+  function preferRestoredModel(conversationId: string, modelId: string) {
+    store.setState({ restoredModel: { conversationId, modelId } })
+  }
   async function loadOlder(id: string) {
     const data = snapshot(id)
     if (!data?.nextCursor || olderLoads.has(id)) return
@@ -387,15 +401,13 @@ export function createImageController(session: SessionService, client: QueryClie
     }
   }
   async function regenerate(task: ImageTask) {
-    if (
-      !task.content_visible ||
-      !task.prompt.trim() ||
-      !task.model_id ||
-      task.conversation_id !== store.getState().active
-    )
-      return
-    await submit(
-      task.conversation_id,
+    if (task.conversation_id !== store.getState().active) return
+    return regenerateInto(task, task.conversation_id)
+  }
+  async function regenerateInto(task: ImageTask, conversationId: string) {
+    if (!task.content_visible || !task.prompt.trim() || !task.model_id) return
+    return submit(
+      conversationId,
       {
         model_id: task.model_id,
         prompt: task.prompt,
@@ -465,8 +477,12 @@ export function createImageController(session: SessionService, client: QueryClie
     open,
     activate,
     draft,
+    restoreDraft,
+    clearRestoredModel,
+    preferRestoredModel,
     submit,
     regenerate,
+    regenerateInto,
     cancel,
     update,
     remove,

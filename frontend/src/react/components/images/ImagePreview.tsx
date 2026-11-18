@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { ChevronLeft, ChevronRight, Copy, Download, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, Download, Info, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ImageFile } from '../../../api/images'
 import { useImageActions } from '../../features/images/actions'
@@ -11,6 +11,7 @@ import { ModalDialog } from '../ui/modal-dialog'
 import { Button } from '../ui/button'
 import { NativeSelect, NativeSelectOption } from '../ui/native-select'
 import { ProtectedImage } from './ProtectedImage'
+import { GalleryTaskDetails, type GalleryTaskAction } from './GalleryTaskDetails'
 import { ImageEditorControls } from './ImageEditorControls'
 import { ImageEditorLayer } from './ImageEditorLayer'
 
@@ -19,6 +20,12 @@ const control =
 const fitZoom = 100
 const minZoom = 50
 const maxZoom = 200
+
+interface GalleryDetails {
+  taskIdForFile(fileId: string): string | undefined
+  conversationId?: string
+  onWorkspace(kind: GalleryTaskAction): void
+}
 
 /** Full-screen lightbox: arrows or keys move between results; 100% fits the screen. */
 export function ImagePreview({
@@ -31,6 +38,7 @@ export function ImagePreview({
   onNavigate,
   returnFocus,
   editor,
+  galleryDetails,
 }: {
   files: ImageFile[]
   initialIndex?: number
@@ -41,6 +49,7 @@ export function ImagePreview({
   onNavigate?: ((index: number) => void) | undefined
   returnFocus?: RefObject<HTMLElement | null>
   editor?: ImageEditorTarget
+  galleryDetails?: GalleryDetails
 }) {
   const { t } = useTranslation(),
     actions = useImageActions(),
@@ -54,6 +63,9 @@ export function ImagePreview({
   const file = files[index]
   const draft = useImageEditorDraft()
   const [discard, setDiscard] = useState<'close' | 'reference' | number | null>(null)
+  const [detailsTaskId, setDetailsTaskId] = useState<string | null>(null)
+  const detailsTrigger = useRef<HTMLButtonElement>(null)
+  const fileTaskId = file && galleryDetails?.taskIdForFile(file.id)
   const actionLabel = editor ? 'max-sm:sr-only' : ''
   const previewAction = cn(control, editor && 'max-sm:size-9 max-sm:px-0')
   function selectZoom(value: number) {
@@ -68,7 +80,7 @@ export function ImagePreview({
     onNavigate?.(next)
   }
   function move(direction: number) {
-    if (files.length < 2 || draft.busy || discard !== null) return
+    if (files.length < 2 || draft.busy || discard !== null || detailsTaskId !== null) return
     const next = (index + direction + files.length) % files.length
     if (editor && draft.dirty) setDiscard(next)
     else navigateTo(next)
@@ -83,6 +95,8 @@ export function ImagePreview({
     const listener = (event: KeyboardEvent) => {
       if (
         event.defaultPrevented ||
+        detailsTaskId !== null ||
+        discard !== null ||
         (event.target instanceof HTMLElement &&
           event.target.closest(
             'input, select, textarea, canvas, [role="menu"], [contenteditable="true"]',
@@ -166,7 +180,22 @@ export function ImagePreview({
                   {t('react.previewPosition', { index: index + 1, total: files.length })}
                 </span>
               ) : null}
-              <span className="truncate">{parameters}</span>
+              <span className="min-w-0 flex-1 truncate">{parameters}</span>
+              {fileTaskId ? (
+                <Button
+                  ref={detailsTrigger}
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={cn(control, 'shrink-0')}
+                  aria-haspopup="dialog"
+                  disabled={draft.busy}
+                  onClick={() => setDetailsTaskId(fileTaskId)}
+                >
+                  <Info aria-hidden="true" />
+                  {t('images.details')}
+                </Button>
+              ) : null}
             </div>
             <div
               ref={setViewport}
@@ -337,6 +366,19 @@ export function ImagePreview({
           </>
         ) : null}
       </ModalDialog>
+      {detailsTaskId && galleryDetails ? (
+        <GalleryTaskDetails
+          key={detailsTaskId}
+          taskId={detailsTaskId}
+          editorDirty={draft.dirty}
+          returnFocus={detailsTrigger}
+          onClose={() => setDetailsTaskId(null)}
+          onWorkspace={galleryDetails.onWorkspace}
+          {...(galleryDetails.conversationId === undefined
+            ? {}
+            : { conversationId: galleryDetails.conversationId })}
+        />
+      ) : null}
       {discard !== null ? (
         <ModalDialog
           open
