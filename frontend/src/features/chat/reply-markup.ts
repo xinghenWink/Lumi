@@ -1,4 +1,5 @@
 import { publicSourceURL, type ChatSource } from '../../api/chat'
+import { recoverReplayedReply } from './reply-replay'
 
 export function advanceMarkdownFence(line: string, fence: string): string {
   const mark = /^ {0,3}(\x60{3,}|~{3,})/.exec(line)?.[1]
@@ -94,7 +95,7 @@ export function readReplyTag(source: string, start: number): Tag | undefined {
     }
     tag.attributes.set(match[1].toLowerCase(), value)
   }
-  const recovery = /\n[ \t]*\n|[<>]/g
+  const recovery = /\n(?:[ \t]*\r?\n| {0,3}#{1,6}[ \t])|[<>]/g
   recovery.lastIndex = tag.end
   tag.end = recovery.exec(source)?.index ?? source.length
   return tag
@@ -131,6 +132,9 @@ const known = new Set([
   ...listItems,
   'codeblock',
   'asyncimage',
+  'asyncimagegroup',
+  'entity',
+  'mapwidgetv2',
   'cite',
   'link',
   'a',
@@ -160,6 +164,73 @@ function escapeMarkdown(value: string): string {
     .trim()
     .replace(/[\uE000\uE001]/g, '\uFFFD')
     .replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^_\x60{|}~-]/g, '\\$&')
+}
+
+function arrayAttribute(value: string | undefined, limit: number): unknown[] {
+  if (!value || value.length > 65536) return []
+  try {
+    const items: unknown = JSON.parse(value)
+    return Array.isArray(items) ? items.slice(0, limit) : []
+  } catch {
+    return []
+  }
+}
+
+export function readIllustrationQueries(tag: Tag): string[] {
+  const query = tag.attributes.get('query')
+  if (tag.name === 'asyncimagegroup') {
+    return arrayAttribute(query, 12).filter(
+      (item): item is string => typeof item === 'string' && !!item.trim(),
+    )
+  }
+  return [query ?? tag.attributes.get('prompt') ?? tag.attributes.get('alt') ?? '']
+}
+
+function field(value: unknown, key: string): string {
+  if (!value || typeof value !== 'object' || !Object.hasOwn(value, key)) return ''
+  const item = (value as Record<string, unknown>)[key]
+  return typeof item === 'string' ? item.trim().slice(0, 512) : ''
+}
+
+function mapItinerary(attributes: Tag['attributes']): string {
+  const points = arrayAttribute(attributes.get('points'), 40)
+  const places = new Map<string, string>()
+  const descriptions = points.map((point) => {
+    const name = escapeMarkdown(field(point, 'name'))
+    const address = escapeMarkdown(field(point, 'address'))
+    const label = name && address && name !== address ? `${name} (${address})` : name || address
+    const id = field(point, 'id')
+    const ref = field(point, 'ref')
+    if (id && label) places.set(id, label)
+    if (ref && label) places.set(ref, label)
+    return label
+  })
+  const groups = arrayAttribute(attributes.get('groups'), 12).flatMap((group) => {
+    if (!group || typeof group !== 'object' || !('locations' in group)) return []
+    if (!Array.isArray(group.locations)) return []
+    const locations = group.locations
+      .slice(0, 40)
+      .map((location: unknown) => {
+        const place = places.get(field(location, 'point_id')) ?? ''
+        const notes = escapeMarkdown(field(location, 'notes'))
+        return place && notes ? `${place} — ${notes}` : place || notes
+      })
+      .filter(Boolean)
+    if (!locations.length) return []
+    const title = escapeMarkdown(field(group, 'title'))
+    return [(title ? `**${title}**\n\n` : '') + locations.map((item) => '- ' + item).join('\n')]
+  })
+  const title = escapeMarkdown(attributes.get('title') ?? '')
+  const body = groups.length
+    ? groups
+    : [
+        descriptions
+          .filter(Boolean)
+          .map((item) => '- ' + item)
+          .join('\n'),
+      ]
+  const sections = [title ? `**${title}**` : '', ...body].filter(Boolean)
+  return sections.length ? '\n\n' + sections.join('\n\n') + '\n\n' : ''
 }
 
 function markdownLink(title: string, url: string): string {
@@ -249,17 +320,18 @@ function sourcePositions(source: string, sources: readonly ChatSource[]): Map<nu
 }
 
 export function parseAssistantReply(
-  source: string,
+  content: string,
   complete: boolean,
   sources: readonly ChatSource[] = [],
   labels = { unavailable: '', sources: '' },
 ): AssistantReply {
+  const source = recoverReplayedReply(content, complete)
   const decorations: ReplyDecoration[] = []
   const parts: ReplyPart[] = []
   const used = new Set<string>()
   const urls = new Map<string, SourceLink>()
   const refs = new Map<string, string | undefined>()
-  const positions = sourcePositions(source, sources)
+  const positions = sourcePositions(source, source === content ? sources : [])
   let expansionBudget = 65536
   for (const item of sources) {
     const url = publicSourceURL(item.url)
@@ -529,7 +601,10 @@ export function parseAssistantReply(
       }
       const tag = readReplyTag(text, pos)
       if (!tag) {
-        if (!complete && (head === '<' || head === '</')) replace(text.length, '')
+        const brokenHeading = /^<(text|map(?:widget(?:v2)?)?)(?=#{1,6}(?:[ \t]|$))/i.exec(head)
+        if (brokenHeading && /^[ \t]*$/.test(text.slice(lineStart, pos)))
+          replace(pos + brokenHeading[0].length, '')
+        else if (!complete && (head === '<' || head === '</')) replace(text.length, '')
         else pos++
         continue
       }
@@ -573,11 +648,17 @@ export function parseAssistantReply(
           last ? last.index + last[0].length : text.length,
           fencedCode(code, attributes.get('language')?.toLowerCase() ?? ''),
         )
-      } else if (name === 'asyncimage' && !closing) {
-        const prompt =
-          attributes.get('query') ?? attributes.get('prompt') ?? attributes.get('alt') ?? ''
-        const tagSource = text.slice(pos, end).replace(/^<asyncimage/i, '<AsyncImage')
-        replace(end, tagSource, escapeMarkdown(prompt))
+      } else if ((name === 'asyncimage' || name === 'asyncimagegroup') && !closing) {
+        const prefix = name === 'asyncimagegroup' ? '<AsyncImageGroup' : '<AsyncImage'
+        const tagSource = prefix + text.slice(pos + name.length + 1, end)
+        replace(end, tagSource, readIllustrationQueries(tag).map(escapeMarkdown).join('\n\n'))
+      } else if (name === 'mapwidgetv2') {
+        replace(end, closing ? '' : mapItinerary(attributes))
+      } else if (name === 'entity') {
+        replace(
+          end,
+          closing ? '' : escapeMarkdown(attributes.get('value') ?? attributes.get('name') ?? ''),
+        )
       } else if (name === 'cite' && !closing) {
         let ids: string[] = []
         try {

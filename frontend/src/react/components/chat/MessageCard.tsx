@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { Message } from '../../../api/chat'
 import type { Illustration } from '../../../features/chat/markdown'
-import { parseAssistantReply } from '../../../features/chat/reply-markup'
 import { ApiNotice } from '../shared/ApiNotice'
 import { BrandMark } from '../shared/BrandMark'
 import { useRuntime } from '../../app/context'
@@ -97,15 +96,16 @@ export const MessageCard = memo(function MessageCard({
           aria-label={t(copied ? 'chat.copied' : 'chat.copy')}
           title={t(copied ? 'chat.copied' : 'chat.copy')}
           onClick={() => {
-            void navigator.clipboard
-              .writeText(
-                user
-                  ? content
-                  : parseAssistantReply(content, !streaming, message.meta.sources, {
-                      unavailable: t('chat.sourceUnavailable'),
-                      sources: t('chat.sources'),
-                    }).copy,
-              )
+            const copy = async () => {
+              if (user) return navigator.clipboard.writeText(content)
+              const { parseAssistantReply } = await import('../../../features/chat/reply-markup')
+              const reply = parseAssistantReply(content, !streaming, message.meta.sources, {
+                unavailable: t('chat.sourceUnavailable'),
+                sources: t('chat.sources'),
+              })
+              return navigator.clipboard.writeText(reply.copy)
+            }
+            void copy()
               .then(() => setCopied(true))
               .catch(() => setCopied(false))
           }}

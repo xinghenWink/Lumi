@@ -27,6 +27,96 @@ async function renderReply(
 }
 
 describe('safe incremental markdown', () => {
+  it('recovers replayed fragments before rendering or copying streamed and saved replies', async () => {
+    const fragments = [
+      '# Weekend plan\n\nStart at the muse',
+      'um and follow the river until the obser',
+      'vation deck.\n\n<text',
+      ' color="secondary" size="xs">Per person</text>\n\n## Bud',
+      'get\n\n| Item | Cost |\n| --- | --- |\n| Tour | ¥25 |\n',
+    ]
+    const original = fragments.join('')
+    const replayed = fragments.map((fragment) => fragment.repeat(2)).join('')
+    for (const complete of [false, true]) {
+      const element = await renderReply(replayed, complete)
+      expect([...element.querySelectorAll('h1, h2')].map((heading) => heading.textContent)).toEqual(
+        ['Weekend plan', 'Budget'],
+      )
+      expect(element.querySelectorAll('table')).toHaveLength(1)
+      expect(element.textContent).toContain(
+        'museum and follow the river until the observation deck',
+      )
+      expect(element.textContent).not.toMatch(/<text|color=|size=/)
+      expect(parseAssistantReply(replayed, complete).copy).toBe(
+        parseAssistantReply(original, complete).copy,
+      )
+    }
+    expect(parseAssistantReply(replayed + '\nIt is open', false).copy).toContain('It is open')
+  })
+
+  it('keeps intentional Markdown and code repetitions', () => {
+    const stanza =
+      '## Refrain\n\nWalk down by the river, over the bridge, and back to the river.\n\n'
+    const source = stanza.repeat(2) + '```js\n' + 'console.log("again")\n'.repeat(4) + '```'
+    expect(parseAssistantReply(source, true).copy).toBe(source)
+  })
+
+  it('renders map itineraries and entity names as safe Markdown', async () => {
+    const source = [
+      '<Entity value="Museum" category="point_of_interest" />',
+      '',
+      '<MapWidgetV2 title="Weekend stops"',
+      ' points={[{"id":"museum","name":"Museum","address":"West Bank"},{"ref":"turn23business1"}]}',
+      ' groups={[{"title":"Saturday","locations":[{"point_id":"museum","notes":"Use the north entrance"},{"point_id":"turn23business1","notes":"Walk across the bridge"}]}]} />',
+      '',
+      '<MapWidgetV2 points={[{"name":"[example](javascript:alert(1)) <script>"}]} />',
+    ].join('\n')
+    const element = await renderReply(source, true)
+    expect(element.querySelector('p')?.textContent).toBe('Museum')
+    expect([...element.querySelectorAll('li')].map((item) => item.textContent)).toEqual([
+      'Museum (West Bank) — Use the north entrance',
+      'Walk across the bridge',
+      '[example](javascript:alert(1)) <script>',
+    ])
+    expect(element.querySelector('a, script')).toBeNull()
+    expect(element.textContent).not.toMatch(/MapWidgetV2|turn23business1/)
+  })
+
+  it('drops broken component fragments and preserves subsequent headings and code examples', async () => {
+    const source = [
+      '<Map# Itinerary',
+      '',
+      '<MapWidgetV2 points={[{"name":"Missing close',
+      '<text## Budget',
+      '',
+      '```tsx',
+      '<MapWidgetV2 points={[]} />',
+      '```',
+    ].join('\n')
+    const element = await renderReply(source, true)
+    expect(element.querySelector('h1')?.textContent).toBe('Itinerary')
+    expect(element.querySelector('h2')?.textContent).toBe('Budget')
+    expect(element.querySelector('code')?.textContent).toContain('<MapWidgetV2 points={[]} />')
+    expect(element.textContent).not.toMatch(/Missing close|<text|<Map#/)
+  })
+
+  it('shows grouped image suggestions through the existing illustration cards', async () => {
+    const source = '<AsyncImageGroup query={["A bridge", "A museum"]} aspectRatio="4:3" />'
+    const reply = parseAssistantReply(source, true)
+    const html = await renderMarkdown(reply.parts[0]?.source ?? '', true, 'Copy', {
+      label: 'Suggested image',
+      pending: 'Preparing suggestion',
+      action: 'Open studio',
+    })
+    const element = document.createElement('div')
+    element.innerHTML = html
+    expect(
+      [...element.querySelectorAll('button')].map((button) => button.dataset.illustrationPrompt),
+    ).toEqual(['A bridge', 'A museum'])
+    expect(element.querySelectorAll('[data-ratio="4:3"]')).toHaveLength(2)
+    expect(reply.copy).toBe('A bridge\n\nA museum')
+  })
+
   it('renders legacy code blocks with their language, indentation and blank lines intact', async () => {
     const code = 'function identity<T>(value: T) {\n\n  return value\n}'
     const source =
