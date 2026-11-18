@@ -653,6 +653,27 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(uploadedReference).toBeFocused()
     const removeReference = references.getByRole('button', { name: '移除参考图', exact: true })
     await expect(removeReference).toHaveCount(2)
+    if (!mobile) {
+      const action = removeReference.nth(1)
+      for (const colorScheme of ['light', 'dark'] as const) {
+        await member.emulateMedia({ colorScheme })
+        await expect(member.locator('html')).toHaveAttribute('data-theme', colorScheme)
+        const theme = await member.locator('body').evaluate((body) => {
+          const { backgroundColor, color } = getComputedStyle(body)
+          return { backgroundColor, color }
+        })
+        await member.mouse.move(0, 0)
+        await uploadedReference.focus()
+        await member.keyboard.press('Tab')
+        await expect(action).toBeFocused()
+        await expect(action).toHaveCSS('background-color', theme.color)
+        await expect(action.locator('svg')).toHaveCSS('stroke', theme.backgroundColor)
+        await action.hover()
+        await expect(action).toHaveCSS('background-color', theme.color)
+        await expect(action.locator('svg')).toHaveCSS('stroke', theme.backgroundColor)
+      }
+      await member.emulateMedia({ colorScheme: null })
+    }
     await removeReference.first().click()
     await removeReference.click()
     // Files dropped anywhere in the workspace, or pasted outside a text field, become references.
