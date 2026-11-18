@@ -89,8 +89,8 @@ function AnnouncementEditor({
       onOpenChange={(value) => {
         if (!value) onClose()
       }}
-      title={t(picking ? 'react.announcementImport' : row ? 'ops.edit' : 'ops.addAnnouncement')}
-      description={t(picking ? 'react.announcementChooseRelease' : 'ops.content')}
+      title={t(picking ? 'ops.announcementImport' : row ? 'ops.edit' : 'ops.addAnnouncement')}
+      description={t(picking ? 'ops.announcementChooseRelease' : 'ops.content')}
       busy={save.isPending}
       returnFocus={returnFocus}
     >
@@ -131,7 +131,7 @@ function AnnouncementEditor({
                   role={overLimit ? 'alert' : 'status'}
                   className="text-xs text-muted-foreground"
                 >
-                  {t(overLimit ? 'react.announcementTooLong' : 'react.announcementTruncated', {
+                  {t(overLimit ? 'ops.announcementTooLong' : 'ops.announcementTruncated', {
                     limit: announcementCharacterLimit,
                   })}
                 </p>
@@ -166,7 +166,7 @@ function AnnouncementEditor({
               {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={save.isPending || overLimit}>
-              {t(draft && form.enabled ? 'react.announcementPublish' : 'common.save')}
+              {t(draft && form.enabled ? 'ops.announcementPublish' : 'common.save')}
             </Button>
           </div>
         </form>
@@ -184,7 +184,7 @@ function ReleaseSource({ tag }: { tag: string }) {
       rel="noopener noreferrer"
       className="w-fit text-sm text-primary underline underline-offset-4"
     >
-      {t('react.announcementReleaseSource', { version: tag })}
+      {t('ops.announcementReleaseSource', { version: tag })}
     </a>
   )
 }
@@ -242,7 +242,7 @@ export default function AnnouncementsPage() {
             }}
           >
             <Download data-icon="inline-start" />
-            {t('react.announcementImport')}
+            {t('ops.announcementImport')}
           </Button>
           <Button
             onClick={(event) => {

@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { operations, type AnnouncementRelease } from '../../../api/operations'
+import {
+  getAnnouncementReleases,
+  type AnnouncementRelease,
+} from '../../../api/announcement-releases'
 import { CursorControls } from '../shared/CursorControls'
 import { PageStatus } from '../shared/PageStatus'
 import { Button } from '../ui/button'
@@ -17,7 +20,7 @@ export function AnnouncementReleasePicker({
   const [page, setPage] = useState(1)
   const query = useQuery({
     queryKey: ['user', userId, 'announcement-github-releases', page],
-    queryFn: ({ signal }) => operations.announcementReleases(page, true, signal),
+    queryFn: ({ signal }) => getAnnouncementReleases(page, signal),
     staleTime: 0,
     refetchOnWindowFocus: false,
     retry: false,
@@ -31,10 +34,10 @@ export function AnnouncementReleasePicker({
   return (
     <div className="min-w-0">
       {query.isError || query.isPending ? <PageStatus error={query.error} retry={refetch} /> : null}
-      {query.data?.stale ? (
+      {query.data?.stale && !query.isError ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted p-3 text-sm">
           <p role="status" className="text-muted-foreground">
-            {t('react.announcementReleaseStale')}
+            {t('ops.announcementReleaseStale')}
           </p>
           <Button variant="outline" size="sm" disabled={query.isFetching} onClick={refetch}>
             {t('common.retry')}
@@ -72,7 +75,7 @@ export function AnnouncementReleasePicker({
           </ul>
           {!query.data.items.length ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              {t('react.announcementReleaseEmpty')}
+              {t('ops.announcementReleaseEmpty')}
             </p>
           ) : null}
         </>

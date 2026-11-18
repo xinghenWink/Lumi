@@ -34,6 +34,16 @@ export default {
     successRate: 'Success rate',
     latency: 'Average latency (ms)',
     addAnnouncement: 'Add announcement',
+    announcementImport: 'Import from GitHub',
+    announcementChooseRelease: 'Choose a stable release, then edit the release notes.',
+    announcementReleaseEmpty: 'There are no stable releases on this page.',
+    announcementReleaseStale:
+      'GitHub is temporarily unavailable. Showing the last fetched releases.',
+    announcementReleaseSource: 'GitHub release {version}',
+    announcementPublish: 'Publish announcement',
+    announcementTooLong: 'An announcement can contain at most {limit} characters.',
+    announcementTruncated:
+      'The release notes exceeded {limit} characters and were shortened. Review before publishing.',
     content: 'Content (Markdown)',
     startsAt: 'Starts at (UTC)',
     endsAt: 'Ends at (UTC, optional)',

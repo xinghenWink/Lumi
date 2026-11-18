@@ -28,8 +28,6 @@ export interface Announcement {
   created_at: string
   github_release_tag?: string
 }
-type AnnouncementReleasePage = components['schemas']['AnnouncementReleasePage']
-export type AnnouncementRelease = AnnouncementReleasePage['items'][number]
 export interface OperationsSettings {
   maintenance: boolean
   turnstile_enabled: boolean
@@ -96,7 +94,7 @@ export const boolean = (v: unknown): boolean => {
   if (typeof v !== 'boolean') throw new ApiError('RESPONSE_INVALID')
   return v
 }
-function array<T>(v: unknown, parse: (x: unknown) => T): T[] {
+export function array<T>(v: unknown, parse: (x: unknown) => T): T[] {
   if (!Array.isArray(v)) throw new ApiError('RESPONSE_INVALID')
   return v.map(parse)
 }
@@ -130,32 +128,14 @@ export function parseAnnouncement(v: unknown): Announcement {
     created_at: text(d.created_at),
     ...(d.github_release_tag === undefined
       ? {}
-      : { github_release_tag: releaseTag(d.github_release_tag) }),
+      : { github_release_tag: announcementReleaseTag(d.github_release_tag) }),
   }
 }
-function releaseTag(value: unknown): string {
+export function announcementReleaseTag(value: unknown): string {
   const tag = text(value)
   if (!/^v(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/.test(tag))
     throw new ApiError('RESPONSE_INVALID')
   return tag
-}
-function parseAnnouncementReleases(value: unknown): AnnouncementReleasePage {
-  const data = record(value)
-  return {
-    items: array(data.items, (value) => {
-      const release = record(value)
-      const publishedAt = text(release.published_at)
-      if (!Number.isFinite(Date.parse(publishedAt))) throw new ApiError('RESPONSE_INVALID')
-      return {
-        version: releaseTag(release.version),
-        name: text(release.name),
-        notes: text(release.notes),
-        published_at: publishedAt,
-      }
-    }),
-    next_page: integer(data.next_page),
-    stale: boolean(data.stale),
-  }
 }
 export function parseOperations(v: unknown): OperationsSettings {
   const d = record(v)
@@ -271,12 +251,6 @@ export const operations = {
         `announcements?limit=${limit}&cursor=` +
         encodeURIComponent(cursor),
       (v) => page(v, parseAnnouncement),
-      readOptions(signal),
-    ),
-  announcementReleases: (page: number, refresh: boolean, signal?: AbortSignal) =>
-    authorized(
-      `/api/v1/admin/announcements/github-releases?page=${page}${refresh ? '&refresh=1' : ''}`,
-      parseAnnouncementReleases,
       readOptions(signal),
     ),
   saveAnnouncement: (body: components['schemas']['AnnouncementInput'], id?: string) =>

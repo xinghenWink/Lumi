@@ -1,5 +1,5 @@
 import { useCallback, useContext } from 'react'
-import { Megaphone } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { AnnouncementsContext } from '../../features/announcements/context'
 import { Button } from '../ui/button'
@@ -24,7 +24,7 @@ export function AnnouncementButton() {
       title={t('react.announcementButton')}
       onClick={() => announcements.open()}
     >
-      <Megaphone size={18} aria-hidden="true" />
+      <Bell size={18} aria-hidden="true" />
     </Button>
   )
 }

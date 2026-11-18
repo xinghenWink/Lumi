@@ -21,16 +21,6 @@ export default {
     announcementMore: 'Load more announcements',
     announcementCloseToday: 'Dismiss for today',
     announcementCloseCurrent: 'Dismiss for this login',
-    announcementImport: 'Import from GitHub',
-    announcementChooseRelease: 'Choose a stable release, then edit the release notes.',
-    announcementReleaseEmpty: 'There are no stable releases on this page.',
-    announcementReleaseStale:
-      'GitHub is temporarily unavailable. Showing the last fetched releases.',
-    announcementReleaseSource: 'GitHub release {version}',
-    announcementPublish: 'Publish announcement',
-    announcementTooLong: 'An announcement can contain at most {limit} characters.',
-    announcementTruncated:
-      'The release notes exceeded {limit} characters and were shortened. Review before publishing.',
     adminOverview: 'Overview',
     adminUsers: 'Users & finance',
     adminAI: 'AI services',

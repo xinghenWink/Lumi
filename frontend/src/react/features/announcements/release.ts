@@ -1,4 +1,4 @@
-import type { AnnouncementRelease } from '../../../api/operations'
+import type { AnnouncementRelease } from '../../../api/announcement-releases'
 
 export const announcementCharacterLimit = 10_000
 
