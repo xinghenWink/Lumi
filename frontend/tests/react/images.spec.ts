@@ -655,9 +655,17 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(removeReference).toHaveCount(2)
     if (!mobile) {
       const action = removeReference.nth(1)
+      const html = member.locator('html')
+      const initialTheme = (await html.getAttribute('data-theme')) === 'dark' ? 'dark' : 'light'
+      async function selectTheme(theme: 'light' | 'dark') {
+        if ((await html.getAttribute('data-theme')) !== theme) {
+          const name = theme === 'light' ? '切换浅色主题' : '切换深色主题'
+          await member.getByRole('button', { name, exact: true }).click()
+        }
+        await expect(html).toHaveAttribute('data-theme', theme)
+      }
       for (const colorScheme of ['light', 'dark'] as const) {
-        await member.emulateMedia({ colorScheme })
-        await expect(member.locator('html')).toHaveAttribute('data-theme', colorScheme)
+        await selectTheme(colorScheme)
         const theme = await member.locator('body').evaluate((body) => {
           const { backgroundColor, color } = getComputedStyle(body)
           return { backgroundColor, color }
@@ -672,7 +680,7 @@ test('React real image generation editing gallery cancellation and administrator
         await expect(action).toHaveCSS('background-color', theme.color)
         await expect(action.locator('svg')).toHaveCSS('stroke', theme.backgroundColor)
       }
-      await member.emulateMedia({ colorScheme: null })
+      await selectTheme(initialTheme)
     }
     await removeReference.first().click()
     await removeReference.click()
