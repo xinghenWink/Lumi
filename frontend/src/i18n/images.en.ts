@@ -34,7 +34,7 @@ export default {
     resolutionOption: '{resolution} · {pixels}',
     presetTitle: 'Aspect ratio and resolution presets',
     presetHint:
-      'Common ratios and 1K, 2K, and 4K are enabled by default. Disabled options are removed from image creation and canvas. Keep at least one of each.',
+      'Auto, common ratios, and 1K, 2K, and 4K are enabled by default. Disabled options are removed from image creation and canvas. Keep at least one ratio and one resolution.',
     useSizePresets: 'Use system size presets',
     modelPresetHint:
       'Use the presets enabled in Image settings. Turn this off to enter sizes supported by a restricted provider.',

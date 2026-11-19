@@ -138,7 +138,7 @@ export function ImageComposer({
   const summary = options.quality
     ? [
         t('images.' + options.quality),
-        options.ratio || options.size,
+        options.size === 'auto' ? t('images.auto') : options.ratio || options.size,
         t('react.imageCount', { count: options.n }),
       ]
         .filter(Boolean)

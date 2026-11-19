@@ -178,15 +178,16 @@ function ImageComposer({ node, ...props }: InspectorProps) {
     settings.model_id ?? undefined,
   )
   const model = options.model
+  const count = t('react.imageCount', { count: options.n })
   const parameterSummary =
     options.size && options.n
-      ? t('canvas.prompt.imageParameterSummary', {
-          ratio: options.ratio || t('images.custom'),
-          resolution:
-            options.resolution?.toUpperCase() ??
-            (options.size === 'auto' ? t('images.auto') : options.size.replace('x', ' × ')),
-          count: t('react.imageCount', { count: options.n }),
-        })
+      ? options.size === 'auto'
+        ? t('canvas.prompt.imageParameterAutoSummary', { ratio: t('images.auto'), count })
+        : t('canvas.prompt.imageParameterSummary', {
+            ratio: options.ratio || t('images.custom'),
+            resolution: options.resolution?.toUpperCase() ?? options.size.replace('x', ' × '),
+            count,
+          })
       : ''
   const prompt = buildPrompt(settings.prompt, inputs.texts)
   function patch(change: Partial<CanvasGeneratorContent>, key = '') {

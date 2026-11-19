@@ -146,6 +146,7 @@ export default {
       parameters: '参数',
       imageParameters: '生图参数',
       imageParameterSummary: '{ratio} · {resolution} · {count}',
+      imageParameterAutoSummary: '{ratio} · {count}',
       textParameters: '文本参数',
       parametersDescription: '更改会自动保存到当前节点。',
       disconnect: '断开 {name}',

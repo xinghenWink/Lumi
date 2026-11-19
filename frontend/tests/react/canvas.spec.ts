@@ -214,7 +214,7 @@ test('canvas journey composes, generates from references, persists and edits', a
           capabilities: {
             ...defaultCapabilities('image'),
             qualities: ['medium'],
-            sizes: ['1024x1024', '1536x1024'],
+            sizes: ['1024x1024', '1536x1024', 'auto'],
             max_n: 2,
             supports_edit: true,
             max_reference_images: 4,
@@ -371,7 +371,7 @@ test('canvas journey composes, generates from references, persists and edits', a
     await inspector.getByLabel('模型', { exact: true }).selectOption({ label: modelName })
     const parameters = inspector.getByRole('button', { name: '参数', exact: true })
     const summary = inspector.getByTestId('canvas-image-parameter-summary')
-    await expect(summary).toHaveText('1:1 · 1K · 1 张')
+    await expect(summary).toHaveText('自动 · 1 张')
     const run = inspector.getByRole('button', { name: '生成', exact: true })
     // The quote can resize and re-anchor the editor after the model changes.
     await expect(run).toBeEnabled({ timeout: 15_000 })
@@ -386,14 +386,17 @@ test('canvas journey composes, generates from references, persists and edits', a
     await parameters.click()
     await expect(imageParameters).toBeVisible()
     await expect(imageParameters.getByRole('radiogroup', { name: '质量' })).toBeVisible()
-    await expect(imageParameters.getByLabel('分辨率', { exact: true })).toBeVisible()
+    const auto = imageParameters.getByRole('radio', { name: '自动', exact: true })
+    await expect(auto).toBeChecked()
+    await expect(imageParameters.getByLabel('分辨率', { exact: true })).toHaveCount(0)
     expect(await box(inspector)).toEqual(editorBox)
     await imageParameters.getByRole('radio', { name: '3:2', exact: true }).check()
+    await expect(imageParameters.getByLabel('分辨率', { exact: true })).toBeVisible()
     await imageParameters.getByRole('radio', { name: '2 张', exact: true }).check()
     await expect(summary).toHaveText('3:2 · 1K · 2 张')
     await imageParameters.getByRole('radio', { name: '按尺寸', exact: true }).check()
     await expect(summary).toHaveText('按尺寸 · 1536 × 1024 · 2 张')
-    await imageParameters.getByRole('radio', { name: '1:1', exact: true }).check()
+    await auto.check()
     await imageParameters.getByRole('radio', { name: '1 张', exact: true }).check()
     await page.keyboard.press('Escape')
     await expect(imageParameters).toBeHidden()
@@ -404,7 +407,12 @@ test('canvas journey composes, generates from references, persists and edits', a
     const cost = Number((await estimate.textContent())?.replace(/\D/g, ''))
     expect(cost).toBeGreaterThan(0)
     const balance = Number((await self('GET', '/me/credits')).total)
+    const runRequest = page.waitForRequest(
+      (request) =>
+        request.url().endsWith('/canvases/' + canvasID + '/runs') && request.method() === 'POST',
+    )
     await run.click()
+    expect((await runRequest).postDataJSON()).toMatchObject({ ratio: 'auto', size: 'auto' })
     await expect(nodes('image').locator('img')).toHaveCount(2, { timeout: 30_000 })
     await expect(edges).toHaveCount(3)
     expect(upstream.edits).toBe(1)
@@ -428,13 +436,25 @@ test('canvas journey composes, generates from references, persists and edits', a
     const zoomLabel = await zoom.getAttribute('aria-label')
     await viewSave
     const stored = await self('GET', '/canvases/' + canvasID)
-    expect(stored).toMatchObject({ title, node_count: 4 })
+    expect(stored).toMatchObject({
+      title,
+      node_count: 4,
+      document: {
+        nodes: expect.arrayContaining([
+          expect.objectContaining({
+            generator: expect.objectContaining({ ratio: 'auto', size: 'auto' }),
+          }),
+        ]),
+      },
+    })
     await page.reload()
     await expect(nodes()).toHaveCount(4)
     await expect(edges).toHaveCount(3)
     await expect(page.getByLabel('画布名称', { exact: true })).toHaveValue(title)
     await expect(zoom).toHaveAttribute('aria-label', zoomLabel ?? '')
     await expect(nodes('image').locator('img')).toHaveCount(2)
+    await nodes('generator').click()
+    await expect(summary).toHaveText('自动 · 1 张')
 
     // Undo and redo a deletion.
     await page.keyboard.press('1')

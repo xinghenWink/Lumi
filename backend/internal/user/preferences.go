@@ -29,7 +29,7 @@ func PreferenceView(row query.UserPreference) Preferences {
 	return Preferences{Theme: row.Theme, Instructions: row.Instructions, ImageQuality: row.ImageQuality, ImageRatio: row.ImageRatio, ImageCount: row.ImageCount}
 }
 func DefaultPreferences() Preferences {
-	return Preferences{Theme: "system", ImageQuality: "medium", ImageRatio: "1:1", ImageCount: 1}
+	return Preferences{Theme: "system", ImageQuality: "medium", ImageRatio: "auto", ImageCount: 1}
 }
 func (s *Service) Preferences(ctx context.Context, id uuid.UUID) (Preferences, error) {
 	row, err := s.queries.GetPreferences(ctx, id)
@@ -42,7 +42,7 @@ func (s *Service) Preferences(ctx context.Context, id uuid.UUID) (Preferences, e
 	return PreferenceView(row), nil
 }
 func (s *Service) SavePreferences(ctx context.Context, actor Actor, v Preferences) (Preferences, error) {
-	if !slices.Contains([]string{"system", "light", "dark"}, v.Theme) || !slices.Contains([]string{"low", "medium", "high"}, v.ImageQuality) || !slices.Contains([]string{"1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16"}, v.ImageRatio) || v.ImageCount < 1 || v.ImageCount > 4 || !validation.Text(v.Instructions, 0, 4000) {
+	if !slices.Contains([]string{"system", "light", "dark"}, v.Theme) || !slices.Contains([]string{"low", "medium", "high"}, v.ImageQuality) || !slices.Contains([]string{"auto", "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16"}, v.ImageRatio) || v.ImageCount < 1 || v.ImageCount > 4 || !validation.Text(v.Instructions, 0, 4000) {
 		return Preferences{}, problem.Invalid()
 	}
 	var result Preferences

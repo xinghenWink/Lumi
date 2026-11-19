@@ -63,7 +63,7 @@ export async function restoreGalleryTask({
     prompt: task.prompt,
     quality: task.quality,
     size: task.size,
-    ratio: task.ratio,
+    ratio: task.ratio || (task.size === 'auto' ? 'auto' : ''),
     n: task.n,
     references: files.map((file) => file.id),
   } satisfies ImageDraft

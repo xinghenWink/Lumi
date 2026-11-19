@@ -21,6 +21,10 @@ export function resolveImageOptions(
   const presets = config?.resolution_presets ?? []
   const modelSizes = model?.capabilities.sizes ?? []
   const inherits = model?.capabilities.use_size_presets
+  const allowsAuto =
+    !!config &&
+    !disabledRatios.has('auto') &&
+    (inherits || (modelSizes.includes('auto') && config.sizes.includes('auto')))
   const variants = presets.filter(
     (preset) =>
       !disabledRatios.has(preset.ratio) &&
@@ -32,10 +36,17 @@ export function resolveImageOptions(
   const explicitSizes = inherits
     ? []
     : (config?.sizes.filter(
-        (size) => modelSizes.includes(size) && (!presetSizes.has(size) || enabledSizes.has(size)),
+        (size) =>
+          size !== 'auto' &&
+          modelSizes.includes(size) &&
+          (!presetSizes.has(size) || enabledSizes.has(size)),
       ) ?? [])
   const sizes = [...new Set([...explicitSizes, ...enabledSizes])]
   const ratioOptions = new Map<string, string[]>()
+  if (allowsAuto) {
+    sizes.push('auto')
+    ratioOptions.set('auto', ['auto'])
+  }
   for (const preset of variants) {
     const options = ratioOptions.get(preset.ratio) ?? []
     options.push(preset.size)
@@ -46,7 +57,7 @@ export function resolveImageOptions(
     // Keep custom mappings with the same ratio. Older approximate mappings remain valid over the API.
     const [w = 0, h = 0] = size.split('x').map(Number)
     const [a = 0, b = 0] = ratio.split(':').map(Number)
-    const restoredMapping = draft.ratio === ratio && draft.size === size && size !== 'auto'
+    const restoredMapping = draft.ratio === ratio && draft.size === size
     if (
       !restoredMapping &&
       presets.length &&
@@ -62,15 +73,16 @@ export function resolveImageOptions(
   const maxN = Math.min(config?.max_n ?? 0, model?.capabilities.max_n ?? 0)
   const maxReferences = referenceCapacity(config, model)
   const hasDraftSize = sizes.includes(draft.size)
+  const draftRatio = draft.ratio || (draft.size === 'auto' ? 'auto' : '')
   const preferredRatio = preferences?.image_ratio ?? ''
   const ratio =
-    draft.ratio &&
-    ratioOptions.has(draft.ratio) &&
-    (!hasDraftSize || ratioOptions.get(draft.ratio)?.includes(draft.size))
-      ? draft.ratio
+    draftRatio &&
+    ratioOptions.has(draftRatio) &&
+    (!hasDraftSize || ratioOptions.get(draftRatio)?.includes(draft.size))
+      ? draftRatio
       : !hasDraftSize && ratioOptions.has(preferredRatio)
         ? preferredRatio
-        : !hasDraftSize && variants.length
+        : !hasDraftSize && (allowsAuto || variants.length)
           ? (ratios[0] ?? '')
           : ''
   const ratioSizes = ratioOptions.get(ratio) ?? []

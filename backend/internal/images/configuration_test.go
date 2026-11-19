@@ -40,6 +40,34 @@ func TestResolutionPresetPolicy(t *testing.T) {
 	}
 }
 
+func TestAutomaticSizePolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name, size, ratio        string
+		siteSizes, modelSizes    []string
+		inherits, disabled, want bool
+	}{
+		{name: "inherited", size: "auto", ratio: "auto", inherits: true, want: true},
+		{name: "explicit", size: "auto", ratio: "auto", siteSizes: []string{"auto"}, modelSizes: []string{"auto"}, want: true},
+		{name: "legacy", size: "auto", siteSizes: []string{"auto"}, modelSizes: []string{"auto"}, want: true},
+		{name: "site size missing", size: "auto", ratio: "auto", modelSizes: []string{"auto"}},
+		{name: "model size missing", size: "auto", ratio: "auto", siteSizes: []string{"auto"}},
+		{name: "inherited disabled", size: "auto", ratio: "auto", inherits: true, disabled: true},
+		{name: "legacy disabled", size: "auto", siteSizes: []string{"auto"}, modelSizes: []string{"auto"}, disabled: true},
+		{name: "auto size with fixed ratio", size: "auto", ratio: "1:1", inherits: true},
+		{name: "auto ratio with fixed size", size: "1024x1024", ratio: "auto", inherits: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			config := Configuration{Sizes: tc.siteSizes, DisabledResolutions: []string{"1k"}}
+			if tc.disabled {
+				config.DisabledRatios = []string{"auto"}
+			}
+			if got := config.allowsSize(tc.size, tc.ratio, tc.modelSizes, tc.inherits); got != tc.want {
+				t.Errorf("allowsSize = %t, want %t", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestConfigurationReferenceLimitIsAdministratorChoice(t *testing.T) {
 	valid := Configuration{
 		MaxN:                1,

@@ -37,6 +37,60 @@ const model: PublicModel = {
   },
 }
 describe('server-derived image options', () => {
+  it('defaults to auto when available and retains valid explicit sizes and preferences', () => {
+    const configured: ImageConfiguration = {
+      ...config,
+      sizes: ['1024x1024', 'auto'],
+      resolution_presets: [{ ratio: '1:1', resolution: '1k', size: '1024x1024' }],
+    }
+    const explicit = { ...model, capabilities: { ...model.capabilities, sizes: configured.sizes } }
+    const inherited = { ...model, capabilities: { ...model.capabilities, use_size_presets: true } }
+    const preferences: Preferences = {
+      theme: 'system',
+      instructions: '',
+      image_quality: 'high',
+      image_ratio: '1:1',
+      image_count: 1,
+    }
+    for (const options of [
+      resolveImageOptions(emptyImageDraft, configured, explicit),
+      resolveImageOptions(emptyImageDraft, { ...configured, sizes: ['1024x1024'] }, inherited),
+      resolveImageOptions({ ...emptyImageDraft, size: 'auto' }, configured, explicit, preferences),
+    ]) {
+      expect(options).toMatchObject({
+        ratios: ['auto', '1:1'],
+        size: 'auto',
+        ratio: 'auto',
+        ratioSizes: ['auto'],
+        resolution: undefined,
+      })
+    }
+    expect(resolveImageOptions(emptyImageDraft, configured, explicit, preferences)).toMatchObject({
+      ratio: '1:1',
+      size: '1024x1024',
+    })
+    expect(
+      resolveImageOptions({ ...emptyImageDraft, size: '1024x1024' }, configured, explicit),
+    ).toMatchObject({
+      ratio: '',
+      size: '1024x1024',
+    })
+    const fixedOnly = {
+      ...explicit,
+      capabilities: { ...explicit.capabilities, sizes: ['1024x1024'] },
+    }
+    for (const options of [
+      resolveImageOptions(emptyImageDraft, { ...configured, disabled_ratios: ['auto'] }, inherited),
+      resolveImageOptions(emptyImageDraft, { ...configured, sizes: ['1024x1024'] }, explicit),
+      resolveImageOptions(emptyImageDraft, configured, fixedOnly, {
+        ...preferences,
+        image_ratio: 'auto',
+      }),
+    ]) {
+      expect(options).toMatchObject({ ratios: ['1:1'], ratio: '1:1', size: '1024x1024' })
+    }
+  })
+
   it('keeps the exact draft size and lists only available resolutions for its ratio', () => {
     const configured: ImageConfiguration = {
       ...config,
@@ -76,7 +130,7 @@ describe('server-derived image options', () => {
     expect(
       resolveImageOptions(
         { ...emptyImageDraft, ratio: '16:9', size: '3840x2160' },
-        { ...configured, disabled_ratios: ['16:9'] },
+        { ...configured, disabled_ratios: ['auto', '16:9'] },
         inherited,
       ),
     ).toMatchObject({ ratio: '1:1', resolution: '1k', size: '1024x1024' })

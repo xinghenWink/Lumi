@@ -33,7 +33,8 @@ export default {
     resolution: '分辨率',
     resolutionOption: '{resolution} · {pixels}',
     presetTitle: '比例与分辨率预设',
-    presetHint: '默认启用常见比例和 1K、2K、4K。关闭的选项会从生图页和画布移除。请各保留至少一项。',
+    presetHint:
+      '默认启用自动比例、常见比例和 1K、2K、4K。关闭的选项会从生图页和画布移除。比例与分辨率请各保留至少一项。',
     useSizePresets: '使用系统尺寸预设',
     modelPresetHint: '使用生图设置中启用的预设。若上游仅支持特定尺寸，可关闭并单独设置。',
     customSizes: '自定义尺寸与旧比例映射',
