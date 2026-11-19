@@ -26,6 +26,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
+	"github.com/xinghenWink/Lumi/backend/internal/credits"
 	"github.com/xinghenWink/Lumi/backend/internal/images"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/user"
@@ -78,6 +79,7 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 		}
 		var input struct {
 			Prompt string `json:"prompt"`
+			Size   string `json:"size"`
 			Count  int    `json:"n"`
 		}
 		var guideFound bool
@@ -118,6 +120,8 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 					input.Prompt = string(data)
 				}
 				switch part.FormName() {
+				case "size":
+					input.Size = string(data)
 				case "background":
 					background = string(data)
 				case "output_format":
@@ -131,6 +135,10 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			}
 		} else if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			w.WriteHeader(400)
+			return
+		}
+		if input.Prompt == "automatic size" && input.Size != "auto" {
+			w.WriteHeader(422)
 			return
 		}
 		if strings.Contains(input.Prompt, "guide request") && !guideFound {
@@ -377,7 +385,26 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		execute(task.ID)
+		if task := execute(task.ID); task.Status != "succeeded" || task.Ratio != "" {
+			t.Fatalf("legacy auto size did not round trip: %+v", task)
+		}
+		auto.Ratio = "auto"
+		for _, operation := range []string{"generate", "edit"} {
+			if operation == "edit" {
+				auto.ReferenceFileIDs = []uuid.UUID{upload.ID}
+			}
+			quote, err := f.services.Credits.Quote(f.ctx, credits.QuoteInput{ModelID: &model.ID, Operation: operation, Quality: auto.Quality, Size: auto.Size, Count: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			task, err := service.Submit(f.ctx, actor, uuid.NewString(), auto)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if task := execute(task.ID); task.Status != "succeeded" || task.Size != "auto" || task.Ratio != "auto" || task.TotalCost != quote.TotalCost || task.Operation != operation {
+				t.Fatalf("automatic %s did not use the quoted settings: %+v", operation, task)
+			}
+		}
 	})
 	t.Run("editor guides are private and edit results are validated before settlement", func(t *testing.T) {
 		source, err := f.services.Files.Upload(f.ctx, actor, "upload", bitmap.Bytes(), 10<<20)

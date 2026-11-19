@@ -58,7 +58,7 @@ func validateConfiguration(c Configuration) error {
 		return problem.Invalid()
 	}
 	seen := map[string]bool{}
-	if !validDisabled(c.DisabledRatios, presetRatios()) || !validDisabled(c.DisabledResolutions, presetResolutions()) {
+	if !validDisabled(c.DisabledRatios, append(presetRatios(), "auto")) || !validDisabled(c.DisabledResolutions, presetResolutions()) {
 		return problem.Invalid()
 	}
 	for _, size := range c.Sizes {

@@ -252,7 +252,10 @@ export const ImageTaskCard = memo(function ImageTaskCard({
                   <ProtectedImage
                     file={item.file}
                     alt={t('images.result', { index: item.position + 1 })}
-                    className="size-full object-cover animate-fade-in"
+                    className={cn(
+                      'size-full animate-fade-in',
+                      task.size === 'auto' ? 'object-contain' : 'object-cover',
+                    )}
                   />
                   <Button
                     type="button"

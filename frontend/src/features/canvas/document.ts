@@ -125,7 +125,7 @@ export function connectable(
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const sizePattern = /^(auto|[1-9][0-9]{1,4}x[1-9][0-9]{1,4})$/
-const ratioPattern = /^[1-9][0-9]{0,2}:[1-9][0-9]{0,2}$/
+const ratioPattern = /^(auto|[1-9][0-9]{0,2}:[1-9][0-9]{0,2})$/
 const codePattern = /^[A-Z0-9_]{0,64}$/
 // eslint-disable-next-line no-control-regex -- the server rejects these control characters.
 const titleControl = /[\u0000-\u001f\u007f-\u009f]/

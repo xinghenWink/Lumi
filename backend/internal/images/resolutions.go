@@ -44,6 +44,13 @@ func validDisabled(values, options []string) bool {
 }
 
 func (c Configuration) allowsSize(size, ratio string, modelSizes []string, inherits bool) bool {
+	if size == "auto" {
+		return (ratio == "auto" || ratio == "") && !slices.Contains(c.DisabledRatios, "auto") &&
+			(inherits || slices.Contains(c.Sizes, size) && slices.Contains(modelSizes, size))
+	}
+	if ratio == "auto" {
+		return false
+	}
 	presets := c.ResolutionPresets
 	if presets == nil {
 		presets = defaultResolutionPresets()
@@ -72,5 +79,5 @@ func (c Configuration) allowsSize(size, ratio string, modelSizes []string, inher
 	if !slices.Contains(c.Sizes, size) || (known && !enabled) || slices.Contains(c.DisabledRatios, ratio) {
 		return false
 	}
-	return ratio == "" || c.RatioSizes[ratio] == size && size != "auto"
+	return ratio == "" || c.RatioSizes[ratio] == size
 }

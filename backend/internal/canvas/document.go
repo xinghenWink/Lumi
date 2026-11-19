@@ -54,7 +54,7 @@ const (
 
 var (
 	sizePattern  = regexp.MustCompile(`^(auto|[1-9][0-9]{1,4}x[1-9][0-9]{1,4})$`)
-	ratioPattern = regexp.MustCompile(`^[1-9][0-9]{0,2}:[1-9][0-9]{0,2}$`)
+	ratioPattern = regexp.MustCompile(`^(auto|[1-9][0-9]{0,2}:[1-9][0-9]{0,2})$`)
 	codePattern  = regexp.MustCompile(`^[A-Z0-9_]{0,64}$`)
 )
 

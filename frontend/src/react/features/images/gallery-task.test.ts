@@ -13,7 +13,7 @@ const configuration: ImageConfiguration = {
   max_n: 3,
   max_references: 3,
   max_upload_bytes: 1024,
-  sizes: ['1024x1024', '1536x1024'],
+  sizes: ['1024x1024', '1536x1024', 'auto'],
   ratio_sizes: { '16:9': '1536x1024' },
   resolution_presets: [{ ratio: '3:2', resolution: '1k', size: '1536x1024' }],
   per_user_concurrency: 1,
@@ -123,6 +123,15 @@ describe('restoring an owned gallery task', () => {
     expect(image.store.getState().drafts.new).toMatchObject({ prompt: task.prompt, references: [] })
     expect(images.conversation).not.toHaveBeenCalled()
     expect(images.file).not.toHaveBeenCalled()
+  })
+
+  it('restores legacy automatic tasks as the auto ratio option', async () => {
+    expect(await restore({ ...task, size: 'auto', ratio: '' })).toBe(true)
+    expect(image.store.getState().drafts.destination).toMatchObject({ size: 'auto', ratio: 'auto' })
+    expect(images.quote).toHaveBeenCalledWith(
+      expect.objectContaining({ size: 'auto' }),
+      expect.anything(),
+    )
   })
 
   it('keeps the destination draft when a reference or historical setting is unavailable', async () => {

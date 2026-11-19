@@ -1990,8 +1990,11 @@ export interface components {
       instructions: string
       /** @enum {string} */
       image_quality: 'low' | 'medium' | 'high'
-      /** @enum {string} */
-      image_ratio: '1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16'
+      /**
+       * @default auto
+       * @enum {string}
+       */
+      image_ratio: 'auto' | '1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16'
       image_count: number
     }
     Health: {
@@ -2522,7 +2525,7 @@ export interface components {
     ModelCapabilities: {
       /** @description Chat model accepts explicit reasoning effort. */
       reasoning_effort?: boolean
-      /** @description Image model inherits the site's enabled ratio and resolution presets. Otherwise its explicit sizes are used. */
+      /** @description Image model inherits the site's enabled ratio and resolution presets, including automatic sizing. Explicitly sized models use their own sizes and require auto in both size lists to offer automatic sizing. */
       use_size_presets?: boolean
       vision: boolean
       stream: boolean
@@ -2797,7 +2800,8 @@ export interface components {
       }
       /** @description Site preset catalog. Disabled choices remain in the catalog so administrators can re-enable them. */
       readonly resolution_presets?: components['schemas']['ImageResolutionPreset'][]
-      disabled_ratios?: ('1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16')[]
+      /** @description Ratios disabled for new image tasks. Disabling auto also disables legacy requests that use auto size with an empty ratio. */
+      disabled_ratios?: ('auto' | '1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16')[]
       disabled_resolutions?: ('1k' | '2k' | '4k')[]
       /** Format: int64 */
       per_user_concurrency: number
@@ -2842,7 +2846,9 @@ export interface components {
       prompt: string
       /** @enum {string} */
       quality: 'low' | 'medium' | 'high'
+      /** @description Width and height as WIDTHxHEIGHT, or auto to let the provider choose the size. */
       size: string
+      /** @description The selected aspect ratio. Use auto with size auto. An empty ratio selects a size directly. */
       ratio?: string
       /** Format: int64 */
       n: number
@@ -3014,7 +3020,9 @@ export interface components {
       model_id: string | null
       /** @enum {string} */
       quality: '' | 'low' | 'medium' | 'high'
+      /** @description The selected dimensions or auto. */
       size: string
+      /** @description The selected aspect ratio, auto, or an empty string for direct size selection or defaults. */
       ratio: string
       n: number
     }
@@ -3062,7 +3070,9 @@ export interface components {
       model_id: string
       /** @enum {string} */
       quality: 'low' | 'medium' | 'high'
+      /** @description Width and height as WIDTHxHEIGHT, or auto to let the provider choose the size. */
       size: string
+      /** @description The selected aspect ratio. Use auto with size auto. An empty ratio selects a size directly. */
       ratio: string
       n: number
     }

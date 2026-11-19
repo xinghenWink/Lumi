@@ -12,6 +12,8 @@ export type ImageConfiguration = S['ImageConfiguration']
 export type ImageResolutionPreset = S['ImageResolutionPreset']
 export type GalleryItem = S['ImageGalleryItem']
 export type ImagePage<T> = { items: T[]; next_cursor: string }
+const fixedRatios = ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16'] as const
+export const imageRatios = ['auto', ...fixedRatios] as const
 const str = (v: unknown): string => {
   if (typeof v !== 'string') throw new ApiError('RESPONSE_INVALID')
   return v
@@ -85,7 +87,7 @@ export function parseImageConfiguration(v: unknown): ImageConfiguration {
           resolution_presets: list(d.resolution_presets, (item) => {
             const preset = record(item)
             return {
-              ratio: choice(preset.ratio, ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16']),
+              ratio: choice(preset.ratio, fixedRatios),
               resolution: choice(preset.resolution, ['1k', '2k', '4k']),
               size: str(preset.size),
             }
@@ -94,9 +96,7 @@ export function parseImageConfiguration(v: unknown): ImageConfiguration {
     ...(d.disabled_ratios === undefined
       ? {}
       : {
-          disabled_ratios: list(d.disabled_ratios, (item) =>
-            choice(item, ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16']),
-          ),
+          disabled_ratios: list(d.disabled_ratios, (item) => choice(item, imageRatios)),
         }),
     ...(d.disabled_resolutions === undefined
       ? {}

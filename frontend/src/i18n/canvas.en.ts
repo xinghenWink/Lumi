@@ -143,6 +143,7 @@ export default {
       parameters: 'Parameters',
       imageParameters: 'Image parameters',
       imageParameterSummary: '{ratio} · {resolution} · {count}',
+      imageParameterAutoSummary: '{ratio} · {count}',
       textParameters: 'Text parameters',
       parametersDescription: 'Changes are saved to this node automatically.',
       disconnect: 'Disconnect {name}',

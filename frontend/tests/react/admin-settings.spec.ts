@@ -78,12 +78,21 @@ test('real versioned chat and image settings preserve drafts on conflicts and re
     await page.getByRole('button', { name: '刷新', exact: true }).click()
     await expect(page.getByLabel('最大生成张数', { exact: true })).toHaveValue(String(latest.max_n))
     await page.getByLabel('最大生成张数', { exact: true }).fill('2')
+    const auto = page.getByRole('switch', { name: '自动', exact: true })
+    await expect(auto).toBeChecked()
+    await auto.uncheck()
     await page.getByRole('button', { name: '保存修改', exact: true }).click()
     await expect(page.getByRole('status')).toContainText('生图设置已保存')
     await page.reload()
     await expect(page.getByLabel('最大生成张数', { exact: true })).toHaveValue('2')
+    await expect(auto).not.toBeChecked()
     const savedImage = parseImageConfiguration(await f.api('GET', '/admin/image-settings'))
-    expect(savedImage).toEqual({ ...latest, max_n: 2, version: latest.version + 1 })
+    expect(savedImage).toEqual({
+      ...latest,
+      max_n: 2,
+      disabled_ratios: [...(latest.disabled_ratios ?? []), 'auto'],
+      version: latest.version + 1,
+    })
     await noOverflow(page)
     await page.screenshot({
       path: info.outputPath('versioned-image-settings.png'),

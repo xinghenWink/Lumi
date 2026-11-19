@@ -5,8 +5,8 @@ export function taskParameters(task: ImageTask, t: TFunction) {
   return [
     task.model_name,
     t('images.' + task.quality),
-    task.size,
-    task.ratio,
+    task.size === 'auto' ? t('images.auto') : task.size,
+    task.ratio === 'auto' ? '' : task.ratio,
     t('react.imageCount', { count: task.n }),
   ]
     .filter(Boolean)
