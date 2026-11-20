@@ -103,6 +103,11 @@ type Task struct {
 	Items            []Item       `json:"items"`
 	ContentVisible   bool         `json:"content_visible"`
 }
+type AdminTask struct {
+	Task
+	UserNickname string `json:"user_nickname,omitempty"`
+	UserEmail    string `json:"user_email,omitempty"`
+}
 type Filter struct {
 	Owner                  *uuid.UUID
 	Conversation           *uuid.UUID

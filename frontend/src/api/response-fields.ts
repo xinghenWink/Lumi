@@ -9,3 +9,10 @@ export const integer = (v: unknown): number => {
     throw new ApiError('RESPONSE_INVALID')
   return v
 }
+
+export function parseAdminUserFields(row: Record<string, unknown>) {
+  return {
+    ...(row.user_nickname === undefined ? {} : { user_nickname: text(row.user_nickname) }),
+    ...(row.user_email === undefined ? {} : { user_email: text(row.user_email) }),
+  }
+}

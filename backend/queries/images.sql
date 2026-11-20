@@ -126,6 +126,9 @@ AND (sqlc.narg(from_time)::timestamptz IS NULL OR created_at>=sqlc.narg(from_tim
 AND (sqlc.narg(until_time)::timestamptz IS NULL OR created_at<sqlc.narg(until_time)::timestamptz)
 AND (sqlc.narg(before_time)::timestamptz IS NULL OR (created_at,id)<(sqlc.narg(before_time)::timestamptz,sqlc.narg(before_id)::uuid))
 ORDER BY created_at DESC,id DESC LIMIT sqlc.arg(page_limit);
+-- name: ListImageTaskOwners :many
+SELECT id,nickname,email::text AS email FROM users
+WHERE id=ANY(sqlc.arg(user_ids)::uuid[]) AND deleted_at IS NULL;
 -- name: ListImageGallery :many
 SELECT f.*,t.prompt,t.params,t.quality,t.size AS requested_size,t.ratio,t.model_id,t.model_name,t.status AS task_status,t.conversation_id,t.unit_price
 FROM files f JOIN image_tasks t ON t.id=f.task_id

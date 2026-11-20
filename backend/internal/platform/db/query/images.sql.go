@@ -1266,6 +1266,37 @@ func (q *Queries) ListImageTaskItems(ctx context.Context, ids []uuid.UUID) ([]Li
 	return items, nil
 }
 
+const listImageTaskOwners = `-- name: ListImageTaskOwners :many
+SELECT id,nickname,email::text AS email FROM users
+WHERE id=ANY($1::uuid[]) AND deleted_at IS NULL
+`
+
+type ListImageTaskOwnersRow struct {
+	ID       uuid.UUID
+	Nickname string
+	Email    string
+}
+
+func (q *Queries) ListImageTaskOwners(ctx context.Context, userIds []uuid.UUID) ([]ListImageTaskOwnersRow, error) {
+	rows, err := q.db.Query(ctx, listImageTaskOwners, userIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListImageTaskOwnersRow{}
+	for rows.Next() {
+		var i ListImageTaskOwnersRow
+		if err := rows.Scan(&i.ID, &i.Nickname, &i.Email); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listImageTasks = `-- name: ListImageTasks :many
 SELECT id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id FROM image_tasks WHERE ($1::uuid IS NULL OR user_id=$1::uuid)
 AND ($2::uuid IS NULL OR conversation_id=$2::uuid)

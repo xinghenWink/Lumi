@@ -249,6 +249,8 @@ func (s *Service) Dashboard(ctx context.Context, days int32) (Dashboard, error) 
 type ChatMetadata struct {
 	ID            uuid.UUID  `json:"id"`
 	UserID        uuid.UUID  `json:"user_id"`
+	UserNickname  string     `json:"user_nickname,omitempty"`
+	UserEmail     string     `json:"user_email,omitempty"`
 	ModelID       *uuid.UUID `json:"model_id"`
 	LastMessageAt time.Time  `json:"last_message_at"`
 	CreatedAt     time.Time  `json:"created_at"`
@@ -278,7 +280,10 @@ func (s *Service) Chats(ctx context.Context, owner *uuid.UUID, cursor string, li
 		}
 	}
 	for _, r := range rows {
-		result.Items = append(result.Items, ChatMetadata{ID: r.ID, UserID: r.UserID, ModelID: r.ModelID, LastMessageAt: r.LastMessageAt, CreatedAt: r.CreatedAt, Busy: r.ActiveRunID != nil})
+		result.Items = append(result.Items, ChatMetadata{
+			ID: r.ID, UserID: r.UserID, UserNickname: r.UserNickname, UserEmail: r.UserEmail,
+			ModelID: r.ModelID, LastMessageAt: r.LastMessageAt, CreatedAt: r.CreatedAt, Busy: r.ActiveRunID != nil,
+		})
 	}
 	return result, nil
 }

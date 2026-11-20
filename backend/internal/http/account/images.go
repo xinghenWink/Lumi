@@ -213,10 +213,13 @@ func (h *Handler) imageTaskList(c *gin.Context) {
 		h.fail(c, err)
 		return
 	}
-	if !admin {
-		f.Search = c.Query("search")
+	if admin {
+		result, err := h.services.Images.ListAdminTasks(c.Request.Context(), p.Actor, f)
+		h.imageReply(c, result, err, 200)
+		return
 	}
-	result, err := h.services.Images.List(c.Request.Context(), p.Actor, f, admin)
+	f.Search = c.Query("search")
+	result, err := h.services.Images.List(c.Request.Context(), p.Actor, f, false)
 	h.imageReply(c, result, err, 200)
 }
 func (h *Handler) imageTask(c *gin.Context) {

@@ -9,12 +9,14 @@ export interface Column<T> {
 export function DataTable<T extends { id: string }>({
   rows,
   columns,
+  scrollRegionLabel,
 }: {
   rows: T[]
   columns: Column<T>[]
+  scrollRegionLabel?: string
 }) {
   return (
-    <Table className="w-full text-left text-xs">
+    <Table className="w-full text-left text-xs" scrollRegionLabel={scrollRegionLabel}>
       <TableHeader>
         <TableRow className="border-b border-border bg-muted/40">
           {columns.map((column) => (

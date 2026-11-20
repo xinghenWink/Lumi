@@ -141,6 +141,7 @@ export default {
     refunded: 'Refund completed',
     model: 'Model',
     owner: 'User ID',
+    conversationId: 'Conversation ID',
     lastMessage: 'Last activity',
     viewContent: 'View messages (requires content access)',
     hiddenContent:

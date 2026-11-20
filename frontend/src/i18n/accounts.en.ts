@@ -154,6 +154,7 @@ export default {
       registered: 'Registered',
       lastLogin: 'Last sign-in',
       identity: 'Account',
+      userInfo: 'User information',
       id: 'User ID',
       ip: 'Last sign-in IP',
       edit: 'Edit user',

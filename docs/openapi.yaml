@@ -2894,8 +2894,9 @@ paths:
       operationId: listAdminImageTasks
       summary: listAdminImageTasks
       description: >-
-        Admin only. Default excludes prompts/reference IDs/file URLs. Content opt-in records an audit
-        on every view.
+        Admin only. Lists task metadata and the current nickname and email of each existing,
+        non-deleted owner. Default excludes prompts/reference IDs/file URLs. Content opt-in records
+        an audit on every view.
       security:
         - bearerAuth: []
       parameters:
@@ -2946,7 +2947,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ImageTaskPage'
+                $ref: '#/components/schemas/AdminImageTaskPage'
         default:
           $ref: '#/components/responses/APIError'
   /api/v1/admin/image-tasks/{id}:
@@ -4110,6 +4111,9 @@ paths:
     get:
       summary: /api/v1/admin/conversations
       operationId: m6_get__api_v1_admin_conversations
+      description: >-
+        Admin only. Lists chat metadata and the current nickname and email of each existing,
+        non-deleted owner. Message content is governed by the content access setting.
       security:
         - bearerAuth: []
       parameters:
@@ -5547,6 +5551,11 @@ components:
         user_id:
           type: string
           format: uuid
+        user_nickname:
+          type: string
+        user_email:
+          type: string
+          format: email
         model_id:
           type:
             - string
@@ -8553,8 +8562,21 @@ components:
         - file
         - error_code
     ImageTask:
+      $ref: '#/components/schemas/ImageTaskFields'
+      unevaluatedProperties: false
+    AdminImageTask:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: '#/components/schemas/ImageTaskFields'
+        - type: object
+          properties:
+            user_nickname:
+              type: string
+            user_email:
+              type: string
+              format: email
+    ImageTaskFields:
       type: object
-      additionalProperties: false
       properties:
         id:
           type: string
@@ -8742,6 +8764,19 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ImageTask'
+        next_cursor:
+          type: string
+      required:
+        - items
+        - next_cursor
+    AdminImageTaskPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminImageTask'
         next_cursor:
           type: string
       required:

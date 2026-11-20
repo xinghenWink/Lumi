@@ -2,9 +2,11 @@ import type { components } from './schema'
 import { authorized, authorizedResponse } from './protected'
 import { ApiError, noContent, record } from './transport'
 import { parsePage } from './catalog-contracts'
+import { parseAdminUserFields } from './response-fields'
 type S = components['schemas']
 export type ImageFile = S['ImageFile']
 export type ImageTask = S['ImageTask']
+export type AdminImageTask = S['AdminImageTask']
 export type ImageInput = S['ImageTaskInput']
 export type ImageEditOptions = S['ImageEditOptions']
 export type ImageConversation = S['ImageConversation']
@@ -165,6 +167,10 @@ export function parseTask(v: unknown): ImageTask {
     }),
   }
 }
+function parseAdminTask(v: unknown): AdminImageTask {
+  const d = record(v)
+  return { ...parseTask(d), ...parseAdminUserFields(d) }
+}
 export function parseGallery(v: unknown): GalleryItem {
   const d = record(v)
   return {
@@ -267,10 +273,12 @@ export const images = {
     authorized(root + '/image-tasks', parseTask, { method: 'POST', body, idempotencyKey: key }),
   task: (id: string, admin = false, signal?: AbortSignal) =>
     authorized(task(id, admin), parseTask, signalOptions(signal)),
-  tasks: (q: URLSearchParams, admin = false, signal?: AbortSignal) =>
+  tasks: (q: URLSearchParams, signal?: AbortSignal) =>
+    authorized(root + '/image-tasks?' + q, (v) => parsePage(v, parseTask), signalOptions(signal)),
+  adminTasks: (q: URLSearchParams, signal?: AbortSignal) =>
     authorized(
-      root + (admin ? '/admin' : '') + '/image-tasks?' + q,
-      (v) => parsePage(v, parseTask),
+      root + '/admin/image-tasks?' + q,
+      (v) => parsePage(v, parseAdminTask),
       signalOptions(signal),
     ),
   cancel: (id: string) => authorized(task(id) + '/cancel', parseTask, { method: 'POST' }),

@@ -1,8 +1,9 @@
 import { authorized, authorizedResponse } from './protected'
 import { ApiError, record, noContent, request } from './transport'
 import { parseMessage } from './chat'
+import type { components } from './schema'
 
-import { integer, text } from './response-fields'
+import { integer, parseAdminUserFields, text } from './response-fields'
 import { userPreferences } from './preferences'
 
 export { integer, text } from './response-fields'
@@ -57,14 +58,7 @@ export interface SystemInfo {
   redis_ok: boolean
   image_bytes: number
 }
-export interface ChatMetadata {
-  id: string
-  user_id: string
-  model_id: string | null
-  last_message_at: string
-  created_at: string
-  busy: boolean
-}
+export type ChatMetadata = components['schemas']['AdminChatMetadata']
 export interface Page<T> {
   items: T[]
   next_cursor: string
@@ -241,11 +235,12 @@ export const operations = {
     authorized(
       '/api/v1/admin/conversations?' + query,
       (v) =>
-        page(v, (v) => {
+        page(v, (v): ChatMetadata => {
           const d = record(v)
           return {
             id: text(d.id),
             user_id: text(d.user_id),
+            ...parseAdminUserFields(d),
             model_id: d.model_id === null ? null : text(d.model_id),
             created_at: text(d.created_at),
             last_message_at: text(d.last_message_at),
