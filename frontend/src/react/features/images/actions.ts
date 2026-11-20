@@ -4,6 +4,27 @@ import { ApiError } from '../../../api/transport'
 import { authorizedResponse } from '../../../api/protected'
 import { useRuntime } from '../../app/context'
 
+async function clipboardImage(blob: Blob): Promise<Blob> {
+  if (blob.type !== 'image/gif') return blob
+  const frame = await createImageBitmap(blob)
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = frame.width
+    canvas.height = frame.height
+    const context = canvas.getContext('2d')
+    if (!context) throw new ApiError('IMAGE_COPY_UNAVAILABLE')
+    context.drawImage(frame, 0, 0)
+    return await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(
+        (png) => (png ? resolve(png) : reject(new ApiError('IMAGE_COPY_UNAVAILABLE'))),
+        'image/png',
+      ),
+    )
+  } finally {
+    frame.close()
+  }
+}
+
 export function useImageActions() {
   const runtime = useRuntime()
   const [error, setError] = useState<unknown>(null),
@@ -93,8 +114,13 @@ export function useImageActions() {
     error,
     copied,
     download: (file: ImageFile) =>
-      perform((signal) => images.blob(file, false, signal), 'lumi-' + file.id + '.png', false),
-    copy: (file: ImageFile) => perform((signal) => images.blob(file, false, signal), '', true),
+      perform(
+        (signal) => images.blob(file, false, signal),
+        'lumi-' + file.id + (file.mime === 'image/gif' ? '.gif' : '.png'),
+        false,
+      ),
+    copy: (file: ImageFile) =>
+      perform((signal) => images.blob(file, false, signal).then(clipboardImage), '', true),
     downloadBatch: (ids: string[]) =>
       perform(
         async (signal) => {

@@ -151,6 +151,10 @@ func (s *Service) submit(ctx context.Context, actor user.Actor, key string, requ
 		if err := validateInput(input, cfg, model); err != nil {
 			return err
 		}
+		outputFormat, err := resolveOutputFormat(input, model.Capabilities.SupportsGIF, attach == nil)
+		if err != nil {
+			return err
+		}
 		conversation, err := q.LockTaskConversation(ctx, query.LockTaskConversationParams{ID: input.ConversationID, UserID: actor.ID})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -214,6 +218,7 @@ func (s *Service) submit(ctx context.Context, actor user.Actor, key string, requ
 			}
 		}
 		insert := query.CreateImageTaskParams{ID: id, UserID: actor.ID, ConversationID: input.ConversationID, MessageID: messageID, UserMessageID: userID, Operation: operation, ModelID: input.ModelID, ModelName: model.DisplayName, Prompt: input.Prompt, Params: params, Quality: input.Quality, Size: input.Size, Ratio: input.Ratio, ImageCount: input.Count, ReferenceFileIds: input.ReferenceFileIDs, ChargeID: charge.ID, UnitPrice: charge.Quote.UnitPrice, TotalCost: charge.Quote.TotalCost, IdempotencyKey: key, RequestHash: hash, SplitRequests: cfg.SplitRequests, TimeoutSeconds: cfg.TimeoutSeconds, QueueTimeout: cfg.QueueTimeoutSeconds}
+		insert.OutputFormat = outputFormat
 		if input.EditOptions != nil {
 			insert.EditAction = input.EditOptions.Action
 			insert.EditGuideFileID = input.EditOptions.GuideFileID
@@ -303,6 +308,7 @@ func (s *Service) views(ctx context.Context, rows []query.ImageTask, viewer uuid
 		view := Task{ID: row.ID, UserID: row.UserID, ConversationID: row.ConversationID, ModelID: row.ModelID, ModelName: row.ModelName, Operation: row.Operation, Quality: row.Quality, Size: row.Size, Ratio: row.Ratio, Count: row.ImageCount, ReferenceFileIDs: []uuid.UUID{}, UnitPrice: row.UnitPrice, TotalCost: row.TotalCost, RefundedCost: row.RefundedCost, ActualCost: actual, Status: row.Status, SuccessfulImages: row.SuccessfulImages, QueuePosition: ranks[row.ID], CancelRequested: row.CancelRequested, ErrorCode: row.ErrorCode, StartedAt: row.StartedAt, FinishedAt: row.FinishedAt, CreatedAt: row.CreatedAt.UTC(), Version: row.Version, Items: byTask[row.ID], ContentVisible: content}
 		if content {
 			view.Prompt = row.Prompt
+			view.OutputFormat = row.OutputFormat
 			view.ReferenceFileIDs = append(view.ReferenceFileIDs, row.ReferenceFileIds...)
 			if row.EditAction != "" {
 				view.EditOptions = &EditOptions{Action: row.EditAction, GuideFileID: row.EditGuideFileID}

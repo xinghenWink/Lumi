@@ -7,6 +7,9 @@ export function taskParameters(task: ImageTask, t: TFunction) {
     t('images.' + task.quality),
     task.size === 'auto' ? t('images.auto') : task.size,
     task.ratio === 'auto' ? '' : task.ratio,
+    task.output_format === 'gif' || task.items.some((item) => item.file?.mime === 'image/gif')
+      ? t('images.outputFormatGif')
+      : '',
     t('react.imageCount', { count: task.n }),
   ]
     .filter(Boolean)

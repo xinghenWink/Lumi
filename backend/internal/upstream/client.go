@@ -47,11 +47,12 @@ type ChatEvent struct {
 	Sources                          []ChatSource
 }
 type ImageRequest struct {
-	Model   string `json:"model"`
-	Prompt  string `json:"prompt"`
-	Quality string `json:"quality"`
-	Size    string `json:"size"`
-	Count   int    `json:"n"`
+	Model        string `json:"model"`
+	Prompt       string `json:"prompt"`
+	Quality      string `json:"quality"`
+	Size         string `json:"size"`
+	Count        int    `json:"n"`
+	OutputFormat string `json:"output_format,omitempty"`
 }
 type Reference struct {
 	Name, MIME string
@@ -246,9 +247,44 @@ func (c *Client) ListModels(ctx context.Context) (models []RemoteModel, result e
 	return models, nil
 }
 func validImage(input ImageRequest) bool {
-	return validRemoteName(input.Model) && len(input.Prompt) > 0 && len(input.Prompt) <= 64000 && input.Count >= 1 && input.Count <= 10 && len(input.Size) <= 40 && len(input.Quality) <= 40
+	return validRemoteName(input.Model) && len(input.Prompt) > 0 && len(input.Prompt) <= 64000 && input.Count >= 1 && input.Count <= 10 && len(input.Size) <= 40 && len(input.Quality) <= 40 &&
+		(input.OutputFormat == "" || input.OutputFormat == "png" || input.OutputFormat == "gif")
 }
+
+const (
+	maxImageBytes = 20 << 20
+	gifDataPrefix = "data:image/gif;base64,"
+)
+
+func legacyImageResponseFormat(output string) string {
+	if output == "" {
+		return "b64_json"
+	}
+	return ""
+}
+
+func readImageBody(response *http.Response) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(response.Body, maxImageBytes+1))
+	if err != nil || len(data) == 0 || len(data) > maxImageBytes {
+		return nil, &Failure{Code: "UPSTREAM_RESPONSE_INVALID", Status: response.StatusCode}
+	}
+	return data, nil
+}
+
 func (c *Client) imageResults(response *http.Response, count int) ([]ImageResult, error) {
+	if contentType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type")); err == nil && contentType == "image/gif" {
+		if count != 1 {
+			return nil, &Failure{Code: "UPSTREAM_RESPONSE_INVALID", Status: response.StatusCode}
+		}
+		raw, err := readImageBody(response)
+		if err != nil {
+			return nil, err
+		}
+		if http.DetectContentType(raw) != "image/gif" {
+			return nil, &Failure{Code: "UPSTREAM_RESPONSE_INVALID", Status: response.StatusCode}
+		}
+		return []ImageResult{{Data: raw}}, nil
+	}
 	var body struct {
 		Data []struct {
 			Base64        string `json:"b64_json"`
@@ -265,9 +301,14 @@ func (c *Client) imageResults(response *http.Response, count int) ([]ImageResult
 	results := make([]ImageResult, 0, len(body.Data))
 	for _, item := range body.Data {
 		result := ImageResult{RevisedPrompt: item.RevisedPrompt}
-		if item.Base64 != "" {
-			raw, err := base64.StdEncoding.Strict().DecodeString(item.Base64)
-			if err != nil || len(raw) == 0 || len(raw) > 20<<20 {
+		encoded := item.Base64
+		if encoded == "" && strings.HasPrefix(item.URL, gifDataPrefix) {
+			encoded = item.URL
+		}
+		if encoded != "" {
+			encoded, gifURI := strings.CutPrefix(encoded, gifDataPrefix)
+			raw, err := base64.StdEncoding.Strict().DecodeString(encoded)
+			if err != nil || len(raw) == 0 || len(raw) > maxImageBytes || (gifURI && http.DetectContentType(raw) != "image/gif") {
 				return nil, &Failure{Code: "UPSTREAM_RESPONSE_INVALID"}
 			}
 			result.Data = raw
@@ -288,8 +329,8 @@ func (c *Client) GenerateImages(ctx context.Context, input ImageRequest) (result
 	}
 	body, err := json.Marshal(struct {
 		ImageRequest
-		ResponseFormat string `json:"response_format"`
-	}{input, "b64_json"})
+		ResponseFormat string `json:"response_format,omitempty"`
+	}{input, legacyImageResponseFormat(input.OutputFormat)})
 	if err != nil {
 		return nil, fmt.Errorf("encode generation request: %w", err)
 	}
@@ -324,17 +365,10 @@ func (c *Client) FetchImage(ctx context.Context, raw string) (data []byte, resul
 	if response.StatusCode != http.StatusOK {
 		return nil, &Failure{Code: "UPSTREAM_RESPONSE_INVALID", Status: response.StatusCode}
 	}
-	data, err = io.ReadAll(io.LimitReader(response.Body, 20<<20+1))
-	if err != nil {
-		return nil, &Failure{Code: "UPSTREAM_RESPONSE_INVALID"}
-	}
-	if len(data) == 0 || len(data) > 20<<20 {
-		return nil, &Failure{Code: "UPSTREAM_RESPONSE_INVALID"}
-	}
-	return data, nil
+	return readImageBody(response)
 }
 func (c *Client) EditImages(ctx context.Context, input EditRequest) (results []ImageResult, result error) {
-	if !validImage(input.ImageRequest) || len(input.References) < 1 {
+	if !validImage(input.ImageRequest) || len(input.References) < 1 || (input.OutputFormat == "gif" && input.TransparentBackground) {
 		return nil, &Failure{Code: "UPSTREAM_REQUEST_INVALID"}
 	}
 	for _, reference := range input.References {
@@ -344,9 +378,10 @@ func (c *Client) EditImages(ctx context.Context, input EditRequest) (results []I
 	}
 	var body bytes.Buffer
 	contentType := "application/json"
-	background, output := "", ""
+	format := legacyImageResponseFormat(input.OutputFormat)
+	background := ""
 	if input.TransparentBackground {
-		background, output = "transparent", "png"
+		background, input.OutputFormat = "transparent", "png"
 	}
 	if c.connection.EditFormat == "json" {
 		images := make([]map[string]string, 0, len(input.References))
@@ -355,18 +390,23 @@ func (c *Client) EditImages(ctx context.Context, input EditRequest) (results []I
 		}
 		if err := json.NewEncoder(&body).Encode(struct {
 			ImageRequest
-			Images       []map[string]string `json:"images"`
-			Format       string              `json:"response_format"`
-			Background   string              `json:"background,omitempty"`
-			OutputFormat string              `json:"output_format,omitempty"`
-		}{input.ImageRequest, images, "b64_json", background, output}); err != nil {
+			Images     []map[string]string `json:"images"`
+			Format     string              `json:"response_format,omitempty"`
+			Background string              `json:"background,omitempty"`
+		}{input.ImageRequest, images, format, background}); err != nil {
 			return nil, fmt.Errorf("encode edit request: %w", err)
 		}
 	} else {
 		writer := multipart.NewWriter(&body)
-		fields := map[string]string{"model": input.Model, "prompt": input.Prompt, "quality": input.Quality, "size": input.Size, "n": strconv.Itoa(input.Count), "response_format": "b64_json"}
+		fields := map[string]string{"model": input.Model, "prompt": input.Prompt, "quality": input.Quality, "size": input.Size, "n": strconv.Itoa(input.Count)}
+		if format != "" {
+			fields["response_format"] = format
+		}
+		if input.OutputFormat != "" {
+			fields["output_format"] = input.OutputFormat
+		}
 		if input.TransparentBackground {
-			fields["background"], fields["output_format"] = background, output
+			fields["background"] = background
 		}
 		for name, value := range fields {
 			if err := writer.WriteField(name, value); err != nil {

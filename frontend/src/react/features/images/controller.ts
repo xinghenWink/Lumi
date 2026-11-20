@@ -17,6 +17,7 @@ export interface ImageDraft {
   ratio: string
   n: number
   references: string[]
+  outputFormat?: ImageInput['output_format']
 }
 export const emptyImageDraft: ImageDraft = {
   prompt: '',
@@ -416,6 +417,7 @@ export function createImageController(session: SessionService, client: QueryClie
         ratio: task.ratio,
         n: task.n,
         reference_file_ids: task.reference_file_ids,
+        ...(task.output_format ? { output_format: task.output_format } : {}),
         ...(task.edit_options ? { edit_options: task.edit_options } : {}),
       },
       'task',

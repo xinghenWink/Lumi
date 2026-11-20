@@ -142,6 +142,7 @@ function ImageWorkspace({ id }: { id: string }) {
           size: value.task.size,
           ratio: value.task.ratio,
           n: value.task.n,
+          outputFormat: value.task.output_format,
           references: references.map((file) => file.id),
         })
         if (references.length !== results.length) throw new ApiError('IMAGE_REFERENCE_INVALID')

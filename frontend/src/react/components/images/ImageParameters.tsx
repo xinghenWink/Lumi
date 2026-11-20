@@ -6,6 +6,7 @@ import type { ImageDraft } from '../../features/images/controller'
 import { ratioBox } from '../../features/images/presentation'
 import type { useImageOptions } from '../../features/images/options'
 import { ChoiceGroup } from '../ui/choice-group'
+import { Field, FieldGroup } from '../ui/field'
 import { NativeSelect, NativeSelectOption } from '../ui/native-select'
 
 /** Quality, ratio, size and count for one image draft; shared by the panel and the mobile sheet. */
@@ -20,10 +21,11 @@ export function ImageParameters({
 }) {
   const { t } = useTranslation()
   const size = useId()
+  const format = useId()
   const hasRatio = !!options.ratio
   const customSizes = options.sizes.filter((value) => value !== 'auto')
   return (
-    <div className="flex flex-col gap-4">
+    <FieldGroup>
       {options.priced.length ? (
         <ChoiceGroup
           label={t('images.quality')}
@@ -35,6 +37,22 @@ export function ImageParameters({
           }))}
           onChange={(quality) => onPatch({ quality: quality as ImageInput['quality'] })}
         />
+      ) : null}
+      {options.supportsGif ? (
+        <Field id={format} label={t('images.outputFormat')}>
+          <NativeSelect
+            id={format}
+            value={options.outputFormat ?? 'auto'}
+            disabled={disabled}
+            onChange={({ target: { value } }) =>
+              onPatch({ outputFormat: value === 'png' || value === 'gif' ? value : undefined })
+            }
+          >
+            <NativeSelectOption value="auto">{t('images.outputFormatAuto')}</NativeSelectOption>
+            <NativeSelectOption value="png">{t('images.outputFormatPng')}</NativeSelectOption>
+            <NativeSelectOption value="gif">{t('images.outputFormatGif')}</NativeSelectOption>
+          </NativeSelect>
+        </Field>
       ) : null}
       {options.ratios.length ? (
         <ChoiceGroup
@@ -142,6 +160,6 @@ export function ImageParameters({
           onChange={(n) => onPatch({ n })}
         />
       ) : null}
-    </div>
+    </FieldGroup>
   )
 }

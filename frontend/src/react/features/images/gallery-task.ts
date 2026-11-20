@@ -65,6 +65,7 @@ export async function restoreGalleryTask({
     size: task.size,
     ratio: task.ratio || (task.size === 'auto' ? 'auto' : ''),
     n: task.n,
+    outputFormat: task.output_format,
     references: files.map((file) => file.id),
   } satisfies ImageDraft
   const options = resolveImageOptions(draft, configuration, model)
@@ -72,7 +73,8 @@ export async function restoreGalleryTask({
     options.quality !== draft.quality ||
     options.size !== draft.size ||
     options.ratio !== draft.ratio ||
-    options.n !== draft.n
+    options.n !== draft.n ||
+    (draft.outputFormat === 'gif' && !options.supportsGif)
   )
     throw new ApiError('IMAGE_HISTORY_PARAMETERS_UNAVAILABLE')
   if (files.length > options.maxReferences) throw new ApiError('IMAGE_REFERENCES_INVALID')

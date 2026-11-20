@@ -62,6 +62,7 @@ type Capabilities struct {
 	MaxN                          int32    `json:"max_n"`
 	SupportsEdit                  bool     `json:"supports_edit"`
 	SupportsTransparentBackground bool     `json:"supports_transparent_background,omitempty"`
+	SupportsGIF                   bool     `json:"supports_gif,omitempty"`
 	MaxReferenceImages            int32    `json:"max_reference_images"`
 	ResponseFormat                string   `json:"response_format"`
 }

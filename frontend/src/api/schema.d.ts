@@ -2542,6 +2542,8 @@ export interface components {
       supports_edit: boolean
       /** @description All enabled routes of this image model have been verified to support transparent edit output. */
       supports_transparent_background?: boolean
+      /** @description All enabled routes for this image model support GIF output. */
+      supports_gif?: boolean
       max_reference_images: number
       /** @enum {string} */
       response_format: '' | 'b64_json' | 'url'
@@ -2759,8 +2761,8 @@ export interface components {
       id: string
       /** @enum {string} */
       kind: 'upload' | 'generated' | 'thumbnail' | 'avatar' | 'edit_guide'
-      /** @constant */
-      mime: 'image/png'
+      /** @enum {string} */
+      mime: 'image/png' | 'image/gif'
       /** Format: int64 */
       size: number
       /** Format: int64 */
@@ -2861,6 +2863,11 @@ export interface components {
       reference_file_ids: string[]
       /** @description Requires one source image and one result. Resize requires an enabled editor aspect ratio. */
       edit_options?: components['schemas']['ImageEditOptions']
+      /**
+       * @description When omitted, GIF-enabled models infer GIF from an explicit request in the prompt. GIF output cannot be combined with edit_options.
+       * @enum {string}
+       */
+      output_format?: 'png' | 'gif'
     }
     ImageTaskItem: {
       /** Format: int64 */
@@ -2900,6 +2907,11 @@ export interface components {
       reference_file_ids: string[]
       /** @description Present only when edit options exist and the viewer can see task content. */
       edit_options?: components['schemas']['ImageEditOptions']
+      /**
+       * @description Resolved output format when selected or inferred and task content is visible.
+       * @enum {string}
+       */
+      output_format?: 'png' | 'gif'
       /** Format: int64 */
       unit_price: number
       /** Format: int64 */
@@ -4982,6 +4994,7 @@ export interface operations {
         }
         content: {
           'image/png': string
+          'image/gif': string
         }
       }
       default: components['responses']['APIError']
