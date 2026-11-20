@@ -2276,13 +2276,17 @@ export interface components {
       /** Format: int64 */
       version: number
     }
+    /** @enum {string} */
+    ImageQuality: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+    /** @description An empty value returns all qualities. */
+    ImageQualityFilter: '' | components['schemas']['ImageQuality']
     CreditPricingRule: {
       /** Format: uuid */
       model_id: string | null
       /** @enum {string} */
       operation: 'generate' | 'edit'
-      /** @enum {string} */
-      quality: 'low' | 'medium' | 'high'
+      /** @description The xhigh and max tiers require a model_id. */
+      quality: components['schemas']['ImageQuality']
       /** Format: int64 */
       credits_per_image: number
       enabled: boolean
@@ -2296,8 +2300,7 @@ export interface components {
       model_id?: string | null
       /** @enum {string} */
       operation: 'generate' | 'edit'
-      /** @enum {string} */
-      quality: 'low' | 'medium' | 'high'
+      quality: components['schemas']['ImageQuality']
       size: string
       /** Format: int64 */
       count: number
@@ -2374,6 +2377,10 @@ export interface components {
         medium: number
         /** Format: int64 */
         high: number
+        /** Format: int64 */
+        xhigh?: number
+        /** Format: int64 */
+        max?: number
       }
       timezone: string
     }
@@ -2536,7 +2543,7 @@ export interface components {
       vision: boolean
       stream: boolean
       max_context_tokens: number
-      qualities: ('low' | 'medium' | 'high')[]
+      qualities: components['schemas']['ImageQuality'][]
       sizes: string[]
       max_n: number
       supports_edit: boolean
@@ -2852,8 +2859,7 @@ export interface components {
       /** Format: uuid */
       model_id: string
       prompt: string
-      /** @enum {string} */
-      quality: 'low' | 'medium' | 'high'
+      quality: components['schemas']['ImageQuality']
       /** @description Width and height as WIDTHxHEIGHT, or auto to let the provider choose the size. */
       size: string
       /** @description The selected aspect ratio. Use auto with size auto. An empty ratio selects a size directly. */
@@ -2898,8 +2904,7 @@ export interface components {
       /** @enum {string} */
       operation: 'generate' | 'edit'
       prompt: string
-      /** @enum {string} */
-      quality: 'low' | 'medium' | 'high'
+      quality: components['schemas']['ImageQuality']
       size: string
       ratio: string
       /** Format: int64 */
@@ -2949,8 +2954,7 @@ export interface components {
       model_id: string
       model_name: string
       prompt: string
-      /** @enum {string} */
-      quality: 'low' | 'medium' | 'high'
+      quality: components['schemas']['ImageQuality']
       size: string
       ratio: string
       status: string
@@ -3046,8 +3050,7 @@ export interface components {
       mentions?: components['schemas']['CanvasMention'][]
       /** Format: uuid */
       model_id: string | null
-      /** @enum {string} */
-      quality: '' | 'low' | 'medium' | 'high'
+      quality: '' | components['schemas']['ImageQuality']
       /** @description The selected dimensions or auto. */
       size: string
       /** @description The selected aspect ratio, auto, or an empty string for direct size selection or defaults. */
@@ -3096,8 +3099,7 @@ export interface components {
       node_id: string
       /** Format: uuid */
       model_id: string
-      /** @enum {string} */
-      quality: 'low' | 'medium' | 'high'
+      quality: components['schemas']['ImageQuality']
       /** @description Width and height as WIDTHxHEIGHT, or auto to let the provider choose the size. */
       size: string
       /** @description The selected aspect ratio. Use auto with size auto. An empty ratio selects a size directly. */
@@ -5219,7 +5221,7 @@ export interface operations {
         cursor?: string
         limit?: number
         state?: string
-        quality?: string
+        quality?: components['schemas']['ImageQualityFilter']
         from?: string
         until?: string
         conversation_id?: string
@@ -5351,7 +5353,7 @@ export interface operations {
         cursor?: string
         limit?: number
         state?: string
-        quality?: string
+        quality?: components['schemas']['ImageQualityFilter']
         from?: string
         until?: string
       }
@@ -5403,7 +5405,7 @@ export interface operations {
         cursor?: string
         limit?: number
         state?: string
-        quality?: string
+        quality?: components['schemas']['ImageQualityFilter']
         from?: string
         until?: string
         user_id?: string

@@ -1,4 +1,5 @@
 import type { components } from './schema'
+import { parseImageQuality } from './image-quality'
 import { authorized, authorizedResponse } from './protected'
 import { ApiError, noContent, record } from './transport'
 import { parsePage } from './catalog-contracts'
@@ -128,7 +129,7 @@ export function parseTask(v: unknown): ImageTask {
     model_name: str(d.model_name),
     prompt: str(d.prompt),
     operation: choice(d.operation, ['generate', 'edit']),
-    quality: choice(d.quality, ['low', 'medium', 'high']),
+    quality: parseImageQuality(d.quality),
     size: str(d.size),
     ratio: str(d.ratio),
     n: num(d.n),
@@ -183,7 +184,7 @@ export function parseGallery(v: unknown): GalleryItem {
     model_id: str(d.model_id),
     model_name: str(d.model_name),
     prompt: str(d.prompt),
-    quality: choice(d.quality, ['low', 'medium', 'high']),
+    quality: parseImageQuality(d.quality),
     size: str(d.size),
     ratio: str(d.ratio),
     status: str(d.status),

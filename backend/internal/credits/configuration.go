@@ -104,7 +104,6 @@ func validSize(value string) bool {
 	y, err := strconv.Atoi(height)
 	return err == nil && y > 0 && y <= 65536 && value == fmt.Sprintf("%dx%d", x, y)
 }
-func validQuality(value string) bool   { return value == "low" || value == "medium" || value == "high" }
 func validOperation(value string) bool { return value == "generate" || value == "edit" }
 
 func (s *Service) Pricing(ctx context.Context) (Pricing, error) {
@@ -143,7 +142,10 @@ func (s *Service) SavePricing(ctx context.Context, actor user.Actor, value Prici
 	}
 	seen := make(map[string]bool, len(value.Rules))
 	for _, rule := range value.Rules {
-		if !validQuality(rule.Quality) || !validOperation(rule.Operation) || rule.CreditsPerImage < 0 || rule.CreditsPerImage > 1_000_000_000 || (rule.ModelID != nil && *rule.ModelID == uuid.Nil) {
+		if !validation.ImageQuality(rule.Quality) || !validOperation(rule.Operation) || rule.CreditsPerImage < 0 || rule.CreditsPerImage > 1_000_000_000 || (rule.ModelID != nil && *rule.ModelID == uuid.Nil) {
+			return Pricing{}, problem.Invalid()
+		}
+		if rule.ModelID == nil && (rule.Quality == "xhigh" || rule.Quality == "max") {
 			return Pricing{}, problem.Invalid()
 		}
 		model := "global"
@@ -203,7 +205,7 @@ func (s *Service) SavePricing(ctx context.Context, actor user.Actor, value Prici
 	return value, err
 }
 func price(ctx context.Context, q *query.Queries, cfg Configuration, input QuoteInput) (Quote, error) {
-	if !validQuality(input.Quality) || !validOperation(input.Operation) || !validSize(input.Size) || input.Count < 1 || input.Count > 10 || (input.ModelID != nil && *input.ModelID == uuid.Nil) {
+	if !validation.ImageQuality(input.Quality) || !validOperation(input.Operation) || !validSize(input.Size) || input.Count < 1 || input.Count > 10 || (input.ModelID != nil && *input.ModelID == uuid.Nil) {
 		return Quote{}, problem.Invalid()
 	}
 	rule, err := q.GetEffectivePricing(ctx, query.GetEffectivePricingParams{ModelID: input.ModelID, Operation: input.Operation, Quality: input.Quality})

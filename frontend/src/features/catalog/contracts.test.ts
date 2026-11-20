@@ -36,6 +36,14 @@ describe('catalog contracts', () => {
     ).toThrow()
     expect(defaultCapabilities('image').supports_edit).toBe(false)
   })
+  it('reads the advanced tiers and keeps image model defaults opt-in', () => {
+    const capabilities = defaultCapabilities('image')
+    expect(capabilities.qualities).toEqual(['low'])
+    expect(parseCapabilities({ ...capabilities, qualities: ['xhigh', 'max'] }).qualities).toEqual([
+      'xhigh',
+      'max',
+    ])
+  })
   it('compiles matching Chinese and English messages', async () => {
     function paths(value: unknown, prefix = ''): string[] {
       if (typeof value !== 'object' || value === null) return [prefix]

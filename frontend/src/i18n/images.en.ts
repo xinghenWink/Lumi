@@ -46,6 +46,8 @@ export default {
     low: 'Standard',
     medium: 'Fine',
     high: 'High',
+    xhigh: 'Extra high',
+    max: 'Maximum',
     size: 'Size',
     auto: 'Auto',
     ratio: 'Aspect ratio',

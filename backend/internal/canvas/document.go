@@ -306,9 +306,7 @@ func validateGenerator(generator GeneratorContent) error {
 	if generator.ModelID != nil && *generator.ModelID == uuid.Nil {
 		return fmt.Errorf("invalid model")
 	}
-	switch generator.Quality {
-	case "", "low", "medium", "high":
-	default:
+	if generator.Quality != "" && !validation.ImageQuality(generator.Quality) {
 		return fmt.Errorf("invalid quality")
 	}
 	if generator.Size != "" && !sizePattern.MatchString(generator.Size) || generator.Ratio != "" && !ratioPattern.MatchString(generator.Ratio) {

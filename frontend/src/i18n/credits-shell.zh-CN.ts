@@ -26,5 +26,7 @@ export default {
     low: '低',
     medium: '中',
     high: '高',
+    xhigh: '超高（xhigh）',
+    max: '最高（max）',
   },
 }

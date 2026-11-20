@@ -29,6 +29,7 @@ export function ImageParameters({
       {options.priced.length ? (
         <ChoiceGroup
           label={t('images.quality')}
+          variant={options.priced.length > 3 ? 'chips' : 'segmented'}
           value={options.quality}
           disabled={disabled || options.pricing}
           options={options.priced.map((quality) => ({

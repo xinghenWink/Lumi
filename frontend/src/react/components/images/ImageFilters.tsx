@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { imageQualities } from '../../../api/image-quality'
 import { Button } from '../ui/button'
 import { selectClass } from '../ui/field'
 import { Input } from '../ui/input'
@@ -61,7 +62,7 @@ export function ImageFilters({
           onChange={(event) => setValues({ ...values, quality: event.target.value })}
         >
           <option value="">{t('images.all')}</option>
-          {['low', 'medium', 'high'].map((quality) => (
+          {imageQualities.map((quality) => (
             <option key={quality} value={quality}>
               {t('images.' + quality)}
             </option>

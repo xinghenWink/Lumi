@@ -2,6 +2,7 @@ import type { components } from './schema'
 import { authorized } from './protected'
 import { ApiError, noContent, record } from './transport'
 import { parseFile, parseTask } from './images'
+import { parseImageQuality } from './image-quality'
 
 type S = components['schemas']
 export type Canvas = S['Canvas']
@@ -102,7 +103,7 @@ function parseNode(v: unknown): CanvasNode {
       prompt: str(g.prompt),
       ...(g.mentions === undefined ? {} : { mentions: list(g.mentions, parseMention) }),
       model_id: nullableText(g.model_id),
-      quality: choice(g.quality, ['', 'low', 'medium', 'high']),
+      quality: g.quality === '' ? '' : parseImageQuality(g.quality),
       size: str(g.size),
       ratio: str(g.ratio),
       n: int(g.n),

@@ -2638,7 +2638,7 @@ paths:
           in: query
           required: false
           schema:
-            type: string
+            $ref: '#/components/schemas/ImageQualityFilter'
         - name: from
           in: query
           required: false
@@ -2839,7 +2839,7 @@ paths:
           in: query
           required: false
           schema:
-            type: string
+            $ref: '#/components/schemas/ImageQualityFilter'
         - name: from
           in: query
           required: false
@@ -2926,7 +2926,7 @@ paths:
           in: query
           required: false
           schema:
-            type: string
+            $ref: '#/components/schemas/ImageQualityFilter'
         - name: from
           in: query
           required: false
@@ -6862,6 +6862,14 @@ components:
           format: int64
           minimum: 0
           maximum: 9007199254740991
+    ImageQuality:
+      type: string
+      enum: [low, medium, high, xhigh, max]
+    ImageQualityFilter:
+      description: An empty value returns all qualities.
+      anyOf:
+        - const: ''
+        - $ref: '#/components/schemas/ImageQuality'
     CreditPricingRule:
       type: object
       additionalProperties: false
@@ -6883,11 +6891,8 @@ components:
             - generate
             - edit
         quality:
-          type: string
-          enum:
-            - low
-            - medium
-            - high
+          $ref: '#/components/schemas/ImageQuality'
+          description: The xhigh and max tiers require a model_id.
         credits_per_image:
           type: integer
           format: int64
@@ -6928,11 +6933,7 @@ components:
             - generate
             - edit
         quality:
-          type: string
-          enum:
-            - low
-            - medium
-            - high
+          $ref: '#/components/schemas/ImageQuality'
         size:
           type: string
         count:
@@ -7129,6 +7130,16 @@ components:
               minimum: 0
               maximum: 9007199254740991
             high:
+              type: integer
+              format: int64
+              minimum: 0
+              maximum: 9007199254740991
+            xhigh:
+              type: integer
+              format: int64
+              minimum: 0
+              maximum: 9007199254740991
+            max:
               type: integer
               format: int64
               minimum: 0
@@ -7592,12 +7603,10 @@ components:
           maximum: 1000000
         qualities:
           type: array
+          maxItems: 5
+          uniqueItems: true
           items:
-            type: string
-            enum:
-              - low
-              - medium
-              - high
+            $ref: '#/components/schemas/ImageQuality'
         sizes:
           type: array
           items:
@@ -8505,11 +8514,7 @@ components:
           minLength: 1
           maxLength: 64000
         quality:
-          type: string
-          enum:
-            - low
-            - medium
-            - high
+          $ref: '#/components/schemas/ImageQuality'
         size:
           type: string
           description: Width and height as WIDTHxHEIGHT, or auto to let the provider choose the size.
@@ -8611,11 +8616,7 @@ components:
         prompt:
           type: string
         quality:
-          type: string
-          enum:
-            - low
-            - medium
-            - high
+          $ref: '#/components/schemas/ImageQuality'
         size:
           type: string
         ratio:
@@ -8744,11 +8745,7 @@ components:
         prompt:
           type: string
         quality:
-          type: string
-          enum:
-            - low
-            - medium
-            - high
+          $ref: '#/components/schemas/ImageQuality'
         size:
           type: string
         ratio:
@@ -8977,12 +8974,9 @@ components:
             - 'null'
           format: uuid
         quality:
-          type: string
-          enum:
-            - ''
-            - low
-            - medium
-            - high
+          anyOf:
+            - const: ''
+            - $ref: '#/components/schemas/ImageQuality'
         size:
           type: string
           maxLength: 11
@@ -9120,11 +9114,7 @@ components:
           type: string
           format: uuid
         quality:
-          type: string
-          enum:
-            - low
-            - medium
-            - high
+          $ref: '#/components/schemas/ImageQuality'
         size:
           type: string
           description: Width and height as WIDTHxHEIGHT, or auto to let the provider choose the size.

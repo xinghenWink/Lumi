@@ -1,4 +1,5 @@
 import type { components } from './schema'
+import { parseImageQuality } from './image-quality'
 import { ApiError, record } from './transport'
 type Schema = components['schemas']
 export type Upstream = Schema['Upstream']
@@ -53,11 +54,7 @@ const parseText = (value: unknown) => {
 }
 export function parseCapabilities(value: unknown): Capabilities {
   const data = record(value)
-  const qualities = list(data, 'qualities', (value) => {
-    if (value !== 'low' && value !== 'medium' && value !== 'high')
-      throw new ApiError('RESPONSE_INVALID')
-    return value
-  })
+  const qualities = list(data, 'qualities', parseImageQuality)
   return {
     ...(data.reasoning_effort === undefined
       ? {}

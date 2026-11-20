@@ -92,6 +92,8 @@ export default {
     vision: 'Image understanding',
     maxContext: 'Context token limit',
     qualities: 'Available qualities',
+    advancedQualityPricing:
+      'Set per-image generation and editing prices for the selected advanced qualities under Pricing and gifts.',
     sizes: 'Available sizes',
     sizesHint:
       'Pick a ratio, then a suggested resolution or type width and height. Actual dimensions come from the returned file.',

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -44,12 +43,12 @@ func validCapabilities(kind string, c Capabilities) bool {
 	if kind == "chat" {
 		return c.MaxContextTokens >= 1 && c.MaxContextTokens <= 1000000
 	}
-	if kind != "image" || len(c.Qualities) < 1 || len(c.Qualities) > 3 || (!c.UseSizePresets && len(c.Sizes) < 1) || len(c.Sizes) > 20 || c.MaxN < 1 || c.MaxN > 10 || c.MaxReferenceImages < 0 || (c.SupportsEdit && c.MaxReferenceImages == 0) || (c.ResponseFormat != "b64_json" && c.ResponseFormat != "url") {
+	if kind != "image" || len(c.Qualities) < 1 || (!c.UseSizePresets && len(c.Sizes) < 1) || len(c.Sizes) > 20 || c.MaxN < 1 || c.MaxN > 10 || c.MaxReferenceImages < 0 || (c.SupportsEdit && c.MaxReferenceImages == 0) || (c.ResponseFormat != "b64_json" && c.ResponseFormat != "url") {
 		return false
 	}
 	seen := map[string]bool{}
 	for _, value := range c.Qualities {
-		if !slices.Contains([]string{"low", "medium", "high"}, value) || seen[value] {
+		if !validation.ImageQuality(value) || seen[value] {
 			return false
 		}
 		seen[value] = true

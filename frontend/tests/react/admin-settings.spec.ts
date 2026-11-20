@@ -5,6 +5,7 @@ import { observeErrors } from '../browser-errors'
 import { parseConfiguration } from '../../src/api/chat'
 import { parseImageConfiguration } from '../../src/api/images'
 import { defaultCapabilities, parseModel } from '../../src/api/catalog-contracts'
+import { parsePricing } from '../../src/api/credit-contracts'
 import { modelInput } from '../../src/react/features/admin/catalog'
 
 test('real versioned chat and image settings preserve drafts on conflicts and reject duplicate ratios', async ({
@@ -191,5 +192,144 @@ test('real model version conflict and explicit pricing override retain server-ow
   } finally {
     await f.api('PUT', '/admin/pricing', pricing)
     await f.api('DELETE', '/admin/models/' + model.id)
+  }
+})
+
+test('advanced image qualities are opt-in, priced by model, and keyboard selectable', async ({
+  page,
+  baseURL,
+}, info) => {
+  const f = await adminFixture(page, baseURL)
+  const mobile = info.project.name.includes('mobile')
+  await page.emulateMedia({ colorScheme: mobile ? 'dark' : 'light' })
+  const suffix = randomUUID().slice(0, 10)
+  const displayName = 'Advanced quality ' + suffix
+  const pricing = parsePricing(await f.api('GET', '/admin/pricing'))
+  const channel = await f.api('POST', '/admin/upstreams', {
+    version: 0,
+    name: displayName,
+    base_url: 'http://127.0.0.1:1/v1',
+    api_key: 'browser-quality-fixture',
+    timeout_chat_s: 5,
+    timeout_image_s: 5,
+    enabled: true,
+    priority: 0,
+    weight: 1,
+    edit_format: 'multipart',
+  })
+  let modelId: string | undefined
+  try {
+    const model = parseModel(
+      await f.api('POST', '/admin/models', {
+        version: 0,
+        display_name: displayName,
+        type: 'image',
+        enabled: true,
+        capabilities: {
+          ...defaultCapabilities('image'),
+          qualities: ['low', 'medium', 'high'],
+        },
+        routes: [
+          {
+            upstream_id: channel.id,
+            upstream_model_name: 'image-2.6',
+            priority: 0,
+            weight: 1,
+            enabled: true,
+          },
+        ],
+      }),
+    )
+    modelId = model.id
+    const dialog = page.getByRole('dialog')
+    const extra = dialog.getByRole('checkbox', { name: '超高（xhigh）', exact: true })
+    const maximum = dialog.getByRole('checkbox', { name: '最高（max）', exact: true })
+    const openEditor = async () => {
+      await page.goto('/admin/models')
+      await page.getByRole('searchbox').fill(suffix)
+      await page.getByRole('button', { name: '搜索', exact: true }).click()
+      await page.getByRole('button', { name: '编辑模型 ' + displayName, exact: true }).click()
+    }
+    const saveModel = async () => {
+      await dialog.getByRole('button', { name: '保存模型', exact: true }).click()
+      await expect(dialog).toHaveCount(0)
+    }
+    const qualityOptions = async () => {
+      await page.goto('/create')
+      await page.getByRole('button', { name: '选择模型', exact: true }).click()
+      await page.getByRole('menuitemradio', { name: displayName, exact: true }).click()
+      if (mobile) await page.getByRole('button', { name: '生图参数', exact: true }).click()
+      return page
+        .getByRole(mobile ? 'dialog' : 'region', { name: '生图参数', exact: true })
+        .getByRole('radiogroup', { name: '质量', exact: true })
+    }
+    await openEditor()
+    await expect(extra).not.toBeChecked()
+    await expect(maximum).not.toBeChecked()
+    await extra.press('Space')
+    await maximum.check()
+    await expect(dialog.getByText(/请在「价格与赠送」中/)).toBeVisible()
+    await saveModel()
+    await openEditor()
+    await expect(extra).toBeChecked()
+    await expect(maximum).toBeChecked()
+
+    const group = await qualityOptions()
+    await expect(group.getByRole('radio')).toHaveCount(3)
+    await expect(group.getByRole('radio', { name: '超高', exact: true })).toHaveCount(0)
+    await page.goto('/admin/pricing')
+    for (const quality of ['xhigh', 'max']) {
+      await page.getByRole('button', { name: '添加模型规则', exact: true }).click()
+      const rule = page
+        .getByRole('row')
+        .filter({ has: page.getByLabel('模型 ID', { exact: true }) })
+        .last()
+      await rule.getByLabel('模型 ID', { exact: true }).fill(model.id)
+      await rule.getByLabel('操作', { exact: true }).selectOption('generate')
+      await rule.getByLabel('质量', { exact: true }).selectOption(quality)
+      await rule.getByRole('spinbutton').fill(quality === 'xhigh' ? '11' : '17')
+      if (quality === 'max') await rule.getByRole('checkbox').uncheck()
+    }
+    await page.getByRole('button', { name: '保存价格与赠送', exact: true }).click()
+    await expect(page.getByRole('status')).toContainText('价格与赠送配置已保存')
+    await qualityOptions()
+    await expect(group.getByRole('radio', { name: '超高', exact: true })).toBeVisible()
+    await expect(group.getByRole('radio', { name: '最高', exact: true })).toHaveCount(0)
+
+    const updated = parsePricing(await f.api('GET', '/admin/pricing'))
+    await f.api('PUT', '/admin/pricing', {
+      ...updated,
+      rules: updated.rules.map((rule) =>
+        rule.model_id === model.id && rule.quality === 'max' ? { ...rule, enabled: true } : rule,
+      ),
+    })
+    await qualityOptions()
+    await expect(group.getByRole('radio')).toHaveCount(5)
+    const extraRadio = group.getByRole('radio', { name: '超高', exact: true })
+    await expect(extraRadio).toBeEnabled()
+    await extraRadio.press('ArrowRight')
+    await expect(group.getByRole('radio', { name: '最高', exact: true })).toBeChecked()
+    expect(
+      await group
+        .locator('label > span > span')
+        .evaluateAll((labels) => labels.every((label) => label.scrollWidth <= label.clientWidth)),
+    ).toBe(true)
+    await expect(page.locator('html')).toHaveAttribute('data-theme', mobile ? 'dark' : 'light')
+    await noOverflow(page)
+    await page.screenshot({
+      path: info.outputPath('advanced-image-qualities.png'),
+      animations: 'disabled',
+    })
+
+    await openEditor()
+    await extra.uncheck()
+    await saveModel()
+    await qualityOptions()
+    await expect(group.getByRole('radio', { name: '最高', exact: true })).toBeVisible()
+    await expect(group.getByRole('radio', { name: '超高', exact: true })).toHaveCount(0)
+  } finally {
+    await f.api('PUT', '/admin/pricing', pricing)
+    if (modelId) await f.api('DELETE', '/admin/models/' + modelId)
+    await f.api('DELETE', '/admin/upstreams/' + String(channel.id))
   }
 })

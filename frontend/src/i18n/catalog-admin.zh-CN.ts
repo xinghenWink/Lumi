@@ -70,6 +70,8 @@ export default {
     vision: '支持图片理解',
     maxContext: '上下文 token 上限',
     qualities: '可用质量',
+    advancedQualityPricing:
+      '请在「价格与赠送」中为此模型的超高或最高质量设置对应的生图、改图单价。',
     sizes: '可用尺寸',
     sizesHint: '先选比例，再点选推荐分辨率，或手动输入宽高；结果实际尺寸以返回文件为准。',
     sizeRatio: '比例',

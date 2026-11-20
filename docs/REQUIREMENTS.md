@@ -223,7 +223,7 @@ lumi/
 
 | 参数 | 选项 | 说明 |
 | --- | --- | --- |
-| 质量 quality | low / medium / high（默认 medium） | 选项与单价取自价格表，后台关闭的档位不显示 |
+| 质量 quality | low / medium / high / xhigh / max（个人偏好默认 medium） | 仅展示当前模型已启用且对应操作可报价的档位 |
 | 尺寸 size | 1024×1024、1536×1024、1024×1536、auto | 可用尺寸列表后台可配 |
 | 宽高比 ratio | 1:1、3:2、2:3、4:3、3:4、16:9、9:16 | 选比例后自动映射到最接近的受支持尺寸；映射表存 settings，可在后台改；尺寸与比例联动，不得出现冲突状态 |
 | 数量 n | 1–4 | 上限后台可配，默认 4 |
@@ -283,7 +283,7 @@ lumi/
 
 ### 8.3 价格表（后台可配）
 
-- 表 `pricing_rules`：`model_id`（空 = 全局默认）、`operation`（generate/edit）、`quality`（low/medium/high）、`credits_per_image`（整数 ≥ 0）、`enabled`。
+- 表 `pricing_rules`：`model_id`（空 = 全局默认）、`operation`（generate/edit）、`quality`（low/medium/high/xhigh/max）、`credits_per_image`（整数 ≥ 0）、`enabled`。xhigh 和 max 仅支持按模型配置。
 - 费用 = `ceil(单价 × 编辑倍率 × 尺寸倍率) × n`；尺寸倍率存 settings（默认全部 1.0，用于大尺寸加价）。
 - 后台页面：表格内直接编辑；支持“全局默认 + 按模型覆盖”；保存即生效（缓存主动失效）。
 - 价格在任务创建时快照到任务（`unit_price`、`total_cost`），之后改价不影响在途与历史任务。
