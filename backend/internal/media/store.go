@@ -152,25 +152,28 @@ func (b *limitedBuffer) Write(p []byte) (int, error) {
 	}
 	return b.Buffer.Write(p)
 }
-func validateImage(raw []byte) (image.Config, error) {
+
+const maxImagePixels = 24_000_000
+
+func validateImage(raw []byte, allowGIF bool) (image.Config, string, error) {
 	cfg, format, err := image.DecodeConfig(bytes.NewReader(raw))
-	if err != nil || (format != "jpeg" && format != "png" && format != "webp") {
-		return image.Config{}, problem.New("FILE_TYPE_INVALID", 400)
+	if err != nil || (format != "jpeg" && format != "png" && format != "webp" && (!allowGIF || format != "gif")) {
+		return image.Config{}, "", problem.New("FILE_TYPE_INVALID", 400)
 	}
-	if cfg.Width < 1 || cfg.Height < 1 || cfg.Width > 8192 || cfg.Height > 8192 || int64(cfg.Width)*int64(cfg.Height) > 24_000_000 {
-		return image.Config{}, problem.New("FILE_DIMENSIONS_INVALID", 400)
+	if cfg.Width < 1 || cfg.Height < 1 || cfg.Width > 8192 || cfg.Height > 8192 || int64(cfg.Width)*int64(cfg.Height) > maxImagePixels {
+		return image.Config{}, "", problem.New("FILE_DIMENSIONS_INVALID", 400)
 	}
-	return cfg, nil
+	return cfg, format, nil
 }
 func (s *Store) Prepare(ctx context.Context, owner uuid.UUID, task *uuid.UUID, kind string, raw []byte, limit int64) (query.InsertImageFileParams, error) {
-	return s.prepare(ctx, owner, task, kind, raw, limit, nil)
+	return s.prepare(ctx, owner, task, kind, raw, limit, "", nil)
 }
 
-func (s *Store) PrepareImageResult(ctx context.Context, owner, task uuid.UUID, raw []byte, check func(image.Image) error) (query.InsertImageFileParams, error) {
-	return s.prepare(ctx, owner, &task, "generated", raw, 20<<20, check)
+func (s *Store) PrepareImageResult(ctx context.Context, owner, task uuid.UUID, raw []byte, outputFormat string, check func(image.Image) error) (query.InsertImageFileParams, error) {
+	return s.prepare(ctx, owner, &task, "generated", raw, 20<<20, outputFormat, check)
 }
 
-func (s *Store) prepare(ctx context.Context, owner uuid.UUID, task *uuid.UUID, kind string, raw []byte, limit int64, check func(image.Image) error) (query.InsertImageFileParams, error) {
+func (s *Store) prepare(ctx context.Context, owner uuid.UUID, task *uuid.UUID, kind string, raw []byte, limit int64, outputFormat string, check func(image.Image) error) (query.InsertImageFileParams, error) {
 	var result query.InsertImageFileParams
 	if err := ctx.Err(); err != nil {
 		return result, err
@@ -184,12 +187,24 @@ func (s *Store) prepare(ctx context.Context, owner uuid.UUID, task *uuid.UUID, k
 		return result, ctx.Err()
 	}
 	defer func() { <-s.decodeSlots }()
-	if _, err := validateImage(raw); err != nil {
+	cfg, format, err := validateImage(raw, kind == "generated" && outputFormat != "png")
+	if err != nil {
 		return result, err
 	}
-	decoded, _, err := image.Decode(bytes.NewReader(raw))
-	if err != nil {
+	if outputFormat == "gif" && format != "gif" {
 		return result, problem.New("FILE_TYPE_INVALID", 400)
+	}
+	var decoded image.Image
+	if format == "gif" {
+		decoded, err = decodeGIF(ctx, raw, cfg)
+	} else {
+		decoded, _, err = image.Decode(bytes.NewReader(raw))
+		if err != nil {
+			err = problem.New("FILE_TYPE_INVALID", 400)
+		}
+	}
+	if err != nil {
+		return result, err
 	}
 	if err := ctx.Err(); err != nil {
 		return result, err
@@ -209,9 +224,13 @@ func (s *Store) prepare(ctx context.Context, owner uuid.UUID, task *uuid.UUID, k
 		decoded = dest
 		width, height = 256, 256
 	}
-	output := &limitedBuffer{limit: limit}
-	if err := png.Encode(output, decoded); err != nil {
-		return result, fmt.Errorf("normalize image: %w", err)
+	original, extension, mime := raw, ".gif", "image/gif"
+	if format != "gif" {
+		output := &limitedBuffer{limit: limit}
+		if err := png.Encode(output, decoded); err != nil {
+			return result, fmt.Errorf("normalize image: %w", err)
+		}
+		original, extension, mime = output.Bytes(), ".png", "image/png"
 	}
 	tw, th := width, height
 	if max(tw, th) > 512 {
@@ -232,16 +251,16 @@ func (s *Store) prepare(ctx context.Context, owner uuid.UUID, task *uuid.UUID, k
 	if err := s.root.MkdirAll(directory, 0700); err != nil {
 		return result, fmt.Errorf("create image owner directory: %w", err)
 	}
-	path := directory + "/" + id.String() + ".png"
+	path := directory + "/" + id.String() + extension
 	thumbnailPath := directory + "/" + id.String() + ".webp"
-	if err := s.write(path, output.Bytes()); err != nil {
+	if err := s.write(path, original); err != nil {
 		return result, err
 	}
 	if err := s.write(thumbnailPath, thumb.Bytes()); err != nil {
 		return result, errors.Join(err, s.remove(path))
 	}
-	hash := sha256.Sum256(output.Bytes())
-	return query.InsertImageFileParams{ID: id, UserID: owner, Kind: kind, TaskID: task, Path: path, ThumbnailPath: thumbnailPath, Size: int64(output.Len()), Width: int32(width), Height: int32(height), ThumbnailWidth: int32(tw), ThumbnailHeight: int32(th), Sha256: hex.EncodeToString(hash[:])}, nil
+	hash := sha256.Sum256(original)
+	return query.InsertImageFileParams{ID: id, UserID: owner, Kind: kind, TaskID: task, Path: path, ThumbnailPath: thumbnailPath, Mime: mime, Size: int64(len(original)), Width: int32(width), Height: int32(height), ThumbnailWidth: int32(tw), ThumbnailHeight: int32(th), Sha256: hex.EncodeToString(hash[:])}, nil
 }
 func (s *Store) write(path string, data []byte) error {
 	temp := path + ".tmp"
@@ -340,6 +359,9 @@ func (s *Store) Reference(ctx context.Context, owner, id uuid.UUID) ([]byte, err
 	if len(data) > 10<<20 {
 		return nil, problem.New("FILE_TOO_LARGE", 413)
 	}
+	if row.Mime == "image/gif" {
+		return s.gifReference(ctx, data)
+	}
 	return data, nil
 }
 func (s *Store) Cleanup(ctx context.Context, days int32) error {
@@ -373,7 +395,7 @@ func (s *Store) cleanupOrphans(ctx context.Context) error {
 		if walkErr != nil {
 			return walkErr
 		}
-		if entry.IsDir() || !entry.Type().IsRegular() || (!strings.HasSuffix(path, ".png") && !strings.HasSuffix(path, ".webp") && !strings.HasSuffix(path, ".tmp")) {
+		if entry.IsDir() || !entry.Type().IsRegular() || (!strings.HasSuffix(path, ".png") && !strings.HasSuffix(path, ".webp") && !strings.HasSuffix(path, ".gif") && !strings.HasSuffix(path, ".tmp")) {
 			return nil
 		}
 		info, err := entry.Info()

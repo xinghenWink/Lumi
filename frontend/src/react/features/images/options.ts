@@ -94,6 +94,7 @@ export function resolveImageOptions(
   const resolution = variants.find(
     (preset) => preset.ratio === ratio && preset.size === size,
   )?.resolution
+  const supportsGif = model?.capabilities.supports_gif ?? false
   return {
     sizes,
     ratios,
@@ -108,6 +109,8 @@ export function resolveImageOptions(
     quality,
     ratio,
     n,
+    supportsGif,
+    outputFormat: supportsGif ? draft.outputFormat : undefined,
   }
 }
 /**

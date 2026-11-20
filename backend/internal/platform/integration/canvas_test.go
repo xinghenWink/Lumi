@@ -72,11 +72,12 @@ func TestCanvasRebuildUpgrade(t *testing.T) {
 				return err
 			}
 			// Seed legacy canvas tasks through the current image service before migration 11.
-			if _, err := p.ApplyVersion(ctx, 13, true); err != nil {
-				return err
+			for _, version := range []int64{13, 16, 21} {
+				if _, err := p.ApplyVersion(ctx, version, true); err != nil {
+					return err
+				}
 			}
-			_, err := p.ApplyVersion(ctx, 16, true)
-			return err
+			return nil
 		})
 	})
 	testCanvas(t, f, true)

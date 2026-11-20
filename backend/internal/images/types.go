@@ -61,6 +61,7 @@ type Input struct {
 	Count            int32        `json:"n"`
 	ReferenceFileIDs []uuid.UUID  `json:"reference_file_ids"`
 	EditOptions      *EditOptions `json:"edit_options,omitempty"`
+	OutputFormat     string       `json:"output_format,omitempty"`
 }
 type EditOptions struct {
 	Action      string     `json:"action"`
@@ -87,6 +88,7 @@ type Task struct {
 	Count            int32        `json:"n"`
 	ReferenceFileIDs []uuid.UUID  `json:"reference_file_ids"`
 	EditOptions      *EditOptions `json:"edit_options,omitempty"`
+	OutputFormat     string       `json:"output_format,omitempty"`
 	UnitPrice        int64        `json:"unit_price"`
 	TotalCost        int64        `json:"total_cost"`
 	RefundedCost     int64        `json:"refunded_cost"`

@@ -294,6 +294,11 @@ export function ModelEditor({
                     changeCaps({ supports_transparent_background })
                   }
                 />
+                <CheckField
+                  label={t('catalog.supportsGif')}
+                  checked={form.capabilities.supports_gif ?? false}
+                  onChange={(supports_gif) => changeCaps({ supports_gif })}
+                />
                 <NumberField
                   label={t('catalog.maxReferences')}
                   value={form.capabilities.max_reference_images}

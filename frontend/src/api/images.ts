@@ -50,7 +50,7 @@ export function parseFile(v: unknown): ImageFile {
   return {
     id: str(d.id),
     kind: choice(d.kind, ['upload', 'generated', 'thumbnail', 'avatar', 'edit_guide']),
-    mime: choice(d.mime, ['image/png']),
+    mime: choice(d.mime, ['image/png', 'image/gif']),
     size: num(d.size),
     width: num(d.width),
     height: num(d.height),
@@ -133,6 +133,9 @@ export function parseTask(v: unknown): ImageTask {
     ratio: str(d.ratio),
     n: num(d.n),
     reference_file_ids: list(d.reference_file_ids, str),
+    ...(d.output_format === undefined
+      ? {}
+      : { output_format: choice(d.output_format, ['png', 'gif']) }),
     ...(edit
       ? {
           edit_options: {
@@ -330,7 +333,7 @@ export const images = {
     )
     if (
       response.headers.get('Content-Type')?.split(';')[0] !==
-      (thumbnail ? 'image/webp' : 'image/png')
+      (thumbnail ? 'image/webp' : current.mime)
     )
       throw new ApiError('RESPONSE_INVALID')
     return response.blob()

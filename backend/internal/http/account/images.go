@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -418,7 +419,7 @@ func (h *Handler) imageBytes(c *gin.Context) {
 	}()
 	c.Header("Content-Type", mime)
 	c.Header("Cache-Control", "private, no-store")
-	c.Header("Content-Disposition", `inline; filename="`+id.String()+map[bool]string{true: ".webp", false: ".png"}[thumb]+`"`)
+	c.Header("Content-Disposition", `inline; filename="`+id.String()+filepath.Ext(file.Name())+`"`)
 	http.ServeContent(c.Writer, c.Request, row.ID.String(), row.CreatedAt, file)
 }
 func (h *Handler) imageEvents(c *gin.Context) {

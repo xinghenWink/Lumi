@@ -2325,6 +2325,10 @@ paths:
               schema:
                 type: string
                 format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
         default:
           $ref: '#/components/responses/APIError'
   /api/v1/files/{id}/thumb:
@@ -7607,6 +7611,9 @@ components:
         supports_transparent_background:
           type: boolean
           description: All enabled routes of this image model have been verified to support transparent edit output.
+        supports_gif:
+          type: boolean
+          description: All enabled routes for this image model support GIF output.
         max_reference_images:
           type: integer
           minimum: 0
@@ -8282,7 +8289,7 @@ components:
             - edit_guide
         mime:
           type: string
-          const: image/png
+          enum: [image/png, image/gif]
         size:
           type: integer
           format: int64
@@ -8522,6 +8529,10 @@ components:
         edit_options:
           $ref: '#/components/schemas/ImageEditOptions'
           description: Requires one source image and one result. Resize requires an enabled editor aspect ratio.
+        output_format:
+          type: string
+          enum: [png, gif]
+          description: When omitted, GIF-enabled models infer GIF from an explicit request in the prompt. GIF output cannot be combined with edit_options.
       required:
         - conversation_id
         - model_id
@@ -8621,6 +8632,10 @@ components:
         edit_options:
           $ref: '#/components/schemas/ImageEditOptions'
           description: Present only when edit options exist and the viewer can see task content.
+        output_format:
+          type: string
+          enum: [png, gif]
+          description: Resolved output format when selected or inferred and task content is visible.
         unit_price:
           type: integer
           format: int64

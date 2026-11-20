@@ -30,6 +30,10 @@ export default {
     send: 'Generate',
     retry: 'Retry last submission',
     quality: 'Quality',
+    outputFormat: 'Output format',
+    outputFormatAuto: 'Auto (from prompt)',
+    outputFormatPng: 'Still PNG',
+    outputFormatGif: 'Animated GIF',
     resolution: 'Resolution',
     resolutionOption: '{resolution} · {pixels}',
     presetTitle: 'Aspect ratio and resolution presets',
@@ -220,6 +224,7 @@ export default {
       'This workspace has an unconfirmed submission. Retry it in the workspace first.',
     IMAGE_DRAFT_CHANGED: 'The conversation or draft changed. Start the action again.',
     IMAGE_RESULT_INVALID: 'Invalid upstream image; credits refunded',
+    IMAGE_GIF_UNSUPPORTED: 'The selected model or edit action does not support GIF output.',
     IMAGE_RESULT_NOT_TRANSPARENT:
       'The result needs a transparent background and a visible subject. Credits refunded.',
     IMAGE_RESULT_RATIO_MISMATCH:

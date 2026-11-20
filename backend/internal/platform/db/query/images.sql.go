@@ -55,8 +55,8 @@ func (q *Queries) CreateImageConversation(ctx context.Context, arg CreateImageCo
 }
 
 const createImageTask = `-- name: CreateImageTask :one
-INSERT INTO image_tasks(id,user_id,conversation_id,message_id,user_message_id,operation,model_id,model_name,prompt,params,quality,size,ratio,image_count,reference_file_ids,charge_id,unit_price,total_cost,idempotency_key,request_hash,split_requests,timeout_seconds,edit_action,edit_guide_file_id,queue_deadline)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,now()+make_interval(secs=>$25::integer)) RETURNING id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id
+INSERT INTO image_tasks(id,user_id,conversation_id,message_id,user_message_id,operation,model_id,model_name,prompt,params,quality,size,ratio,image_count,reference_file_ids,charge_id,unit_price,total_cost,idempotency_key,request_hash,split_requests,timeout_seconds,edit_action,edit_guide_file_id,output_format,queue_deadline)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,now()+make_interval(secs=>$26::integer)) RETURNING id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id, output_format
 `
 
 type CreateImageTaskParams struct {
@@ -84,6 +84,7 @@ type CreateImageTaskParams struct {
 	TimeoutSeconds   int32
 	EditAction       string
 	EditGuideFileID  *uuid.UUID
+	OutputFormat     string
 	QueueTimeout     int32
 }
 
@@ -113,6 +114,7 @@ func (q *Queries) CreateImageTask(ctx context.Context, arg CreateImageTaskParams
 		arg.TimeoutSeconds,
 		arg.EditAction,
 		arg.EditGuideFileID,
+		arg.OutputFormat,
 		arg.QueueTimeout,
 	)
 	var i ImageTask
@@ -155,6 +157,7 @@ func (q *Queries) CreateImageTask(ctx context.Context, arg CreateImageTaskParams
 		&i.Version,
 		&i.EditAction,
 		&i.EditGuideFileID,
+		&i.OutputFormat,
 	)
 	return i, err
 }
@@ -236,7 +239,7 @@ func (q *Queries) ExpireImageFiles(ctx context.Context, retentionDays int32) (in
 }
 
 const expiredImageTasks = `-- name: ExpiredImageTasks :many
-SELECT t.id, t.user_id, t.conversation_id, t.message_id, t.user_message_id, t.operation, t.model_id, t.model_name, t.prompt, t.params, t.quality, t.size, t.ratio, t.image_count, t.reference_file_ids, t.charge_id, t.unit_price, t.total_cost, t.refunded_cost, t.successful_images, t.status, t.idempotency_key, t.request_hash, t.error_code, t.error_message, t.split_requests, t.timeout_seconds, t.queue_deadline, t.run_token, t.lease_until, t.cancel_requested, t.started_at, t.finished_at, t.created_at, t.updated_at, t.version, t.edit_action, t.edit_guide_file_id FROM image_tasks t LEFT JOIN users u ON u.id=t.user_id LEFT JOIN conversations c ON c.id=t.conversation_id
+SELECT t.id, t.user_id, t.conversation_id, t.message_id, t.user_message_id, t.operation, t.model_id, t.model_name, t.prompt, t.params, t.quality, t.size, t.ratio, t.image_count, t.reference_file_ids, t.charge_id, t.unit_price, t.total_cost, t.refunded_cost, t.successful_images, t.status, t.idempotency_key, t.request_hash, t.error_code, t.error_message, t.split_requests, t.timeout_seconds, t.queue_deadline, t.run_token, t.lease_until, t.cancel_requested, t.started_at, t.finished_at, t.created_at, t.updated_at, t.version, t.edit_action, t.edit_guide_file_id, t.output_format FROM image_tasks t LEFT JOIN users u ON u.id=t.user_id LEFT JOIN conversations c ON c.id=t.conversation_id
 WHERE t.status IN ('queued','running') AND ((t.status='queued' AND t.queue_deadline<now()) OR (t.status='running' AND t.lease_until<now()) OR u.id IS NULL OR u.status<>'active' OR u.deleted_at IS NOT NULL OR c.deleted_at IS NOT NULL)
 ORDER BY t.created_at,t.id LIMIT 100
 `
@@ -289,6 +292,7 @@ func (q *Queries) ExpiredImageTasks(ctx context.Context) ([]ImageTask, error) {
 			&i.Version,
 			&i.EditAction,
 			&i.EditGuideFileID,
+			&i.OutputFormat,
 		); err != nil {
 			return nil, err
 		}
@@ -330,7 +334,7 @@ func (q *Queries) FinishImageMessage(ctx context.Context, arg FinishImageMessage
 }
 
 const finishImageTask = `-- name: FinishImageTask :one
-UPDATE image_tasks SET status=$2,successful_images=$3,refunded_cost=$4,error_code=$5,error_message=$5,finished_at=now(),lease_until=NULL,run_token=NULL,version=version+1,updated_at=now() WHERE id=$1 AND status IN ('queued','running') RETURNING id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id
+UPDATE image_tasks SET status=$2,successful_images=$3,refunded_cost=$4,error_code=$5,error_message=$5,finished_at=now(),lease_until=NULL,run_token=NULL,version=version+1,updated_at=now() WHERE id=$1 AND status IN ('queued','running') RETURNING id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id, output_format
 `
 
 type FinishImageTaskParams struct {
@@ -389,6 +393,7 @@ func (q *Queries) FinishImageTask(ctx context.Context, arg FinishImageTaskParams
 		&i.Version,
 		&i.EditAction,
 		&i.EditGuideFileID,
+		&i.OutputFormat,
 	)
 	return i, err
 }
@@ -560,7 +565,7 @@ func (q *Queries) GetImageSettings(ctx context.Context) (ImageSetting, error) {
 }
 
 const getImageTask = `-- name: GetImageTask :one
-SELECT id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id FROM image_tasks WHERE id=$1
+SELECT id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id, output_format FROM image_tasks WHERE id=$1
 `
 
 func (q *Queries) GetImageTask(ctx context.Context, id uuid.UUID) (ImageTask, error) {
@@ -605,6 +610,7 @@ func (q *Queries) GetImageTask(ctx context.Context, id uuid.UUID) (ImageTask, er
 		&i.Version,
 		&i.EditAction,
 		&i.EditGuideFileID,
+		&i.OutputFormat,
 	)
 	return i, err
 }
@@ -670,7 +676,7 @@ func (q *Queries) ImageFileInUse(ctx context.Context, fileID uuid.UUID) (bool, e
 }
 
 const imageQueueCandidates = `-- name: ImageQueueCandidates :many
-SELECT id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id FROM image_tasks WHERE status='queued' ORDER BY created_at,id LIMIT 500
+SELECT id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id, output_format FROM image_tasks WHERE status='queued' ORDER BY created_at,id LIMIT 500
 `
 
 func (q *Queries) ImageQueueCandidates(ctx context.Context) ([]ImageTask, error) {
@@ -721,6 +727,7 @@ func (q *Queries) ImageQueueCandidates(ctx context.Context) ([]ImageTask, error)
 			&i.Version,
 			&i.EditAction,
 			&i.EditGuideFileID,
+			&i.OutputFormat,
 		); err != nil {
 			return nil, err
 		}
@@ -878,7 +885,7 @@ func (q *Queries) ImageStoragePathExists(ctx context.Context, path string) (bool
 }
 
 const imageTaskByKey = `-- name: ImageTaskByKey :one
-SELECT id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id FROM image_tasks WHERE user_id=$1 AND idempotency_key=$2
+SELECT id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id, output_format FROM image_tasks WHERE user_id=$1 AND idempotency_key=$2
 `
 
 type ImageTaskByKeyParams struct {
@@ -928,13 +935,14 @@ func (q *Queries) ImageTaskByKey(ctx context.Context, arg ImageTaskByKeyParams) 
 		&i.Version,
 		&i.EditAction,
 		&i.EditGuideFileID,
+		&i.OutputFormat,
 	)
 	return i, err
 }
 
 const insertImageFile = `-- name: InsertImageFile :one
 INSERT INTO files(id,user_id,kind,task_id,path,thumbnail_path,mime,size,width,height,thumbnail_width,thumbnail_height,sha256)
-VALUES($1,$2,$3,$4,$5,$6,'image/png',$7,$8,$9,$10,$11,$12) RETURNING id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at
 `
 
 type InsertImageFileParams struct {
@@ -944,6 +952,7 @@ type InsertImageFileParams struct {
 	TaskID          *uuid.UUID
 	Path            string
 	ThumbnailPath   string
+	Mime            string
 	Size            int64
 	Width           int32
 	Height          int32
@@ -960,6 +969,7 @@ func (q *Queries) InsertImageFile(ctx context.Context, arg InsertImageFileParams
 		arg.TaskID,
 		arg.Path,
 		arg.ThumbnailPath,
+		arg.Mime,
 		arg.Size,
 		arg.Width,
 		arg.Height,
@@ -1298,7 +1308,7 @@ func (q *Queries) ListImageTaskOwners(ctx context.Context, userIds []uuid.UUID) 
 }
 
 const listImageTasks = `-- name: ListImageTasks :many
-SELECT id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id FROM image_tasks WHERE ($1::uuid IS NULL OR user_id=$1::uuid)
+SELECT id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id, output_format FROM image_tasks WHERE ($1::uuid IS NULL OR user_id=$1::uuid)
 AND ($2::uuid IS NULL OR conversation_id=$2::uuid)
 AND ($3::text='' OR prompt ILIKE $3::text ESCAPE '\')
 AND ($4::text='' OR status=$4::text)
@@ -1381,6 +1391,7 @@ func (q *Queries) ListImageTasks(ctx context.Context, arg ListImageTasksParams) 
 			&i.Version,
 			&i.EditAction,
 			&i.EditGuideFileID,
+			&i.OutputFormat,
 		); err != nil {
 			return nil, err
 		}
@@ -1433,7 +1444,7 @@ func (q *Queries) LockImageScheduler(ctx context.Context) error {
 }
 
 const lockImageTask = `-- name: LockImageTask :one
-SELECT id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id FROM image_tasks WHERE id=$1 FOR UPDATE
+SELECT id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id, output_format FROM image_tasks WHERE id=$1 FOR UPDATE
 `
 
 func (q *Queries) LockImageTask(ctx context.Context, id uuid.UUID) (ImageTask, error) {
@@ -1478,6 +1489,7 @@ func (q *Queries) LockImageTask(ctx context.Context, id uuid.UUID) (ImageTask, e
 		&i.Version,
 		&i.EditAction,
 		&i.EditGuideFileID,
+		&i.OutputFormat,
 	)
 	return i, err
 }
@@ -1690,7 +1702,7 @@ func (q *Queries) SetUserAvatar(ctx context.Context, arg SetUserAvatarParams) er
 }
 
 const startImageTask = `-- name: StartImageTask :one
-UPDATE image_tasks SET status='running',run_token=$2,lease_until=now()+interval '30 seconds',started_at=now(),updated_at=now(),version=version+1 WHERE id=$1 AND status='queued' AND NOT cancel_requested RETURNING id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id
+UPDATE image_tasks SET status='running',run_token=$2,lease_until=now()+interval '30 seconds',started_at=now(),updated_at=now(),version=version+1 WHERE id=$1 AND status='queued' AND NOT cancel_requested RETURNING id, user_id, conversation_id, message_id, user_message_id, operation, model_id, model_name, prompt, params, quality, size, ratio, image_count, reference_file_ids, charge_id, unit_price, total_cost, refunded_cost, successful_images, status, idempotency_key, request_hash, error_code, error_message, split_requests, timeout_seconds, queue_deadline, run_token, lease_until, cancel_requested, started_at, finished_at, created_at, updated_at, version, edit_action, edit_guide_file_id, output_format
 `
 
 type StartImageTaskParams struct {
@@ -1740,6 +1752,7 @@ func (q *Queries) StartImageTask(ctx context.Context, arg StartImageTaskParams) 
 		&i.Version,
 		&i.EditAction,
 		&i.EditGuideFileID,
+		&i.OutputFormat,
 	)
 	return i, err
 }

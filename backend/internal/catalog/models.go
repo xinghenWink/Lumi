@@ -38,7 +38,7 @@ func validSize(value string) bool {
 	return true
 }
 func validCapabilities(kind string, c Capabilities) bool {
-	if c.SupportsTransparentBackground && (kind != "image" || !c.SupportsEdit) {
+	if (c.SupportsTransparentBackground && (kind != "image" || !c.SupportsEdit)) || (c.SupportsGIF && kind != "image") {
 		return false
 	}
 	if kind == "chat" {

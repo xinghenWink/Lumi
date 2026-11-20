@@ -130,6 +130,7 @@ export function ImageComposer({
         ratio: options.ratio,
         n: options.n,
         reference_file_ids: draft.references,
+        ...(options.outputFormat ? { output_format: options.outputFormat } : {}),
       }
     }
     const result = await controller.submit(conversationId, body)
@@ -139,6 +140,7 @@ export function ImageComposer({
     ? [
         t('images.' + options.quality),
         options.size === 'auto' ? t('images.auto') : options.ratio || options.size,
+        options.outputFormat === 'gif' ? t('images.outputFormatGif') : '',
         t('react.imageCount', { count: options.n }),
       ]
         .filter(Boolean)

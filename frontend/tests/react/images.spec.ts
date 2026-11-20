@@ -36,6 +36,11 @@ test('React real image generation editing gallery cancellation and administrator
   const suffix = randomUUID().slice(0, 8),
     key = randomBytes(24).toString('base64url'),
     png = fixturePNG()
+  // Two solid-color frames with different delays and an infinite loop.
+  const gif = Buffer.from(
+    'R0lGODlhBAADAIAAAP8AAAD/ACH/C05FVFNDQVBFMi4wAwEAAAAh+QQAFAAAACwAAAAABAADAAACCgRBEARBEARBEAUAIfkEAB4AAAAsAAAAAAQAAwAAAgoMwzAMwzAMwzAFADs=',
+    'base64',
+  )
   const wire = 'private-image-' + suffix,
     modelName = 'Lumi Image ' + suffix,
     alternateModelName = 'Alternate Image ' + suffix
@@ -72,21 +77,36 @@ test('React real image generation editing gallery cancellation and administrator
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)))
     const raw = Buffer.concat(chunks)
     let prompt: string,
+      outputFormat: unknown,
+      size: unknown,
       count = 1
     if (request.url === '/v1/images/edits') {
       edits++
-      prompt = raw.toString('utf8').match(/name="prompt"\r\n\r\n([^\r]*)/)?.[1] ?? ''
+      const form = raw.toString('utf8')
+      prompt = form.match(/name="prompt"\r\n\r\n([^\r]*)/)?.[1] ?? ''
+      outputFormat = form.match(/name="output_format"\r\n\r\n([^\r]*)/)?.[1]
+      size = form.match(/name="size"\r\n\r\n([^\r]*)/)?.[1]
       reusedReference = raw.includes(Buffer.from([137, 80, 78, 71]))
     } else if (request.url === '/v1/images/generations') {
       const input = record(JSON.parse(raw.toString('utf8')) as unknown)
       prompt = String(input.prompt)
       count = Number(input.n)
+      outputFormat = input.output_format
+      size = input.size
     } else {
       response.writeHead(404)
       response.end()
       return
     }
     calls++
+    if (
+      prompt.includes('自拍比耶') &&
+      (request.url !== '/v1/images/edits' || outputFormat !== 'gif' || size !== '1024x768')
+    ) {
+      response.writeHead(422)
+      response.end()
+      return
+    }
     if (prompt === 'cancel') {
       // Keep a real outstanding upstream request until application cancellation closes it.
       response.on('close', () => undefined)
@@ -106,7 +126,9 @@ test('React real image generation editing gallery cancellation and administrator
       response.setHeader('Content-Type', 'application/json')
       response.end(
         JSON.stringify({
-          data: Array.from({ length: count }, () => ({ b64_json: png.toString('base64') })),
+          data: Array.from({ length: count }, () => ({
+            b64_json: (outputFormat === 'gif' ? gif : png).toString('base64'),
+          })),
         }),
       )
     }
@@ -222,9 +244,10 @@ test('React real image generation editing gallery cancellation and administrator
       capabilities: {
         ...defaultCapabilities('image'),
         qualities: ['low', 'medium', 'high'],
-        sizes: ['1024x1024', '1536x1024', '2016x1344', 'auto'],
+        sizes: ['1024x1024', '1536x1024', '2016x1344', '1024x768', 'auto'],
         max_n: 4,
         supports_edit: true,
+        supports_gif: true,
         max_reference_images: 4,
       },
       routes: [
@@ -1375,7 +1398,7 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(galleryEditor.getByRole('img')).toBeVisible()
     await galleryEditor.getByRole('button', { name: '调整大小', exact: true }).click()
     const ratios = galleryEditor.getByRole('menu', { name: '调整大小' })
-    await expect(ratios.getByRole('menuitem')).toHaveCount(1)
+    await expect(ratios.getByRole('menuitem')).toHaveCount(2)
     await ratios.getByRole('menuitem', { name: '正方形 1:1' }).click()
     await expect(galleryEditor.getByRole('button', { name: '调整大小 1:1' })).toBeVisible()
     await galleryEditor.getByRole('button', { name: '添加评论', exact: true }).click()
@@ -1413,6 +1436,59 @@ test('React real image generation editing gallery cancellation and administrator
       edit_options: { action: 'markup', guide_file_id: expect.any(String) },
     })
     await member.unroute('**/api/v1/image-tasks')
+
+    await member.goto('/create')
+    if (mobile) await member.getByRole('button', { name: '生图参数', exact: true }).click()
+    const format = parameters.getByLabel('输出格式', { exact: true })
+    await expect(format).toHaveValue('auto')
+    await format.selectOption('gif')
+    await expect(format).toHaveValue('gif')
+    await format.selectOption('auto')
+    await parameters.getByRole('radio', { name: '4:3', exact: true }).check()
+    await expect(resolution).toHaveValue('1024x768')
+    await parameters.getByRole('radio', { name: '1 张', exact: true }).check()
+    await member.keyboard.press('Escape')
+    await member
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'gif-source.png', mimeType: 'image/png', buffer: png })
+    await expect(member.locator('.image-references img')).toHaveCount(1)
+    await prompt.fill('使用参考图，生成角色自拍比耶的 GIF 动图')
+    const gifSubmission = member.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/v1/image-tasks') && response.request().method() === 'POST',
+    )
+    await send.click()
+    const animatedTask = parseTask(await (await gifSubmission).json())
+    expect(animatedTask).toMatchObject({ operation: 'edit', ratio: '4:3', output_format: 'gif' })
+    const gifCard = member.locator('.image-task').first()
+    await expect(gifCard.locator('.image-status')).toHaveText('已完成', { timeout: 20_000 })
+    await gifCard.getByRole('button', { name: '预览图片 1', exact: true }).click()
+    const gifPreview = member.getByRole('dialog', { name: '预览图片', exact: true })
+    const animatedImage = gifPreview.getByRole('img')
+    await expect(animatedImage).toBeVisible()
+    await expect
+      .poll(() => animatedImage.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+      .toBe(4)
+    const firstFrame = await animatedImage.screenshot()
+    await expect
+      .poll(async () => (await animatedImage.screenshot()).equals(firstFrame), {
+        intervals: [80, 140, 220, 300],
+      })
+      .toBe(false)
+    const gifDownload = member.waitForEvent('download')
+    await gifPreview.getByRole('button', { name: '下载原图', exact: true }).click()
+    const savedGIF = await gifDownload
+    expect(savedGIF.suggestedFilename()).toMatch(/\.gif$/)
+    expect(await readFile(await savedGIF.path())).toEqual(gif)
+    await gifPreview.getByRole('button', { name: '复制图片', exact: true }).click()
+    await expect(gifPreview.getByRole('button', { name: '图片已复制', exact: true })).toBeVisible()
+    await member.keyboard.press('Escape')
+    await gifCard
+      .getByTestId('image-task-top-actions')
+      .getByRole('button', { name: '使用相同参数', exact: true })
+      .click()
+    if (mobile) await member.getByRole('button', { name: '生图参数', exact: true }).click()
+    await expect(format).toHaveValue('gif')
     expect(errors).toEqual([])
   } finally {
     await memberContext.close()
