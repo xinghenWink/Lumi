@@ -8,7 +8,7 @@
 
 ## GIF 动图
 
-- 安装含迁移 `00020` 的版本后，在模型的每条启用路由上确认 `/v1/images/generations` 和已配置的 `/v1/images/edits` 支持 `output_format=gif`，再在模型管理勾选「已验证所有启用路由支持 GIF 输出」。已有模型默认关闭。
+- 安装含迁移 `00021` 的版本后，在模型的每条启用路由上确认 `/v1/images/generations` 和已配置的 `/v1/images/edits` 支持 `output_format=gif`，再在模型管理勾选「已验证所有启用路由支持 GIF 输出」。已有模型默认关闭。
 - 工作台提供「自动 / PNG 静态图 / GIF 动图」。自动模式识别「生成 GIF 动图」和 `create a GIF of …` 等明确的输出指令。使用 API 时可以传 `output_format`，可选值为 `png`、`gif`，省略即使用自动模式。
 - GIF 请求保留所选尺寸、质量和数量。支持的尺寸和总像素预算由渠道决定。Lumi 使用 GPT Image 默认的 Base64 响应，还可接收同源结果 URL、GIF Base64 data URL 和单结果 `image/gif` 响应。[OpenAI GIF 接口文档](https://developers.openai.com/api/docs/guides/image-generation#generate-animated-gif-output)
 - 原图和 ZIP 保留动画，预览播放原图。缩略图使用首帧 WebP，复制和再次作为改图参考使用首帧 PNG。GIF 原图沿用 20 MiB 和单图 2400 万像素的上限，最多 512 帧和累计 9600 万帧像素。
