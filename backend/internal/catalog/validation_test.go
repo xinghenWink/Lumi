@@ -14,6 +14,9 @@ func TestCapabilityBoundaries(t *testing.T) {
 	if !validCapabilities("image", Capabilities{MaxN: 4, Qualities: []string{"low", "medium", "high"}, Sizes: []string{"1024x1024", "auto"}, SupportsEdit: true, MaxReferenceImages: 4, ResponseFormat: "b64_json"}) {
 		t.Fatal("valid image capabilities rejected")
 	}
+	if !validCapabilities("image", Capabilities{MaxN: 1, Qualities: []string{"low", "medium", "high", "xhigh", "max"}, Sizes: []string{"1024x1024"}, ResponseFormat: "b64_json"}) {
+		t.Fatal("all five quality tiers must be configurable")
+	}
 	// The reference-image limit is an administrator choice with no fixed upper bound.
 	if !validCapabilities("image", Capabilities{MaxN: 1, Qualities: []string{"low"}, Sizes: []string{"1024x1024"}, SupportsEdit: true, MaxReferenceImages: 16, ResponseFormat: "b64_json"}) {
 		t.Fatal("administrator reference limit above four rejected")

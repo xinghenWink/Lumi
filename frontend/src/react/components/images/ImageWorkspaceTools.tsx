@@ -2,11 +2,11 @@ import * as Popover from '@radix-ui/react-popover'
 import { FolderOpen, Funnel, Search } from 'lucide-react'
 import { useId, useState, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
+import { imageQualities } from '../../../api/image-quality'
 import {
   datePresets,
   emptyTaskFilters,
   recentTaskDates,
-  taskQualities,
   taskStatuses,
   type TaskFilters,
 } from '../../features/images/task-filters'
@@ -225,12 +225,12 @@ export function ImageWorkspaceTools({
                     value={draft.quality}
                     onChange={(event) => {
                       const quality =
-                        taskQualities.find((value) => value === event.target.value) ?? ''
+                        imageQualities.find((value) => value === event.target.value) ?? ''
                       setDraft({ ...draft, quality })
                     }}
                   >
                     <NativeSelectOption value="">{t('images.all')}</NativeSelectOption>
-                    {taskQualities.map((quality) => (
+                    {imageQualities.map((quality) => (
                       <NativeSelectOption key={quality} value={quality}>
                         {t('images.' + quality)}
                       </NativeSelectOption>

@@ -3,6 +3,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2 } from 'lucide-react'
 import { catalog } from '../../../api/catalog'
+import { imageQualities } from '../../../api/image-quality'
 import { ApiError } from '../../../api/transport'
 import {
   defaultCapabilities,
@@ -221,7 +222,7 @@ export function ModelEditor({
                     {t('catalog.qualities')}
                   </legend>
                   <div className="flex flex-wrap gap-6">
-                    {(['low', 'medium', 'high'] as const).map((quality) => (
+                    {imageQualities.map((quality) => (
                       <CheckField
                         key={quality}
                         label={t(`credits.${quality}`)}
@@ -236,6 +237,13 @@ export function ModelEditor({
                       />
                     ))}
                   </div>
+                  {form.capabilities.qualities.some(
+                    (quality) => quality === 'xhigh' || quality === 'max',
+                  ) && (
+                    <p className="text-xs text-muted-foreground">
+                      {t('catalog.advancedQualityPricing')}
+                    </p>
+                  )}
                 </fieldset>
                 <CheckField
                   role="switch"

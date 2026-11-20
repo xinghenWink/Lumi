@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Trash2 } from 'lucide-react'
 import { credits } from '../../../api/credits'
 import type { CreditPricing, CreditRule } from '../../../api/credit-contracts'
+import { imageQualities } from '../../../api/image-quality'
 import { ApiError } from '../../../api/transport'
 import { useRuntime } from '../../app/context'
 import { useSession } from '../../features/auth/hooks'
@@ -56,18 +57,20 @@ function PricingForm({ initial }: { initial: CreditPricing }) {
       },
       rules: rules.map((row) => {
         const amount = Number(row.credits_per_image)
+        const modelId = row.model_id?.trim() || null
         if (
           !row.credits_per_image.trim() ||
           !Number.isSafeInteger(amount) ||
           amount < 0 ||
           amount > 1e9 ||
           (row.operation !== 'generate' && row.operation !== 'edit') ||
-          (row.quality !== 'low' && row.quality !== 'medium' && row.quality !== 'high')
+          !row.quality ||
+          (modelId === null && (row.quality === 'xhigh' || row.quality === 'max'))
         )
           throw new ApiError('INVALID_INPUT')
         return {
           ...row,
-          model_id: row.model_id?.trim() || null,
+          model_id: modelId,
           operation: row.operation,
           quality: row.quality,
           credits_per_image: amount,
@@ -236,19 +239,15 @@ function PricingForm({ initial }: { initial: CreditPricing }) {
                           required
                           value={rule.quality}
                           aria-label={t('credits.quality')}
-                          onChange={(event) => {
-                            const value = event.target.value
-                            if (
-                              value === '' ||
-                              value === 'low' ||
-                              value === 'medium' ||
-                              value === 'high'
-                            )
-                              updateRule(index, { quality: value })
-                          }}
+                          onChange={(event) =>
+                            updateRule(index, {
+                              quality:
+                                imageQualities.find((value) => value === event.target.value) ?? '',
+                            })
+                          }
                         >
                           <option value="">{t('common.none')}</option>
-                          {['low', 'medium', 'high'].map((value) => (
+                          {imageQualities.map((value) => (
                             <option key={value} value={value}>
                               {t(`credits.${value}`)}
                             </option>

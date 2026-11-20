@@ -371,7 +371,7 @@ func (s *Service) Get(ctx context.Context, actor user.Actor, id uuid.UUID, admin
 	return items[0], nil
 }
 func validateFilter(f Filter) error {
-	if f.Limit < 1 || f.Limit > 100 || (!slices.Contains([]string{"", "queued", "running", "succeeded", "partial", "failed", "canceled"}, f.State)) || !slices.Contains([]string{"", "low", "medium", "high"}, f.Quality) || (f.From != nil && f.Until != nil && !f.From.Before(*f.Until)) {
+	if f.Limit < 1 || f.Limit > 100 || !slices.Contains([]string{"", "queued", "running", "succeeded", "partial", "failed", "canceled"}, f.State) || (f.Quality != "" && !validation.ImageQuality(f.Quality)) || (f.From != nil && f.Until != nil && !f.From.Before(*f.Until)) {
 		return problem.Invalid()
 	}
 	return nil

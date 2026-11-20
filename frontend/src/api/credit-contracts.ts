@@ -1,4 +1,5 @@
 import type { components } from './schema'
+import { parseImageQuality } from './image-quality'
 import { ApiError, record } from './transport'
 type Schema = components['schemas']
 export type CreditAccount = Schema['CreditAccount']
@@ -86,7 +87,7 @@ function parseRule(value: unknown): CreditRule {
   return {
     model_id: nullable(data, 'model_id'),
     operation: choice(data, 'operation', ['generate', 'edit']),
-    quality: choice(data, 'quality', ['low', 'medium', 'high']),
+    quality: parseImageQuality(data.quality),
     credits_per_image: number(data, 'credits_per_image'),
     enabled: bool(data, 'enabled'),
   }
@@ -145,6 +146,8 @@ export function parseUsage(value: unknown): CreditUsage {
       low: number(images, 'low'),
       medium: number(images, 'medium'),
       high: number(images, 'high'),
+      xhigh: images.xhigh === undefined ? 0 : number(images, 'xhigh'),
+      max: images.max === undefined ? 0 : number(images, 'max'),
     },
   }
 }

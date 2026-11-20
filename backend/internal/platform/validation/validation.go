@@ -56,6 +56,15 @@ func Text(value string, minimum, maximum int) bool {
 	return true
 }
 
+func ImageQuality(value string) bool {
+	switch value {
+	case "low", "medium", "high", "xhigh", "max":
+		return true
+	default:
+		return false
+	}
+}
+
 func Link(value string) bool {
 	if !Text(value, 0, 2048) {
 		return false

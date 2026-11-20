@@ -45,6 +45,8 @@ export default {
     low: '标准',
     medium: '精细',
     high: '高清',
+    xhigh: '超高',
+    max: '最高',
     size: '尺寸',
     auto: '自动',
     ratio: '比例',

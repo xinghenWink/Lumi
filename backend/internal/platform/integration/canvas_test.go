@@ -67,7 +67,7 @@ func TestCanvasRebuildPersistenceGenerationAndRetention(t *testing.T) {
 
 func TestCanvasRebuildUpgrade(t *testing.T) {
 	f := accountFixtureWithMigrations(t, func(ctx context.Context, pool *pgxpool.Pool) error {
-		return withCanvasUpgradeProvider(ctx, pool, func(p *goose.Provider) error {
+		return withUpgradeProvider(ctx, pool, func(p *goose.Provider) error {
 			if _, err := p.UpTo(ctx, 10); err != nil {
 				return err
 			}
@@ -83,7 +83,7 @@ func TestCanvasRebuildUpgrade(t *testing.T) {
 	testCanvas(t, f, true)
 }
 
-func withCanvasUpgradeProvider(ctx context.Context, pool *pgxpool.Pool, work func(*goose.Provider) error) (result error) {
+func withUpgradeProvider(ctx context.Context, pool *pgxpool.Pool, work func(*goose.Provider) error) (result error) {
 	conn := stdlib.OpenDB(*pool.Config().ConnConfig)
 	defer func() { result = errors.Join(result, conn.Close()) }()
 	provider, err := goose.NewProvider(goose.DialectPostgres, conn, os.DirFS("../../../migrations"),
@@ -211,7 +211,7 @@ func testCanvas(t *testing.T, f *fixture, upgrade bool) {
 	doc.Nodes = []canvas.Node{
 		{ID: imageNode, Kind: canvas.KindImage, W: 400, H: 300, Image: &canvas.ImageContent{State: canvas.StateReady, FileID: &upload.ID}},
 		{ID: textNode, Kind: canvas.KindText, Y: 340, W: 240, H: 120, Text: &canvas.TextContent{Content: "暖色调\n胶片质感"}},
-		{ID: generatorNode, Kind: canvas.KindGenerator, X: 500, W: 320, H: 240, Generator: &canvas.GeneratorContent{Prompt: "一只猫", Count: 1}},
+		{ID: generatorNode, Kind: canvas.KindGenerator, X: 500, W: 320, H: 240, Generator: &canvas.GeneratorContent{Prompt: "一只猫", Quality: "max", Count: 1}},
 	}
 	doc.Edges = []canvas.Edge{{ID: uuid.New(), From: imageNode, To: generatorNode, Kind: canvas.EdgeInput}, {ID: uuid.New(), From: textNode, To: generatorNode, Kind: canvas.EdgeInput}}
 	path := "/api/v1/canvases/" + id.String()
@@ -245,6 +245,9 @@ func testCanvas(t *testing.T, f *fixture, upgrade bool) {
 		reloaded := decodeReply[canvas.Canvas](t, f.call(t, client, "GET", path, token, nil))
 		if reloaded.Version != board.Version || len(reloaded.Document.Nodes) != 3 {
 			t.Fatal("rejected saves changed the canvas")
+		}
+		if generator := reloaded.Document.Nodes[2].Generator; generator == nil || generator.Quality != "max" {
+			t.Fatal("the reloaded generator lost the selected quality")
 		}
 		page := decodeReply[canvas.Page](t, f.call(t, client, "GET", "/api/v1/canvases", token, nil))
 		if len(page.Items) != 1 || page.Items[0].Cover == nil || page.Items[0].Cover.ID != upload.ID {
@@ -335,7 +338,7 @@ func testCanvas(t *testing.T, f *fixture, upgrade bool) {
 			if _, err := f.pool.Exec(f.ctx, "UPDATE canvases SET document=jsonb_set(document,'{schema}','1') WHERE id=$1", id); err != nil {
 				t.Fatal(err)
 			}
-			if err := withCanvasUpgradeProvider(f.ctx, f.pool, func(p *goose.Provider) error {
+			if err := withUpgradeProvider(f.ctx, f.pool, func(p *goose.Provider) error {
 				_, err := p.Up(f.ctx)
 				return err
 			}); err != nil {

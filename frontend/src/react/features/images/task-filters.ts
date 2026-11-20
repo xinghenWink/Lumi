@@ -8,11 +8,6 @@ export const taskStatuses = [
   'failed',
   'canceled',
 ] as const satisfies readonly ImageTask['status'][]
-export const taskQualities = [
-  'low',
-  'medium',
-  'high',
-] as const satisfies readonly ImageTask['quality'][]
 export const datePresets = ['week', 'month', 'quarter'] as const
 
 export type TaskFilters = {

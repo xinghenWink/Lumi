@@ -91,6 +91,8 @@ export default {
     low: 'Low',
     medium: 'Medium',
     high: 'High',
+    xhigh: 'Extra high (xhigh)',
+    max: 'Maximum (max)',
     pricingTitle: 'Pricing & gifts',
     pricingDescription: 'Set per-image prices, registration gifts and daily credits.',
     gifts: 'Gift configuration',
