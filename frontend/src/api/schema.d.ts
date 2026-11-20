@@ -2249,8 +2249,14 @@ export interface components {
       credits_timezone: string
       /** @description Exact decimal multiplier from 0 to 100; never a binary floating-point amount. */
       edit_multiplier: string
+      /** @description Exact decimal multipliers by resolution tier. Automatic sizing uses the 1k multiplier. */
       size_multipliers: {
-        [key: string]: string
+        /** @description Exact decimal multiplier from 0 to 100. */
+        '1k': string
+        /** @description Exact decimal multiplier from 0 to 100. */
+        '2k': string
+        /** @description Exact decimal multiplier from 0 to 100. */
+        '4k': string
       }
     }
     CreditAccount: {
@@ -2292,6 +2298,7 @@ export interface components {
       operation: 'generate' | 'edit'
       /** @enum {string} */
       quality: 'low' | 'medium' | 'high'
+      /** @description Pixel size or auto. Uses the matching site preset tier, otherwise classifies by the longest edge (up to 1536 for 1k, up to 2560 for 2k, above 2560 for 4k). Automatic sizing uses the 1k multiplier. */
       size: string
       /** Format: int64 */
       count: number
@@ -2525,6 +2532,8 @@ export interface components {
     ModelCapabilities: {
       /** @description Chat model accepts explicit reasoning effort. */
       reasoning_effort?: boolean
+      /** @description Supported tiers for fixed-size image requests. Unset legacy models keep their existing size constraints. An update that omits the list preserves any saved selection. Automatic sizing follows the existing auto policy. */
+      supported_resolutions?: components['schemas']['ImageResolution'][]
       /** @description Image model inherits the site's enabled ratio and resolution presets, including automatic sizing. Explicitly sized models use their own sizes and require auto in both size lists to offer automatic sizing. */
       use_size_presets?: boolean
       vision: boolean
@@ -2802,7 +2811,7 @@ export interface components {
       readonly resolution_presets?: components['schemas']['ImageResolutionPreset'][]
       /** @description Ratios disabled for new image tasks. Disabling auto also disables legacy requests that use auto size with an empty ratio. */
       disabled_ratios?: ('auto' | '1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16')[]
-      disabled_resolutions?: ('1k' | '2k' | '4k')[]
+      disabled_resolutions?: components['schemas']['ImageResolution'][]
       /** Format: int64 */
       per_user_concurrency: number
       /** Format: int64 */
@@ -2818,11 +2827,12 @@ export interface components {
       /** Format: int64 */
       version: number
     }
+    /** @enum {string} */
+    ImageResolution: '1k' | '2k' | '4k'
     ImageResolutionPreset: {
       /** @enum {string} */
       ratio: '1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16'
-      /** @enum {string} */
-      resolution: '1k' | '2k' | '4k'
+      resolution: components['schemas']['ImageResolution']
       /** @description Exact width and height sent to the provider, in pixels. */
       size: string
     }

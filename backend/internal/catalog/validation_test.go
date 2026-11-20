@@ -22,3 +22,22 @@ func TestCapabilityBoundaries(t *testing.T) {
 		t.Fatal("negative reference limit accepted")
 	}
 }
+
+func TestSupportedImageResolutions(t *testing.T) {
+	capabilities := Capabilities{UseSizePresets: true, MaxN: 1, Qualities: []string{"low"}, ResponseFormat: "b64_json"}
+	for _, valid := range [][]string{nil, {"1k"}, {"1k", "2k"}, {"1k", "2k", "4k"}} {
+		capabilities.SupportedResolutions = valid
+		if !validCapabilities("image", capabilities) {
+			t.Errorf("rejected resolutions %v", valid)
+		}
+	}
+	for _, invalid := range [][]string{{}, {"1K"}, {"8k"}, {"1k", "1k"}} {
+		capabilities.SupportedResolutions = invalid
+		if validCapabilities("image", capabilities) {
+			t.Errorf("accepted invalid resolutions %v", invalid)
+		}
+	}
+	if validCapabilities("chat", Capabilities{MaxContextTokens: 1000, SupportedResolutions: []string{"1k"}}) {
+		t.Fatal("accepted an image resolution on a chat model")
+	}
+}

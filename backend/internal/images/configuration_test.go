@@ -1,6 +1,10 @@
 package images
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/xinghenWink/Lumi/backend/internal/imageresolution"
+)
 
 func TestResolutionPresetPolicy(t *testing.T) {
 	config := Configuration{
@@ -29,12 +33,12 @@ func TestResolutionPresetPolicy(t *testing.T) {
 		{"", "1024x1025", []string{"1024x1025"}, false, true},
 		{"", "auto", []string{"auto"}, false, true},
 	} {
-		if got := config.allowsSize(tc.size, tc.ratio, tc.modelSizes, tc.inherits); got != tc.want {
+		if got := config.allowsSize(tc.size, tc.ratio, tc.modelSizes, nil, tc.inherits); got != tc.want {
 			t.Errorf("allowsSize(%q, %q, %v, %t) = %t, want %t", tc.size, tc.ratio, tc.modelSizes, tc.inherits, got, tc.want)
 		}
 	}
 	for _, values := range [][]string{{"1k", "2k", "4k"}, {"2k", "2k"}, {"8k"}} {
-		if validDisabled(values, presetResolutions()) {
+		if validDisabled(values, imageresolution.Tiers()) {
 			t.Errorf("accepted invalid disabled resolutions %v", values)
 		}
 	}
@@ -61,7 +65,7 @@ func TestAutomaticSizePolicy(t *testing.T) {
 			if tc.disabled {
 				config.DisabledRatios = []string{"auto"}
 			}
-			if got := config.allowsSize(tc.size, tc.ratio, tc.modelSizes, tc.inherits); got != tc.want {
+			if got := config.allowsSize(tc.size, tc.ratio, tc.modelSizes, nil, tc.inherits); got != tc.want {
 				t.Errorf("allowsSize = %t, want %t", got, tc.want)
 			}
 		})
@@ -87,5 +91,27 @@ func TestConfigurationReferenceLimitIsAdministratorChoice(t *testing.T) {
 	negative.MaxReferences = -1
 	if err := validateConfiguration(negative); err == nil {
 		t.Fatal("negative reference limit accepted")
+	}
+}
+
+func TestModelResolutionPolicy(t *testing.T) {
+	config := Configuration{Sizes: []string{"2560x1440", "2561x1440", "auto"}, DisabledResolutions: []string{"2k"}}
+	tiers := []string{"1k", "2k"}
+	for _, tc := range []struct {
+		size           string
+		ratio          string
+		inherits, want bool
+	}{
+		{"1536x1024", "3:2", true, true},
+		{"2016x1344", "3:2", true, false},
+		{"4032x2688", "", true, false},
+		{"2560x1440", "", false, true},
+		{"2561x1440", "", false, false},
+		{"auto", "auto", true, true},
+		{"auto", "", false, true},
+	} {
+		if got := config.allowsSize(tc.size, tc.ratio, config.Sizes, tiers, tc.inherits); got != tc.want {
+			t.Errorf("allowsSize(%q, %q) = %t, want %t", tc.size, tc.ratio, got, tc.want)
+		}
 	}
 }

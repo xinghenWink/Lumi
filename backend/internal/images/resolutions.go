@@ -1,35 +1,12 @@
 package images
 
-import "slices"
+import (
+	"slices"
 
-type ResolutionPreset struct {
-	Ratio      string `json:"ratio"`
-	Resolution string `json:"resolution"`
-	Size       string `json:"size"`
-}
+	"github.com/xinghenWink/Lumi/backend/internal/imageresolution"
+)
 
-func presetRatios() []string      { return []string{"1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16"} }
-func presetResolutions() []string { return []string{"1k", "2k", "4k"} }
-
-func defaultResolutionPresets() []ResolutionPreset {
-	sizes := [...][3]string{
-		{"1024x1024", "2048x2048", "4096x4096"},
-		{"1536x1024", "2016x1344", "4032x2688"},
-		{"1024x1536", "1344x2016", "2688x4032"},
-		{"1024x768", "2048x1536", "4096x3072"},
-		{"768x1024", "1536x2048", "3072x4096"},
-		{"1280x720", "2048x1152", "3840x2160"},
-		{"720x1280", "1152x2048", "2160x3840"},
-	}
-	ratios, resolutions := presetRatios(), presetResolutions()
-	options := make([]ResolutionPreset, 0, len(ratios)*len(resolutions))
-	for i, ratio := range ratios {
-		for j, resolution := range resolutions {
-			options = append(options, ResolutionPreset{Ratio: ratio, Resolution: resolution, Size: sizes[i][j]})
-		}
-	}
-	return options
-}
+type ResolutionPreset = imageresolution.Preset
 
 func validDisabled(values, options []string) bool {
 	if len(values) >= len(options) {
@@ -43,7 +20,7 @@ func validDisabled(values, options []string) bool {
 	return true
 }
 
-func (c Configuration) allowsSize(size, ratio string, modelSizes []string, inherits bool) bool {
+func (c Configuration) allowsSize(size, ratio string, modelSizes, supportedResolutions []string, inherits bool) bool {
 	if size == "auto" {
 		return (ratio == "auto" || ratio == "") && !slices.Contains(c.DisabledRatios, "auto") &&
 			(inherits || slices.Contains(c.Sizes, size) && slices.Contains(modelSizes, size))
@@ -53,7 +30,10 @@ func (c Configuration) allowsSize(size, ratio string, modelSizes []string, inher
 	}
 	presets := c.ResolutionPresets
 	if presets == nil {
-		presets = defaultResolutionPresets()
+		presets = imageresolution.Presets()
+	}
+	if len(supportedResolutions) > 0 && !slices.Contains(supportedResolutions, imageresolution.ForSize(size)) {
+		return false
 	}
 	known, enabled, ratioMatches := false, false, false
 	for _, preset := range presets {

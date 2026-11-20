@@ -1,4 +1,5 @@
 import type { components } from './schema'
+import { imageResolutions } from './image-resolutions'
 import { ApiError, record } from './transport'
 type Schema = components['schemas']
 export type CreditAccount = Schema['CreditAccount']
@@ -68,17 +69,13 @@ export function parseCreditAccount(value: unknown): CreditAccount {
 function parseConfiguration(value: unknown): CreditConfiguration {
   const data = record(value),
     sizes = record(data.size_multipliers)
-  const multipliers: Record<string, string> = {}
-  for (const [size, amount] of Object.entries(sizes)) {
-    if (typeof amount !== 'string') throw new ApiError('RESPONSE_INVALID')
-    multipliers[size] = amount
-  }
+  if (Object.keys(sizes).length !== imageResolutions.length) throw new ApiError('RESPONSE_INVALID')
   return {
     signup_bonus_credits: number(data, 'signup_bonus_credits'),
     daily_free_credits: number(data, 'daily_free_credits'),
     credits_timezone: text(data, 'credits_timezone'),
     edit_multiplier: text(data, 'edit_multiplier'),
-    size_multipliers: multipliers,
+    size_multipliers: { '1k': text(sizes, '1k'), '2k': text(sizes, '2k'), '4k': text(sizes, '4k') },
   }
 }
 function parseRule(value: unknown): CreditRule {

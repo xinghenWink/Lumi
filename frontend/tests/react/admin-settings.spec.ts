@@ -169,11 +169,20 @@ test('real model version conflict and explicit pricing override retain server-ow
     await expect(override.getByRole('spinbutton')).toHaveValue('')
     await override.getByRole('spinbutton').fill('9')
     await page.getByLabel('改图倍率', { exact: true }).fill('1.25')
+    const tier = (name: string) => page.getByLabel(name, { exact: true })
+    await expect(tier('1K')).toHaveValue('1.00')
+    await tier('2K').fill('1.6250')
+    await tier('4K').fill('2.25')
     await page.getByRole('button', { name: '保存价格与赠送', exact: true }).click()
     await expect(page.getByRole('status')).toContainText('价格与赠送配置已保存')
     await page.reload()
     await expect(page.getByLabel('改图倍率', { exact: true })).toHaveValue('1.25')
+    await expect(tier('2K')).toHaveValue('1.6250')
+    await expect(tier('4K')).toHaveValue('2.25')
     const result = await f.api('GET', '/admin/pricing')
+    expect(result.configuration).toMatchObject({
+      size_multipliers: { '1k': '1.00', '2k': '1.6250', '4k': '2.25' },
+    })
     if (!Array.isArray(result.rules)) throw new Error('Missing actual pricing rules')
     expect(result.rules).toContainEqual({
       model_id: model.id,
@@ -191,5 +200,55 @@ test('real model version conflict and explicit pricing override retain server-ow
   } finally {
     await f.api('PUT', '/admin/pricing', pricing)
     await f.api('DELETE', '/admin/models/' + model.id)
+  }
+})
+
+test('image model resolution defaults and selections persist through the admin form', async ({
+  page,
+  baseURL,
+}, info) => {
+  const f = await adminFixture(page, baseURL)
+  const modelName = 'Resolution fixture ' + randomUUID().slice(0, 10)
+  let modelID = ''
+  try {
+    await page.goto('/admin/models')
+    await page.getByRole('button', { name: '切换深色主题', exact: true }).click()
+    await page.getByRole('button', { name: '新增模型', exact: true }).click()
+    const dialog = page.getByRole('dialog')
+    const oneK = dialog.getByRole('checkbox', { name: '1K', exact: true })
+    const twoK = dialog.getByRole('checkbox', { name: '2K', exact: true })
+    const fourK = dialog.getByRole('checkbox', { name: '4K', exact: true })
+    await dialog.getByLabel('展示名称', { exact: true }).fill(modelName)
+    await dialog.getByLabel('模型类型', { exact: true }).selectOption('image')
+    await expect(oneK).toBeChecked()
+    await expect(oneK).toBeDisabled()
+    await expect(twoK).not.toBeChecked()
+    await expect(fourK).not.toBeChecked()
+    await twoK.focus()
+    await page.keyboard.press('Space')
+    await expect(twoK).toBeChecked()
+    await noOverflow(page)
+    await page.screenshot({
+      path: info.outputPath('model-resolutions-dark.png'),
+      animations: 'disabled',
+    })
+    const response = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/admin/models') && response.request().method() === 'POST',
+    )
+    await dialog.getByRole('button', { name: '保存模型', exact: true }).click()
+    const saved = parseModel(await (await response).json())
+    modelID = saved.id
+    expect(saved.capabilities.supported_resolutions).toEqual(['1k', '2k'])
+    await expect(dialog).toBeHidden()
+    await page.reload()
+    await page.getByRole('searchbox').fill(modelName)
+    await page.getByRole('button', { name: '搜索', exact: true }).click()
+    await page.getByRole('button', { name: '编辑模型 ' + modelName, exact: true }).click()
+    await expect(oneK).toBeChecked()
+    await expect(twoK).toBeChecked()
+    await expect(fourK).not.toBeChecked()
+  } finally {
+    if (modelID) await f.api('DELETE', '/admin/models/' + modelID)
   }
 })

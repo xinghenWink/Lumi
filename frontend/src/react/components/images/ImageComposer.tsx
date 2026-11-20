@@ -111,6 +111,7 @@ export function ImageComposer({
     options.pricing ||
     !draft.prompt.trim() ||
     !options.models.selected ||
+    !options.size ||
     !options.quote ||
     !options.account.data ||
     insufficient ||
@@ -143,13 +144,19 @@ export function ImageComposer({
       ]
         .filter(Boolean)
         .join(' · ')
-    : t('images.noPrice')
+    : t(options.noImageSize ? 'images.noImageSize' : 'images.noPrice')
   const cost = (
     <>
       <span>
         {options.quote
           ? t('images.estimate', { cost: options.quote.total_cost })
-          : t(options.pricing ? 'common.loading' : 'images.noPrice')}
+          : t(
+              options.pricing
+                ? 'common.loading'
+                : options.noImageSize
+                  ? 'images.noImageSize'
+                  : 'images.noPrice',
+            )}
       </span>
       <span>
         {options.account.data

@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
+	"github.com/xinghenWink/Lumi/backend/internal/imageresolution"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/problem"
@@ -65,14 +66,12 @@ func validateConfiguration(value Configuration) error {
 	if _, err := multiplier(value.EditMultiplier); err != nil {
 		return err
 	}
-	if len(value.SizeMultipliers) > 20 || value.SizeMultipliers == nil {
+	tiers := imageresolution.Tiers()
+	if len(value.SizeMultipliers) != len(tiers) {
 		return problem.Invalid()
 	}
-	for size, amount := range value.SizeMultipliers {
-		if !validSize(size) {
-			return problem.Invalid()
-		}
-		if _, err := multiplier(amount); err != nil {
+	for _, tier := range tiers {
+		if _, err := multiplier(value.SizeMultipliers[tier]); err != nil {
 			return err
 		}
 	}
@@ -224,13 +223,11 @@ func price(ctx context.Context, q *query.Queries, cfg Configuration, input Quote
 		}
 		amount.Mul(amount, factor)
 	}
-	if text, exists := cfg.SizeMultipliers[input.Size]; exists {
-		factor, err := multiplier(text)
-		if err != nil {
-			return Quote{}, err
-		}
-		amount.Mul(amount, factor)
+	factor, err := multiplier(cfg.SizeMultipliers[imageresolution.ForSize(input.Size)])
+	if err != nil {
+		return Quote{}, err
 	}
+	amount.Mul(amount, factor)
 	rounded, remainder := new(big.Int).QuoRem(amount.Num(), amount.Denom(), new(big.Int))
 	if remainder.Sign() != 0 {
 		rounded.Add(rounded, big.NewInt(1))

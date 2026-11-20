@@ -222,7 +222,8 @@ test('React real image generation editing gallery cancellation and administrator
       capabilities: {
         ...defaultCapabilities('image'),
         qualities: ['low', 'medium', 'high'],
-        sizes: ['1024x1024', '1536x1024', '2016x1344', 'auto'],
+        supported_resolutions: ['1k', '2k'],
+        sizes: ['1024x1024', '1536x1024', '2016x1344', '4032x2688', 'auto'],
         max_n: 4,
         supports_edit: true,
         max_reference_images: 4,
@@ -384,6 +385,7 @@ test('React real image generation editing gallery cancellation and administrator
     ).toBe(1)
     await parameters.getByRole('radio', { name: '3:2', exact: true }).check()
     await expect(resolution).toHaveValue('1536x1024')
+    await expect(resolution.locator('option[value="4032x2688"]')).toHaveCount(0)
     await resolution.selectOption({ label: '2K · 2016 × 1344' })
     await expect(parameters.getByRole('radio', { name: '3:2', exact: true })).toBeChecked()
     await expect(resolution).toHaveValue('2016x1344')

@@ -214,7 +214,8 @@ test('canvas journey composes, generates from references, persists and edits', a
           capabilities: {
             ...defaultCapabilities('image'),
             qualities: ['medium'],
-            sizes: ['1024x1024', '1536x1024', 'auto'],
+            sizes: ['1024x1024', '1536x1024', '2016x1344', '4032x2688', 'auto'],
+            supported_resolutions: ['1k', '2k'],
             max_n: 2,
             supports_edit: true,
             max_reference_images: 4,
@@ -391,7 +392,10 @@ test('canvas journey composes, generates from references, persists and edits', a
     await expect(imageParameters.getByLabel('分辨率', { exact: true })).toHaveCount(0)
     expect(await box(inspector)).toEqual(editorBox)
     await imageParameters.getByRole('radio', { name: '3:2', exact: true }).check()
-    await expect(imageParameters.getByLabel('分辨率', { exact: true })).toBeVisible()
+    const resolution = imageParameters.getByLabel('分辨率', { exact: true })
+    await expect(resolution).toBeVisible()
+    await expect(resolution.locator('option[value="2016x1344"]')).toHaveCount(1)
+    await expect(resolution.locator('option[value="4032x2688"]')).toHaveCount(0)
     await imageParameters.getByRole('radio', { name: '2 张', exact: true }).check()
     await expect(summary).toHaveText('3:2 · 1K · 2 张')
     await imageParameters.getByRole('radio', { name: '按尺寸', exact: true }).check()

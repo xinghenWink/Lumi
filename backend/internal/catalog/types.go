@@ -52,6 +52,7 @@ type Channel struct {
 	UpdatedAt           time.Time  `json:"updated_at"`
 }
 type Capabilities struct {
+	SupportedResolutions          []string `json:"supported_resolutions,omitempty"`
 	UseSizePresets                bool     `json:"use_size_presets,omitempty"`
 	ReasoningEffort               bool     `json:"reasoning_effort,omitempty"`
 	Vision                        bool     `json:"vision"`

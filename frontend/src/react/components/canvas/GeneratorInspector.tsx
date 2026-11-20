@@ -185,7 +185,9 @@ function ImageComposer({ node, ...props }: InspectorProps) {
         ? t('canvas.prompt.imageParameterAutoSummary', { ratio: t('images.auto'), count })
         : t('canvas.prompt.imageParameterSummary', {
             ratio: options.ratio || t('images.custom'),
-            resolution: options.resolution?.toUpperCase() ?? options.size.replace('x', ' × '),
+            resolution: options.resolution
+              ? t('images.resolutionTier.' + options.resolution)
+              : options.size.replace('x', ' × '),
             count,
           })
       : ''
@@ -204,15 +206,17 @@ function ImageComposer({ node, ...props }: InspectorProps) {
     ? 'canvas.generator.noModel'
     : missing.length || inputs.unavailable
       ? 'canvas.generator.missingInput'
-      : inputs.references.length && !model.capabilities.supports_edit
-        ? 'canvas.generator.noEdit'
-        : inputs.references.length > options.maxReferences
-          ? 'canvas.generator.tooManyReferences'
-          : !prompt
-            ? 'canvas.generator.emptyPrompt'
-            : new TextEncoder().encode(prompt).length > 64000
-              ? 'canvas.generator.longPrompt'
-              : ''
+      : options.noImageSize
+        ? 'images.noImageSize'
+        : inputs.references.length && !model.capabilities.supports_edit
+          ? 'canvas.generator.noEdit'
+          : inputs.references.length > options.maxReferences
+            ? 'canvas.generator.tooManyReferences'
+            : !prompt
+              ? 'canvas.generator.emptyPrompt'
+              : new TextEncoder().encode(prompt).length > 64000
+                ? 'canvas.generator.longPrompt'
+                : ''
   const insufficient =
     !!options.quote &&
     !!options.account.data &&

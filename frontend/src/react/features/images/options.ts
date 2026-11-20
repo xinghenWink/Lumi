@@ -1,5 +1,6 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
 import type { PublicModel } from '../../../api/catalog-contracts'
+import { customSizeResolution, type ImageResolution } from '../../../api/image-resolutions'
 import { images, type ImageConfiguration, type ImageInput } from '../../../api/images'
 import { operations, type Preferences } from '../../../api/operations'
 import { credits } from '../../../api/credits'
@@ -20,6 +21,9 @@ export function resolveImageOptions(
   const disabledRatios = new Set<string>(config?.disabled_ratios)
   const presets = config?.resolution_presets ?? []
   const modelSizes = model?.capabilities.sizes ?? []
+  const modelResolutions = model?.capabilities.supported_resolutions
+  const supports = (tier: ImageResolution | undefined) =>
+    !modelResolutions || (tier !== undefined && modelResolutions.includes(tier))
   const inherits = model?.capabilities.use_size_presets
   const allowsAuto =
     !!config &&
@@ -29,6 +33,7 @@ export function resolveImageOptions(
     (preset) =>
       !disabledRatios.has(preset.ratio) &&
       !disabledResolutions.has(preset.resolution) &&
+      supports(preset.resolution) &&
       (inherits || modelSizes.includes(preset.size)),
   )
   const enabledSizes = new Set(variants.map((preset) => preset.size))
@@ -39,7 +44,7 @@ export function resolveImageOptions(
         (size) =>
           size !== 'auto' &&
           modelSizes.includes(size) &&
-          (!presetSizes.has(size) || enabledSizes.has(size)),
+          (presetSizes.has(size) ? enabledSizes.has(size) : supports(customSizeResolution(size))),
       ) ?? [])
   const sizes = [...new Set([...explicitSizes, ...enabledSizes])]
   const ratioOptions = new Map<string, string[]>()
@@ -178,6 +183,7 @@ export function useImageOptions(draft: ImageDraft, modelId?: string) {
     models,
     model,
     config,
+    noImageSize: !!model && !!config.data && !values.size,
     account,
     preferences,
     quoteError,

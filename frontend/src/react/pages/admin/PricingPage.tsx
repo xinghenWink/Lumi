@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2 } from 'lucide-react'
 import { credits } from '../../../api/credits'
+import { imageResolutions } from '../../../api/image-resolutions'
 import type { CreditPricing, CreditRule } from '../../../api/credit-contracts'
 import { ApiError } from '../../../api/transport'
 import { useRuntime } from '../../app/context'
@@ -13,7 +14,7 @@ import { NumberField } from '../../components/admin/AdminFields'
 import { Panel } from '../../components/shared/Panel'
 import { PageStatus } from '../../components/shared/PageStatus'
 import { ApiNotice } from '../../components/shared/ApiNotice'
-import { Field, selectClass } from '../../components/ui/field'
+import { Field, FieldGroup, selectClass } from '../../components/ui/field'
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
 
@@ -24,11 +25,6 @@ type RuleDraft = Omit<CreditRule, 'credits_per_image' | 'operation' | 'quality'>
 }
 const ruleDrafts = (value: CreditPricing): RuleDraft[] =>
   value.rules.map((row) => ({ ...row, credits_per_image: String(row.credits_per_image) }))
-const sizeDrafts = (value: CreditPricing) =>
-  Object.entries(value.configuration.size_multipliers).map(([size, multiplier]) => ({
-    size,
-    multiplier,
-  }))
 function PricingForm({ initial }: { initial: CreditPricing }) {
   const runtime = useRuntime(),
     { user } = useSession(),
@@ -36,23 +32,20 @@ function PricingForm({ initial }: { initial: CreditPricing }) {
     id = useId()
   const [configuration, setConfiguration] = useState(() => structuredClone(initial.configuration)),
     [rules, setRules] = useState(() => ruleDrafts(initial)),
-    [sizes, setSizes] = useState(() => sizeDrafts(initial)),
     [notice, setNotice] = useState(false)
   const updateRule = (index: number, patch: Partial<RuleDraft>) =>
     setRules((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)))
   const save = useOwnedMutation(user?.id, async (check) => {
-    const mapping = new Map<string, string>()
-    for (const row of sizes) {
-      const size = row.size.trim()
-      if (!size || mapping.has(size)) throw new ApiError('INVALID_INPUT')
-      mapping.set(size, row.multiplier.trim())
-    }
     const body: CreditPricing = {
       configuration: {
         ...configuration,
         credits_timezone: configuration.credits_timezone.trim(),
         edit_multiplier: configuration.edit_multiplier.trim(),
-        size_multipliers: Object.fromEntries(mapping),
+        size_multipliers: {
+          '1k': configuration.size_multipliers['1k'].trim(),
+          '2k': configuration.size_multipliers['2k'].trim(),
+          '4k': configuration.size_multipliers['4k'].trim(),
+        },
       },
       rules: rules.map((row) => {
         const amount = Number(row.credits_per_image)
@@ -78,7 +71,6 @@ function PricingForm({ initial }: { initial: CreditPricing }) {
     check()
     setConfiguration(result.configuration)
     setRules(ruleDrafts(result))
-    setSizes(sizeDrafts(result))
     setNotice(true)
     runtime.queryClient.setQueryData(['user', user?.id, 'admin-pricing'], result)
     for (const kind of ['credits', 'admin-users', 'image-quote', 'image-options'])
@@ -310,66 +302,36 @@ function PricingForm({ initial }: { initial: CreditPricing }) {
             </table>
           </div>
         </Panel>
-        <Panel title={t('credits.sizeMultipliers')}>
-          <div className="mb-4 flex justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={sizes.length >= 20}
-              onClick={() => setSizes([...sizes, { size: '', multiplier: '' }])}
-            >
-              <Plus size={15} />
-              {t('credits.addSize')}
-            </Button>
-          </div>
-          <div className="space-y-4">
-            {sizes.map((row, index) => (
-              <div key={index} className="grid grid-cols-[1fr_1fr_auto] items-end gap-3">
-                <Field id={id + '-size-' + index} label={t('credits.size')}>
-                  <Input
-                    id={id + '-size-' + index}
-                    value={row.size}
-                    maxLength={12}
-                    required
-                    onChange={(event) =>
-                      setSizes((rows) =>
-                        rows.map((item, i) =>
-                          i === index ? { ...item, size: event.target.value } : item,
-                        ),
-                      )
-                    }
-                  />
-                </Field>
-                <Field id={id + '-multiplier-' + index} label={t('credits.multiplier')}>
-                  <Input
-                    id={id + '-multiplier-' + index}
-                    value={row.multiplier}
-                    inputMode="decimal"
-                    maxLength={8}
-                    required
-                    onChange={(event) =>
-                      setSizes((rows) =>
-                        rows.map((item, i) =>
-                          i === index ? { ...item, multiplier: event.target.value } : item,
-                        ),
-                      )
-                    }
-                  />
-                </Field>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={t('credits.removeSize')}
-                  className="text-destructive"
-                  onClick={() => setSizes((rows) => rows.filter((_, i) => i !== index))}
-                >
-                  <Trash2 size={15} />
-                </Button>
-              </div>
+        <Panel
+          title={t('credits.resolutionMultipliers')}
+          description={t('credits.resolutionMultiplierHint')}
+        >
+          <FieldGroup className="grid sm:grid-cols-3">
+            {imageResolutions.map((resolution) => (
+              <Field
+                key={resolution}
+                id={id + '-' + resolution}
+                label={t('images.resolutionTier.' + resolution)}
+              >
+                <Input
+                  id={id + '-' + resolution}
+                  value={configuration.size_multipliers[resolution]}
+                  inputMode="decimal"
+                  maxLength={8}
+                  required
+                  onChange={(event) =>
+                    setConfiguration({
+                      ...configuration,
+                      size_multipliers: {
+                        ...configuration.size_multipliers,
+                        [resolution]: event.target.value,
+                      },
+                    })
+                  }
+                />
+              </Field>
             ))}
-          </div>
+          </FieldGroup>
         </Panel>
       </fieldset>
       <ApiNotice error={save.error} />

@@ -71,12 +71,13 @@ func TestCanvasRebuildUpgrade(t *testing.T) {
 			if _, err := p.UpTo(ctx, 10); err != nil {
 				return err
 			}
-			// Seed legacy canvas tasks through the current image service before migration 11.
-			if _, err := p.ApplyVersion(ctx, 13, true); err != nil {
-				return err
+			// Seed legacy canvas tasks through the current image and billing services before migration 11.
+			for _, version := range []int64{13, 16, 20} {
+				if _, err := p.ApplyVersion(ctx, version, true); err != nil {
+					return err
+				}
 			}
-			_, err := p.ApplyVersion(ctx, 16, true)
-			return err
+			return nil
 		})
 	})
 	testCanvas(t, f, true)
@@ -150,7 +151,7 @@ func testCanvas(t *testing.T, f *fixture, upgrade bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	model, err := f.services.Catalog.SaveModel(f.ctx, admin, uuid.Nil, catalog.ModelInput{DisplayName: "画布图片", Type: "image", Enabled: true, Capabilities: catalog.Capabilities{Qualities: []string{"low"}, Sizes: []string{"1024x1024"}, MaxN: 4, SupportsEdit: true, MaxReferenceImages: 4, ResponseFormat: "b64_json"}, Routes: []catalog.RouteInput{{UpstreamID: channel.ID, UpstreamModelName: "canvas-image-model", Weight: 1, Enabled: true}}})
+	model, err := f.services.Catalog.SaveModel(f.ctx, admin, uuid.Nil, catalog.ModelInput{DisplayName: "画布图片", Type: "image", Enabled: true, Capabilities: catalog.Capabilities{Qualities: []string{"low"}, UseSizePresets: true, SupportedResolutions: []string{"1k", "2k"}, MaxN: 4, SupportsEdit: true, MaxReferenceImages: 4, ResponseFormat: "b64_json"}, Routes: []catalog.RouteInput{{UpstreamID: channel.ID, UpstreamModelName: "canvas-image-model", Weight: 1, Enabled: true}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,6 +257,12 @@ func testCanvas(t *testing.T, f *fixture, upgrade bool) {
 		input := canvas.RunInput{Version: board.Version, NodeID: generatorNode, ModelID: model.ID, Quality: "low", Size: "1024x1024", Count: 1}
 		key := uuid.NewString()
 		expectStatus(t, f.call(t, otherClient, "POST", path+"/runs", otherToken, input, key), 404)
+		rejected := input
+		rejected.Size, rejected.Ratio = "4096x4096", "1:1"
+		expectStatus(t, f.call(t, client, "POST", path+"/runs", token, rejected, uuid.NewString()), http.StatusBadRequest)
+		if creditBalance(t, f, member.ID).Total != before.Total {
+			t.Fatal("unsupported 4k canvas run was charged")
+		}
 		submitted := f.call(t, client, "POST", path+"/runs", token, input, key)
 		expectStatus(t, submitted, 202)
 		run := decodeReply[canvas.Run](t, submitted)

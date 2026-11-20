@@ -198,6 +198,7 @@ function EditorForm({
   const canSubmit =
     !!model &&
     !!options.quality &&
+    !!options.size &&
     !!options.quote &&
     !!options.account.data &&
     !!options.maxReferences &&
@@ -593,7 +594,7 @@ function EditorForm({
                     : model && options.pricing
                       ? t('common.loading')
                       : model
-                        ? t('images.noPrice')
+                        ? t(options.noImageSize ? 'images.noImageSize' : 'images.noPrice')
                         : t('images.editor.noModel')}
             </span>
             <Button
