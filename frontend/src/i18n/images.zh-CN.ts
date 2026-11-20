@@ -31,6 +31,10 @@ export default {
     retry: '重试上次提交',
     quality: '质量',
     resolution: '分辨率',
+    resolutionTier: { '1k': '1K', '2k': '2K', '4k': '4K' },
+    supportedResolutions: '支持的分辨率',
+    supportedResolutionsHint: '至少选择一档。请勾选所有启用路由都支持的分辨率。',
+    noImageSize: '当前模型没有可用的图片尺寸。',
     resolutionOption: '{resolution} · {pixels}',
     presetTitle: '比例与分辨率预设',
     presetHint:

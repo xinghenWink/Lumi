@@ -232,6 +232,47 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 		}
 		return result
 	}
+	t.Run("model tiers reject unsupported image tasks before charging or dispatch", func(t *testing.T) {
+		modelInput := catalog.ModelInput{DisplayName: "Restricted image fixture", Type: "image", Enabled: true, Capabilities: model.Capabilities, Routes: []catalog.RouteInput{model.Routes[0].RouteInput}}
+		modelInput.Capabilities.UseSizePresets = true
+		modelInput.Capabilities.SupportedResolutions = []string{"1k", "2k"}
+		restricted, err := f.services.Catalog.SaveModel(f.ctx, admin, uuid.Nil, modelInput)
+		if err != nil {
+			t.Fatal(err)
+		}
+		modelInput.Version = restricted.Version
+		modelInput.Capabilities.SupportedResolutions = nil
+		restricted, err = f.services.Catalog.SaveModel(f.ctx, admin, restricted.ID, modelInput)
+		if err != nil || len(restricted.Capabilities.SupportedResolutions) != 2 {
+			t.Fatalf("legacy update did not preserve model restrictions: %+v, %v", restricted.Capabilities, err)
+		}
+		client := f.client(t)
+		login := f.login(t, client, member.Email, "Integration-password-1")
+		request := input("restricted size", 1)
+		request.ModelID, request.Size, request.Ratio = restricted.ID, "3840x2160", "16:9"
+		before := creditBalance(t, f, member.ID)
+		previous := calls.Load()
+		const path = "/api/v1/image-tasks"
+		upload, err := f.services.Files.Upload(f.ctx, actor, "upload", bitmap.Bytes(), 10<<20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, refs := range [][]uuid.UUID{{}, {upload.ID}} {
+			request.ReferenceFileIDs = refs
+			expectStatus(t, f.call(t, client, http.MethodPost, path, login.AccessToken, request, uuid.NewString()), http.StatusBadRequest)
+		}
+		after := creditBalance(t, f, member.ID)
+		if after.Total != before.Total || calls.Load() != previous {
+			t.Fatalf("rejected request affected the balance or upstream: %d to %d", before.Total, after.Total)
+		}
+		request.Size, request.ReferenceFileIDs = "2048x1152", []uuid.UUID{}
+		accepted := f.call(t, client, http.MethodPost, path, login.AccessToken, request, uuid.NewString())
+		expectStatus(t, accepted, http.StatusAccepted)
+		task := decodeReply[images.Task](t, accepted)
+		if task := execute(task.ID); task.Status != "succeeded" || task.Size != request.Size {
+			t.Fatalf("2k was not accepted: %+v", task)
+		}
+	})
 	t.Run("submission needs only one available database connection", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(f.ctx, 5*time.Second)
 		defer cancel()

@@ -135,6 +135,51 @@ describe('server-derived image options', () => {
       ),
     ).toMatchObject({ ratio: '1:1', resolution: '1k', size: '1024x1024' })
   })
+  it('filters both preset and explicit tiers and replaces an invalid size within the same ratio', () => {
+    const configuration: ImageConfiguration = {
+      ...config,
+      sizes: ['2560x1440', '2561x1440', 'auto'],
+      ratio_sizes: {},
+      resolution_presets: [
+        { ratio: '16:9', resolution: '1k', size: '1280x720' },
+        { ratio: '16:9', resolution: '2k', size: '2048x1152' },
+        { ratio: '16:9', resolution: '4k', size: '3840x2160' },
+        { ratio: '1:1', resolution: '1k', size: '1024x1024' },
+      ],
+    }
+    const restricted: PublicModel = {
+      ...model,
+      capabilities: {
+        ...model.capabilities,
+        supported_resolutions: ['1k', '2k'],
+        sizes: [...configuration.sizes, '3840x2160', '2048x1152'],
+        use_size_presets: true,
+      },
+    }
+    const draft = { ...emptyImageDraft, size: '3840x2160', ratio: '16:9' }
+    expect(resolveImageOptions(draft, configuration, restricted)).toMatchObject({
+      size: '1280x720',
+      ratio: '16:9',
+      ratioSizes: ['1280x720', '2048x1152'],
+    })
+    const explicit = {
+      ...restricted,
+      capabilities: { ...restricted.capabilities, use_size_presets: false },
+    }
+    expect(resolveImageOptions(draft, configuration, explicit)).toMatchObject({
+      sizes: ['2560x1440', '2048x1152', 'auto'],
+      size: '2048x1152',
+    })
+    const fixedOnly = {
+      ...explicit,
+      capabilities: { ...explicit.capabilities, sizes: ['3840x2160', '2561x1440'] },
+    }
+    expect(resolveImageOptions(draft, configuration, fixedOnly)).toMatchObject({
+      sizes: [],
+      size: '',
+    })
+  })
+
   it('does not invent dimensions, capabilities or defaults while backend data is unavailable', () => {
     expect(resolveImageOptions(emptyImageDraft)).toMatchObject({
       size: '',

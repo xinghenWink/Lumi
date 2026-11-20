@@ -111,10 +111,8 @@ export default {
     removeRule: 'Remove rule',
     multiplier: 'Multiplier',
     editMultiplier: 'Edit multiplier',
-    sizeMultipliers: 'Size multipliers',
-    size: 'Size',
-    addSize: 'Add size',
-    removeSize: 'Remove size',
+    resolutionMultipliers: 'Resolution multipliers',
+    resolutionMultiplierHint: 'Automatic sizing uses the 1K multiplier.',
     priceHint:
       'The unit price is rounded up, then multiplied by quantity. Saved changes do not affect existing charges.',
     pricingSaved: 'Pricing and gift configuration saved',

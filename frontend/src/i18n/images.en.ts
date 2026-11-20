@@ -31,6 +31,10 @@ export default {
     retry: 'Retry last submission',
     quality: 'Quality',
     resolution: 'Resolution',
+    resolutionTier: { '1k': '1K', '2k': '2K', '4k': '4K' },
+    supportedResolutions: 'Supported resolutions',
+    supportedResolutionsHint: 'Select at least one resolution supported by every enabled route.',
+    noImageSize: 'This model has no available image sizes.',
     resolutionOption: '{resolution} · {pixels}',
     presetTitle: 'Aspect ratio and resolution presets',
     presetHint:

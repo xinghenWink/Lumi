@@ -1,4 +1,5 @@
 import type { components } from './schema'
+import { isImageResolution } from './image-resolutions'
 import { ApiError, record } from './transport'
 type Schema = components['schemas']
 export type Upstream = Schema['Upstream']
@@ -58,7 +59,17 @@ export function parseCapabilities(value: unknown): Capabilities {
       throw new ApiError('RESPONSE_INVALID')
     return value
   })
+  const resolutions =
+    data.supported_resolutions === undefined
+      ? undefined
+      : list(data, 'supported_resolutions', (resolution) => {
+          if (!isImageResolution(resolution)) throw new ApiError('RESPONSE_INVALID')
+          return resolution
+        })
+  if (resolutions && (!resolutions.length || new Set(resolutions).size !== resolutions.length))
+    throw new ApiError('RESPONSE_INVALID')
   return {
+    ...(resolutions ? { supported_resolutions: resolutions } : {}),
     ...(data.reasoning_effort === undefined
       ? {}
       : { reasoning_effort: bool(data, 'reasoning_effort') }),

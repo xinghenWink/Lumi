@@ -22,6 +22,7 @@ export function ImageParameters({
   const size = useId()
   const hasRatio = !!options.ratio
   const customSizes = options.sizes.filter((value) => value !== 'auto')
+  if (options.noImageSize) return null
   return (
     <div className="flex flex-col gap-4">
       {options.priced.length ? (
@@ -120,7 +121,7 @@ export function ImageParameters({
                 <NativeSelectOption key={value} value={value}>
                   {preset
                     ? t('images.resolutionOption', {
-                        resolution: preset.resolution.toUpperCase(),
+                        resolution: t('images.resolutionTier.' + preset.resolution),
                         pixels,
                       })
                     : pixels}

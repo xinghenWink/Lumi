@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Trash2 } from 'lucide-react'
 import { catalog } from '../../../api/catalog'
 import { ApiError } from '../../../api/transport'
+import { imageResolutions } from '../../../api/image-resolutions'
 import {
   defaultCapabilities,
   type Capabilities,
@@ -18,6 +19,8 @@ import { ModalDialog } from '../ui/modal-dialog'
 import { Field, selectClass, textareaClass } from '../ui/field'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
+import { Checkbox } from '../ui/checkbox'
+import { Label } from '../ui/label'
 import { ApiNotice } from '../shared/ApiNotice'
 import { CheckField, NumberField, unboundedCount } from './AdminFields'
 import { SizePicker } from './SizePicker'
@@ -71,6 +74,7 @@ export function ModelEditor({
       ...form,
       routes: form.routes.map((row, i) => (i === index ? { ...row, ...patch } : row)),
     })
+  const resolutions = form.capabilities.supported_resolutions ?? imageResolutions
   const mutation = useOwnedMutation(user?.id, async (check) => {
     if (
       !form.display_name.trim() ||
@@ -132,9 +136,11 @@ export function ModelEditor({
                 className={selectClass}
                 onChange={(event) => {
                   const type = event.target.value === 'image' ? 'image' : 'chat',
-                    capabilities = {
+                    capabilities: Capabilities = {
                       ...defaultCapabilities(type),
-                      ...(type === 'image' ? { use_size_presets: true } : {}),
+                      ...(type === 'image'
+                        ? { use_size_presets: true, supported_resolutions: ['1k'] }
+                        : {}),
                     }
                   setForm({ ...form, type, capabilities })
                 }}
@@ -236,6 +242,40 @@ export function ModelEditor({
                       />
                     ))}
                   </div>
+                </fieldset>
+                <fieldset aria-describedby={id + '-resolutions-hint'}>
+                  <legend className="text-xs text-muted-foreground">
+                    {t('images.supportedResolutions')}
+                  </legend>
+                  <div className="flex flex-wrap gap-x-6">
+                    {imageResolutions.map((resolution) => {
+                      const checked = resolutions.includes(resolution)
+                      const key = id + '-resolution-' + resolution
+                      return (
+                        <Label key={resolution} htmlFor={key} className="min-h-10 gap-3 text-sm">
+                          <Checkbox
+                            id={key}
+                            checked={checked}
+                            disabled={mutation.isPending || (checked && resolutions.length === 1)}
+                            onCheckedChange={(selected) =>
+                              changeCaps({
+                                supported_resolutions:
+                                  selected === true
+                                    ? imageResolutions.filter(
+                                        (tier) => tier === resolution || resolutions.includes(tier),
+                                      )
+                                    : resolutions.filter((tier) => tier !== resolution),
+                              })
+                            }
+                          />
+                          {t('images.resolutionTier.' + resolution)}
+                        </Label>
+                      )
+                    })}
+                  </div>
+                  <p id={id + '-resolutions-hint'} className="text-xs text-muted-foreground">
+                    {t('images.supportedResolutionsHint')}
+                  </p>
                 </fieldset>
                 <CheckField
                   role="switch"

@@ -37,7 +37,7 @@ func checkOwner(ctx context.Context, q *query.Queries, actor user.Actor) error {
 	return nil
 }
 func validateInput(input Input, c Configuration, model catalog.PublicModel) error {
-	if input.ConversationID == uuid.Nil || input.ModelID == uuid.Nil || strings.TrimSpace(input.Prompt) == "" || len(input.Prompt) > 64000 || !utf8.ValidString(input.Prompt) || strings.ContainsRune(input.Prompt, 0) || input.Count < 1 || input.Count > c.MaxN || input.Count > model.Capabilities.MaxN || !slices.Contains(model.Capabilities.Qualities, input.Quality) || !c.allowsSize(input.Size, input.Ratio, model.Capabilities.Sizes, model.Capabilities.UseSizePresets) {
+	if input.ConversationID == uuid.Nil || input.ModelID == uuid.Nil || strings.TrimSpace(input.Prompt) == "" || len(input.Prompt) > 64000 || !utf8.ValidString(input.Prompt) || strings.ContainsRune(input.Prompt, 0) || input.Count < 1 || input.Count > c.MaxN || input.Count > model.Capabilities.MaxN || !slices.Contains(model.Capabilities.Qualities, input.Quality) || !c.allowsSize(input.Size, input.Ratio, model.Capabilities.Sizes, model.Capabilities.SupportedResolutions, model.Capabilities.UseSizePresets) {
 		return problem.Invalid()
 	}
 	if len(input.ReferenceFileIDs) > int(c.MaxReferences) || len(input.ReferenceFileIDs) > int(model.Capabilities.MaxReferenceImages) || (len(input.ReferenceFileIDs) > 0 && !model.Capabilities.SupportsEdit) {

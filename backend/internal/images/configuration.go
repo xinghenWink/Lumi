@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
+	"github.com/xinghenWink/Lumi/backend/internal/imageresolution"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/problem"
@@ -25,7 +26,7 @@ func configView(row query.ImageSetting) (Configuration, error) {
 	if err := json.Unmarshal(row.RatioSizes, &result.RatioSizes); err != nil {
 		return result, fmt.Errorf("decode image ratios: %w", err)
 	}
-	result.ResolutionPresets = defaultResolutionPresets()
+	result.ResolutionPresets = imageresolution.Presets()
 	result.DisabledRatios = append([]string{}, row.DisabledRatios...)
 	result.DisabledResolutions = append([]string{}, row.DisabledResolutions...)
 	return result, nil
@@ -58,7 +59,7 @@ func validateConfiguration(c Configuration) error {
 		return problem.Invalid()
 	}
 	seen := map[string]bool{}
-	if !validDisabled(c.DisabledRatios, append(presetRatios(), "auto")) || !validDisabled(c.DisabledResolutions, presetResolutions()) {
+	if !validDisabled(c.DisabledRatios, append(imageresolution.Ratios(), "auto")) || !validDisabled(c.DisabledResolutions, imageresolution.Tiers()) {
 		return problem.Invalid()
 	}
 	for _, size := range c.Sizes {
@@ -68,7 +69,7 @@ func validateConfiguration(c Configuration) error {
 		seen[size] = true
 	}
 	for ratio, size := range c.RatioSizes {
-		if !slices.Contains(presetRatios(), ratio) || size == "auto" || !seen[size] {
+		if !slices.Contains(imageresolution.Ratios(), ratio) || size == "auto" || !seen[size] {
 			return problem.Invalid()
 		}
 	}
