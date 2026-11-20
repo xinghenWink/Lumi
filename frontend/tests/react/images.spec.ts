@@ -276,7 +276,7 @@ test('React real image generation editing gallery cancellation and administrator
       split_requests: false,
       admin_can_view_content: false,
     })
-    const memberEmail = 'image-member-' + suffix + '@lumi.test'
+    const memberEmail = ('image-member-' + suffix).padEnd(62, 'x') + '@lumi.test'
     const registration = await api('GET', '/admin/settings/registration')
     await api('PUT', '/admin/settings/registration', {
       registration: {
@@ -895,11 +895,26 @@ test('React real image generation editing gallery cancellation and administrator
     await page.goto('/admin/image-tasks')
     await page.getByLabel('用户 ID', { exact: true }).fill(String(memberUser.id))
     await page.getByRole('button', { name: '筛选', exact: true }).click()
-    await page
-      .getByRole('row')
-      .filter({ hasText: firstID })
-      .getByRole('button', { name: '任务详情', exact: true })
-      .click()
+    const taskTable = page.getByRole('region', { name: '图片任务', exact: true })
+    const taskRow = taskTable.getByRole('row').filter({ hasText: firstID })
+    const emailCell = taskRow.getByText(memberEmail, { exact: true })
+    await expect(taskTable.getByRole('columnheader', { name: '用户信息' })).toBeVisible()
+    await expect(taskRow.getByText('Image member', { exact: true })).toBeVisible()
+    await expect(emailCell).toBeVisible()
+    await expect(taskRow.getByText(String(memberUser.id), { exact: true })).toBeVisible()
+    expect(await emailCell.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+      true,
+    )
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await taskTable.focus()
+    await expect(taskTable).toBeFocused()
+    if (info.project.use.isMobile) {
+      await taskTable.press('ArrowRight')
+      await expect
+        .poll(() => taskTable.evaluate((element) => element.scrollLeft))
+        .toBeGreaterThan(0)
+    }
+    await taskRow.getByRole('button', { name: '任务详情', exact: true }).click()
     await expect(
       page.getByRole('dialog').getByText('内容访问未开启', { exact: true }),
     ).toBeVisible()

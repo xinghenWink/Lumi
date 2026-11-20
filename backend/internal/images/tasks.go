@@ -445,3 +445,28 @@ func (s *Service) List(ctx context.Context, actor user.Actor, f Filter, admin bo
 	result.Items, err = s.views(ctx, rows, actor.ID, visible)
 	return result, err
 }
+
+func (s *Service) ListAdminTasks(ctx context.Context, actor user.Actor, f Filter) (Page[AdminTask], error) {
+	page, err := s.List(ctx, actor, f, true)
+	result := Page[AdminTask]{Items: make([]AdminTask, 0, len(page.Items)), NextCursor: page.NextCursor}
+	if err != nil || len(page.Items) == 0 {
+		return result, err
+	}
+	userIDs := make([]uuid.UUID, 0, len(page.Items))
+	for _, task := range page.Items {
+		userIDs = append(userIDs, task.UserID)
+	}
+	owners, err := s.q.ListImageTaskOwners(ctx, userIDs)
+	if err != nil {
+		return result, fmt.Errorf("list image task owners: %w", err)
+	}
+	byID := make(map[uuid.UUID]query.ListImageTaskOwnersRow, len(owners))
+	for _, owner := range owners {
+		byID[owner.ID] = owner
+	}
+	for _, task := range page.Items {
+		owner := byID[task.UserID]
+		result.Items = append(result.Items, AdminTask{Task: task, UserNickname: owner.Nickname, UserEmail: owner.Email})
+	}
+	return result, nil
+}

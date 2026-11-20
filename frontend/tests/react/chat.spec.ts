@@ -554,6 +554,10 @@ test('React real streaming history stop editing isolation and bounded rendering'
       await page.goto('/admin/conversations?user_id=' + auth.user.id)
       const metadata = page.getByRole('row').filter({ hasText: conversationID })
       await expect(metadata).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: '会话 ID', exact: true })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: '用户信息', exact: true })).toBeVisible()
+      await expect(metadata.getByText(String(auth.user.nickname), { exact: true })).toBeVisible()
+      await expect(metadata.getByText(String(auth.user.email), { exact: true })).toBeVisible()
       expect(contentReads).toBe(0)
       await expect(page.getByText('灯塔与海风', { exact: true })).toHaveCount(0)
       const deniedContent = page.waitForResponse((response) =>
@@ -587,6 +591,24 @@ test('React real streaming history stop editing isolation and bounded rendering'
         '/admin/audit-logs?action=chat.content_view&target_id=' + conversationID,
       )
       expect(audit?.items).toHaveLength(1)
+      await page.getByRole('button', { name: /简体中文/ }).click()
+      await page.getByRole('menuitemradio', { name: 'English', exact: true }).click()
+      await expect(
+        page.getByRole('columnheader', { name: 'Conversation ID', exact: true }),
+      ).toBeVisible()
+      await expect(
+        page.getByRole('columnheader', { name: 'User information', exact: true }),
+      ).toBeVisible()
+      const darkTheme = page.getByRole('button', { name: 'Use dark theme', exact: true })
+      const startedInLightTheme = await darkTheme.isVisible()
+      if (startedInLightTheme) await darkTheme.click()
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+      await expect(metadata.getByText(String(auth.user.email), { exact: true })).toBeVisible()
+      if (startedInLightTheme)
+        await page.getByRole('button', { name: 'Use light theme', exact: true }).click()
+      await page.getByRole('button', { name: /English/ }).click()
+      await page.getByRole('menuitemradio', { name: '简体中文', exact: true }).click()
+      await expect(page.getByRole('columnheader', { name: '用户信息', exact: true })).toBeVisible()
     } finally {
       page.off('request', observeContent)
       const latest = await api('GET', '/admin/image-settings')

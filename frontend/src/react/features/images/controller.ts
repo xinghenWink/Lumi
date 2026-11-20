@@ -233,7 +233,7 @@ export function createImageController(session: SessionService, client: QueryClie
         if (!valid(owner, id)) throw new ApiError('AUTH_REQUIRED', 401)
         const [conversation, page] = await Promise.all([
           images.conversation(id, signal),
-          images.tasks(new URLSearchParams({ conversation_id: id, limit: '50' }), false, signal),
+          images.tasks(new URLSearchParams({ conversation_id: id, limit: '50' }), signal),
         ])
         if (!valid(owner, id)) throw new ApiError('AUTH_REQUIRED', 401)
         const cached = snapshot(id)

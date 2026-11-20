@@ -1047,7 +1047,7 @@ export interface paths {
     }
     /**
      * listAdminImageTasks
-     * @description Admin only. Default excludes prompts/reference IDs/file URLs. Content opt-in records an audit on every view.
+     * @description Admin only. Lists task metadata and the current nickname and email of each existing, non-deleted owner. Default excludes prompts/reference IDs/file URLs. Content opt-in records an audit on every view.
      */
     get: operations['listAdminImageTasks']
     put?: never
@@ -1382,7 +1382,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** /api/v1/admin/conversations */
+    /**
+     * /api/v1/admin/conversations
+     * @description Admin only. Lists chat metadata and the current nickname and email of each existing, non-deleted owner. Message content is governed by the content access setting.
+     */
     get: operations['m6_get__api_v1_admin_conversations']
     put?: never
     post?: never
@@ -1782,6 +1785,9 @@ export interface components {
       id: string
       /** Format: uuid */
       user_id: string
+      user_nickname?: string
+      /** Format: email */
+      user_email?: string
       /** Format: uuid */
       model_id: string | null
       /** Format: date-time */
@@ -2866,7 +2872,13 @@ export interface components {
       file: components['schemas']['ImageFile'] | null
       error_code: string
     }
-    ImageTask: {
+    ImageTask: components['schemas']['ImageTaskFields']
+    AdminImageTask: components['schemas']['ImageTaskFields'] & {
+      user_nickname?: string
+      /** Format: email */
+      user_email?: string
+    }
+    ImageTaskFields: {
       /** Format: uuid */
       id: string
       /** Format: uuid */
@@ -2935,6 +2947,10 @@ export interface components {
     }
     ImageTaskPage: {
       items: components['schemas']['ImageTask'][]
+      next_cursor: string
+    }
+    AdminImageTaskPage: {
+      items: components['schemas']['AdminImageTask'][]
       next_cursor: string
     }
     ImageConversationPage: {
@@ -5391,7 +5407,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['ImageTaskPage']
+          'application/json': components['schemas']['AdminImageTaskPage']
         }
       }
       default: components['responses']['APIError']

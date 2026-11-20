@@ -82,7 +82,7 @@ function ImageWorkspace({ id }: { id: string }) {
       params.set('conversation_id', id)
       params.set('limit', '50')
       if (pageParam) params.set('cursor', pageParam)
-      return images.tasks(params, false, signal)
+      return images.tasks(params, signal)
     },
     getNextPageParam: (page) => page.next_cursor || undefined,
     refetchInterval: (query) => {
