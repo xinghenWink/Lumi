@@ -1550,7 +1550,7 @@ test('React real image generation editing gallery cancellation and administrator
       await sketch.dialog.getByRole('button', { name: '文字', exact: true }).click()
       await sketch.paper.click({ position: { x: paperSize.width / 4, y: paperSize.height / 2 } })
       await sketch.dialog.getByRole('textbox', { name: '文字', exact: true }).fill('草图备注')
-      await sketch.dialog.getByRole('button', { name: '保存', exact: true }).click()
+      await sketch.dialog.getByRole('button', { name: '保存修改', exact: true }).click()
       await sketch.dialog.getByRole('button', { name: '选择和移动', exact: true }).click()
       await sketch.paper.focus()
       await member.keyboard.press('BracketLeft')
