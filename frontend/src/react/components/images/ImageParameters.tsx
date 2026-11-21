@@ -8,8 +8,9 @@ import type { useImageOptions } from '../../features/images/options'
 import { ChoiceGroup } from '../ui/choice-group'
 import { Field, FieldGroup } from '../ui/field'
 import { NativeSelect, NativeSelectOption } from '../ui/native-select'
+import { ImageComplexityField } from './ImageComplexityField'
 
-/** Quality, ratio, size and count for one image draft; shared by the panel and the mobile sheet. */
+/** Image draft parameters shared by the workbench and canvas. */
 export function ImageParameters({
   options,
   disabled,
@@ -37,6 +38,13 @@ export function ImageParameters({
             label: t('images.' + quality),
           }))}
           onChange={(quality) => onPatch({ quality: quality as ImageInput['quality'] })}
+        />
+      ) : null}
+      {options.supportsComplexity ? (
+        <ImageComplexityField
+          value={options.complexity}
+          disabled={disabled}
+          onChange={(complexity) => onPatch({ complexity })}
         />
       ) : null}
       {options.supportsGif ? (

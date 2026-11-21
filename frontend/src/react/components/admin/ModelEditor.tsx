@@ -307,6 +307,11 @@ export function ModelEditor({
                   checked={form.capabilities.supports_gif ?? false}
                   onChange={(supports_gif) => changeCaps({ supports_gif })}
                 />
+                <CheckField
+                  label={t('catalog.supportsComplexity')}
+                  checked={form.capabilities.supports_complexity ?? false}
+                  onChange={(supports_complexity) => changeCaps({ supports_complexity })}
+                />
                 <NumberField
                   label={t('catalog.maxReferences')}
                   value={form.capabilities.max_reference_images}

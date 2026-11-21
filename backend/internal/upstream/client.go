@@ -53,6 +53,7 @@ type ImageRequest struct {
 	Size         string `json:"size"`
 	Count        int    `json:"n"`
 	OutputFormat string `json:"output_format,omitempty"`
+	Complexity   string `json:"complexity,omitempty"`
 }
 type Reference struct {
 	Name, MIME string
@@ -404,6 +405,9 @@ func (c *Client) EditImages(ctx context.Context, input EditRequest) (results []I
 		}
 		if input.OutputFormat != "" {
 			fields["output_format"] = input.OutputFormat
+		}
+		if input.Complexity != "" {
+			fields["complexity"] = input.Complexity
 		}
 		if input.TransparentBackground {
 			fields["background"] = background

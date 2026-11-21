@@ -275,7 +275,9 @@ func (s *Service) Execute(ctx context.Context, task query.ImageTask) {
 			fileIDs = []uuid.UUID{*task.EditGuideFileID}
 		}
 		transparent := task.EditAction == editRemoveBackground
-		if transparent && !model.Capabilities.SupportsTransparentBackground {
+		if task.Complexity != "" && !model.Capabilities.SupportsComplexity {
+			code = "IMAGE_COMPLEXITY_UNSUPPORTED"
+		} else if transparent && !model.Capabilities.SupportsTransparentBackground {
 			code = "IMAGE_BACKGROUND_UNSUPPORTED"
 		}
 		refs := make([]upstream.Reference, 0, len(fileIDs))
@@ -300,7 +302,7 @@ func (s *Service) Execute(ctx context.Context, task query.ImageTask) {
 				outputFormat = ""
 			}
 			request := upstream.EditRequest{
-				ImageRequest: upstream.ImageRequest{Model: remote, Prompt: editPrompt(task.EditAction, task.Prompt), Quality: task.Quality, Size: task.Size, Count: int(task.ImageCount), OutputFormat: outputFormat},
+				ImageRequest: upstream.ImageRequest{Model: remote, Prompt: editPrompt(task.EditAction, task.Prompt), Quality: task.Quality, Size: task.Size, Count: int(task.ImageCount), OutputFormat: outputFormat, Complexity: task.Complexity},
 				References:   refs, TransparentBackground: transparent,
 			}
 			run := func(position int32, count int) {

@@ -8,6 +8,7 @@ import {
   type ImageTask,
 } from '../../../api/images'
 import type { SessionService } from '../../../api/auth-session'
+import type { ImageComplexity } from '../../../api/image-complexity'
 import { ApiError } from '../../../api/transport'
 
 export interface ImageDraft {
@@ -18,6 +19,8 @@ export interface ImageDraft {
   n: number
   references: string[]
   outputFormat?: ImageInput['output_format']
+  complexity?: ImageComplexity | undefined
+  complexityModelId?: string | undefined
 }
 export const emptyImageDraft: ImageDraft = {
   prompt: '',
@@ -418,6 +421,7 @@ export function createImageController(session: SessionService, client: QueryClie
         n: task.n,
         reference_file_ids: task.reference_file_ids,
         ...(task.output_format ? { output_format: task.output_format } : {}),
+        ...(task.complexity ? { complexity: task.complexity } : {}),
         ...(task.edit_options ? { edit_options: task.edit_options } : {}),
       },
       'task',

@@ -1,4 +1,5 @@
 import type { components } from './schema'
+import { parseImageComplexity } from './image-complexity'
 import { parseImageQuality } from './image-quality'
 import { authorized, authorizedResponse } from './protected'
 import { ApiError, noContent, record } from './transport'
@@ -134,6 +135,7 @@ export function parseTask(v: unknown): ImageTask {
     ratio: str(d.ratio),
     n: num(d.n),
     reference_file_ids: list(d.reference_file_ids, str),
+    ...(d.complexity === undefined ? {} : { complexity: parseImageComplexity(d.complexity) }),
     ...(d.output_format === undefined
       ? {}
       : { output_format: choice(d.output_format, ['png', 'gif']) }),

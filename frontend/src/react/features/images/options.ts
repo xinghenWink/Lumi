@@ -95,6 +95,11 @@ export function resolveImageOptions(
     (preset) => preset.ratio === ratio && preset.size === size,
   )?.resolution
   const supportsGif = model?.capabilities.supports_gif ?? false
+  const supportsComplexity = model?.capabilities.supports_complexity ?? false
+  const complexity =
+    supportsComplexity && (!draft.complexityModelId || draft.complexityModelId === model?.id)
+      ? draft.complexity
+      : undefined
   return {
     sizes,
     ratios,
@@ -110,6 +115,8 @@ export function resolveImageOptions(
     ratio,
     n,
     supportsGif,
+    supportsComplexity,
+    complexity,
     outputFormat: supportsGif ? draft.outputFormat : undefined,
   }
 }

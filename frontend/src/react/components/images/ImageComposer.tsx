@@ -61,7 +61,15 @@ export function ImageComposer({
     if (draft.references.length) textarea.current?.focus()
   }, [draft.references.length])
   function patch(value: Parameters<typeof controller.draft>[1]) {
-    controller.draft(conversationId, value)
+    controller.draft(
+      conversationId,
+      'complexity' in value
+        ? { ...value, complexityModelId: value.complexity ? options.model?.id : undefined }
+        : value,
+    )
+  }
+  function resetComplexity() {
+    if (draft.complexity) patch({ complexity: undefined })
   }
   function attach(file: ImageFile) {
     const current = controller.store.getState().drafts[scope] ?? emptyImageDraft
@@ -131,6 +139,7 @@ export function ImageComposer({
         n: options.n,
         reference_file_ids: draft.references,
         ...(options.outputFormat ? { output_format: options.outputFormat } : {}),
+        ...(options.complexity ? { complexity: options.complexity } : {}),
       }
     }
     const result = await controller.submit(conversationId, body)
@@ -295,7 +304,7 @@ export function ImageComposer({
             </div>
           ) : null}
           <div className="mb-3 -ml-1">
-            <ModelPicker kind="image" disabled={locked} />
+            <ModelPicker kind="image" disabled={locked} onModelChange={resetComplexity} />
           </div>
           <div
             className={cn(
@@ -446,7 +455,7 @@ export function ImageComposer({
         />
         <div className="flex min-w-0 items-center gap-0.5 px-2 pt-1 pb-2">
           <div className="min-w-0 flex-1">
-            <ModelPicker kind="image" disabled={locked} />
+            <ModelPicker kind="image" disabled={locked} onModelChange={resetComplexity} />
           </div>
           {fileInput}
           <Button

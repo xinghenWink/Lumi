@@ -217,6 +217,7 @@ test('canvas journey composes, generates from references, persists and edits', a
             sizes: ['1024x1024', '1536x1024', 'auto'],
             max_n: 2,
             supports_edit: true,
+            supports_complexity: true,
             max_reference_images: 4,
           },
           routes: [
@@ -386,6 +387,9 @@ test('canvas journey composes, generates from references, persists and edits', a
     await parameters.click()
     await expect(imageParameters).toBeVisible()
     await expect(imageParameters.getByRole('radiogroup', { name: '质量' })).toBeVisible()
+    const planning = imageParameters.getByLabel('规划强度', { exact: true })
+    await expect(planning).toHaveValue('')
+    await planning.selectOption('medium')
     const auto = imageParameters.getByRole('radio', { name: '自动', exact: true })
     await expect(auto).toBeChecked()
     await expect(imageParameters.getByLabel('分辨率', { exact: true })).toHaveCount(0)
@@ -412,7 +416,11 @@ test('canvas journey composes, generates from references, persists and edits', a
         request.url().endsWith('/canvases/' + canvasID + '/runs') && request.method() === 'POST',
     )
     await run.click()
-    expect((await runRequest).postDataJSON()).toMatchObject({ ratio: 'auto', size: 'auto' })
+    expect((await runRequest).postDataJSON()).toMatchObject({
+      ratio: 'auto',
+      size: 'auto',
+      complexity: 'medium',
+    })
     await expect(nodes('image').locator('img')).toHaveCount(2, { timeout: 30_000 })
     await expect(edges).toHaveCount(3)
     expect(upstream.edits).toBe(1)
@@ -442,7 +450,11 @@ test('canvas journey composes, generates from references, persists and edits', a
       document: {
         nodes: expect.arrayContaining([
           expect.objectContaining({
-            generator: expect.objectContaining({ ratio: 'auto', size: 'auto' }),
+            generator: expect.objectContaining({
+              ratio: 'auto',
+              size: 'auto',
+              complexity: 'medium',
+            }),
           }),
         ]),
       },
@@ -455,6 +467,10 @@ test('canvas journey composes, generates from references, persists and edits', a
     await expect(nodes('image').locator('img')).toHaveCount(2)
     await nodes('generator').click()
     await expect(summary).toHaveText('自动 · 1 张')
+
+    await parameters.click()
+    await expect(planning).toHaveValue('medium')
+    await page.keyboard.press('Escape')
 
     // Undo and redo a deletion.
     await page.keyboard.press('1')

@@ -116,8 +116,10 @@ function ImageWorkspace({ id }: { id: string }) {
       if (value.kind === 'edit') {
         await addExistingReference(runtime, models, value.file, id, { requireActive: true })
       } else {
-        if (!models.items.some((model) => model.id === value.task.model_id))
-          throw new ApiError('IMAGE_MODEL_UNAVAILABLE')
+        const model = models.items.find((item) => item.id === value.task.model_id)
+        if (!model) throw new ApiError('IMAGE_MODEL_UNAVAILABLE')
+        if (value.task.complexity && !model.capabilities.supports_complexity)
+          throw new ApiError('IMAGE_COMPLEXITY_UNSUPPORTED')
         const results = await Promise.allSettled(
           value.task.reference_file_ids.map((reference) => images.file(reference)),
         )
@@ -143,6 +145,8 @@ function ImageWorkspace({ id }: { id: string }) {
           ratio: value.task.ratio,
           n: value.task.n,
           outputFormat: value.task.output_format,
+          complexity: value.task.complexity,
+          complexityModelId: value.task.complexity ? model.id : undefined,
           references: references.map((file) => file.id),
         })
         if (references.length !== results.length) throw new ApiError('IMAGE_REFERENCE_INVALID')

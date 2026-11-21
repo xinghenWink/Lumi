@@ -2278,6 +2278,11 @@ export interface components {
     }
     /** @enum {string} */
     ImageQuality: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+    /**
+     * @description Image planning level independent of rendering quality.
+     * @enum {string}
+     */
+    ImageComplexity: 'low' | 'medium' | 'high'
     /** @description An empty value returns all qualities. */
     ImageQualityFilter: '' | components['schemas']['ImageQuality']
     CreditPricingRule: {
@@ -2551,6 +2556,8 @@ export interface components {
       supports_transparent_background?: boolean
       /** @description All enabled routes for this image model support GIF output. */
       supports_gif?: boolean
+      /** @description All enabled routes for this image model have been verified to support explicit planning levels. */
+      supports_complexity?: boolean
       max_reference_images: number
       /** @enum {string} */
       response_format: '' | 'b64_json' | 'url'
@@ -2860,6 +2867,8 @@ export interface components {
       model_id: string
       prompt: string
       quality: components['schemas']['ImageQuality']
+      /** @description Omit to use the upstream model default. Explicit values require supports_complexity. */
+      complexity?: components['schemas']['ImageComplexity']
       /** @description Width and height as WIDTHxHEIGHT, or auto to let the provider choose the size. */
       size: string
       /** @description The selected aspect ratio. Use auto with size auto. An empty ratio selects a size directly. */
@@ -2905,6 +2914,8 @@ export interface components {
       operation: 'generate' | 'edit'
       prompt: string
       quality: components['schemas']['ImageQuality']
+      /** @description Present only when explicitly selected and task content is visible. */
+      complexity?: components['schemas']['ImageComplexity']
       size: string
       ratio: string
       /** Format: int64 */
@@ -3051,6 +3062,8 @@ export interface components {
       /** Format: uuid */
       model_id: string | null
       quality: '' | components['schemas']['ImageQuality']
+      /** @description Omit to use the upstream model default. */
+      complexity?: components['schemas']['ImageComplexity']
       /** @description The selected dimensions or auto. */
       size: string
       /** @description The selected aspect ratio, auto, or an empty string for direct size selection or defaults. */
@@ -3100,6 +3113,8 @@ export interface components {
       /** Format: uuid */
       model_id: string
       quality: components['schemas']['ImageQuality']
+      /** @description Omit to use the upstream model default. Explicit values require supports_complexity. */
+      complexity?: components['schemas']['ImageComplexity']
       /** @description Width and height as WIDTHxHEIGHT, or auto to let the provider choose the size. */
       size: string
       /** @description The selected aspect ratio. Use auto with size auto. An empty ratio selects a size directly. */

@@ -2,6 +2,7 @@ import type { components } from './schema'
 import { authorized } from './protected'
 import { ApiError, noContent, record } from './transport'
 import { parseFile, parseTask } from './images'
+import { parseImageComplexity } from './image-complexity'
 import { parseImageQuality } from './image-quality'
 
 type S = components['schemas']
@@ -104,6 +105,7 @@ function parseNode(v: unknown): CanvasNode {
       ...(g.mentions === undefined ? {} : { mentions: list(g.mentions, parseMention) }),
       model_id: nullableText(g.model_id),
       quality: g.quality === '' ? '' : parseImageQuality(g.quality),
+      ...(g.complexity === undefined ? {} : { complexity: parseImageComplexity(g.complexity) }),
       size: str(g.size),
       ratio: str(g.ratio),
       n: int(g.n),

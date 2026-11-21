@@ -5,6 +5,12 @@
 - 在模型管理的「可用质量」中，可为支持的 2.5 / 2.6 Sunburst、Flare 等生图模型勾选「超高（xhigh）」和「最高（max）」。启用前确认该模型的每条启用路由支持所选值。
 - 在「价格与赠送」中使用平台模型 ID，按档位分别添加生图或改图价格规则。工作台和画布只展示已勾选且当前操作有可用价格的档位，Lumi 将选中的 `quality` 原样传给上游。
 
+## 生图规划强度
+
+- 在模型管理中为 GPT Image 2.6 Sunburst、Flare 或其代理别名勾选「已验证所有启用路由支持规划强度」。先确认每条启用路由的生图及已配置的改图接口接受对应字段，路由变更后重新核对。已有模型和新导入模型默认关闭。
+- 工作台、画布和全屏 AI 改图提供「官方默认 / 低 / 中 / 高」。显式档位以 `complexity=low|medium|high` 发送。选择官方默认时，Lumi 省略该字段，由上游模型决定默认值。OpenAI 的 2.6 Sunburst 和 Flare 当前默认使用 `high`。 [OpenAI 生图指南](https://developers.openai.com/api/docs/guides/image-generation#set-image-complexity)
+- 规划强度独立于画质和 Lumi 积分计价。图片任务和画布运行 API 接受可选的 `complexity`，可见的任务详情会返回显式选择。
+
 ## 自动比例
 
 - 工作台和画布选择「自动」时，Lumi 按 `size=auto` 报价，并把同一尺寸值传给生图或参考图改图接口。上游决定输出尺寸，任务按实际图片像素记录结果。

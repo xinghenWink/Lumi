@@ -1,6 +1,7 @@
 package validation
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/mail"
 	"net/url"
@@ -63,6 +64,26 @@ func ImageQuality(value string) bool {
 	default:
 		return false
 	}
+}
+
+// ImageComplexity is an optional planning level. Its zero value means omitted.
+type ImageComplexity string
+
+func (c ImageComplexity) Valid() bool {
+	return c == "low" || c == "medium" || c == "high"
+}
+
+func (c *ImageComplexity) UnmarshalJSON(raw []byte) error {
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return fmt.Errorf("decode image complexity: %w", err)
+	}
+	level := ImageComplexity(value)
+	if !level.Valid() {
+		return problem.Invalid()
+	}
+	*c = level
+	return nil
 }
 
 func Link(value string) bool {

@@ -69,6 +69,7 @@ beforeEach(async () => {
         capabilities: {
           ...defaultCapabilities('image'),
           supports_edit: true,
+          supports_complexity: true,
           sizes: configuration.sizes,
           qualities: ['medium'],
           max_n: 3,
@@ -116,6 +117,14 @@ describe('restoring an owned gallery task', () => {
     expect(runtime.queryClient.getQueryData(['user', undefined, 'file', 'first'])).toEqual(
       file('first'),
     )
+  })
+
+  it('restores the selected planning level for the historical model', async () => {
+    expect(await restore({ ...task, complexity: 'high' })).toBe(true)
+    expect(image.store.getState().drafts.destination).toMatchObject({
+      complexity: 'high',
+      complexityModelId: task.model_id,
+    })
   })
 
   it('fills a blank conversation with no reference images and leaves creation for submission', async () => {
