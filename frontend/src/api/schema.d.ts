@@ -791,7 +791,7 @@ export interface paths {
     put?: never
     /**
      * uploadImageFile
-     * @description One multipart file, magic/decoded dimension checks, PNG re-encoding and WebP thumbnail. Upload and private edit guides <=10MiB and 24 million pixels; avatar <=2MiB.
+     * @description One multipart file, magic/decoded dimension checks, PNG re-encoding and WebP thumbnail. Upload and private edit guides <=10MiB and 24 million pixels; avatar <=2MiB. Sketches from the image workspace and canvas are regular PNG uploads with kind upload.
      */
     post: operations['uploadImageFile']
     delete?: never
@@ -2875,6 +2875,7 @@ export interface components {
       ratio?: string
       /** Format: int64 */
       n: number
+      /** @description Ordered IDs of owned reference images, including uploaded sketch PNGs. */
       reference_file_ids: string[]
       /** @description Requires one source image and one result. Resize requires an enabled editor aspect ratio. */
       edit_options?: components['schemas']['ImageEditOptions']
@@ -2920,6 +2921,7 @@ export interface components {
       ratio: string
       /** Format: int64 */
       n: number
+      /** @description Ordered IDs of owned reference images, including uploaded sketch PNGs. */
       reference_file_ids: string[]
       /** @description Present only when edit options exist and the viewer can see task content. */
       edit_options?: components['schemas']['ImageEditOptions']

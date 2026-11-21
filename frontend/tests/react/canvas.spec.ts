@@ -4,9 +4,10 @@ import type { APIRequestContext, Locator } from '@playwright/test'
 import { expect, test, type Page } from './test'
 import { record } from '../../src/api/transport'
 import { defaultCapabilities } from '../../src/api/catalog-contracts'
-import { parseImageConfiguration } from '../../src/api/images'
+import { parseImageConfiguration, parseTask } from '../../src/api/images'
 import { observeErrors } from '../browser-errors'
 import { fixturePNG } from '../image-fixture'
+import { drawStroke, isSketchUpload, openSketch } from './sketch'
 
 interface Caller {
   (method: string, path: string, body?: unknown): Promise<Record<string, unknown>>
@@ -703,6 +704,61 @@ test('canvas journey composes, generates from references, persists and edits', a
     await page.getByRole('button', { name: '删除画布', exact: true }).click()
     await expect(card).toHaveCount(0)
     expect(await self.status('GET', '/canvases/' + canvasID)).toBe(404)
+
+    await page.unroute('**/api/v1/canvases/*')
+    await page.getByRole('link', { name: '新建画布', exact: true }).click()
+    await expect(page).toHaveURL(/\/canvas\/[0-9a-f-]{36}$/)
+    await expect(viewport).toBeVisible()
+    const sketch = await openSketch(page, 'canvas')
+    await drawStroke(page, sketch.paper, false)
+    let uploads = 0
+    await page.route('**/api/v1/files*', async (route) => {
+      if (isSketchUpload(route.request().url(), route.request().method()) && ++uploads === 1)
+        await route.fulfill({ status: 503, json: { code: 'TEMPORARILY_UNAVAILABLE' } })
+      else await route.continue()
+    })
+    await sketch.confirm.click()
+    await expect(sketch.dialog.getByRole('alert')).toBeVisible()
+    await expect(sketch.confirm).toBeEnabled()
+    await expect(nodes('image')).toHaveCount(0)
+    const sketchUpload = page.waitForResponse(
+      (response) =>
+        isSketchUpload(response.url(), response.request().method()) && response.status() === 201,
+    )
+    const autosaveSketch = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(new URL(page.url()).pathname.replace('/canvas/', '/canvases/')) &&
+        response.request().method() === 'PUT' &&
+        response.ok(),
+    )
+    await sketch.confirm.click({ clickCount: 2 })
+    const sketchFile = record(await (await sketchUpload).json())
+    expect(sketchFile).toMatchObject({ id: expect.any(String), width: 1024, height: 1024 })
+    await expect(sketch.dialog).toBeHidden()
+    expect(uploads).toBe(2)
+    const sketchNode = nodes('image')
+    await expect(sketchNode).toHaveAttribute('data-selected', 'true')
+    const sketchNodeID = await sketchNode.getAttribute('data-node-id')
+    await autosaveSketch
+    await page.reload()
+    await expect(sketchNode).toHaveAttribute('data-node-id', sketchNodeID ?? '')
+    await expect(sketchNode.locator('img')).toBeVisible()
+    await sketchNode.click()
+    await page
+      .getByRole('toolbar', { name: '选中操作' })
+      .getByRole('button', { name: '生成', exact: true })
+      .click()
+    await expect(inspector.getByTestId('canvas-inputs')).toHaveText('1 张参考图 · 0 段文本')
+    await inspector.getByLabel('模型', { exact: true }).selectOption({ label: modelName })
+    await inspector.getByLabel('提示词', { exact: true }).fill('Use the sketch composition')
+    const sketchRun = page.waitForResponse(
+      (response) => response.url().endsWith('/runs') && response.status() === 202,
+    )
+    await run.click()
+    const task = parseTask(record(await (await sketchRun).json()).task)
+    expect(task.reference_file_ids).toEqual([sketchFile.id])
+    await expect(nodes('image').locator('img')).toHaveCount(2, { timeout: 30_000 })
+    expect(upstream.prompts).toContain('Use the sketch composition')
     expect(errors).toEqual([])
   } finally {
     if (oldPricing) await admin('PUT', '/admin/pricing', oldPricing)
@@ -827,5 +883,12 @@ test('canvas on small screens keeps tools reachable and pans by touch', async ({
   await expect(page.getByTestId('canvas-save-state')).toHaveAttribute('data-status', 'saved', {
     timeout: 15_000,
   })
+  const sketch = await openSketch(page, 'canvas')
+  await drawStroke(page, sketch.paper, true)
+  await expect(sketch.confirm).toBeEnabled()
+  await sketch.dialog.getByRole('button', { name: '关闭', exact: true }).click()
+  await sketch.dialog.getByRole('button', { name: '放弃草图', exact: true }).click()
+  await expect(sketch.dialog).toBeHidden()
+  await expect(sketch.trigger).toBeFocused()
   expect(errors).toEqual([])
 })

@@ -6,7 +6,7 @@ import { AlertTriangle, ArrowLeft, Check, CloudOff, Loader2 } from 'lucide-react
 import type { ImageFile } from '../../../api/images'
 import { canGenerate, LIMITS } from '../../../features/canvas/document'
 import { boundsOf } from '../../../features/canvas/geometry'
-import { insertFile } from '../../features/canvas/actions'
+import { insertFile, stageCenter } from '../../features/canvas/actions'
 import { useCanvas, useEditor } from '../../features/canvas/context'
 import type { Preview } from '../../features/canvas/editor'
 import { useImageConfig } from '../../features/images/config'
@@ -27,6 +27,7 @@ import { referenceAccept, type Rejections } from '../../features/files/reference
 import { CanvasImageTools, type ImageTool } from './CanvasImageTools'
 import type { CanvasNode } from '../../../api/canvases'
 
+const SketchDialog = lazy(() => import('../shared/SketchDialog'))
 const ImageLibrary = lazy(() =>
   import('../images/ImageLibrary').then((module) => ({ default: module.ImageLibrary })),
 )
@@ -178,6 +179,8 @@ export function CanvasEditor({ rejected }: { rejected: Rejections | null }) {
   const config = useImageConfig()
   const actions = useImageActions()
   const [library, setLibrary] = useState(false)
+  const [sketch, setSketch] = useState(false)
+  const sketchTrigger = useRef<HTMLButtonElement>(null)
   const [preview, setPreview] = useState<ImageFile | null>(null)
   const [imageTool, setImageTool] = useState<{
     tool: ImageTool
@@ -227,6 +230,12 @@ export function CanvasEditor({ rejected }: { rejected: Rejections | null }) {
           <div className="absolute inset-x-2 top-2 z-10 w-fit sm:top-4 sm:left-4">
             <CanvasToolbar
               onLibrary={() => setLibrary(true)}
+              onSketch={() => {
+                setMenu(null)
+                setSketch(true)
+              }}
+              sketchTrigger={sketchTrigger}
+              sketchDisabled={!config.data}
               onCreate={() => {
                 const { stage } = editor.state
                 setMenu(
@@ -293,6 +302,17 @@ export function CanvasEditor({ rejected }: { rejected: Rejections | null }) {
       ) : null}
       {sheet ? (
         <GeneratorSheet key={sheet.id} node={sheet} onClose={() => editor.openInspector(null)} />
+      ) : null}
+      {sketch ? (
+        <Suspense fallback={null}>
+          <SketchDialog
+            destination="canvas"
+            maxBytes={maxBytes}
+            returnFocus={() => sketchTrigger.current}
+            onClose={() => setSketch(false)}
+            onConfirm={(file) => services.uploads.placeSketch(file, stageCenter(editor))}
+          />
+        </Suspense>
       ) : null}
       {library ? (
         <Suspense fallback={null}>
