@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react'
+import { useRef, type ReactNode, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowUpToLine,
@@ -17,6 +17,7 @@ import {
   Maximize,
   Minus,
   MousePointer2,
+  Pencil,
   Plus,
   Redo2,
   Sparkles,
@@ -47,6 +48,7 @@ import {
   zoomBy,
 } from '../../features/canvas/actions'
 import { cn } from '../../lib/utils'
+import { Button } from '../ui/button'
 
 export function ToolButton({
   label,
@@ -81,7 +83,19 @@ export function ToolButton({
 
 const panel = 'rounded-xl border border-border bg-card/95 p-1 shadow-md backdrop-blur-sm'
 
-export function CanvasToolbar({ onLibrary, onCreate }: { onLibrary(): void; onCreate(): void }) {
+export function CanvasToolbar({
+  onLibrary,
+  onCreate,
+  onSketch,
+  sketchTrigger,
+  sketchDisabled,
+}: {
+  onLibrary(): void
+  onCreate(): void
+  onSketch(): void
+  sketchTrigger: RefObject<HTMLButtonElement | null>
+  sketchDisabled: boolean
+}) {
   const { t } = useTranslation()
   const services = useCanvas()
   const { editor, uploads } = services
@@ -123,6 +137,19 @@ export function CanvasToolbar({ onLibrary, onCreate }: { onLibrary(): void; onCr
       <ToolButton label={t('canvas.tools.upload')} onClick={() => picker.current?.click()}>
         <ImagePlus size={17} />
       </ToolButton>
+      <Button
+        ref={sketchTrigger}
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-9"
+        aria-label={t('images.sketch.title')}
+        title={t('images.sketch.title')}
+        disabled={sketchDisabled}
+        onClick={onSketch}
+      >
+        <Pencil size={17} aria-hidden="true" />
+      </Button>
       <ToolButton label={t('canvas.tools.library')} onClick={onLibrary}>
         <Images size={17} />
       </ToolButton>
@@ -266,7 +293,7 @@ export function SelectionBar({
           <Sparkles size={15} />
         </ToolButton>
       ) : null}
-      {feedable && (!single || single.kind !== 'image') ? (
+      {feedable ? (
         <button
           type="button"
           onClick={() => generateFromSelection(editor)}

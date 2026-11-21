@@ -21,6 +21,7 @@ import { ApiNotice } from '../components/shared/ApiNotice'
 import { ImageGenerationIcon } from '../components/shared/ImageGenerationIcon'
 import { Button } from '../components/ui/button'
 
+const SketchDialog = lazy(() => import('../components/shared/SketchDialog'))
 const ImageAssetPanel = lazy(() => import('../components/images/ImageAssetPanel'))
 const ImageTaskList = lazy(() =>
   import('../components/images/ImageTaskList').then((module) => ({
@@ -69,6 +70,15 @@ function ImageWorkspace({ id }: { id: string }) {
   const wide = useMediaQuery('(min-width: 1024px)')
   const dockAssets = useMediaQuery('(min-width: 1440px)')
   const assetsTrigger = useRef<HTMLButtonElement>(null)
+  const sketchTrigger = useRef<HTMLButtonElement>(null)
+  const sketchAttachmentRef = useRef<((file: File) => void) | null>(null)
+  const [sketchMaxBytes, setSketchMaxBytes] = useState<number | null>(null)
+  const sketchControls = {
+    sketchOpen: sketchMaxBytes !== null,
+    sketchTrigger,
+    sketchAttachmentRef,
+    onSketch: setSketchMaxBytes,
+  }
   const [assetsOpen, setAssetsOpen] = useState(false)
   const [keyword, setKeyword] = useState('')
   const [filters, setFilters] = useState(emptyTaskFilters)
@@ -210,7 +220,7 @@ function ImageWorkspace({ id }: { id: string }) {
     <div className="flex min-h-0 flex-1 overflow-hidden">
       {wide && composer ? (
         <aside className="flex w-[320px] shrink-0 flex-col border-r border-border bg-sidebar/45 xl:w-[360px]">
-          <ImageComposer key={id || 'new'} conversationId={id} layout="panel" />
+          <ImageComposer key={id || 'new'} conversationId={id} layout="panel" {...sketchControls} />
         </aside>
       ) : null}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -323,9 +333,27 @@ function ImageWorkspace({ id }: { id: string }) {
           </section>
         )}
         {!wide && composer ? (
-          <ImageComposer key={id || 'new'} conversationId={id} layout="dock" />
+          <ImageComposer key={id || 'new'} conversationId={id} layout="dock" {...sketchControls} />
         ) : null}
       </div>
+      {sketchMaxBytes !== null ? (
+        <Suspense fallback={null}>
+          <SketchDialog
+            destination="reference"
+            maxBytes={sketchMaxBytes}
+            returnFocus={() =>
+              sketchTrigger.current?.disabled
+                ? document.querySelector<HTMLTextAreaElement>('.image-composer textarea')
+                : sketchTrigger.current
+            }
+            onClose={() => setSketchMaxBytes(null)}
+            onConfirm={(file) => {
+              if (!sketchAttachmentRef.current) throw new ApiError('IMAGE_REFERENCE_INVALID')
+              sketchAttachmentRef.current(file)
+            }}
+          />
+        </Suspense>
+      ) : null}
       {assetsOpen ? (
         <Suspense
           fallback={

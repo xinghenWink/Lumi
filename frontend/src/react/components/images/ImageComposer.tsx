@@ -1,5 +1,15 @@
-import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { ArrowUp, ImagePlus, Images, Plus, RotateCw, SlidersHorizontal } from 'lucide-react'
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react'
+import { ArrowUp, ImagePlus, Images, Pencil, Plus, RotateCw, SlidersHorizontal } from 'lucide-react'
 import { useStore } from 'zustand'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -31,9 +41,17 @@ const ImageLibrary = lazy(() =>
 export function ImageComposer({
   conversationId,
   layout = 'dock',
+  sketchOpen,
+  sketchTrigger,
+  sketchAttachmentRef,
+  onSketch,
 }: {
   conversationId: string
   layout?: 'panel' | 'dock'
+  sketchOpen: boolean
+  sketchTrigger: RefObject<HTMLButtonElement | null>
+  sketchAttachmentRef: RefObject<((file: File) => void) | null>
+  onSketch(maxBytes: number): void
 }) {
   const runtime = useRuntime()
   const controller = useImageController(),
@@ -91,10 +109,19 @@ export function ImageComposer({
     enabled: !locked && options.maxReferences > 0 && !!maxBytes,
     commit: attach,
   })
+  const uploads = upload.uploads
+  useLayoutEffect(() => {
+    sketchAttachmentRef.current = (file) => {
+      if (uploads.add([file]) !== 1) throw new ApiError('IMAGE_REFERENCE_INVALID')
+    }
+    return () => {
+      sketchAttachmentRef.current = null
+    }
+  }, [sketchAttachmentRef, uploads])
   const full = upload.used >= options.maxReferences
   const attachable = !locked && options.maxReferences > 0 && !full && !!maxBytes
   const dragging = useFileDrop({
-    enabled: attachable,
+    enabled: attachable && !sketchOpen,
     title: locked
       ? t('react.dropLocked')
       : !options.maxReferences
@@ -279,6 +306,24 @@ export function ImageComposer({
         />
       </Suspense>
     ) : null
+  const sketchButton = (
+    <Button
+      ref={sketchTrigger}
+      type="button"
+      variant="ghost"
+      size={panel ? 'sm' : 'icon'}
+      className={panel ? 'px-2' : 'size-9 rounded-full'}
+      aria-label={t('images.sketch.title')}
+      title={t('images.sketch.title')}
+      disabled={!attachable}
+      onClick={() => {
+        if (maxBytes) onSketch(maxBytes)
+      }}
+    >
+      <Pencil size={panel ? 14 : 17} aria-hidden="true" />
+      {panel ? t('images.sketch.title') : null}
+    </Button>
+  )
   const parameters = <ImageParameters options={options} disabled={locked} onPatch={patch} />
   const notice = error || localError || options.error
 
@@ -363,7 +408,7 @@ export function ImageComposer({
                   </span>
                 </button>
               )}
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1">
                 <Button
                   type="button"
                   variant="ghost"
@@ -375,8 +420,9 @@ export function ImageComposer({
                   <Images size={14} />
                   {t('images.library')}
                 </Button>
+                {sketchButton}
                 {options.maxReferences && upload.used ? (
-                  <span className="text-2xs text-muted-foreground tabular-nums">
+                  <span className="ml-auto text-2xs text-muted-foreground tabular-nums">
                     <span aria-hidden="true">
                       {t('react.referenceSlots', {
                         count: upload.used,
@@ -481,6 +527,7 @@ export function ImageComposer({
           >
             <Images size={17} />
           </Button>
+          {sketchButton}
           <Button
             type="button"
             variant="ghost"

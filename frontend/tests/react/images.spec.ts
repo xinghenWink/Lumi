@@ -10,6 +10,7 @@ import { defaultCapabilities } from '../../src/api/catalog-contracts'
 import { parseTask, parseImageConfiguration } from '../../src/api/images'
 import { observeErrors } from '../browser-errors'
 import { fixturePNG } from '../image-fixture'
+import { drawStroke, isSketchUpload, openSketch } from './sketch'
 async function login(page: Page, email: string, password: string) {
   await page.goto('/login')
   const pending = page.waitForResponse(
@@ -1463,6 +1464,44 @@ test('React real image generation editing gallery cancellation and administrator
     })
     await member.unroute('**/api/v1/image-tasks')
 
+    const imageCatalog = '**/api/v1/models?type=image'
+    await member.route(imageCatalog, async (route) => {
+      const response = await route.fetch()
+      const data = record(await response.json())
+      if (!Array.isArray(data.items)) throw new Error('Missing image models')
+      const items: unknown[] = data.items
+      await route.fulfill({
+        response,
+        json: {
+          ...data,
+          items: items.map((item) => {
+            const model = record(item)
+            return {
+              ...model,
+              capabilities: {
+                ...record(model.capabilities),
+                supports_edit: false,
+                max_reference_images: 0,
+              },
+            }
+          }),
+        },
+      })
+    })
+    await member.goto('/create')
+    const sketchTrigger = member.getByRole('button', { name: '绘制草图', exact: true })
+    await expect(member.getByRole('button', { name: '选择模型', exact: true })).toContainText(
+      modelName,
+    )
+    await expect(sketchTrigger).toBeDisabled()
+    await member.unroute(imageCatalog)
+    await member.route('**/api/v1/image-options', async (route) => {
+      const response = await route.fetch()
+      await route.fulfill({
+        response,
+        json: { ...record(await response.json()), max_references: 1 },
+      })
+    })
     await member.goto('/create')
     if (mobile) await member.getByRole('button', { name: '生图参数', exact: true }).click()
     const format = parameters.getByLabel('输出格式', { exact: true })
@@ -1476,10 +1515,85 @@ test('React real image generation editing gallery cancellation and administrator
     await expect(resolution).toHaveValue('1024x768')
     await parameters.getByRole('radio', { name: '1 张', exact: true }).check()
     await member.keyboard.press('Escape')
-    await member
-      .locator('input[type=file]')
-      .setInputFiles({ name: 'gif-source.png', mimeType: 'image/png', buffer: png })
+    const sketch = await openSketch(member, 'reference')
+    await member.keyboard.press('Escape')
+    await expect(sketch.dialog).toBeHidden()
+    await expect(sketch.trigger).toBeFocused()
+    await sketch.trigger.click()
+    await drawStroke(member, sketch.paper, mobile)
+    await expect(sketch.confirm).toBeEnabled()
+    await member.keyboard.press('Control+Z')
+    await expect(sketch.confirm).toBeDisabled()
+    await member.keyboard.press('Control+Shift+Z')
+    await expect(sketch.confirm).toBeEnabled()
+    if (!mobile) {
+      const paperSize = await sketch.paper.boundingBox()
+      if (!paperSize) throw new Error('Missing paper bounds')
+      const sampleInk = (x: number, y: number) =>
+        sketch.paper.evaluate(
+          (canvas, [x, y]) => {
+            if (!(canvas instanceof HTMLCanvasElement)) return false
+            return canvas
+              .getContext('2d')
+              ?.getImageData(x - 2, y - 2, 5, 5)
+              .data.some((value, index) => index % 4 === 3 && value > 0)
+          },
+          [x, y] as const,
+        )
+      await expect.poll(() => sampleInk(512, 427)).toBe(true)
+      await sketch.dialog.getByRole('button', { name: '橡皮擦', exact: true }).click()
+      await sketch.paper.click({
+        position: { x: paperSize.width / 2, y: (paperSize.height * 5) / 12 },
+      })
+      await expect.poll(() => sampleInk(512, 427)).toBe(false)
+      await expect.poll(() => sampleInk(256, 256)).toBe(true)
+      await sketch.dialog.getByRole('button', { name: '文字', exact: true }).click()
+      await sketch.paper.click({ position: { x: paperSize.width / 4, y: paperSize.height / 2 } })
+      await sketch.dialog.getByRole('textbox', { name: '文字', exact: true }).fill('草图备注')
+      await sketch.dialog.getByRole('button', { name: '保存', exact: true }).click()
+      await sketch.dialog.getByRole('button', { name: '选择和移动', exact: true }).click()
+      await sketch.paper.focus()
+      await member.keyboard.press('BracketLeft')
+      await member.keyboard.press('ArrowRight')
+      await member.keyboard.press('Enter')
+      await expect(sketch.dialog.getByRole('textbox', { name: '文字', exact: true })).toHaveValue(
+        '草图备注',
+      )
+      await member.keyboard.press('Escape')
+
+      const initialViewport = member.viewportSize()
+      if (!initialViewport) throw new Error('Missing desktop viewport')
+      await member.setViewportSize({ ...initialViewport, width: 1000 })
+      await expect(sketch.confirm).toBeEnabled()
+      await expect.poll(() => sampleInk(256, 256)).toBe(true)
+      await member.setViewportSize(initialViewport)
+    }
+    await sketch.dialog.getByRole('button', { name: '形状', exact: true }).click()
+    await expect(sketch.dialog.getByRole('menuitem')).toHaveCount(8)
+    await sketch.dialog.getByRole('menuitem', { name: '星形', exact: true }).click()
+    await drawStroke(member, sketch.paper, mobile)
+
+    let attempts = 0
+    await member.route('**/api/v1/files*', async (route) => {
+      if (isSketchUpload(route.request().url(), route.request().method()) && ++attempts === 1)
+        await route.fulfill({ status: 503, json: { code: 'TEMPORARILY_UNAVAILABLE' } })
+      else await route.continue()
+    })
+    await sketch.confirm.click({ clickCount: 2 })
+    await expect(sketch.dialog).toBeHidden()
+    const retrySketch = member.getByRole('button', { name: '重试上传', exact: true })
+    await expect(retrySketch).toBeVisible()
+    expect(attempts).toBe(1)
+    const uploadedSketch = member.waitForResponse(
+      (response) =>
+        isSketchUpload(response.url(), response.request().method()) && response.status() === 201,
+    )
+    await retrySketch.click()
+    const sketchFile = record(await (await uploadedSketch).json())
+    expect(sketchFile).toMatchObject({ id: expect.any(String), width: 1024, height: 1024 })
     await expect(member.locator('.image-references img')).toHaveCount(1)
+    await expect(sketchTrigger).toBeDisabled()
+    await member.unroute('**/api/v1/files*')
     await prompt.fill('使用参考图，生成角色自拍比耶的 GIF 动图')
     const gifSubmission = member.waitForResponse(
       (response) =>
@@ -1492,6 +1606,7 @@ test('React real image generation editing gallery cancellation and administrator
       ratio: '4:3',
       output_format: 'gif',
       complexity: 'high',
+      reference_file_ids: [sketchFile.id],
     })
     const gifCard = member.locator('.image-task').first()
     await expect(gifCard.locator('.image-status')).toHaveText('已完成', { timeout: 20_000 })

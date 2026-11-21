@@ -2242,7 +2242,8 @@ paths:
       summary: uploadImageFile
       description: >-
         One multipart file, magic/decoded dimension checks, PNG re-encoding and WebP thumbnail. Upload
-        and private edit guides <=10MiB and 24 million pixels; avatar <=2MiB.
+        and private edit guides <=10MiB and 24 million pixels; avatar <=2MiB. Sketches from the
+        image workspace and canvas are regular PNG uploads with kind upload.
       security:
         - bearerAuth: []
       parameters:
@@ -8538,6 +8539,7 @@ components:
           maximum: 4
         reference_file_ids:
           type: array
+          description: Ordered IDs of owned reference images, including uploaded sketch PNGs.
           items:
             type: string
             format: uuid
@@ -8640,6 +8642,7 @@ components:
           minimum: 0
         reference_file_ids:
           type: array
+          description: Ordered IDs of owned reference images, including uploaded sketch PNGs.
           items:
             type: string
             format: uuid
