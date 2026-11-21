@@ -79,8 +79,8 @@ SELECT * FROM image_tasks WHERE id=$1;
 -- name: LockImageTask :one
 SELECT * FROM image_tasks WHERE id=$1 FOR UPDATE;
 -- name: CreateImageTask :one
-INSERT INTO image_tasks(id,user_id,conversation_id,message_id,user_message_id,operation,model_id,model_name,prompt,params,quality,size,ratio,image_count,reference_file_ids,charge_id,unit_price,total_cost,idempotency_key,request_hash,split_requests,timeout_seconds,edit_action,edit_guide_file_id,output_format,queue_deadline)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,now()+make_interval(secs=>sqlc.arg(queue_timeout)::integer)) RETURNING *;
+INSERT INTO image_tasks(id,user_id,conversation_id,message_id,user_message_id,operation,model_id,model_name,prompt,params,quality,size,ratio,image_count,reference_file_ids,charge_id,unit_price,total_cost,idempotency_key,request_hash,split_requests,timeout_seconds,edit_action,edit_guide_file_id,output_format,complexity,queue_deadline)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,now()+make_interval(secs=>sqlc.arg(queue_timeout)::integer)) RETURNING *;
 -- name: CreateImageTaskItem :exec
 INSERT INTO image_task_items(task_id,position) VALUES($1,$2);
 -- name: ListImageTaskItems :many

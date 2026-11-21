@@ -113,6 +113,7 @@ export default {
     maxN: 'Maximum images per request',
     supportsEdit: 'Image editing',
     supportsTransparentBackground: 'Transparent edits verified on all enabled routes',
+    supportsComplexity: 'Planning level verified on all enabled routes',
     supportsGif: 'GIF output verified on all enabled routes',
     maxReferences: 'Maximum reference images',
     responseFormat: 'Image response format',

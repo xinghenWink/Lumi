@@ -90,6 +90,7 @@ export default {
     maxN: '每次最多图片数',
     supportsEdit: '支持改图',
     supportsTransparentBackground: '已验证所有启用路由支持透明背景改图',
+    supportsComplexity: '已验证所有启用路由支持规划强度',
     supportsGif: '已验证所有启用路由支持 GIF 输出',
     maxReferences: '最多参考图数',
     responseFormat: '图片响应格式',

@@ -40,6 +40,14 @@ func validateInput(input Input, c Configuration, model catalog.PublicModel) erro
 	if input.ConversationID == uuid.Nil || input.ModelID == uuid.Nil || strings.TrimSpace(input.Prompt) == "" || len(input.Prompt) > 64000 || !utf8.ValidString(input.Prompt) || strings.ContainsRune(input.Prompt, 0) || input.Count < 1 || input.Count > c.MaxN || input.Count > model.Capabilities.MaxN || !slices.Contains(model.Capabilities.Qualities, input.Quality) || !c.allowsSize(input.Size, input.Ratio, model.Capabilities.Sizes, model.Capabilities.UseSizePresets) {
 		return problem.Invalid()
 	}
+	if input.Complexity != "" {
+		if !input.Complexity.Valid() {
+			return problem.Invalid()
+		}
+		if !model.Capabilities.SupportsComplexity {
+			return problem.New("IMAGE_COMPLEXITY_UNSUPPORTED", 400)
+		}
+	}
 	if len(input.ReferenceFileIDs) > int(c.MaxReferences) || len(input.ReferenceFileIDs) > int(model.Capabilities.MaxReferenceImages) || (len(input.ReferenceFileIDs) > 0 && !model.Capabilities.SupportsEdit) {
 		return problem.New("IMAGE_REFERENCES_INVALID", 400)
 	}
@@ -219,6 +227,7 @@ func (s *Service) submit(ctx context.Context, actor user.Actor, key string, requ
 		}
 		insert := query.CreateImageTaskParams{ID: id, UserID: actor.ID, ConversationID: input.ConversationID, MessageID: messageID, UserMessageID: userID, Operation: operation, ModelID: input.ModelID, ModelName: model.DisplayName, Prompt: input.Prompt, Params: params, Quality: input.Quality, Size: input.Size, Ratio: input.Ratio, ImageCount: input.Count, ReferenceFileIds: input.ReferenceFileIDs, ChargeID: charge.ID, UnitPrice: charge.Quote.UnitPrice, TotalCost: charge.Quote.TotalCost, IdempotencyKey: key, RequestHash: hash, SplitRequests: cfg.SplitRequests, TimeoutSeconds: cfg.TimeoutSeconds, QueueTimeout: cfg.QueueTimeoutSeconds}
 		insert.OutputFormat = outputFormat
+		insert.Complexity = string(input.Complexity)
 		if input.EditOptions != nil {
 			insert.EditAction = input.EditOptions.Action
 			insert.EditGuideFileID = input.EditOptions.GuideFileID
@@ -309,6 +318,7 @@ func (s *Service) views(ctx context.Context, rows []query.ImageTask, viewer uuid
 		if content {
 			view.Prompt = row.Prompt
 			view.OutputFormat = row.OutputFormat
+			view.Complexity = validation.ImageComplexity(row.Complexity)
 			view.ReferenceFileIDs = append(view.ReferenceFileIDs, row.ReferenceFileIds...)
 			if row.EditAction != "" {
 				view.EditOptions = &EditOptions{Action: row.EditAction, GuideFileID: row.EditGuideFileID}

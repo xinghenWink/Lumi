@@ -6865,6 +6865,10 @@ components:
     ImageQuality:
       type: string
       enum: [low, medium, high, xhigh, max]
+    ImageComplexity:
+      type: string
+      enum: [low, medium, high]
+      description: Image planning level independent of rendering quality.
     ImageQualityFilter:
       description: An empty value returns all qualities.
       anyOf:
@@ -7623,6 +7627,9 @@ components:
         supports_gif:
           type: boolean
           description: All enabled routes for this image model support GIF output.
+        supports_complexity:
+          type: boolean
+          description: All enabled routes for this image model have been verified to support explicit planning levels.
         max_reference_images:
           type: integer
           minimum: 0
@@ -8515,6 +8522,9 @@ components:
           maxLength: 64000
         quality:
           $ref: '#/components/schemas/ImageQuality'
+        complexity:
+          $ref: '#/components/schemas/ImageComplexity'
+          description: Omit to use the upstream model default. Explicit values require supports_complexity.
         size:
           type: string
           description: Width and height as WIDTHxHEIGHT, or auto to let the provider choose the size.
@@ -8617,6 +8627,9 @@ components:
           type: string
         quality:
           $ref: '#/components/schemas/ImageQuality'
+        complexity:
+          $ref: '#/components/schemas/ImageComplexity'
+          description: Present only when explicitly selected and task content is visible.
         size:
           type: string
         ratio:
@@ -8977,6 +8990,9 @@ components:
           anyOf:
             - const: ''
             - $ref: '#/components/schemas/ImageQuality'
+        complexity:
+          $ref: '#/components/schemas/ImageComplexity'
+          description: Omit to use the upstream model default.
         size:
           type: string
           maxLength: 11
@@ -9115,6 +9131,9 @@ components:
           format: uuid
         quality:
           $ref: '#/components/schemas/ImageQuality'
+        complexity:
+          $ref: '#/components/schemas/ImageComplexity'
+          description: Omit to use the upstream model default. Explicit values require supports_complexity.
         size:
           type: string
           description: Width and height as WIDTHxHEIGHT, or auto to let the provider choose the size.

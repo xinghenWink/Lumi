@@ -37,6 +37,22 @@ const model: PublicModel = {
   },
 }
 describe('server-derived image options', () => {
+  it('keeps planning optional and scoped to the supported model', () => {
+    const enabled = { ...model, capabilities: { ...model.capabilities, supports_complexity: true } }
+    const choice = { ...emptyImageDraft, complexity: 'high' as const, complexityModelId: model.id }
+    expect(resolveImageOptions(emptyImageDraft, config, enabled)).toMatchObject({
+      supportsComplexity: true,
+      complexity: undefined,
+    })
+    expect(resolveImageOptions(choice, config, enabled).complexity).toBe('high')
+    expect(
+      resolveImageOptions(choice, config, { ...enabled, id: 'other' }).complexity,
+    ).toBeUndefined()
+    expect(resolveImageOptions(choice, config, model)).toMatchObject({
+      supportsComplexity: false,
+      complexity: undefined,
+    })
+  })
   it('defaults to auto when available and retains valid explicit sizes and preferences', () => {
     const configured: ImageConfiguration = {
       ...config,

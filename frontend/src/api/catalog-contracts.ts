@@ -73,6 +73,9 @@ export function parseCapabilities(value: unknown): Capabilities {
       ? {}
       : { supports_transparent_background: bool(data, 'supports_transparent_background') }),
     ...(data.supports_gif === undefined ? {} : { supports_gif: bool(data, 'supports_gif') }),
+    ...(data.supports_complexity === undefined
+      ? {}
+      : { supports_complexity: bool(data, 'supports_complexity') }),
     max_reference_images: integer(data, 'max_reference_images', 0, 2147483647),
     response_format: choice(data, 'response_format', ['', 'b64_json', 'url'] as const),
   }

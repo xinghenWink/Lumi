@@ -98,13 +98,14 @@ type TextSettings struct {
 // GeneratorContent keeps the last chosen parameters; empty values mean "use the defaults"
 // so a generator never pins an option that an administrator later disables.
 type GeneratorContent struct {
-	Prompt   string     `json:"prompt"`
-	Mentions []Mention  `json:"mentions,omitempty"`
-	ModelID  *uuid.UUID `json:"model_id"`
-	Quality  string     `json:"quality"`
-	Size     string     `json:"size"`
-	Ratio    string     `json:"ratio"`
-	Count    int32      `json:"n"`
+	Prompt     string                     `json:"prompt"`
+	Mentions   []Mention                  `json:"mentions,omitempty"`
+	ModelID    *uuid.UUID                 `json:"model_id"`
+	Quality    string                     `json:"quality"`
+	Complexity validation.ImageComplexity `json:"complexity,omitempty"`
+	Size       string                     `json:"size"`
+	Ratio      string                     `json:"ratio"`
+	Count      int32                      `json:"n"`
 }
 
 type Node struct {
@@ -308,6 +309,9 @@ func validateGenerator(generator GeneratorContent) error {
 	}
 	if generator.Quality != "" && !validation.ImageQuality(generator.Quality) {
 		return fmt.Errorf("invalid quality")
+	}
+	if generator.Complexity != "" && !generator.Complexity.Valid() {
+		return fmt.Errorf("invalid generator complexity")
 	}
 	if generator.Size != "" && !sizePattern.MatchString(generator.Size) || generator.Ratio != "" && !ratioPattern.MatchString(generator.Ratio) {
 		return fmt.Errorf("invalid size or ratio")

@@ -66,9 +66,12 @@ export async function restoreGalleryTask({
     ratio: task.ratio || (task.size === 'auto' ? 'auto' : ''),
     n: task.n,
     outputFormat: task.output_format,
+    ...(task.complexity ? { complexity: task.complexity, complexityModelId: task.model_id } : {}),
     references: files.map((file) => file.id),
   } satisfies ImageDraft
   const options = resolveImageOptions(draft, configuration, model)
+  if (draft.complexity && !options.supportsComplexity)
+    throw new ApiError('IMAGE_COMPLEXITY_UNSUPPORTED')
   if (
     options.quality !== draft.quality ||
     options.size !== draft.size ||

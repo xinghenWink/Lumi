@@ -135,6 +135,11 @@ test('React real channel configuration import routing and safe model selection',
         await expect(dialog.getByLabel('上游模型 ID 1', { exact: true })).toHaveValue(wireChat)
         await dialog.getByLabel('上游模型 ID 1', { exact: true }).scrollIntoViewIfNeeded()
         await page.screenshot({ path: info.outputPath('model-routes.png'), animations: 'disabled' })
+        await expect(dialog.getByLabel('已验证所有启用路由支持规划强度')).toHaveCount(0)
+      } else {
+        const planning = dialog.getByLabel('已验证所有启用路由支持规划强度')
+        await expect(planning).not.toBeChecked()
+        await planning.check()
       }
       await dialog.getByRole('button', { name: '保存模型', exact: true }).click()
       await expect(dialog).not.toBeVisible()
@@ -166,6 +171,10 @@ test('React real channel configuration import routing and safe model selection',
       .getByRole('link', { name: '生图', exact: true })
       .click()
     await expect(picker).toContainText(imageName)
+    if (info.project.name.includes('mobile'))
+      await member.getByRole('button', { name: '生图参数', exact: true }).click()
+    await expect(member.getByLabel('规划强度', { exact: true })).toHaveValue('')
+    await member.keyboard.press('Escape')
     await member
       .getByRole('navigation', { name: '创作模式' })
       .getByRole('link', { name: '聊天', exact: true })

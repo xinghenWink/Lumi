@@ -271,6 +271,7 @@ type ImageTask struct {
 	EditAction       string
 	EditGuideFileID  *uuid.UUID
 	OutputFormat     string
+	Complexity       string
 }
 
 type ImageTaskItem struct {

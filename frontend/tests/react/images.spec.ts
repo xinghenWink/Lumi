@@ -50,6 +50,7 @@ test('React real image generation editing gallery cancellation and administrator
   ).join('\n')
   const filteredLivePrompt = 'Live search result ' + suffix
   let finishFilteredTask: (() => void) | undefined
+  const upstreamPlanning = new Map<string, unknown>()
   let calls = 0,
     edits = 0,
     reusedReference = false
@@ -78,6 +79,7 @@ test('React real image generation editing gallery cancellation and administrator
     const raw = Buffer.concat(chunks)
     let prompt: string,
       outputFormat: unknown,
+      complexity: unknown,
       size: unknown,
       count = 1
     if (request.url === '/v1/images/edits') {
@@ -85,6 +87,7 @@ test('React real image generation editing gallery cancellation and administrator
       const form = raw.toString('utf8')
       prompt = form.match(/name="prompt"\r\n\r\n([^\r]*)/)?.[1] ?? ''
       outputFormat = form.match(/name="output_format"\r\n\r\n([^\r]*)/)?.[1]
+      complexity = form.match(/name="complexity"\r\n\r\n([^\r]*)/)?.[1]
       size = form.match(/name="size"\r\n\r\n([^\r]*)/)?.[1]
       reusedReference = raw.includes(Buffer.from([137, 80, 78, 71]))
     } else if (request.url === '/v1/images/generations') {
@@ -92,6 +95,7 @@ test('React real image generation editing gallery cancellation and administrator
       prompt = String(input.prompt)
       count = Number(input.n)
       outputFormat = input.output_format
+      complexity = input.complexity
       size = input.size
     } else {
       response.writeHead(404)
@@ -99,6 +103,7 @@ test('React real image generation editing gallery cancellation and administrator
       return
     }
     calls++
+    upstreamPlanning.set(prompt, complexity)
     if (
       prompt.includes('自拍比耶') &&
       (request.url !== '/v1/images/edits' || outputFormat !== 'gif' || size !== '1024x768')
@@ -248,6 +253,7 @@ test('React real image generation editing gallery cancellation and administrator
         max_n: 4,
         supports_edit: true,
         supports_gif: true,
+        supports_complexity: true,
         max_reference_images: 4,
       },
       routes: [
@@ -266,6 +272,7 @@ test('React real image generation editing gallery cancellation and administrator
       ...modelInput,
       display_name: alternateModelName,
       is_default: false,
+      capabilities: { ...modelInput.capabilities, supports_complexity: false },
     })
     alternateModelID = String(alternateModel.id)
     oldPricing = await api('GET', '/admin/pricing')
@@ -387,6 +394,18 @@ test('React real image generation editing gallery cancellation and administrator
       exact: true,
     })
     if (mobile) await member.getByRole('button', { name: '生图参数', exact: true }).click()
+    const planning = parameters.getByLabel('规划强度', { exact: true })
+    await expect(planning).toHaveValue('')
+    await expect(planning.locator('option')).toHaveText(['官方默认', '低', '中', '高'])
+    if (mobile) await planning.selectOption('low')
+    else {
+      await planning.focus()
+      await expect(planning).toBeFocused()
+      await member.keyboard.press('ArrowDown')
+    }
+    await expect(planning).toHaveValue('low')
+    await planning.selectOption('')
+    await expect(planning).toHaveValue('')
     const auto = parameters.getByRole('radio', { name: '自动', exact: true })
     const bySize = parameters.getByRole('radio', { name: '按尺寸', exact: true })
     const resolution = parameters.getByLabel('分辨率', { exact: true })
@@ -857,6 +876,9 @@ test('React real image generation editing gallery cancellation and administrator
     const modelPicker = member.getByRole('button', { name: '选择模型', exact: true })
     await modelPicker.click()
     await member.getByRole('menuitemradio', { name: alternateModelName, exact: true }).click()
+    if (mobile) await member.getByRole('button', { name: '生图参数', exact: true }).click()
+    await expect(planning).toHaveCount(0)
+    if (mobile) await member.keyboard.press('Escape')
     await prompt.fill('reject')
     const manualResponse = waitForSubmission()
     const savedAlternateModel = waitForSavedModel(source.conversation_id, alternateModelID)
@@ -1408,6 +1430,9 @@ test('React real image generation editing gallery cancellation and administrator
     await galleryEditor.getByLabel('添加评论', { exact: true }).fill('将此处改成浅蓝色')
     await galleryEditor.getByRole('button', { name: '保存修改', exact: true }).click()
     await expect(galleryEditor.getByText(/预计 \d+ 积分/)).toBeVisible()
+    const editorPlanning = galleryEditor.getByLabel('规划强度', { exact: true })
+    await expect(editorPlanning).toHaveValue('')
+    await editorPlanning.selectOption('medium')
     await member.screenshot({
       path: info.outputPath('image-editor-light.png'),
       animations: 'disabled',
@@ -1434,6 +1459,7 @@ test('React real image generation editing gallery cancellation and administrator
     expect(JSON.parse(requests[0]?.body ?? '{}')).toMatchObject({
       n: 1,
       edit_options: { action: 'markup', guide_file_id: expect.any(String) },
+      complexity: 'medium',
     })
     await member.unroute('**/api/v1/image-tasks')
 
@@ -1441,6 +1467,8 @@ test('React real image generation editing gallery cancellation and administrator
     if (mobile) await member.getByRole('button', { name: '生图参数', exact: true }).click()
     const format = parameters.getByLabel('输出格式', { exact: true })
     await expect(format).toHaveValue('auto')
+    await expect(planning).toHaveValue('')
+    await planning.selectOption('high')
     await format.selectOption('gif')
     await expect(format).toHaveValue('gif')
     await format.selectOption('auto')
@@ -1459,7 +1487,12 @@ test('React real image generation editing gallery cancellation and administrator
     )
     await send.click()
     const animatedTask = parseTask(await (await gifSubmission).json())
-    expect(animatedTask).toMatchObject({ operation: 'edit', ratio: '4:3', output_format: 'gif' })
+    expect(animatedTask).toMatchObject({
+      operation: 'edit',
+      ratio: '4:3',
+      output_format: 'gif',
+      complexity: 'high',
+    })
     const gifCard = member.locator('.image-task').first()
     await expect(gifCard.locator('.image-status')).toHaveText('已完成', { timeout: 20_000 })
     await gifCard.getByRole('button', { name: '预览图片 1', exact: true }).click()
@@ -1489,6 +1522,14 @@ test('React real image generation editing gallery cancellation and administrator
       .click()
     if (mobile) await member.getByRole('button', { name: '生图参数', exact: true }).click()
     await expect(format).toHaveValue('gif')
+    await expect(planning).toHaveValue('high')
+    expect(upstreamPlanning.has('partial')).toBe(true)
+    expect(upstreamPlanning.get('partial')).toBeUndefined()
+    expect(upstreamPlanning.get('使用参考图，生成角色自拍比耶的 GIF 动图')).toBe('high')
+    expect([...upstreamPlanning.entries()]).toContainEqual([
+      expect.stringContaining('将此处改成浅蓝色'),
+      'medium',
+    ])
     expect(errors).toEqual([])
   } finally {
     await memberContext.close()

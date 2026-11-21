@@ -18,6 +18,7 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/credits"
 	"github.com/xinghenWink/Lumi/backend/internal/images"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
+	"github.com/xinghenWink/Lumi/backend/internal/platform/validation"
 	"github.com/xinghenWink/Lumi/backend/internal/upstream"
 	"github.com/xinghenWink/Lumi/backend/internal/user"
 	"github.com/xinghenWink/Lumi/backend/migrations"
@@ -43,10 +44,26 @@ func TestAdvancedImageQualities(t *testing.T) {
 		var input upstream.ImageRequest
 		switch r.URL.Path {
 		case "/v1/images/generations":
-			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			var payload struct {
+				upstream.ImageRequest
+				Complexity json.RawMessage `json:"complexity"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 				http.Error(w, "invalid generation body", http.StatusBadRequest)
 				return
 			}
+			switch payload.Prompt {
+			case "planning":
+				if string(payload.Complexity) != `"medium"` {
+					t.Errorf("explicit planning level was not forwarded: %s", payload.Complexity)
+				}
+				payload.Prompt = payload.Quality
+			default:
+				if payload.Complexity != nil {
+					t.Errorf("unexpected explicit planning level: %s", payload.Complexity)
+				}
+			}
+			input = payload.ImageRequest
 		case "/v1/images/edits":
 			r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 			reader, err := r.MultipartReader()
@@ -126,14 +143,31 @@ func TestAdvancedImageQualities(t *testing.T) {
 		}
 		return view
 	}
-	legacy, err := submit("low")
+	// Seed the old schema without calling the current generated INSERT.
+	legacyID := uuid.New()
+	legacyCharge, err := f.services.Credits.Charge(f.ctx, actor.ID, "task-charge:"+legacyID.String(), legacyID,
+		credits.QuoteInput{ModelID: &model.ID, Operation: "generate", Quality: "low", Size: "1024x1024", Count: 1})
 	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(f.ctx, `
+		INSERT INTO image_tasks(id,user_id,conversation_id,message_id,user_message_id,model_id,model_name,operation,prompt,params,
+			quality,size,image_count,charge_id,unit_price,total_cost,idempotency_key,request_hash,split_requests,timeout_seconds,queue_deadline)
+		VALUES($1,$2,$3,$4,$5,$6,$7,'generate','low','{}','low','1024x1024',1,$8,5,5,$9,'legacy-fixture',false,30,now()+interval '5 minutes')`,
+		legacyID, actor.ID, conversation.ID, uuid.New(), uuid.New(), model.ID, model.DisplayName, legacyCharge.ID, legacyID.String()); err != nil {
+		t.Fatal(err)
+	}
+	if err := query.New(f.pool).CreateImageTaskItem(f.ctx, query.CreateImageTaskItemParams{TaskID: legacyID}); err != nil {
 		t.Fatal(err)
 	}
 	if err := migrations.Up(f.ctx, f.pool); err != nil {
 		t.Fatal(err)
 	}
-	reference := *finish(legacy.ID, "low", "generate", 5).Items[0].FileID
+	legacy := finish(legacyID, "low", "generate", 5)
+	if legacy.Complexity != "" {
+		t.Fatalf("legacy task unexpectedly has a planning level: %q", legacy.Complexity)
+	}
+	reference := *legacy.Items[0].FileID
 	legacyQuote, err := f.services.Credits.Quote(f.ctx, credits.QuoteInput{Operation: "generate", Quality: "low", Size: "1024x1024", Count: 1})
 	if err != nil || legacyQuote.UnitPrice != 5 {
 		t.Fatalf("legacy pricing changed: %+v, %v", legacyQuote, err)
@@ -154,7 +188,8 @@ func TestAdvancedImageQualities(t *testing.T) {
 	}
 	config.Version = model.Version
 	config.Capabilities.Qualities = []string{"low", "medium", "high", "xhigh", "max"}
-	if _, err := f.services.Catalog.SaveModel(f.ctx, admin, model.ID, config); err != nil {
+	model, err = f.services.Catalog.SaveModel(f.ctx, admin, model.ID, config)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := submit("max"); creditCode(err) != "PRICE_UNAVAILABLE" {
@@ -190,5 +225,81 @@ func TestAdvancedImageQualities(t *testing.T) {
 	usage, err := f.services.Credits.Usage(f.ctx, actor.ID)
 	if err != nil || usage.ImagesByQuality["xhigh"] != 1 || usage.ImagesByQuality["max"] != 1 {
 		t.Fatalf("advanced image usage=%+v error=%v", usage, err)
+	}
+
+	t.Run("planning level validation, persistence and refund", func(t *testing.T) {
+		initial := creditBalance(t, f, actor.ID)
+		input := images.Input{
+			ConversationID: conversation.ID, ModelID: model.ID, Prompt: "planning",
+			Quality: "low", Size: "1024x1024", Count: 1, Complexity: "medium",
+		}
+		if _, err := service.Submit(f.ctx, actor, uuid.NewString(), input); creditCode(err) != "IMAGE_COMPLEXITY_UNSUPPORTED" {
+			t.Fatalf("disabled planning level should be rejected: %v", err)
+		}
+		config.Version = model.Version
+		config.Capabilities.SupportsComplexity = true
+		enabled, err := f.services.Catalog.SaveModel(f.ctx, admin, model.ID, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		invalid := input
+		invalid.Complexity = "xhigh"
+		if _, err := service.Submit(f.ctx, actor, uuid.NewString(), invalid); creditCode(err) != "INVALID_INPUT" {
+			t.Fatalf("invalid planning level should be rejected: %v", err)
+		}
+		if after := creditBalance(t, f, actor.ID); after.Total != initial.Total {
+			t.Fatalf("rejected requests charged %d credits", initial.Total-after.Total)
+		}
+
+		key := uuid.NewString()
+		task, err := service.Submit(f.ctx, actor, key, input)
+		if err != nil || task.Complexity != input.Complexity {
+			t.Fatalf("submit: complexity = %q, error = %v", task.Complexity, err)
+		}
+		replay, err := service.Submit(f.ctx, actor, key, input)
+		if err != nil || replay.ID != task.ID || replay.Complexity != input.Complexity {
+			t.Fatalf("replay: task = %v, complexity = %q, error = %v", replay.ID, replay.Complexity, err)
+		}
+		different := input
+		different.Complexity = "high"
+		if _, err := service.Submit(f.ctx, actor, key, different); creditCode(err) != "IDEMPOTENCY_CONFLICT" {
+			t.Fatalf("changing planning level should change the request identity: %v", err)
+		}
+		if completed := finish(task.ID, "low", "generate", 5); completed.Complexity != input.Complexity {
+			t.Fatalf("completed task lost planning level: %q", completed.Complexity)
+		}
+
+		beforeQueued := creditBalance(t, f, actor.ID)
+		queued, err := service.Submit(f.ctx, actor, uuid.NewString(), different)
+		if err != nil {
+			t.Fatal(err)
+		}
+		config.Version = enabled.Version
+		config.Capabilities.SupportsComplexity = false
+		if _, err := f.services.Catalog.SaveModel(f.ctx, admin, model.ID, config); err != nil {
+			t.Fatal(err)
+		}
+		claim, claimed, err := service.Claim(f.ctx, queued.ID)
+		if err != nil || !claimed {
+			t.Fatalf("claim=%v error=%v", claimed, err)
+		}
+		service.Execute(f.ctx, claim)
+		view, err := service.Get(f.ctx, actor, queued.ID, false)
+		if err != nil || view.Status != "failed" || view.ErrorCode != "IMAGE_COMPLEXITY_UNSUPPORTED" ||
+			view.RefundedCost != view.TotalCost || view.ActualCost != 0 {
+			t.Fatalf("disabled planning level should fail and refund: %+v, %v", view, err)
+		}
+		if after := creditBalance(t, f, actor.ID); after.Total != beforeQueued.Total {
+			t.Fatalf("queued task refund was not applied: before=%d after=%d", beforeQueued.Total, after.Total)
+		}
+	})
+}
+
+func TestImageComplexityInput(t *testing.T) {
+	for _, input := range []string{`null`, `""`, `"auto"`, `"xhigh"`, `12`} {
+		var complexity validation.ImageComplexity
+		if err := json.Unmarshal([]byte(input), &complexity); err == nil {
+			t.Errorf("accepted invalid explicit planning level: %s", input)
+		}
 	}
 }
