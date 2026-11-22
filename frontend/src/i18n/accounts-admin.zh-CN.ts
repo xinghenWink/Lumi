@@ -21,6 +21,7 @@ export default {
       registered: '注册时间',
       lastLogin: '最近登录',
       identity: '账号',
+      userInfo: '用户信息',
       id: '用户 ID',
       ip: '最近登录 IP',
       edit: '编辑用户',

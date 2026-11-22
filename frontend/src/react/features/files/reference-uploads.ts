@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useState } from 'react'
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 import type { QueryClient } from '@tanstack/react-query'
-import { images, type ImageFile } from '../../../api/images'
+import type { ImageFile } from '../../../api/images'
 import { useRuntime } from '../../app/context'
 import type { AppRuntime } from '../../app/runtime'
 import { screenFiles, type Rejections } from './reference-rules'
@@ -143,14 +143,14 @@ export function createReferenceUploads(session: Session, client: QueryClient, up
     /** Number of slots taken by committed references and unfinished uploads. */
     used: () => options.ids.length + pending().length,
     add(files: Iterable<File>) {
-      if (!options.enabled || !live()) return
+      if (!options.enabled || !live()) return 0
       const { accepted, rejected } = screenFiles(
         files,
         options.limit - options.ids.length - pending().length,
         options.maxBytes,
       )
       showNotice(rejected)
-      if (!accepted.length) return
+      if (!accepted.length) return 0
       watch()
       const added = accepted.map((file) => ({
         key: 'upload-' + ++sequence,
@@ -160,6 +160,7 @@ export function createReferenceUploads(session: Session, client: QueryClient, up
       }))
       store.setState((state) => ({ items: [...state.items, ...added] }))
       pump()
+      return accepted.length
     },
     retry(key: string) {
       const item = items().find((entry) => entry.key === key)
@@ -205,9 +206,10 @@ export type ReferenceUploads = ReturnType<typeof createReferenceUploads>
 export function useReferenceUploads(options: UploadOptions) {
   const runtime = useRuntime()
   const [uploads] = useState(() =>
-    createReferenceUploads(runtime.session, runtime.queryClient, (file, signal) =>
-      images.upload(file, signal),
-    ),
+    createReferenceUploads(runtime.session, runtime.queryClient, async (file, signal) => {
+      const { images } = await import('../../../api/images')
+      return images.upload(file, signal)
+    }),
   )
   useLayoutEffect(() => {
     uploads.configure(options)

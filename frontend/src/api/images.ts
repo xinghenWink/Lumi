@@ -1,10 +1,14 @@
 import type { components } from './schema'
+import { parseImageComplexity } from './image-complexity'
+import { parseImageQuality } from './image-quality'
 import { authorized, authorizedResponse } from './protected'
 import { ApiError, noContent, record } from './transport'
 import { parsePage } from './catalog-contracts'
+import { parseAdminUserFields } from './response-fields'
 type S = components['schemas']
 export type ImageFile = S['ImageFile']
 export type ImageTask = S['ImageTask']
+export type AdminImageTask = S['AdminImageTask']
 export type ImageInput = S['ImageTaskInput']
 export type ImageEditOptions = S['ImageEditOptions']
 export type ImageConversation = S['ImageConversation']
@@ -12,6 +16,8 @@ export type ImageConfiguration = S['ImageConfiguration']
 export type ImageResolutionPreset = S['ImageResolutionPreset']
 export type GalleryItem = S['ImageGalleryItem']
 export type ImagePage<T> = { items: T[]; next_cursor: string }
+const fixedRatios = ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16'] as const
+export const imageRatios = ['auto', ...fixedRatios] as const
 const str = (v: unknown): string => {
   if (typeof v !== 'string') throw new ApiError('RESPONSE_INVALID')
   return v
@@ -46,7 +52,7 @@ export function parseFile(v: unknown): ImageFile {
   return {
     id: str(d.id),
     kind: choice(d.kind, ['upload', 'generated', 'thumbnail', 'avatar', 'edit_guide']),
-    mime: choice(d.mime, ['image/png']),
+    mime: choice(d.mime, ['image/png', 'image/gif']),
     size: num(d.size),
     width: num(d.width),
     height: num(d.height),
@@ -85,7 +91,7 @@ export function parseImageConfiguration(v: unknown): ImageConfiguration {
           resolution_presets: list(d.resolution_presets, (item) => {
             const preset = record(item)
             return {
-              ratio: choice(preset.ratio, ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16']),
+              ratio: choice(preset.ratio, fixedRatios),
               resolution: choice(preset.resolution, ['1k', '2k', '4k']),
               size: str(preset.size),
             }
@@ -94,9 +100,7 @@ export function parseImageConfiguration(v: unknown): ImageConfiguration {
     ...(d.disabled_ratios === undefined
       ? {}
       : {
-          disabled_ratios: list(d.disabled_ratios, (item) =>
-            choice(item, ['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16']),
-          ),
+          disabled_ratios: list(d.disabled_ratios, (item) => choice(item, imageRatios)),
         }),
     ...(d.disabled_resolutions === undefined
       ? {}
@@ -126,11 +130,15 @@ export function parseTask(v: unknown): ImageTask {
     model_name: str(d.model_name),
     prompt: str(d.prompt),
     operation: choice(d.operation, ['generate', 'edit']),
-    quality: choice(d.quality, ['low', 'medium', 'high']),
+    quality: parseImageQuality(d.quality),
     size: str(d.size),
     ratio: str(d.ratio),
     n: num(d.n),
     reference_file_ids: list(d.reference_file_ids, str),
+    ...(d.complexity === undefined ? {} : { complexity: parseImageComplexity(d.complexity) }),
+    ...(d.output_format === undefined
+      ? {}
+      : { output_format: choice(d.output_format, ['png', 'gif']) }),
     ...(edit
       ? {
           edit_options: {
@@ -165,6 +173,10 @@ export function parseTask(v: unknown): ImageTask {
     }),
   }
 }
+function parseAdminTask(v: unknown): AdminImageTask {
+  const d = record(v)
+  return { ...parseTask(d), ...parseAdminUserFields(d) }
+}
 export function parseGallery(v: unknown): GalleryItem {
   const d = record(v)
   return {
@@ -174,7 +186,7 @@ export function parseGallery(v: unknown): GalleryItem {
     model_id: str(d.model_id),
     model_name: str(d.model_name),
     prompt: str(d.prompt),
-    quality: choice(d.quality, ['low', 'medium', 'high']),
+    quality: parseImageQuality(d.quality),
     size: str(d.size),
     ratio: str(d.ratio),
     status: str(d.status),
@@ -267,10 +279,12 @@ export const images = {
     authorized(root + '/image-tasks', parseTask, { method: 'POST', body, idempotencyKey: key }),
   task: (id: string, admin = false, signal?: AbortSignal) =>
     authorized(task(id, admin), parseTask, signalOptions(signal)),
-  tasks: (q: URLSearchParams, admin = false, signal?: AbortSignal) =>
+  tasks: (q: URLSearchParams, signal?: AbortSignal) =>
+    authorized(root + '/image-tasks?' + q, (v) => parsePage(v, parseTask), signalOptions(signal)),
+  adminTasks: (q: URLSearchParams, signal?: AbortSignal) =>
     authorized(
-      root + (admin ? '/admin' : '') + '/image-tasks?' + q,
-      (v) => parsePage(v, parseTask),
+      root + '/admin/image-tasks?' + q,
+      (v) => parsePage(v, parseAdminTask),
       signalOptions(signal),
     ),
   cancel: (id: string) => authorized(task(id) + '/cancel', parseTask, { method: 'POST' }),
@@ -322,7 +336,7 @@ export const images = {
     )
     if (
       response.headers.get('Content-Type')?.split(';')[0] !==
-      (thumbnail ? 'image/webp' : 'image/png')
+      (thumbnail ? 'image/webp' : current.mime)
     )
       throw new ApiError('RESPONSE_INVALID')
     return response.blob()

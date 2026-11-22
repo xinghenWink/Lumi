@@ -19,13 +19,14 @@ import (
 )
 
 type RunInput struct {
-	Version int64     `json:"version"`
-	NodeID  uuid.UUID `json:"node_id"`
-	ModelID uuid.UUID `json:"model_id"`
-	Quality string    `json:"quality"`
-	Size    string    `json:"size"`
-	Ratio   string    `json:"ratio"`
-	Count   int32     `json:"n"`
+	Version    int64                      `json:"version"`
+	NodeID     uuid.UUID                  `json:"node_id"`
+	ModelID    uuid.UUID                  `json:"model_id"`
+	Quality    string                     `json:"quality"`
+	Complexity validation.ImageComplexity `json:"complexity,omitempty"`
+	Size       string                     `json:"size"`
+	Ratio      string                     `json:"ratio"`
+	Count      int32                      `json:"n"`
 }
 
 type Run struct {
@@ -78,7 +79,7 @@ func (s *Service) Run(ctx context.Context, imageService *images.Service, actor u
 		}
 		return images.Input{
 			ConversationID: row.ConversationID, ModelID: input.ModelID, Prompt: prompt,
-			Quality: input.Quality, Size: input.Size, Ratio: input.Ratio, Count: input.Count, ReferenceFileIDs: files,
+			Quality: input.Quality, Complexity: input.Complexity, Size: input.Size, Ratio: input.Ratio, Count: input.Count, ReferenceFileIDs: files,
 		}, nil
 	}
 	attach := func(q *query.Queries, task query.ImageTask) error {

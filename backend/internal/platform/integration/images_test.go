@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -10,6 +11,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/gif"
 	"image/png"
 	"io"
 	"net/http"
@@ -26,12 +28,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
+	"github.com/xinghenWink/Lumi/backend/internal/credits"
 	"github.com/xinghenWink/Lumi/backend/internal/images"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/user"
 )
 
 func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
+	const encodedGIF = "R0lGODlhBAADAIAAAP8AAAD/ACH/C05FVFNDQVBFMi4wAwEAAAAh+QQAFAAAACwAAAAABAADAAACCgRBEARBEARBEAUAIfkEAB4AAAAsAAAAAAQAAwAAAgoMwzAMwzAMwzAFADs="
+	animationBytes, err := base64.StdEncoding.DecodeString(encodedGIF)
+	if err != nil {
+		t.Fatal(err)
+	}
 	f := newAccountFixture(t)
 	admin := creditActor(t, f)
 	service := f.services.Images
@@ -78,9 +86,11 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 		}
 		var input struct {
 			Prompt string `json:"prompt"`
+			Size   string `json:"size"`
 			Count  int    `json:"n"`
+			Output string `json:"output_format"`
 		}
-		var guideFound bool
+		var guideFound, pngReference bool
 		var background, output string
 		if r.URL.Path == "/v1/images/edits" {
 			edits.Add(1)
@@ -110,6 +120,7 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 					references++
 					decoded, decodeErr := png.Decode(bytes.NewReader(data))
 					if decodeErr == nil {
+						pngReference = true
 						_, green, _, _ := decoded.At(1, 0).RGBA()
 						guideFound = green == 235*257
 					}
@@ -118,6 +129,8 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 					input.Prompt = string(data)
 				}
 				switch part.FormName() {
+				case "size":
+					input.Size = string(data)
 				case "background":
 					background = string(data)
 				case "output_format":
@@ -131,6 +144,20 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			}
 		} else if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			w.WriteHeader(400)
+			return
+		} else {
+			output = input.Output
+		}
+		if strings.Contains(input.Prompt, "自拍比耶") && (output != "gif" || input.Size != "1024x768" || r.URL.Path != "/v1/images/edits") {
+			w.WriteHeader(422)
+			return
+		}
+		if input.Prompt == "Use saved GIF frame" && !pngReference {
+			w.WriteHeader(422)
+			return
+		}
+		if input.Prompt == "automatic size" && input.Size != "auto" {
+			w.WriteHeader(422)
 			return
 		}
 		if strings.Contains(input.Prompt, "guide request") && !guideFound {
@@ -158,8 +185,11 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 			count = 1
 		}
 		data := make([]map[string]string, 0, count)
-		for range count {
+		for position := range count {
 			item := map[string]string{"b64_json": base64.StdEncoding.EncodeToString(bitmap.Bytes())}
+			if output == "gif" && position == 0 && input.Prompt != "Unexpected still image" {
+				item = map[string]string{"b64_json": "data:image/gif;base64," + encodedGIF}
+			}
 			if input.Prompt == "url" {
 				item = map[string]string{"url": server.URL + "/asset.png"}
 			}
@@ -181,7 +211,7 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	model, err := f.services.Catalog.SaveModel(f.ctx, admin, uuid.Nil, catalog.ModelInput{DisplayName: "平台图片", Type: "image", Enabled: true, Capabilities: catalog.Capabilities{Qualities: []string{"low"}, Sizes: []string{"1024x1024", "auto"}, MaxN: 4, SupportsEdit: true, SupportsTransparentBackground: true, MaxReferenceImages: 4, ResponseFormat: "b64_json"}, Routes: []catalog.RouteInput{{UpstreamID: channel.ID, UpstreamModelName: "private-image-model", Weight: 1, Enabled: true}}})
+	model, err := f.services.Catalog.SaveModel(f.ctx, admin, uuid.Nil, catalog.ModelInput{DisplayName: "平台图片", Type: "image", Enabled: true, Capabilities: catalog.Capabilities{Qualities: []string{"low"}, Sizes: []string{"1024x1024", "1024x768", "auto"}, MaxN: 4, SupportsEdit: true, SupportsTransparentBackground: true, SupportsGIF: true, MaxReferenceImages: 4, ResponseFormat: "b64_json"}, Routes: []catalog.RouteInput{{UpstreamID: channel.ID, UpstreamModelName: "private-image-model", Weight: 1, Enabled: true}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,6 +254,47 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 		}
 		return result
 	}
+	t.Run("model tiers reject unsupported image tasks before charging or dispatch", func(t *testing.T) {
+		modelInput := catalog.ModelInput{DisplayName: "Restricted image fixture", Type: "image", Enabled: true, Capabilities: model.Capabilities, Routes: []catalog.RouteInput{model.Routes[0].RouteInput}}
+		modelInput.Capabilities.UseSizePresets = true
+		modelInput.Capabilities.SupportedResolutions = []string{"1k", "2k"}
+		restricted, err := f.services.Catalog.SaveModel(f.ctx, admin, uuid.Nil, modelInput)
+		if err != nil {
+			t.Fatal(err)
+		}
+		modelInput.Version = restricted.Version
+		modelInput.Capabilities.SupportedResolutions = nil
+		restricted, err = f.services.Catalog.SaveModel(f.ctx, admin, restricted.ID, modelInput)
+		if err != nil || len(restricted.Capabilities.SupportedResolutions) != 2 {
+			t.Fatalf("legacy update did not preserve model restrictions: %+v, %v", restricted.Capabilities, err)
+		}
+		client := f.client(t)
+		login := f.login(t, client, member.Email, "Integration-password-1")
+		request := input("restricted size", 1)
+		request.ModelID, request.Size, request.Ratio = restricted.ID, "3840x2160", "16:9"
+		before := creditBalance(t, f, member.ID)
+		previous := calls.Load()
+		const path = "/api/v1/image-tasks"
+		upload, err := f.services.Files.Upload(f.ctx, actor, "upload", bitmap.Bytes(), 10<<20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, refs := range [][]uuid.UUID{{}, {upload.ID}} {
+			request.ReferenceFileIDs = refs
+			expectStatus(t, f.call(t, client, http.MethodPost, path, login.AccessToken, request, uuid.NewString()), http.StatusBadRequest)
+		}
+		after := creditBalance(t, f, member.ID)
+		if after.Total != before.Total || calls.Load() != previous {
+			t.Fatalf("rejected request affected the balance or upstream: %d to %d", before.Total, after.Total)
+		}
+		request.Size, request.ReferenceFileIDs = "2048x1152", []uuid.UUID{}
+		accepted := f.call(t, client, http.MethodPost, path, login.AccessToken, request, uuid.NewString())
+		expectStatus(t, accepted, http.StatusAccepted)
+		task := decodeReply[images.Task](t, accepted)
+		if task := execute(task.ID); task.Status != "succeeded" || task.Size != request.Size {
+			t.Fatalf("2k was not accepted: %+v", task)
+		}
+	})
 	t.Run("submission needs only one available database connection", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(f.ctx, 5*time.Second)
 		defer cancel()
@@ -377,7 +448,94 @@ func TestImagesAtomicBillingExecutionRecoveryAndFileIsolation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		execute(task.ID)
+		if task := execute(task.ID); task.Status != "succeeded" || task.Ratio != "" {
+			t.Fatalf("legacy auto size did not round trip: %+v", task)
+		}
+		auto.Ratio = "auto"
+		for _, operation := range []string{"generate", "edit"} {
+			if operation == "edit" {
+				auto.ReferenceFileIDs = []uuid.UUID{upload.ID}
+			}
+			quote, err := f.services.Credits.Quote(f.ctx, credits.QuoteInput{ModelID: &model.ID, Operation: operation, Quality: auto.Quality, Size: auto.Size, Count: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			task, err := service.Submit(f.ctx, actor, uuid.NewString(), auto)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if task := execute(task.ID); task.Status != "succeeded" || task.Size != "auto" || task.Ratio != "auto" || task.TotalCost != quote.TotalCost || task.Operation != operation {
+				t.Fatalf("automatic %s did not use the quoted settings: %+v", operation, task)
+			}
+		}
+	})
+	t.Run("GIF edit preserves animation, downloads and billing", func(t *testing.T) {
+		source, err := f.services.Files.Upload(f.ctx, actor, "upload", bitmap.Bytes(), 10<<20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request := input("参考上传图片，生成角色自拍比耶的 GIF 动图", 1)
+		request.ReferenceFileIDs = []uuid.UUID{source.ID}
+		request.Ratio, request.Size = "4:3", "1024x768"
+		submitGIF := func(request images.Input) images.Task {
+			t.Helper()
+			task, err := service.Submit(f.ctx, actor, uuid.NewString(), request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return execute(task.ID)
+		}
+		result := submitGIF(request)
+		if result.Status != "succeeded" || result.OutputFormat != "gif" || result.Ratio != "4:3" || result.ActualCost != result.UnitPrice || result.RefundedCost != 0 {
+			t.Fatalf("GIF task did not settle successfully: %+v", result)
+		}
+		file := result.Items[0].File
+		if file == nil || file.MIME != "image/gif" || file.Width != 4 || file.Height != 3 {
+			t.Fatalf("invalid GIF file: %+v", file)
+		}
+		client := f.client(t)
+		login := f.login(t, client, member.Email, "Integration-password-1")
+		original := f.call(t, client, "GET", file.URL, login.AccessToken, nil)
+		expectStatus(t, original, 200)
+		if original.header.Get("Content-Type") != "image/gif" || !strings.Contains(original.header.Get("Content-Disposition"), file.ID.String()+".gif") || !bytes.Equal(original.body, animationBytes) {
+			t.Fatal("HTTP result did not preserve GIF bytes and filename")
+		}
+		animation, err := gif.DecodeAll(bytes.NewReader(original.body))
+		if err != nil || len(animation.Image) != 2 {
+			t.Fatalf("animation playback frames missing: %v", err)
+		}
+		thumb := f.call(t, client, "GET", file.ThumbnailURL, login.AccessToken, nil)
+		expectStatus(t, thumb, 200)
+		if thumb.header.Get("Content-Type") != "image/webp" {
+			t.Fatal("thumbnail is not WebP")
+		}
+		download := f.call(t, client, "POST", "/api/v1/me/images/batch-download", login.AccessToken, map[string][]uuid.UUID{"ids": {file.ID, partial.Items[0].File.ID}})
+		expectStatus(t, download, 200)
+		archive, err := zip.NewReader(bytes.NewReader(download.body), int64(len(download.body)))
+		if err != nil || len(archive.File) != 2 || archive.File[0].Name != file.ID.String()+".gif" || !strings.HasSuffix(archive.File[1].Name, ".png") {
+			t.Fatalf("invalid mixed-format archive: %v", err)
+		}
+		entry, err := archive.File[0].Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		content, readErr := io.ReadAll(entry)
+		closeErr := entry.Close()
+		if readErr != nil || closeErr != nil || !bytes.Equal(content, animationBytes) {
+			t.Fatalf("archive changed GIF: read=%v close=%v", readErr, closeErr)
+		}
+		request.Prompt, request.OutputFormat = "Use saved GIF frame", "png"
+		request.ReferenceFileIDs = []uuid.UUID{file.ID}
+		reused := submitGIF(request)
+		if reused.Status != "succeeded" || reused.Items[0].File.MIME != "image/png" {
+			t.Fatalf("GIF could not be reused as a still reference: %+v", reused)
+		}
+		partialGIF := input("Explicit GIF with two outputs", 2)
+		partialGIF.OutputFormat = "gif"
+		mixed := submitGIF(partialGIF)
+		if mixed.Status != "partial" || mixed.RefundedCost != mixed.UnitPrice || mixed.Items[1].ErrorCode != "IMAGE_RESULT_INVALID" {
+			t.Fatalf("non-GIF output did not receive an exact partial refund: %+v", mixed)
+		}
 	})
 	t.Run("editor guides are private and edit results are validated before settlement", func(t *testing.T) {
 		source, err := f.services.Files.Upload(f.ctx, actor, "upload", bitmap.Bytes(), 10<<20)

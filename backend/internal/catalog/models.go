@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
+	"github.com/xinghenWink/Lumi/backend/internal/imageresolution"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/pagination"
@@ -38,18 +39,29 @@ func validSize(value string) bool {
 	return true
 }
 func validCapabilities(kind string, c Capabilities) bool {
-	if c.SupportsTransparentBackground && (kind != "image" || !c.SupportsEdit) {
+	if (c.SupportsTransparentBackground && (kind != "image" || !c.SupportsEdit)) || ((c.SupportsGIF || c.SupportsComplexity) && kind != "image") {
 		return false
 	}
 	if kind == "chat" {
-		return c.MaxContextTokens >= 1 && c.MaxContextTokens <= 1000000
+		return c.SupportedResolutions == nil && c.MaxContextTokens >= 1 && c.MaxContextTokens <= 1000000
 	}
-	if kind != "image" || len(c.Qualities) < 1 || len(c.Qualities) > 3 || (!c.UseSizePresets && len(c.Sizes) < 1) || len(c.Sizes) > 20 || c.MaxN < 1 || c.MaxN > 10 || c.MaxReferenceImages < 0 || (c.SupportsEdit && c.MaxReferenceImages == 0) || (c.ResponseFormat != "b64_json" && c.ResponseFormat != "url") {
+	if kind != "image" || len(c.Qualities) < 1 || (!c.UseSizePresets && len(c.Sizes) < 1) || len(c.Sizes) > 20 || c.MaxN < 1 || c.MaxN > 10 || c.MaxReferenceImages < 0 || (c.SupportsEdit && c.MaxReferenceImages == 0) || (c.ResponseFormat != "b64_json" && c.ResponseFormat != "url") {
 		return false
+	}
+	if resolutions := c.SupportedResolutions; resolutions != nil {
+		tiers := imageresolution.Tiers()
+		if len(resolutions) == 0 || len(resolutions) > len(tiers) {
+			return false
+		}
+		for i, tier := range resolutions {
+			if !slices.Contains(tiers, tier) || slices.Contains(resolutions[:i], tier) {
+				return false
+			}
+		}
 	}
 	seen := map[string]bool{}
 	for _, value := range c.Qualities {
-		if !slices.Contains([]string{"low", "medium", "high"}, value) || seen[value] {
+		if !validation.ImageQuality(value) || seen[value] {
 			return false
 		}
 		seen[value] = true
@@ -196,9 +208,13 @@ func writeModel(ctx context.Context, q *query.Queries, id uuid.UUID, input Model
 		if old.Type != input.Type {
 			return Model{}, nil, problem.Invalid()
 		}
-		before, err = modelView(ctx, q, old)
+		previous, err := modelView(ctx, q, old)
 		if err != nil {
 			return Model{}, nil, err
+		}
+		before = previous
+		if input.Capabilities.SupportedResolutions == nil {
+			input.Capabilities.SupportedResolutions = previous.Capabilities.SupportedResolutions
 		}
 	}
 	var previousDefault any

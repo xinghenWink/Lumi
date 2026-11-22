@@ -4,7 +4,6 @@ import { lazy, Suspense, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { chats, type Conversation } from '../../../api/chat'
-import { images } from '../../../api/images'
 import { useSession } from '../../features/auth/hooks'
 import { ApiNotice } from './ApiNotice'
 import { Input } from '../ui/input'
@@ -44,7 +43,9 @@ export function HistorySidebar({ onNavigate }: { onNavigate?: (() => void) | und
     enabled: !!user && !canvas,
     queryFn: async ({ pageParam, signal }): Promise<HistoryPage> => {
       const params = new URLSearchParams({ search: applied, limit: '50', cursor: pageParam })
-      return image ? images.conversations(params, signal) : chats.list(params, signal)
+      if (!image) return chats.list(params, signal)
+      const { images } = await import('../../../api/images')
+      return images.conversations(params, signal)
     },
     getNextPageParam: (last) => last.next_cursor || undefined,
   })

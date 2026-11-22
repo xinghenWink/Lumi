@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
-import { defaultCapabilities } from '../../src/api/catalog-contracts'
-import type { ImageFile, ImageInput, ImageTask } from '../../src/api/images'
+import { defaultCapabilities, type Capabilities } from '../../src/api/catalog-contracts'
+import type { ImageConfiguration, ImageFile, ImageInput, ImageTask } from '../../src/api/images'
 import { conversation, task } from '../../src/features/images/test-fixtures'
 import { fixturePNG } from '../image-fixture'
 
@@ -19,7 +19,10 @@ const sourceTasks: ImageTask[] = [
   },
 ]
 
-async function mockImageAPI(page: Page) {
+async function mockImageAPI(
+  page: Page,
+  overrides: { options?: Partial<ImageConfiguration>; capabilities?: Partial<Capabilities> } = {},
+) {
   const user = {
     id: task.user_id,
     timezone: 'Asia/Shanghai',
@@ -46,6 +49,7 @@ async function mockImageAPI(page: Page) {
     retention_days: 0,
     admin_can_view_content: false,
     version: 1,
+    ...overrides.options,
   }
   const png = fixturePNG()
   function file(id: string, kind: ImageFile['kind'] = 'generated'): ImageFile {
@@ -130,6 +134,7 @@ async function mockImageAPI(page: Page) {
             max_n: 2,
             supports_edit: true,
             max_reference_images: 3,
+            ...overrides.capabilities,
           },
         })),
       })
@@ -212,6 +217,113 @@ async function openGallery(page: Page) {
   if (await menu.isVisible()) await menu.click()
   await page.getByRole('link', name('我的图库')).click()
 }
+
+test('keeps image quality cards stable while quotes for new parameters are pending', async ({
+  page,
+}, info) => {
+  const api = await mockImageAPI(page, {
+    options: {
+      disabled_ratios: ['auto'],
+      resolution_presets: [
+        { ratio: '1:1', resolution: '1k', size: '1024x1024' },
+        { ratio: '3:2', resolution: '1k', size: '1536x1024' },
+        { ratio: '3:2', resolution: '2k', size: '2016x1344' },
+      ],
+    },
+    capabilities: { use_size_presets: true, qualities: ['low', 'medium', 'high', 'xhigh', 'max'] },
+  })
+  const gates = new Map<string, Promise<void>>()
+  const quotePath = '**/api/v1/me/credits/quote'
+  await page.route(quotePath, async (route) => {
+    const { size, count, quality } = route.request().postDataJSON() as {
+      size: string
+      count: number
+      quality: ImageInput['quality']
+    }
+    // Let one tier resolve early, while the remaining requests are still in flight.
+    if (quality !== 'high') await gates.get(`${size}/${count}`)
+    if (count === 2 && quality === 'max')
+      return route.fulfill({ status: 409, json: { code: 'PRICE_UNAVAILABLE' } })
+    const unitPrice = size === '2016x1344' ? 20 : size === '1536x1024' ? 12 : 10
+    return route.fulfill({ json: { unit_price: unitPrice, total_cost: unitPrice * count, count } })
+  })
+  const releaseGates: Array<() => void> = []
+  function holdQuote(size: string, count: number) {
+    const key = `${size}/${count}`
+    let release = () => {}
+    gates.set(key, new Promise<void>((resolve) => (release = resolve)))
+    releaseGates.push(release)
+    return () => {
+      gates.delete(key)
+      release()
+    }
+  }
+
+  await page.goto('/create/' + workspace.id)
+  await prompt(page).fill('Keep the latest image parameters')
+  const send = page.getByRole('button', { ...name('开始生成'), includeHidden: true })
+  await expect(send).toBeEnabled()
+  const mobile = info.project.name.includes('mobile')
+  if (mobile) await page.getByRole('button', name('生图参数')).click()
+  const parameters = page.getByRole(mobile ? 'dialog' : 'region', name('生图参数'))
+  const qualities = parameters.getByRole('radiogroup', name('质量'))
+  const radio = (quality: string) => qualities.getByRole('radio', name(quality))
+  const estimate = page.getByText(/^预计 \d+ 积分$/)
+  const qualityLabels = ['标准', '精细', '高清', '超高', '最高']
+  await expect(estimate).toHaveText('预计 10 积分')
+  await expect(radio('精细')).toBeChecked()
+  const layout = () =>
+    qualities.evaluate((group) => ({
+      id: group.getAttribute('aria-labelledby'),
+      width: group.clientWidth,
+      height: group.clientHeight,
+    }))
+  const originalLayout = await layout()
+  const expectStable = async (selected: string) => {
+    await expect(qualities.locator('label')).toHaveText(qualityLabels)
+    await expect(radio(selected)).toBeChecked()
+    await expect(radio(selected)).toBeEnabled()
+    expect(await layout()).toEqual(originalLayout)
+    await expect(estimate).toHaveCount(0)
+    await expect(send).toBeDisabled()
+  }
+
+  try {
+    const releaseRatio = holdQuote('1536x1024', 1)
+    await parameters.getByRole('radio', name('3:2')).check()
+    await expectStable('精细')
+    releaseRatio()
+    await expect(estimate).toHaveText('预计 12 积分')
+
+    const releaseResolution = holdQuote('2016x1344', 1)
+    await parameters.getByLabel('分辨率', { exact: true }).selectOption('2016x1344')
+    await expectStable('精细')
+    await radio('最高').check()
+    await expectStable('最高')
+
+    const releaseCount = holdQuote('2016x1344', 2)
+    await parameters.getByRole('radio', name('2 张')).check()
+    await expectStable('最高')
+    releaseCount()
+    await expect(radio('最高')).toHaveCount(0)
+    await expect(radio('标准')).toBeChecked()
+    await expect(estimate).toHaveText('预计 40 积分')
+    releaseResolution()
+
+    if (mobile) await page.keyboard.press('Escape')
+    await send.click()
+    await expect
+      .poll(() => api.submissions[0]?.body)
+      .toMatchObject({
+        ratio: '3:2',
+        size: '2016x1344',
+        n: 2,
+        quality: 'low',
+      })
+  } finally {
+    for (const release of releaseGates) release()
+  }
+})
 
 test('restores the current gallery image into the open conversation and preserves its draft on regeneration', async ({
   page,

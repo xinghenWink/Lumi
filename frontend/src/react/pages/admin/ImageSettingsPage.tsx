@@ -44,7 +44,7 @@ function PresetSwitches({
 }) {
   const { t } = useTranslation()
   const presets: ImageResolutionPreset[] = form.resolution_presets ?? []
-  const ratios = [...new Set(presets.map((preset) => preset.ratio))]
+  const ratios = ['auto' as const, ...new Set(presets.map((preset) => preset.ratio))]
   const resolutions = [...new Set(presets.map((preset) => preset.resolution))]
   const disabledRatios = form.disabled_ratios ?? []
   const disabledResolutions = form.disabled_resolutions ?? []
@@ -64,7 +64,7 @@ function PresetSwitches({
               <CheckField
                 key={ratio}
                 role="switch"
-                label={ratio}
+                label={ratio === 'auto' ? t('images.auto') : ratio}
                 checked={checked}
                 disabled={checked && ratios.length - disabledRatios.length === 1}
                 onChange={(enabled) =>

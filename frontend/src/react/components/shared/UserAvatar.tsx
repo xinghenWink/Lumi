@@ -1,6 +1,5 @@
 import { lazy, Suspense } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { images } from '../../../api/images'
 import { useSession } from '../../features/auth/hooks'
 import { Avatar, AvatarFallback } from '../ui/avatar'
 const ProtectedImage = lazy(() =>
@@ -13,7 +12,10 @@ export function UserAvatar({ className = '' }: { className?: string }) {
   const query = useQuery({
     queryKey: ['user', user?.id, 'file', id],
     enabled: !!user && !!id,
-    queryFn: ({ signal }) => images.file(id ?? '', signal),
+    queryFn: async ({ signal }) => {
+      const { images } = await import('../../../api/images')
+      return images.file(id ?? '', signal)
+    },
   })
 
   const fallback = (

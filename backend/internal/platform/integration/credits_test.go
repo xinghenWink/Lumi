@@ -109,6 +109,20 @@ func TestM7CurrentBalanceReadDoesNotWaitForFinancialWrites(t *testing.T) {
 func TestM2CreditConsistency(t *testing.T) {
 	f := newAccountFixture(t)
 	actor := creditActor(t, f)
+	t.Run("new installations have ten global prices", func(t *testing.T) {
+		prices, err := f.services.Credits.Pricing(f.ctx)
+		if err != nil || len(prices.Rules) != 10 {
+			t.Fatalf("initial pricing rules: %+v, %v", prices.Rules, err)
+		}
+		for _, rule := range prices.Rules {
+			if rule.ModelID != nil || !rule.Enabled {
+				t.Fatalf("unexpected initial pricing rule: %+v", rule)
+			}
+			if (rule.Quality == "xhigh" || rule.Quality == "max") && rule.CreditsPerImage != 10 {
+				t.Fatalf("advanced rule should use the starter high price: %+v", rule)
+			}
+		}
+	})
 	t.Run("registration gifts are atomic and zero stays zero", func(t *testing.T) {
 		cfg, err := f.services.Settings.Read(f.ctx)
 		if err != nil {
@@ -340,7 +354,9 @@ func TestM2CreditConsistency(t *testing.T) {
 	t.Run("precision model overrides disabled rules and free settlement", func(t *testing.T) {
 		prices := creditPricing(t, f, actor, 0)
 		prices.Configuration.EditMultiplier = "1.10"
-		prices.Configuration.SizeMultipliers["1024x1024"] = "1.25"
+		prices.Configuration.SizeMultipliers["1k"] = "1.25"
+		prices.Configuration.SizeMultipliers["2k"] = "1.50"
+		prices.Configuration.SizeMultipliers["4k"] = "2.00"
 		model := uuid.New()
 		prices.Rules = append(prices.Rules, credits.Rule{ModelID: &model, Operation: "edit", Quality: "medium", CreditsPerImage: 7, Enabled: true})
 		if _, err := f.services.Credits.SavePricing(f.ctx, actor, prices); err != nil {
@@ -350,16 +366,53 @@ func TestM2CreditConsistency(t *testing.T) {
 		if err != nil || quote.UnitPrice != 10 || quote.TotalCost != 30 {
 			t.Fatalf("precise quote=%+v error=%v", quote, err)
 		}
+		for size, want := range map[string]int64{
+			"1536x1024": 10, "720x1280": 10, "auto": 10,
+			"1537x1536": 12, "2560x1440": 12, "2016x1344": 12,
+			"1440x2561": 16, "3840x2160": 16,
+		} {
+			quote, err := f.services.Credits.Quote(f.ctx, credits.QuoteInput{ModelID: &model, Operation: "edit", Quality: "medium", Size: size, Count: 3})
+			if err != nil || quote.UnitPrice != want || quote.TotalCost != 3*want {
+				t.Fatalf("size %s: quote=%+v error=%v, want unit cost %d", size, quote, err, want)
+			}
+		}
+		member := creditMember(t, f, actor, 100)
+		charged, err := f.services.Credits.Charge(f.ctx, member.ID, uuid.NewString(), uuid.New(), credits.QuoteInput{ModelID: &model, Operation: "edit", Quality: "medium", Size: "2016x1344", Count: 3})
+		if err != nil || charged.Quote.TotalCost != 36 {
+			t.Fatalf("edit charge = %+v, %v", charged, err)
+		}
 		prices.Rules[len(prices.Rules)-1].Enabled = false
+		var global *credits.Rule
+		for i := range prices.Rules {
+			if rule := &prices.Rules[i]; rule.ModelID == nil && rule.Operation == "edit" && rule.Quality == "medium" {
+				global = rule
+				break
+			}
+		}
+		if global == nil {
+			t.Fatal("missing global edit price")
+		}
+		base := global.CreditsPerImage
+		global.CreditsPerImage = 6
 		if _, err := f.services.Credits.SavePricing(f.ctx, actor, prices); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.services.Credits.Quote(f.ctx, credits.QuoteInput{ModelID: &model, Operation: "edit", Quality: "medium", Size: "1024x1024", Count: 1}); creditCode(err) != "PRICE_UNAVAILABLE" {
-			t.Fatalf("disabled override=%v", err)
+		fallback := credits.QuoteInput{ModelID: &model, Operation: "edit", Quality: "medium", Size: "1024x1024", Count: 1}
+		if quote, err := f.services.Credits.Quote(f.ctx, fallback); err != nil || quote.TotalCost != 9 {
+			t.Fatalf("disabled override did not use global price: %+v, %v", quote, err)
 		}
-		prices.Rules = prices.Rules[:6]
+		global.Enabled = false
+		if _, err := f.services.Credits.SavePricing(f.ctx, actor, prices); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.services.Credits.Quote(f.ctx, fallback); creditCode(err) != "PRICE_UNAVAILABLE" {
+			t.Fatalf("disabled global price should be unavailable: %v", err)
+		}
+		global.Enabled = true
+		global.CreditsPerImage = base
+		prices.Rules = prices.Rules[:len(prices.Rules)-1]
 		prices.Configuration.EditMultiplier = "1.00"
-		prices.Configuration.SizeMultipliers["1024x1024"] = "1.00"
+		prices.Configuration.SizeMultipliers = map[string]string{"1k": "1.00", "2k": "1.00", "4k": "1.00"}
 		for index := range prices.Rules {
 			if prices.Rules[index].Operation == "generate" && prices.Rules[index].Quality == "high" {
 				prices.Rules[index].CreditsPerImage = 0
@@ -368,16 +421,20 @@ func TestM2CreditConsistency(t *testing.T) {
 		if _, err := f.services.Credits.SavePricing(f.ctx, actor, prices); err != nil {
 			t.Fatal(err)
 		}
-		member := creditMember(t, f, actor, 0)
-		charge, err := f.services.Credits.Charge(f.ctx, member.ID, uuid.NewString(), uuid.New(), credits.QuoteInput{Operation: "generate", Quality: "high", Size: "1024x1024", Count: 3})
+		settlement, err := f.services.Credits.Settle(f.ctx, member.ID, uuid.NewString(), charged.ID, 2)
+		if err != nil || settlement.Refunded != 24 || settlement.Account.Total != 88 {
+			t.Fatalf("edit refund used a different price: %+v, %v", settlement, err)
+		}
+		freeMember := creditMember(t, f, actor, 0)
+		charge, err := f.services.Credits.Charge(f.ctx, freeMember.ID, uuid.NewString(), uuid.New(), credits.QuoteInput{Operation: "generate", Quality: "high", Size: "1024x1024", Count: 3})
 		if err != nil {
 			t.Fatal(err)
 		}
-		settled, err := f.services.Credits.Settle(f.ctx, member.ID, uuid.NewString(), charge.ID, 1)
+		settled, err := f.services.Credits.Settle(f.ctx, freeMember.ID, uuid.NewString(), charge.ID, 1)
 		if err != nil || settled.Refunded != 0 {
 			t.Fatalf("free settlement=%+v error=%v", settled, err)
 		}
-		usage, err := f.services.Credits.Usage(f.ctx, member.ID)
+		usage, err := f.services.Credits.Usage(f.ctx, freeMember.ID)
 		if err != nil || usage.ImagesByQuality["high"] != 2 {
 			t.Fatalf("free usage=%+v error=%v", usage, err)
 		}

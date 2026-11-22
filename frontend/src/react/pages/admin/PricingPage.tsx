@@ -1,19 +1,23 @@
-import { useId, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2 } from 'lucide-react'
+import { ChevronsUpDown, Plus, Trash2 } from 'lucide-react'
 import { credits } from '../../../api/credits'
+import { imageResolutions } from '../../../api/image-resolutions'
 import type { CreditPricing, CreditRule } from '../../../api/credit-contracts'
+import { imageQualities } from '../../../api/image-quality'
 import { ApiError } from '../../../api/transport'
 import { useRuntime } from '../../app/context'
 import { useSession } from '../../features/auth/hooks'
 import { useOwnedMutation } from '../../features/accounts/owned-mutation'
+import { listPricingModels } from '../../features/admin/catalog'
 import { AdminPage } from '../../components/admin/AdminPage'
 import { NumberField } from '../../components/admin/AdminFields'
+import { PricingModelDetails, PricingModelPicker } from '../../components/admin/PricingModelPicker'
 import { Panel } from '../../components/shared/Panel'
 import { PageStatus } from '../../components/shared/PageStatus'
 import { ApiNotice } from '../../components/shared/ApiNotice'
-import { Field, selectClass } from '../../components/ui/field'
+import { Field, FieldGroup, selectClass } from '../../components/ui/field'
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
 
@@ -22,13 +26,20 @@ type RuleDraft = Omit<CreditRule, 'credits_per_image' | 'operation' | 'quality'>
   operation: CreditRule['operation'] | ''
   quality: CreditRule['quality'] | ''
 }
-const ruleDrafts = (value: CreditPricing): RuleDraft[] =>
-  value.rules.map((row) => ({ ...row, credits_per_image: String(row.credits_per_image) }))
-const sizeDrafts = (value: CreditPricing) =>
-  Object.entries(value.configuration.size_multipliers).map(([size, multiplier]) => ({
-    size,
-    multiplier,
+const maxPricingRules = 504
+const ruleDrafts = (value: CreditPricing): RuleDraft[] => {
+  const global = value.rules
+    .filter((row) => row.model_id === null)
+    .sort(
+      (left, right) =>
+        left.operation.localeCompare(right.operation) ||
+        imageQualities.indexOf(left.quality) - imageQualities.indexOf(right.quality),
+    )
+  return [...global, ...value.rules.filter((row) => row.model_id !== null)].map((row) => ({
+    ...row,
+    credits_per_image: String(row.credits_per_image),
   }))
+}
 function PricingForm({ initial }: { initial: CreditPricing }) {
   const runtime = useRuntime(),
     { user } = useSession(),
@@ -36,38 +47,47 @@ function PricingForm({ initial }: { initial: CreditPricing }) {
     id = useId()
   const [configuration, setConfiguration] = useState(() => structuredClone(initial.configuration)),
     [rules, setRules] = useState(() => ruleDrafts(initial)),
-    [sizes, setSizes] = useState(() => sizeDrafts(initial)),
     [notice, setNotice] = useState(false)
+  const [pickerIndex, setPickerIndex] = useState<number | null>(null)
+  const modelTrigger = useRef<HTMLButtonElement>(null)
+  const models = useQuery({
+    queryKey: ['user', user?.id, 'admin-models', 'pricing'],
+    enabled: !!user && (pickerIndex !== null || rules.some((rule) => !!rule.model_id)),
+    queryFn: ({ signal }) => listPricingModels(signal),
+  })
+  const modelsById = useMemo(
+    () => new Map(models.data?.map((model) => [model.id, model])),
+    [models.data],
+  )
+  const activeRule = pickerIndex === null ? undefined : rules[pickerIndex]
   const updateRule = (index: number, patch: Partial<RuleDraft>) =>
     setRules((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)))
   const save = useOwnedMutation(user?.id, async (check) => {
-    const mapping = new Map<string, string>()
-    for (const row of sizes) {
-      const size = row.size.trim()
-      if (!size || mapping.has(size)) throw new ApiError('INVALID_INPUT')
-      mapping.set(size, row.multiplier.trim())
-    }
     const body: CreditPricing = {
       configuration: {
         ...configuration,
         credits_timezone: configuration.credits_timezone.trim(),
         edit_multiplier: configuration.edit_multiplier.trim(),
-        size_multipliers: Object.fromEntries(mapping),
+        size_multipliers: {
+          '1k': configuration.size_multipliers['1k'].trim(),
+          '2k': configuration.size_multipliers['2k'].trim(),
+          '4k': configuration.size_multipliers['4k'].trim(),
+        },
       },
       rules: rules.map((row) => {
         const amount = Number(row.credits_per_image)
+        if (row.model_id === '') throw new ApiError('PRICING_MODEL_REQUIRED')
         if (
           !row.credits_per_image.trim() ||
           !Number.isSafeInteger(amount) ||
           amount < 0 ||
           amount > 1e9 ||
           (row.operation !== 'generate' && row.operation !== 'edit') ||
-          (row.quality !== 'low' && row.quality !== 'medium' && row.quality !== 'high')
+          !row.quality
         )
           throw new ApiError('INVALID_INPUT')
         return {
           ...row,
-          model_id: row.model_id?.trim() || null,
           operation: row.operation,
           quality: row.quality,
           credits_per_image: amount,
@@ -78,7 +98,6 @@ function PricingForm({ initial }: { initial: CreditPricing }) {
     check()
     setConfiguration(result.configuration)
     setRules(ruleDrafts(result))
-    setSizes(sizeDrafts(result))
     setNotice(true)
     runtime.queryClient.setQueryData(['user', user?.id, 'admin-pricing'], result)
     for (const kind of ['credits', 'admin-users', 'image-quote', 'image-options'])
@@ -143,7 +162,7 @@ function PricingForm({ initial }: { initial: CreditPricing }) {
               type="button"
               variant="outline"
               size="sm"
-              disabled={rules.length >= 500}
+              disabled={rules.length >= maxPricingRules}
               onClick={() =>
                 setRules([
                   ...rules,
@@ -165,7 +184,7 @@ function PricingForm({ initial }: { initial: CreditPricing }) {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr>
-                  {['model', 'operation', 'quality', 'unitPrice', 'enabled'].map((key) => (
+                  {['pricingModel', 'operation', 'quality', 'unitPrice', 'enabled'].map((key) => (
                     <th
                       key={key}
                       scope="col"
@@ -182,20 +201,40 @@ function PricingForm({ initial }: { initial: CreditPricing }) {
               <tbody>
                 {rules.map((rule, index) => (
                   <tr key={index} className="border-t border-border">
-                    <td className="min-w-44 p-3">
+                    <td className="min-w-60 p-3">
                       {rule.model_id === null ? (
                         <span className="rounded bg-accent px-2 py-1 text-primary">
                           {t('credits.global')}
                         </span>
                       ) : (
-                        <Input
-                          value={rule.model_id}
-                          aria-label={t('credits.model')}
-                          maxLength={36}
-                          required
-                          placeholder={t('credits.modelHint')}
-                          onChange={(event) => updateRule(index, { model_id: event.target.value })}
-                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          aria-haspopup="dialog"
+                          aria-label={t(
+                            rule.model_id
+                              ? 'credits.changePricingModel'
+                              : 'credits.selectPricingModel',
+                          )}
+                          className="h-auto min-h-10 w-full justify-between gap-3 px-3 py-2"
+                          onClick={(event) => {
+                            modelTrigger.current = event.currentTarget
+                            setPickerIndex(index)
+                          }}
+                        >
+                          {rule.model_id ? (
+                            <PricingModelDetails
+                              modelId={rule.model_id}
+                              model={modelsById.get(rule.model_id)}
+                              catalogLoaded={!!models.data}
+                            />
+                          ) : (
+                            <span className="text-muted-foreground">
+                              {t('credits.selectPricingModel')}
+                            </span>
+                          )}
+                          <ChevronsUpDown aria-hidden="true" size={16} />
+                        </Button>
                       )}
                     </td>
                     <td className="min-w-28 p-3">
@@ -236,19 +275,15 @@ function PricingForm({ initial }: { initial: CreditPricing }) {
                           required
                           value={rule.quality}
                           aria-label={t('credits.quality')}
-                          onChange={(event) => {
-                            const value = event.target.value
-                            if (
-                              value === '' ||
-                              value === 'low' ||
-                              value === 'medium' ||
-                              value === 'high'
-                            )
-                              updateRule(index, { quality: value })
-                          }}
+                          onChange={(event) =>
+                            updateRule(index, {
+                              quality:
+                                imageQualities.find((value) => value === event.target.value) ?? '',
+                            })
+                          }
                         >
                           <option value="">{t('common.none')}</option>
-                          {['low', 'medium', 'high'].map((value) => (
+                          {imageQualities.map((value) => (
                             <option key={value} value={value}>
                               {t(`credits.${value}`)}
                             </option>
@@ -310,68 +345,52 @@ function PricingForm({ initial }: { initial: CreditPricing }) {
             </table>
           </div>
         </Panel>
-        <Panel title={t('credits.sizeMultipliers')}>
-          <div className="mb-4 flex justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={sizes.length >= 20}
-              onClick={() => setSizes([...sizes, { size: '', multiplier: '' }])}
-            >
-              <Plus size={15} />
-              {t('credits.addSize')}
-            </Button>
-          </div>
-          <div className="space-y-4">
-            {sizes.map((row, index) => (
-              <div key={index} className="grid grid-cols-[1fr_1fr_auto] items-end gap-3">
-                <Field id={id + '-size-' + index} label={t('credits.size')}>
-                  <Input
-                    id={id + '-size-' + index}
-                    value={row.size}
-                    maxLength={12}
-                    required
-                    onChange={(event) =>
-                      setSizes((rows) =>
-                        rows.map((item, i) =>
-                          i === index ? { ...item, size: event.target.value } : item,
-                        ),
-                      )
-                    }
-                  />
-                </Field>
-                <Field id={id + '-multiplier-' + index} label={t('credits.multiplier')}>
-                  <Input
-                    id={id + '-multiplier-' + index}
-                    value={row.multiplier}
-                    inputMode="decimal"
-                    maxLength={8}
-                    required
-                    onChange={(event) =>
-                      setSizes((rows) =>
-                        rows.map((item, i) =>
-                          i === index ? { ...item, multiplier: event.target.value } : item,
-                        ),
-                      )
-                    }
-                  />
-                </Field>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={t('credits.removeSize')}
-                  className="text-destructive"
-                  onClick={() => setSizes((rows) => rows.filter((_, i) => i !== index))}
-                >
-                  <Trash2 size={15} />
-                </Button>
-              </div>
+        <Panel
+          title={t('credits.resolutionMultipliers')}
+          description={t('credits.resolutionMultiplierHint')}
+        >
+          <FieldGroup className="grid sm:grid-cols-3">
+            {imageResolutions.map((resolution) => (
+              <Field
+                key={resolution}
+                id={id + '-' + resolution}
+                label={t('images.resolutionTier.' + resolution)}
+              >
+                <Input
+                  id={id + '-' + resolution}
+                  value={configuration.size_multipliers[resolution]}
+                  inputMode="decimal"
+                  maxLength={8}
+                  required
+                  onChange={(event) =>
+                    setConfiguration({
+                      ...configuration,
+                      size_multipliers: {
+                        ...configuration.size_multipliers,
+                        [resolution]: event.target.value,
+                      },
+                    })
+                  }
+                />
+              </Field>
             ))}
-          </div>
+          </FieldGroup>
         </Panel>
       </fieldset>
+      {activeRule?.model_id != null && pickerIndex !== null ? (
+        <PricingModelPicker
+          models={models.data}
+          error={models.error}
+          selected={activeRule.model_id}
+          returnFocus={modelTrigger}
+          onRetry={() => void models.refetch()}
+          onSelect={(model_id) => {
+            updateRule(pickerIndex, { model_id })
+            setPickerIndex(null)
+          }}
+          onClose={() => setPickerIndex(null)}
+        />
+      ) : null}
       <ApiNotice error={save.error} />
       {notice ? (
         <p role="status" className="text-xs text-primary">

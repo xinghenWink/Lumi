@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { credits } from '../../../api/credits'
+import { imageQualities } from '../../../api/image-quality'
 import { useSession } from '../../features/auth/hooks'
 import { Panel } from '../shared/Panel'
 import { ApiNotice } from '../shared/ApiNotice'
@@ -41,7 +42,7 @@ export function CreditUsage() {
             <div>
               <span className="text-xs text-muted-foreground">{t('credits.successfulImages')}</span>
               <div className="mt-3 flex flex-wrap gap-3">
-                {(['low', 'medium', 'high'] as const).map((quality) => (
+                {imageQualities.map((quality) => (
                   <span key={quality} className="text-2xs text-muted-foreground">
                     {t('credits.' + quality)}
                     <strong className="ml-1.5 text-sm text-foreground">

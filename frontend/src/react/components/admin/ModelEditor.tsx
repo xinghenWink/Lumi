@@ -3,7 +3,9 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2 } from 'lucide-react'
 import { catalog } from '../../../api/catalog'
+import { imageQualities } from '../../../api/image-quality'
 import { ApiError } from '../../../api/transport'
+import { imageResolutions } from '../../../api/image-resolutions'
 import {
   defaultCapabilities,
   type Capabilities,
@@ -18,6 +20,8 @@ import { ModalDialog } from '../ui/modal-dialog'
 import { Field, selectClass, textareaClass } from '../ui/field'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
+import { Checkbox } from '../ui/checkbox'
+import { Label } from '../ui/label'
 import { ApiNotice } from '../shared/ApiNotice'
 import { CheckField, NumberField, unboundedCount } from './AdminFields'
 import { SizePicker } from './SizePicker'
@@ -71,6 +75,7 @@ export function ModelEditor({
       ...form,
       routes: form.routes.map((row, i) => (i === index ? { ...row, ...patch } : row)),
     })
+  const resolutions = form.capabilities.supported_resolutions ?? imageResolutions
   const mutation = useOwnedMutation(user?.id, async (check) => {
     if (
       !form.display_name.trim() ||
@@ -132,9 +137,11 @@ export function ModelEditor({
                 className={selectClass}
                 onChange={(event) => {
                   const type = event.target.value === 'image' ? 'image' : 'chat',
-                    capabilities = {
+                    capabilities: Capabilities = {
                       ...defaultCapabilities(type),
-                      ...(type === 'image' ? { use_size_presets: true } : {}),
+                      ...(type === 'image'
+                        ? { use_size_presets: true, supported_resolutions: ['1k'] }
+                        : {}),
                     }
                   setForm({ ...form, type, capabilities })
                 }}
@@ -221,7 +228,7 @@ export function ModelEditor({
                     {t('catalog.qualities')}
                   </legend>
                   <div className="flex flex-wrap gap-6">
-                    {(['low', 'medium', 'high'] as const).map((quality) => (
+                    {imageQualities.map((quality) => (
                       <CheckField
                         key={quality}
                         label={t(`credits.${quality}`)}
@@ -236,6 +243,47 @@ export function ModelEditor({
                       />
                     ))}
                   </div>
+                  {form.capabilities.qualities.some(
+                    (quality) => quality === 'xhigh' || quality === 'max',
+                  ) && (
+                    <p className="text-xs text-muted-foreground">
+                      {t('catalog.advancedQualityPricing')}
+                    </p>
+                  )}
+                </fieldset>
+                <fieldset aria-describedby={id + '-resolutions-hint'}>
+                  <legend className="text-xs text-muted-foreground">
+                    {t('images.supportedResolutions')}
+                  </legend>
+                  <div className="flex flex-wrap gap-x-6">
+                    {imageResolutions.map((resolution) => {
+                      const checked = resolutions.includes(resolution)
+                      const key = id + '-resolution-' + resolution
+                      return (
+                        <Label key={resolution} htmlFor={key} className="min-h-10 gap-3 text-sm">
+                          <Checkbox
+                            id={key}
+                            checked={checked}
+                            disabled={mutation.isPending || (checked && resolutions.length === 1)}
+                            onCheckedChange={(selected) =>
+                              changeCaps({
+                                supported_resolutions:
+                                  selected === true
+                                    ? imageResolutions.filter(
+                                        (tier) => tier === resolution || resolutions.includes(tier),
+                                      )
+                                    : resolutions.filter((tier) => tier !== resolution),
+                              })
+                            }
+                          />
+                          {t('images.resolutionTier.' + resolution)}
+                        </Label>
+                      )
+                    })}
+                  </div>
+                  <p id={id + '-resolutions-hint'} className="text-xs text-muted-foreground">
+                    {t('images.supportedResolutionsHint')}
+                  </p>
                 </fieldset>
                 <CheckField
                   role="switch"
@@ -293,6 +341,16 @@ export function ModelEditor({
                   onChange={(supports_transparent_background) =>
                     changeCaps({ supports_transparent_background })
                   }
+                />
+                <CheckField
+                  label={t('catalog.supportsGif')}
+                  checked={form.capabilities.supports_gif ?? false}
+                  onChange={(supports_gif) => changeCaps({ supports_gif })}
+                />
+                <CheckField
+                  label={t('catalog.supportsComplexity')}
+                  checked={form.capabilities.supports_complexity ?? false}
+                  onChange={(supports_complexity) => changeCaps({ supports_complexity })}
                 />
                 <NumberField
                   label={t('catalog.maxReferences')}

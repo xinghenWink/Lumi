@@ -1,9 +1,17 @@
 import { images, type ImageFile } from '../../../api/images'
+import { ApiError } from '../../../api/transport'
 import { addNodes, capacity, updateNode } from '../../../features/canvas/commands'
 import { DEFAULT_SIZE, fitImage, imageNode, newId } from '../../../features/canvas/document'
 import type { Point } from '../../../features/canvas/geometry'
 import { screenFiles, type Rejections } from '../files/reference-rules'
 import type { CanvasEditor, Placeholder } from './editor'
+
+interface Placement {
+  file: File
+  item: Placeholder
+  target?: string
+  result?: { resolve(): void; reject(error: unknown): void }
+}
 
 const GAP = 24,
   CONCURRENCY = 2
@@ -32,7 +40,7 @@ export function rowAt(point: Point, count: number) {
 export function createCanvasUploads(editor: CanvasEditor, hooks: UploadHooks) {
   const upload = hooks.upload ?? ((file: File, signal: AbortSignal) => images.upload(file, signal))
   const controllers = new Set<AbortController>()
-  const queue: { file: File; item: Placeholder; target?: string }[] = []
+  const queue: Placement[] = []
   let maxBytes: number | undefined
   let running = 0,
     failed = 0,
@@ -52,10 +60,12 @@ export function createCanvasUploads(editor: CanvasEditor, hooks: UploadHooks) {
       controllers.add(controller)
       upload(next.file, controller.signal)
         .then((file) => {
-          if (!active || controller.signal.aborted) return
+          if (!active || controller.signal.aborted)
+            throw new DOMException('Upload canceled', 'AbortError')
           const size = fitImage(file.width, file.height)
           editor.addFiles([file])
-          editor.apply((doc) => {
+          let inserted = ''
+          const changed = editor.apply((doc) => {
             const content = {
               state: 'ready',
               file_id: file.id,
@@ -64,16 +74,25 @@ export function createCanvasUploads(editor: CanvasEditor, hooks: UploadHooks) {
               error_code: '',
             } as const
             const image = imageNode({ x: next.item.rect.x, y: next.item.rect.y, ...size }, content)
-            if (!next.target) return addNodes(doc, [image])
+            if (!next.target) {
+              inserted = image.id
+              return addNodes(doc, [image])
+            }
             return updateNode(doc, next.target, (node) =>
               node.image && node.image.state !== 'pending'
                 ? { ...node, h: fitImage(file.width, file.height, node.w).h, image: content }
                 : node,
             )
           })
+          if (next.result) {
+            if (!changed) throw new ApiError('SKETCH_CANVAS_FULL')
+            editor.select([inserted])
+            next.result.resolve()
+          }
         })
-        .catch(() => {
-          if (active) failed += 1
+        .catch((error: unknown) => {
+          if (next.result) next.result.reject(error)
+          else if (active && !controller.signal.aborted) failed += 1
         })
         .finally(() => {
           controllers.delete(controller)
@@ -115,6 +134,32 @@ export function createCanvasUploads(editor: CanvasEditor, hooks: UploadHooks) {
       pump()
       return accepted.length
     },
+    /** Inserts a centered image and reports completion to the sketch editor. */
+    placeSketch(file: File, center: Point) {
+      return new Promise<void>((resolve, reject) => {
+        if (!active) {
+          reject(new ApiError('SKETCH_UPLOAD_UNAVAILABLE'))
+          return
+        }
+        if (maxBytes !== undefined && file.size > maxBytes) {
+          reject(new ApiError('FILE_TOO_LARGE'))
+          return
+        }
+        if (capacity(editor.state.doc) <= editor.state.placeholders.length) {
+          reject(new ApiError('SKETCH_CANVAS_FULL'))
+          return
+        }
+        const size = fitImage(1, 1)
+        const item = {
+          id: newId(),
+          rect: { x: center.x - size.w / 2, y: center.y - size.h / 2, ...size },
+          preview: URL.createObjectURL(file),
+        }
+        editor.addPlaceholders([item])
+        queue.push({ file, item, result: { resolve, reject } })
+        pump()
+      })
+    },
     /** Accepts files until the cleanup cancels uploads still running. */
     mount() {
       active = true
@@ -122,7 +167,10 @@ export function createCanvasUploads(editor: CanvasEditor, hooks: UploadHooks) {
         active = false
         for (const controller of controllers) controller.abort()
         controllers.clear()
-        for (const { item } of queue.splice(0)) finish(item)
+        for (const { item, result } of queue.splice(0)) {
+          finish(item)
+          result?.reject(new DOMException('Upload canceled', 'AbortError'))
+        }
       }
     },
   }

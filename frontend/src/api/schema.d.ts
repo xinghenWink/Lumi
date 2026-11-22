@@ -400,7 +400,7 @@ export interface paths {
     }
     /** getCreditPricing */
     get: operations['getCreditPricing']
-    /** Atomically replace global/model rules and gift configuration; requires all six global operation/quality rules */
+    /** Update gift configuration and replace pricing rules atomically. The six base global rules are required. Omitted xhigh/max global rules retain their saved values. */
     put: operations['saveCreditPricing']
     post?: never
     delete?: never
@@ -791,7 +791,7 @@ export interface paths {
     put?: never
     /**
      * uploadImageFile
-     * @description One multipart file, magic/decoded dimension checks, PNG re-encoding and WebP thumbnail. Upload and private edit guides <=10MiB and 24 million pixels; avatar <=2MiB.
+     * @description One multipart file, magic/decoded dimension checks, PNG re-encoding and WebP thumbnail. Upload and private edit guides <=10MiB and 24 million pixels; avatar <=2MiB. Sketches from the image workspace and canvas are regular PNG uploads with kind upload.
      */
     post: operations['uploadImageFile']
     delete?: never
@@ -1047,7 +1047,7 @@ export interface paths {
     }
     /**
      * listAdminImageTasks
-     * @description Admin only. Default excludes prompts/reference IDs/file URLs. Content opt-in records an audit on every view.
+     * @description Admin only. Lists task metadata and the current nickname and email of each existing, non-deleted owner. Default excludes prompts/reference IDs/file URLs. Content opt-in records an audit on every view.
      */
     get: operations['listAdminImageTasks']
     put?: never
@@ -1382,7 +1382,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** /api/v1/admin/conversations */
+    /**
+     * /api/v1/admin/conversations
+     * @description Admin only. Lists chat metadata and the current nickname and email of each existing, non-deleted owner. Message content is governed by the content access setting.
+     */
     get: operations['m6_get__api_v1_admin_conversations']
     put?: never
     post?: never
@@ -1782,6 +1785,9 @@ export interface components {
       id: string
       /** Format: uuid */
       user_id: string
+      user_nickname?: string
+      /** Format: email */
+      user_email?: string
       /** Format: uuid */
       model_id: string | null
       /** Format: date-time */
@@ -1990,8 +1996,11 @@ export interface components {
       instructions: string
       /** @enum {string} */
       image_quality: 'low' | 'medium' | 'high'
-      /** @enum {string} */
-      image_ratio: '1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16'
+      /**
+       * @default auto
+       * @enum {string}
+       */
+      image_ratio: 'auto' | '1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16'
       image_count: number
     }
     Health: {
@@ -2246,8 +2255,14 @@ export interface components {
       credits_timezone: string
       /** @description Exact decimal multiplier from 0 to 100; never a binary floating-point amount. */
       edit_multiplier: string
+      /** @description Exact decimal multipliers by resolution tier. Automatic sizing uses the 1k multiplier. */
       size_multipliers: {
-        [key: string]: string
+        /** @description Exact decimal multiplier from 0 to 100. */
+        '1k': string
+        /** @description Exact decimal multiplier from 0 to 100. */
+        '2k': string
+        /** @description Exact decimal multiplier from 0 to 100. */
+        '4k': string
       }
     }
     CreditAccount: {
@@ -2267,13 +2282,24 @@ export interface components {
       /** Format: int64 */
       version: number
     }
+    /** @enum {string} */
+    ImageQuality: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+    /**
+     * @description Image planning level independent of rendering quality.
+     * @enum {string}
+     */
+    ImageComplexity: 'low' | 'medium' | 'high'
+    /** @description An empty value returns all qualities. */
+    ImageQualityFilter: '' | components['schemas']['ImageQuality']
     CreditPricingRule: {
-      /** Format: uuid */
+      /**
+       * Format: uuid
+       * @description Null sets the global default. An enabled model rule takes precedence, otherwise the global rule applies.
+       */
       model_id: string | null
       /** @enum {string} */
       operation: 'generate' | 'edit'
-      /** @enum {string} */
-      quality: 'low' | 'medium' | 'high'
+      quality: components['schemas']['ImageQuality']
       /** Format: int64 */
       credits_per_image: number
       enabled: boolean
@@ -2287,8 +2313,8 @@ export interface components {
       model_id?: string | null
       /** @enum {string} */
       operation: 'generate' | 'edit'
-      /** @enum {string} */
-      quality: 'low' | 'medium' | 'high'
+      quality: components['schemas']['ImageQuality']
+      /** @description Pixel size or auto. Uses the matching site preset tier, otherwise classifies by the longest edge (up to 1536 for 1k, up to 2560 for 2k, above 2560 for 4k). Automatic sizing uses the 1k multiplier. */
       size: string
       /** Format: int64 */
       count: number
@@ -2365,6 +2391,10 @@ export interface components {
         medium: number
         /** Format: int64 */
         high: number
+        /** Format: int64 */
+        xhigh?: number
+        /** Format: int64 */
+        max?: number
       }
       timezone: string
     }
@@ -2522,17 +2552,23 @@ export interface components {
     ModelCapabilities: {
       /** @description Chat model accepts explicit reasoning effort. */
       reasoning_effort?: boolean
-      /** @description Image model inherits the site's enabled ratio and resolution presets. Otherwise its explicit sizes are used. */
+      /** @description Supported tiers for fixed-size image requests. Unset legacy models keep their existing size constraints. An update that omits the list preserves any saved selection. Automatic sizing follows the existing auto policy. */
+      supported_resolutions?: components['schemas']['ImageResolution'][]
+      /** @description Image model inherits the site's enabled ratio and resolution presets, including automatic sizing. Explicitly sized models use their own sizes and require auto in both size lists to offer automatic sizing. */
       use_size_presets?: boolean
       vision: boolean
       stream: boolean
       max_context_tokens: number
-      qualities: ('low' | 'medium' | 'high')[]
+      qualities: components['schemas']['ImageQuality'][]
       sizes: string[]
       max_n: number
       supports_edit: boolean
       /** @description All enabled routes of this image model have been verified to support transparent edit output. */
       supports_transparent_background?: boolean
+      /** @description All enabled routes for this image model support GIF output. */
+      supports_gif?: boolean
+      /** @description All enabled routes for this image model have been verified to support explicit planning levels. */
+      supports_complexity?: boolean
       max_reference_images: number
       /** @enum {string} */
       response_format: '' | 'b64_json' | 'url'
@@ -2750,8 +2786,8 @@ export interface components {
       id: string
       /** @enum {string} */
       kind: 'upload' | 'generated' | 'thumbnail' | 'avatar' | 'edit_guide'
-      /** @constant */
-      mime: 'image/png'
+      /** @enum {string} */
+      mime: 'image/png' | 'image/gif'
       /** Format: int64 */
       size: number
       /** Format: int64 */
@@ -2797,8 +2833,9 @@ export interface components {
       }
       /** @description Site preset catalog. Disabled choices remain in the catalog so administrators can re-enable them. */
       readonly resolution_presets?: components['schemas']['ImageResolutionPreset'][]
-      disabled_ratios?: ('1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16')[]
-      disabled_resolutions?: ('1k' | '2k' | '4k')[]
+      /** @description Ratios disabled for new image tasks. Disabling auto also disables legacy requests that use auto size with an empty ratio. */
+      disabled_ratios?: ('auto' | '1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16')[]
+      disabled_resolutions?: components['schemas']['ImageResolution'][]
       /** Format: int64 */
       per_user_concurrency: number
       /** Format: int64 */
@@ -2814,11 +2851,12 @@ export interface components {
       /** Format: int64 */
       version: number
     }
+    /** @enum {string} */
+    ImageResolution: '1k' | '2k' | '4k'
     ImageResolutionPreset: {
       /** @enum {string} */
       ratio: '1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16'
-      /** @enum {string} */
-      resolution: '1k' | '2k' | '4k'
+      resolution: components['schemas']['ImageResolution']
       /** @description Exact width and height sent to the provider, in pixels. */
       size: string
     }
@@ -2840,15 +2878,24 @@ export interface components {
       /** Format: uuid */
       model_id: string
       prompt: string
-      /** @enum {string} */
-      quality: 'low' | 'medium' | 'high'
+      quality: components['schemas']['ImageQuality']
+      /** @description Omit to use the upstream model default. Explicit values require supports_complexity. */
+      complexity?: components['schemas']['ImageComplexity']
+      /** @description Width and height as WIDTHxHEIGHT, or auto to let the provider choose the size. */
       size: string
+      /** @description The selected aspect ratio. Use auto with size auto. An empty ratio selects a size directly. */
       ratio?: string
       /** Format: int64 */
       n: number
+      /** @description Ordered IDs of owned reference images, including uploaded sketch PNGs. */
       reference_file_ids: string[]
       /** @description Requires one source image and one result. Resize requires an enabled editor aspect ratio. */
       edit_options?: components['schemas']['ImageEditOptions']
+      /**
+       * @description When omitted, GIF-enabled models infer GIF from an explicit request in the prompt. GIF output cannot be combined with edit_options.
+       * @enum {string}
+       */
+      output_format?: 'png' | 'gif'
     }
     ImageTaskItem: {
       /** Format: int64 */
@@ -2860,7 +2907,13 @@ export interface components {
       file: components['schemas']['ImageFile'] | null
       error_code: string
     }
-    ImageTask: {
+    ImageTask: components['schemas']['ImageTaskFields']
+    AdminImageTask: components['schemas']['ImageTaskFields'] & {
+      user_nickname?: string
+      /** Format: email */
+      user_email?: string
+    }
+    ImageTaskFields: {
       /** Format: uuid */
       id: string
       /** Format: uuid */
@@ -2873,15 +2926,22 @@ export interface components {
       /** @enum {string} */
       operation: 'generate' | 'edit'
       prompt: string
-      /** @enum {string} */
-      quality: 'low' | 'medium' | 'high'
+      quality: components['schemas']['ImageQuality']
+      /** @description Present only when explicitly selected and task content is visible. */
+      complexity?: components['schemas']['ImageComplexity']
       size: string
       ratio: string
       /** Format: int64 */
       n: number
+      /** @description Ordered IDs of owned reference images, including uploaded sketch PNGs. */
       reference_file_ids: string[]
       /** @description Present only when edit options exist and the viewer can see task content. */
       edit_options?: components['schemas']['ImageEditOptions']
+      /**
+       * @description Resolved output format when selected or inferred and task content is visible.
+       * @enum {string}
+       */
+      output_format?: 'png' | 'gif'
       /** Format: int64 */
       unit_price: number
       /** Format: int64 */
@@ -2919,8 +2979,7 @@ export interface components {
       model_id: string
       model_name: string
       prompt: string
-      /** @enum {string} */
-      quality: 'low' | 'medium' | 'high'
+      quality: components['schemas']['ImageQuality']
       size: string
       ratio: string
       status: string
@@ -2929,6 +2988,10 @@ export interface components {
     }
     ImageTaskPage: {
       items: components['schemas']['ImageTask'][]
+      next_cursor: string
+    }
+    AdminImageTaskPage: {
+      items: components['schemas']['AdminImageTask'][]
       next_cursor: string
     }
     ImageConversationPage: {
@@ -3012,9 +3075,12 @@ export interface components {
       mentions?: components['schemas']['CanvasMention'][]
       /** Format: uuid */
       model_id: string | null
-      /** @enum {string} */
-      quality: '' | 'low' | 'medium' | 'high'
+      quality: '' | components['schemas']['ImageQuality']
+      /** @description Omit to use the upstream model default. */
+      complexity?: components['schemas']['ImageComplexity']
+      /** @description The selected dimensions or auto. */
       size: string
+      /** @description The selected aspect ratio, auto, or an empty string for direct size selection or defaults. */
       ratio: string
       n: number
     }
@@ -3060,9 +3126,12 @@ export interface components {
       node_id: string
       /** Format: uuid */
       model_id: string
-      /** @enum {string} */
-      quality: 'low' | 'medium' | 'high'
+      quality: components['schemas']['ImageQuality']
+      /** @description Omit to use the upstream model default. Explicit values require supports_complexity. */
+      complexity?: components['schemas']['ImageComplexity']
+      /** @description Width and height as WIDTHxHEIGHT, or auto to let the provider choose the size. */
       size: string
+      /** @description The selected aspect ratio. Use auto with size auto. An empty ratio selects a size directly. */
       ratio: string
       n: number
     }
@@ -4956,6 +5025,7 @@ export interface operations {
         }
         content: {
           'image/png': string
+          'image/gif': string
         }
       }
       default: components['responses']['APIError']
@@ -5180,7 +5250,7 @@ export interface operations {
         cursor?: string
         limit?: number
         state?: string
-        quality?: string
+        quality?: components['schemas']['ImageQualityFilter']
         from?: string
         until?: string
         conversation_id?: string
@@ -5312,7 +5382,7 @@ export interface operations {
         cursor?: string
         limit?: number
         state?: string
-        quality?: string
+        quality?: components['schemas']['ImageQualityFilter']
         from?: string
         until?: string
       }
@@ -5364,7 +5434,7 @@ export interface operations {
         cursor?: string
         limit?: number
         state?: string
-        quality?: string
+        quality?: components['schemas']['ImageQualityFilter']
         from?: string
         until?: string
         user_id?: string
@@ -5381,7 +5451,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['ImageTaskPage']
+          'application/json': components['schemas']['AdminImageTaskPage']
         }
       }
       default: components['responses']['APIError']

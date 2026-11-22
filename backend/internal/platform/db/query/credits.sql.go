@@ -186,6 +186,7 @@ func (q *Queries) GetCreditOperation(ctx context.Context, arg GetCreditOperation
 
 const getEffectivePricing = `-- name: GetEffectivePricing :one
 SELECT id, model_id, operation, quality, credits_per_image, enabled FROM pricing_rules WHERE (model_id=$1 OR model_id IS NULL) AND operation=$2 AND quality=$3
+AND (model_id IS NULL OR enabled)
 ORDER BY model_id NULLS LAST LIMIT 1
 `
 

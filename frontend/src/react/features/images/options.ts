@@ -1,5 +1,7 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import type { PublicModel } from '../../../api/catalog-contracts'
+import { customSizeResolution, type ImageResolution } from '../../../api/image-resolutions'
 import { images, type ImageConfiguration, type ImageInput } from '../../../api/images'
 import { operations, type Preferences } from '../../../api/operations'
 import { credits } from '../../../api/credits'
@@ -9,6 +11,10 @@ import { useModels } from '../catalog/models'
 import { referenceCapacity } from '../files/reference-rules'
 import type { ImageDraft } from './controller'
 import { useImageConfig } from './config'
+
+function isPriceUnavailable(error: unknown) {
+  return error instanceof ApiError && error.code === 'PRICE_UNAVAILABLE'
+}
 
 export function resolveImageOptions(
   draft: ImageDraft,
@@ -20,11 +26,19 @@ export function resolveImageOptions(
   const disabledRatios = new Set<string>(config?.disabled_ratios)
   const presets = config?.resolution_presets ?? []
   const modelSizes = model?.capabilities.sizes ?? []
+  const modelResolutions = model?.capabilities.supported_resolutions
+  const supports = (tier: ImageResolution | undefined) =>
+    !modelResolutions || (tier !== undefined && modelResolutions.includes(tier))
   const inherits = model?.capabilities.use_size_presets
+  const allowsAuto =
+    !!config &&
+    !disabledRatios.has('auto') &&
+    (inherits || (modelSizes.includes('auto') && config.sizes.includes('auto')))
   const variants = presets.filter(
     (preset) =>
       !disabledRatios.has(preset.ratio) &&
       !disabledResolutions.has(preset.resolution) &&
+      supports(preset.resolution) &&
       (inherits || modelSizes.includes(preset.size)),
   )
   const enabledSizes = new Set(variants.map((preset) => preset.size))
@@ -32,10 +46,17 @@ export function resolveImageOptions(
   const explicitSizes = inherits
     ? []
     : (config?.sizes.filter(
-        (size) => modelSizes.includes(size) && (!presetSizes.has(size) || enabledSizes.has(size)),
+        (size) =>
+          size !== 'auto' &&
+          modelSizes.includes(size) &&
+          (presetSizes.has(size) ? enabledSizes.has(size) : supports(customSizeResolution(size))),
       ) ?? [])
   const sizes = [...new Set([...explicitSizes, ...enabledSizes])]
   const ratioOptions = new Map<string, string[]>()
+  if (allowsAuto) {
+    sizes.push('auto')
+    ratioOptions.set('auto', ['auto'])
+  }
   for (const preset of variants) {
     const options = ratioOptions.get(preset.ratio) ?? []
     options.push(preset.size)
@@ -46,7 +67,7 @@ export function resolveImageOptions(
     // Keep custom mappings with the same ratio. Older approximate mappings remain valid over the API.
     const [w = 0, h = 0] = size.split('x').map(Number)
     const [a = 0, b = 0] = ratio.split(':').map(Number)
-    const restoredMapping = draft.ratio === ratio && draft.size === size && size !== 'auto'
+    const restoredMapping = draft.ratio === ratio && draft.size === size
     if (
       !restoredMapping &&
       presets.length &&
@@ -62,15 +83,16 @@ export function resolveImageOptions(
   const maxN = Math.min(config?.max_n ?? 0, model?.capabilities.max_n ?? 0)
   const maxReferences = referenceCapacity(config, model)
   const hasDraftSize = sizes.includes(draft.size)
+  const draftRatio = draft.ratio || (draft.size === 'auto' ? 'auto' : '')
   const preferredRatio = preferences?.image_ratio ?? ''
   const ratio =
-    draft.ratio &&
-    ratioOptions.has(draft.ratio) &&
-    (!hasDraftSize || ratioOptions.get(draft.ratio)?.includes(draft.size))
-      ? draft.ratio
+    draftRatio &&
+    ratioOptions.has(draftRatio) &&
+    (!hasDraftSize || ratioOptions.get(draftRatio)?.includes(draft.size))
+      ? draftRatio
       : !hasDraftSize && ratioOptions.has(preferredRatio)
         ? preferredRatio
-        : !hasDraftSize && variants.length
+        : !hasDraftSize && (allowsAuto || variants.length)
           ? (ratios[0] ?? '')
           : ''
   const ratioSizes = ratioOptions.get(ratio) ?? []
@@ -82,6 +104,12 @@ export function resolveImageOptions(
   const resolution = variants.find(
     (preset) => preset.ratio === ratio && preset.size === size,
   )?.resolution
+  const supportsGif = model?.capabilities.supports_gif ?? false
+  const supportsComplexity = model?.capabilities.supports_complexity ?? false
+  const complexity =
+    supportsComplexity && (!draft.complexityModelId || draft.complexityModelId === model?.id)
+      ? draft.complexity
+      : undefined
   return {
     sizes,
     ratios,
@@ -96,6 +124,10 @@ export function resolveImageOptions(
     quality,
     ratio,
     n,
+    supportsGif,
+    supportsComplexity,
+    complexity,
+    outputFormat: supportsGif ? draft.outputFormat : undefined,
   }
 }
 /**
@@ -121,6 +153,12 @@ export function useImageOptions(draft: ImageDraft, modelId?: string) {
   })
   const values = resolveImageOptions(draft, config.data, model, preferences.data)
   const operation = draft.references.length ? 'edit' : 'generate'
+  const canQuote = !!user && !!model && !!values.size && values.n > 0
+  const scope = JSON.stringify([user?.id, model?.id, operation, values.qualities])
+  const [availability, setAvailability] = useState<{
+    scope: string
+    priced: ImageInput['quality'][]
+  }>()
   const quotes = useQueries({
     queries: values.qualities.map((quality) => ({
       queryKey: [
@@ -133,7 +171,7 @@ export function useImageOptions(draft: ImageDraft, modelId?: string) {
         values.size,
         values.n,
       ],
-      enabled: !!user && !!model && !!values.size && values.n > 0,
+      enabled: canQuote,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         images.quote(
           {
@@ -149,15 +187,36 @@ export function useImageOptions(draft: ImageDraft, modelId?: string) {
       staleTime: 0,
     })),
   })
-  const priced = values.qualities.filter((_, index) => quotes[index]?.data !== undefined)
-  const quality = priced.includes(values.quality as ImageInput['quality'])
-    ? values.quality
-    : (priced[0] ?? '')
-  const quote = quotes[values.qualities.findIndex((value) => value === quality)]?.data
-  const quoteError = quotes.find(
-    (query) =>
-      query.error && !(query.error instanceof ApiError && query.error.code === 'PRICE_UNAVAILABLE'),
-  )?.error
+  const pricing =
+    canQuote && quotes.some((query) => query.isPending || query.fetchStatus !== 'idle')
+  const previous = availability?.scope === scope ? availability.priced : []
+  let priced: ImageInput['quality'][] = []
+  if (canQuote) {
+    // Size and count change the amount, but availability comes from the model and operation.
+    priced = pricing
+      ? previous
+      : values.qualities.filter((quality, index) => {
+          const result = quotes[index]
+          return (
+            result?.isSuccess || (!isPriceUnavailable(result?.error) && previous.includes(quality))
+          )
+        })
+  }
+  if (
+    canQuote &&
+    !pricing &&
+    (priced.length !== previous.length ||
+      priced.some((quality, index) => quality !== previous[index]))
+  ) {
+    setAvailability({ scope, priced })
+  } else if (availability && availability.scope !== scope) {
+    setAvailability(undefined)
+  }
+  const quality: ImageDraft['quality'] =
+    priced.find((value) => value === values.quality) ?? priced[0] ?? ''
+  const selectedQuote = quotes[values.qualities.findIndex((value) => value === quality)]
+  const quote = !pricing && selectedQuote?.isSuccess ? selectedQuote.data : undefined
+  const quoteError = quotes.find((query) => query.error && !isPriceUnavailable(query.error))?.error
   return {
     ...values,
     quality,
@@ -166,10 +225,11 @@ export function useImageOptions(draft: ImageDraft, modelId?: string) {
     models,
     model,
     config,
+    noImageSize: !!model && !!config.data && !values.size,
     account,
     preferences,
     quoteError,
-    pricing: quotes.some((query) => query.isFetching),
+    pricing,
     error: config.error ?? models.query.error ?? account.error ?? quoteError,
   }
 }

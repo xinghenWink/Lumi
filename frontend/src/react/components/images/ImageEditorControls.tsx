@@ -16,6 +16,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from 'zustand'
+import type { ImageComplexity } from '../../../api/image-complexity'
 import { images, type ImageEditOptions, type ImageFile, type ImageInput } from '../../../api/images'
 import { ApiError } from '../../../api/transport'
 import { useRuntime } from '../../app/context'
@@ -35,6 +36,7 @@ import {
 import type { ImageEditorDraft } from '../../features/images/editor-state'
 import { resolveImageOptions, useImageOptions } from '../../features/images/options'
 import { cn } from '../../lib/utils'
+import { ImageComplexityField } from './ImageComplexityField'
 import { ApiNotice } from '../shared/ApiNotice'
 import { Button } from '../ui/button'
 import {
@@ -123,6 +125,7 @@ function EditorForm({
   const [error, setError] = useState<unknown>(null)
   const [modelID, setModelID] = useState('')
   const [quality, setQuality] = useState<ImageInput['quality'] | ''>(target.quality ?? '')
+  const [planning, setPlanning] = useState<{ modelId: string; level: ImageComplexity }>()
   const work = useRef<AbortController>(null)
   const [menuPortal, setMenuPortal] = useState<HTMLDivElement | null>(null)
   useEffect(() => () => work.current?.abort(), [])
@@ -170,6 +173,8 @@ function EditorForm({
       references: [file.id],
       n: 1,
       quality,
+      complexity: planning?.level,
+      complexityModelId: planning?.modelId,
       size: (draft.mode === 'resize' ? resizeSize : sourceSize) ?? '',
       ratio: (draft.mode === 'resize' ? draft.ratio : target.ratio) ?? '',
     },
@@ -198,6 +203,7 @@ function EditorForm({
   const canSubmit =
     !!model &&
     !!options.quality &&
+    !!options.size &&
     !!options.quote &&
     !!options.account.data &&
     !!options.maxReferences &&
@@ -256,6 +262,7 @@ function EditorForm({
           model_id: model.id,
           prompt,
           quality: options.quality,
+          ...(options.complexity ? { complexity: options.complexity } : {}),
           size: options.size,
           ratio: options.ratio,
           n: 1,
@@ -534,9 +541,9 @@ function EditorForm({
             disabled={locked}
             className="min-h-9 resize-none"
           />
-          <div className="flex flex-wrap items-center gap-2 text-xs">
+          <div className="flex flex-wrap items-end gap-2 text-xs">
             {model ? (
-              <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:basis-full">
+              <div className="flex min-w-0 flex-wrap items-end gap-2 max-sm:basis-full">
                 {editable.length > 1 ? (
                   <div className="w-36 max-w-full">
                     <NativeSelect
@@ -544,7 +551,10 @@ function EditorForm({
                       aria-label={t('images.editor.model')}
                       value={model?.id ?? ''}
                       disabled={locked}
-                      onChange={(event) => setModelID(event.target.value)}
+                      onChange={(event) => {
+                        setModelID(event.target.value)
+                        setPlanning(undefined)
+                      }}
                     >
                       {editable.map((item) => (
                         <NativeSelectOption key={item.id} value={item.id}>
@@ -554,7 +564,7 @@ function EditorForm({
                     </NativeSelect>
                   </div>
                 ) : model ? (
-                  <span className="max-w-36 truncate text-muted-foreground">
+                  <span className="max-w-36 truncate leading-8 text-muted-foreground">
                     {model.display_name}
                   </span>
                 ) : null}
@@ -578,10 +588,25 @@ function EditorForm({
                     </NativeSelect>
                   </div>
                 ) : null}
+                {options.supportsComplexity ? (
+                  <div className="w-36 max-w-full">
+                    <ImageComplexityField
+                      size="sm"
+                      value={options.complexity}
+                      disabled={locked}
+                      onChange={(level) =>
+                        setPlanning(level ? { modelId: model.id, level } : undefined)
+                      }
+                    />
+                  </div>
+                ) : null}
               </div>
             ) : null}
             <span
-              className={cn('flex-1 text-muted-foreground', insufficient && 'text-destructive')}
+              className={cn(
+                'flex min-h-8 flex-1 items-center text-muted-foreground',
+                insufficient && 'text-destructive',
+              )}
               role="status"
             >
               {pending && !canRetry
@@ -593,7 +618,7 @@ function EditorForm({
                     : model && options.pricing
                       ? t('common.loading')
                       : model
-                        ? t('images.noPrice')
+                        ? t(options.noImageSize ? 'images.noImageSize' : 'images.noPrice')
                         : t('images.editor.noModel')}
             </span>
             <Button

@@ -5,8 +5,14 @@ export function taskParameters(task: ImageTask, t: TFunction) {
   return [
     task.model_name,
     t('images.' + task.quality),
-    task.size,
-    task.ratio,
+    task.complexity
+      ? t('images.complexitySummary', { level: t('images.complexityLevels.' + task.complexity) })
+      : '',
+    task.size === 'auto' ? t('images.auto') : task.size,
+    task.ratio === 'auto' ? '' : task.ratio,
+    task.output_format === 'gif' || task.items.some((item) => item.file?.mime === 'image/gif')
+      ? t('images.outputFormatGif')
+      : '',
     t('react.imageCount', { count: task.n }),
   ]
     .filter(Boolean)

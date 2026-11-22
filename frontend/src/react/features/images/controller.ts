@@ -8,6 +8,7 @@ import {
   type ImageTask,
 } from '../../../api/images'
 import type { SessionService } from '../../../api/auth-session'
+import type { ImageComplexity } from '../../../api/image-complexity'
 import { ApiError } from '../../../api/transport'
 
 export interface ImageDraft {
@@ -17,6 +18,9 @@ export interface ImageDraft {
   ratio: string
   n: number
   references: string[]
+  outputFormat?: ImageInput['output_format']
+  complexity?: ImageComplexity | undefined
+  complexityModelId?: string | undefined
 }
 export const emptyImageDraft: ImageDraft = {
   prompt: '',
@@ -233,7 +237,7 @@ export function createImageController(session: SessionService, client: QueryClie
         if (!valid(owner, id)) throw new ApiError('AUTH_REQUIRED', 401)
         const [conversation, page] = await Promise.all([
           images.conversation(id, signal),
-          images.tasks(new URLSearchParams({ conversation_id: id, limit: '50' }), false, signal),
+          images.tasks(new URLSearchParams({ conversation_id: id, limit: '50' }), signal),
         ])
         if (!valid(owner, id)) throw new ApiError('AUTH_REQUIRED', 401)
         const cached = snapshot(id)
@@ -416,6 +420,8 @@ export function createImageController(session: SessionService, client: QueryClie
         ratio: task.ratio,
         n: task.n,
         reference_file_ids: task.reference_file_ids,
+        ...(task.output_format ? { output_format: task.output_format } : {}),
+        ...(task.complexity ? { complexity: task.complexity } : {}),
         ...(task.edit_options ? { edit_options: task.edit_options } : {}),
       },
       'task',

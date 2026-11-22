@@ -88,6 +88,7 @@ export default {
   refunded: '退款已完成',
   model: '模型',
   owner: '用户 ID',
+  conversationId: '会话 ID',
   lastMessage: '最后活动时间',
   viewContent: '查看消息（需开启内容权限）',
   hiddenContent: '默认仅显示会话元数据，查看内容需要权限并记审计。',

@@ -37,8 +37,16 @@ func checkOwner(ctx context.Context, q *query.Queries, actor user.Actor) error {
 	return nil
 }
 func validateInput(input Input, c Configuration, model catalog.PublicModel) error {
-	if input.ConversationID == uuid.Nil || input.ModelID == uuid.Nil || strings.TrimSpace(input.Prompt) == "" || len(input.Prompt) > 64000 || !utf8.ValidString(input.Prompt) || strings.ContainsRune(input.Prompt, 0) || input.Count < 1 || input.Count > c.MaxN || input.Count > model.Capabilities.MaxN || !slices.Contains(model.Capabilities.Qualities, input.Quality) || !c.allowsSize(input.Size, input.Ratio, model.Capabilities.Sizes, model.Capabilities.UseSizePresets) {
+	if input.ConversationID == uuid.Nil || input.ModelID == uuid.Nil || strings.TrimSpace(input.Prompt) == "" || len(input.Prompt) > 64000 || !utf8.ValidString(input.Prompt) || strings.ContainsRune(input.Prompt, 0) || input.Count < 1 || input.Count > c.MaxN || input.Count > model.Capabilities.MaxN || !slices.Contains(model.Capabilities.Qualities, input.Quality) || !c.allowsSize(input.Size, input.Ratio, model.Capabilities.Sizes, model.Capabilities.SupportedResolutions, model.Capabilities.UseSizePresets) {
 		return problem.Invalid()
+	}
+	if input.Complexity != "" {
+		if !input.Complexity.Valid() {
+			return problem.Invalid()
+		}
+		if !model.Capabilities.SupportsComplexity {
+			return problem.New("IMAGE_COMPLEXITY_UNSUPPORTED", 400)
+		}
 	}
 	if len(input.ReferenceFileIDs) > int(c.MaxReferences) || len(input.ReferenceFileIDs) > int(model.Capabilities.MaxReferenceImages) || (len(input.ReferenceFileIDs) > 0 && !model.Capabilities.SupportsEdit) {
 		return problem.New("IMAGE_REFERENCES_INVALID", 400)
@@ -151,6 +159,10 @@ func (s *Service) submit(ctx context.Context, actor user.Actor, key string, requ
 		if err := validateInput(input, cfg, model); err != nil {
 			return err
 		}
+		outputFormat, err := resolveOutputFormat(input, model.Capabilities.SupportsGIF, attach == nil)
+		if err != nil {
+			return err
+		}
 		conversation, err := q.LockTaskConversation(ctx, query.LockTaskConversationParams{ID: input.ConversationID, UserID: actor.ID})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -214,6 +226,8 @@ func (s *Service) submit(ctx context.Context, actor user.Actor, key string, requ
 			}
 		}
 		insert := query.CreateImageTaskParams{ID: id, UserID: actor.ID, ConversationID: input.ConversationID, MessageID: messageID, UserMessageID: userID, Operation: operation, ModelID: input.ModelID, ModelName: model.DisplayName, Prompt: input.Prompt, Params: params, Quality: input.Quality, Size: input.Size, Ratio: input.Ratio, ImageCount: input.Count, ReferenceFileIds: input.ReferenceFileIDs, ChargeID: charge.ID, UnitPrice: charge.Quote.UnitPrice, TotalCost: charge.Quote.TotalCost, IdempotencyKey: key, RequestHash: hash, SplitRequests: cfg.SplitRequests, TimeoutSeconds: cfg.TimeoutSeconds, QueueTimeout: cfg.QueueTimeoutSeconds}
+		insert.OutputFormat = outputFormat
+		insert.Complexity = string(input.Complexity)
 		if input.EditOptions != nil {
 			insert.EditAction = input.EditOptions.Action
 			insert.EditGuideFileID = input.EditOptions.GuideFileID
@@ -303,6 +317,8 @@ func (s *Service) views(ctx context.Context, rows []query.ImageTask, viewer uuid
 		view := Task{ID: row.ID, UserID: row.UserID, ConversationID: row.ConversationID, ModelID: row.ModelID, ModelName: row.ModelName, Operation: row.Operation, Quality: row.Quality, Size: row.Size, Ratio: row.Ratio, Count: row.ImageCount, ReferenceFileIDs: []uuid.UUID{}, UnitPrice: row.UnitPrice, TotalCost: row.TotalCost, RefundedCost: row.RefundedCost, ActualCost: actual, Status: row.Status, SuccessfulImages: row.SuccessfulImages, QueuePosition: ranks[row.ID], CancelRequested: row.CancelRequested, ErrorCode: row.ErrorCode, StartedAt: row.StartedAt, FinishedAt: row.FinishedAt, CreatedAt: row.CreatedAt.UTC(), Version: row.Version, Items: byTask[row.ID], ContentVisible: content}
 		if content {
 			view.Prompt = row.Prompt
+			view.OutputFormat = row.OutputFormat
+			view.Complexity = validation.ImageComplexity(row.Complexity)
 			view.ReferenceFileIDs = append(view.ReferenceFileIDs, row.ReferenceFileIds...)
 			if row.EditAction != "" {
 				view.EditOptions = &EditOptions{Action: row.EditAction, GuideFileID: row.EditGuideFileID}
@@ -365,7 +381,7 @@ func (s *Service) Get(ctx context.Context, actor user.Actor, id uuid.UUID, admin
 	return items[0], nil
 }
 func validateFilter(f Filter) error {
-	if f.Limit < 1 || f.Limit > 100 || (!slices.Contains([]string{"", "queued", "running", "succeeded", "partial", "failed", "canceled"}, f.State)) || !slices.Contains([]string{"", "low", "medium", "high"}, f.Quality) || (f.From != nil && f.Until != nil && !f.From.Before(*f.Until)) {
+	if f.Limit < 1 || f.Limit > 100 || !slices.Contains([]string{"", "queued", "running", "succeeded", "partial", "failed", "canceled"}, f.State) || (f.Quality != "" && !validation.ImageQuality(f.Quality)) || (f.From != nil && f.Until != nil && !f.From.Before(*f.Until)) {
 		return problem.Invalid()
 	}
 	return nil
@@ -444,4 +460,29 @@ func (s *Service) List(ctx context.Context, actor user.Actor, f Filter, admin bo
 	}
 	result.Items, err = s.views(ctx, rows, actor.ID, visible)
 	return result, err
+}
+
+func (s *Service) ListAdminTasks(ctx context.Context, actor user.Actor, f Filter) (Page[AdminTask], error) {
+	page, err := s.List(ctx, actor, f, true)
+	result := Page[AdminTask]{Items: make([]AdminTask, 0, len(page.Items)), NextCursor: page.NextCursor}
+	if err != nil || len(page.Items) == 0 {
+		return result, err
+	}
+	userIDs := make([]uuid.UUID, 0, len(page.Items))
+	for _, task := range page.Items {
+		userIDs = append(userIDs, task.UserID)
+	}
+	owners, err := s.q.ListImageTaskOwners(ctx, userIDs)
+	if err != nil {
+		return result, fmt.Errorf("list image task owners: %w", err)
+	}
+	byID := make(map[uuid.UUID]query.ListImageTaskOwnersRow, len(owners))
+	for _, owner := range owners {
+		byID[owner.ID] = owner
+	}
+	for _, task := range page.Items {
+		owner := byID[task.UserID]
+		result.Items = append(result.Items, AdminTask{Task: task, UserNickname: owner.Nickname, UserEmail: owner.Email})
+	}
+	return result, nil
 }

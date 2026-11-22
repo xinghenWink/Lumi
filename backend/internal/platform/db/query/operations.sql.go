@@ -136,7 +136,10 @@ func (q *Queries) AddManualRefund(ctx context.Context, id uuid.UUID) error {
 }
 
 const adminChatConversations = `-- name: AdminChatConversations :many
-SELECT c.id, c.user_id, c.type, c.title, c.model_id, c.pinned, c.title_auto, c.last_message_at, c.deleted_at, c.active_run_id, c.lease_until, c.cancel_requested, c.created_at, c.version FROM conversations c WHERE c.type='chat' AND c.deleted_at IS NULL
+SELECT c.id,c.user_id,c.model_id,c.last_message_at,c.created_at,c.active_run_id,
+  coalesce(u.nickname,'') AS user_nickname,coalesce(u.email,'')::text AS user_email
+FROM conversations c LEFT JOIN users u ON u.id=c.user_id AND u.deleted_at IS NULL
+WHERE c.type='chat' AND c.deleted_at IS NULL
 AND ($1::uuid IS NULL OR c.user_id=$1)
 AND ($2::timestamptz IS NULL OR (c.last_message_at,c.id)<($2,$3::uuid))
 ORDER BY c.last_message_at DESC,c.id DESC LIMIT $4
@@ -149,7 +152,18 @@ type AdminChatConversationsParams struct {
 	PageLimit  int32
 }
 
-func (q *Queries) AdminChatConversations(ctx context.Context, arg AdminChatConversationsParams) ([]Conversation, error) {
+type AdminChatConversationsRow struct {
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	ModelID       *uuid.UUID
+	LastMessageAt time.Time
+	CreatedAt     time.Time
+	ActiveRunID   *uuid.UUID
+	UserNickname  string
+	UserEmail     string
+}
+
+func (q *Queries) AdminChatConversations(ctx context.Context, arg AdminChatConversationsParams) ([]AdminChatConversationsRow, error) {
 	rows, err := q.db.Query(ctx, adminChatConversations,
 		arg.Owner,
 		arg.CursorTime,
@@ -160,24 +174,18 @@ func (q *Queries) AdminChatConversations(ctx context.Context, arg AdminChatConve
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Conversation{}
+	items := []AdminChatConversationsRow{}
 	for rows.Next() {
-		var i Conversation
+		var i AdminChatConversationsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
-			&i.Type,
-			&i.Title,
 			&i.ModelID,
-			&i.Pinned,
-			&i.TitleAuto,
 			&i.LastMessageAt,
-			&i.DeletedAt,
-			&i.ActiveRunID,
-			&i.LeaseUntil,
-			&i.CancelRequested,
 			&i.CreatedAt,
-			&i.Version,
+			&i.ActiveRunID,
+			&i.UserNickname,
+			&i.UserEmail,
 		); err != nil {
 			return nil, err
 		}

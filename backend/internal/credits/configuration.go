@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/xinghenWink/Lumi/backend/internal/audit"
+	"github.com/xinghenWink/Lumi/backend/internal/imageresolution"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/db/query"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/problem"
@@ -65,14 +67,12 @@ func validateConfiguration(value Configuration) error {
 	if _, err := multiplier(value.EditMultiplier); err != nil {
 		return err
 	}
-	if len(value.SizeMultipliers) > 20 || value.SizeMultipliers == nil {
+	tiers := imageresolution.Tiers()
+	if len(value.SizeMultipliers) != len(tiers) {
 		return problem.Invalid()
 	}
-	for size, amount := range value.SizeMultipliers {
-		if !validSize(size) {
-			return problem.Invalid()
-		}
-		if _, err := multiplier(amount); err != nil {
+	for _, tier := range tiers {
+		if _, err := multiplier(value.SizeMultipliers[tier]); err != nil {
 			return err
 		}
 	}
@@ -104,7 +104,6 @@ func validSize(value string) bool {
 	y, err := strconv.Atoi(height)
 	return err == nil && y > 0 && y <= 65536 && value == fmt.Sprintf("%dx%d", x, y)
 }
-func validQuality(value string) bool   { return value == "low" || value == "medium" || value == "high" }
 func validOperation(value string) bool { return value == "generate" || value == "edit" }
 
 func (s *Service) Pricing(ctx context.Context) (Pricing, error) {
@@ -134,16 +133,19 @@ func readPricing(ctx context.Context, q *query.Queries, result *Pricing) error {
 	}
 	return nil
 }
+
+const maxPricingRules = 504
+
 func (s *Service) SavePricing(ctx context.Context, actor user.Actor, value Pricing) (Pricing, error) {
 	if err := validateConfiguration(value.Configuration); err != nil {
 		return Pricing{}, err
 	}
-	if len(value.Rules) < 6 || len(value.Rules) > 500 {
+	if len(value.Rules) < 6 || len(value.Rules) > maxPricingRules {
 		return Pricing{}, problem.Invalid()
 	}
 	seen := make(map[string]bool, len(value.Rules))
 	for _, rule := range value.Rules {
-		if !validQuality(rule.Quality) || !validOperation(rule.Operation) || rule.CreditsPerImage < 0 || rule.CreditsPerImage > 1_000_000_000 || (rule.ModelID != nil && *rule.ModelID == uuid.Nil) {
+		if !validation.ImageQuality(rule.Quality) || !validOperation(rule.Operation) || rule.CreditsPerImage < 0 || rule.CreditsPerImage > 1_000_000_000 || (rule.ModelID != nil && *rule.ModelID == uuid.Nil) {
 			return Pricing{}, problem.Invalid()
 		}
 		model := "global"
@@ -174,6 +176,17 @@ func (s *Service) SavePricing(ctx context.Context, actor user.Actor, value Prici
 		if err := readPricing(ctx, q, &before); err != nil {
 			return err
 		}
+		// Older clients only submit the original six global rules.
+		rules := slices.Clone(value.Rules)
+		for _, rule := range before.Rules {
+			if rule.ModelID == nil && !seen["global:"+rule.Operation+":"+rule.Quality] {
+				rules = append(rules, rule)
+			}
+		}
+		if len(rules) > maxPricingRules {
+			return problem.Invalid()
+		}
+		value.Rules = rules
 		if err := q.ClearPricingRules(ctx); err != nil {
 			return fmt.Errorf("replace pricing rules: %w", err)
 		}
@@ -203,7 +216,7 @@ func (s *Service) SavePricing(ctx context.Context, actor user.Actor, value Prici
 	return value, err
 }
 func price(ctx context.Context, q *query.Queries, cfg Configuration, input QuoteInput) (Quote, error) {
-	if !validQuality(input.Quality) || !validOperation(input.Operation) || !validSize(input.Size) || input.Count < 1 || input.Count > 10 || (input.ModelID != nil && *input.ModelID == uuid.Nil) {
+	if !validation.ImageQuality(input.Quality) || !validOperation(input.Operation) || !validSize(input.Size) || input.Count < 1 || input.Count > 10 || (input.ModelID != nil && *input.ModelID == uuid.Nil) {
 		return Quote{}, problem.Invalid()
 	}
 	rule, err := q.GetEffectivePricing(ctx, query.GetEffectivePricingParams{ModelID: input.ModelID, Operation: input.Operation, Quality: input.Quality})
@@ -224,13 +237,11 @@ func price(ctx context.Context, q *query.Queries, cfg Configuration, input Quote
 		}
 		amount.Mul(amount, factor)
 	}
-	if text, exists := cfg.SizeMultipliers[input.Size]; exists {
-		factor, err := multiplier(text)
-		if err != nil {
-			return Quote{}, err
-		}
-		amount.Mul(amount, factor)
+	factor, err := multiplier(cfg.SizeMultipliers[imageresolution.ForSize(input.Size)])
+	if err != nil {
+		return Quote{}, err
 	}
+	amount.Mul(amount, factor)
 	rounded, remainder := new(big.Int).QuoRem(amount.Num(), amount.Denom(), new(big.Int))
 	if remainder.Sign() != 0 {
 		rounded.Add(rounded, big.NewInt(1))

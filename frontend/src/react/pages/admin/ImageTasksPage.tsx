@@ -8,6 +8,7 @@ import { useSession } from '../../features/auth/hooks'
 import { useTime } from '../../features/accounts/time'
 import { useOwnedMutation } from '../../features/accounts/owned-mutation'
 import { AdminPage } from '../../components/admin/AdminPage'
+import { AdminUserInfo } from '../../components/admin/AdminUserInfo'
 import { ImageFilters } from '../../components/images/ImageFilters'
 import { ImageTaskCard } from '../../components/images/ImageTaskCard'
 import { DataTable } from '../../components/shared/DataTable'
@@ -152,7 +153,7 @@ export default function ImageTasksPage() {
     queryFn: ({ pageParam, signal }) => {
       const params = new URLSearchParams(filter)
       if (pageParam) params.set('cursor', pageParam)
-      return images.tasks(params, true, signal)
+      return images.adminTasks(params, signal)
     },
     getNextPageParam: (page) => page.next_cursor || undefined,
     staleTime: 0,
@@ -194,6 +195,7 @@ export default function ImageTasksPage() {
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
           <DataTable
             rows={rows}
+            scrollRegionLabel={t('images.adminTitle')}
             columns={[
               {
                 key: 'task',
@@ -204,10 +206,8 @@ export default function ImageTasksPage() {
               },
               {
                 key: 'user',
-                label: t('images.user'),
-                render: (row) => (
-                  <code className="block min-w-32 break-all text-[10px]">{row.user_id}</code>
-                ),
+                label: t('admin.users.userInfo'),
+                render: (row) => <AdminUserInfo {...row} />,
               },
               { key: 'model', label: t('images.model'), render: (row) => row.model_name },
               {

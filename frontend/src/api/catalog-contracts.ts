@@ -1,4 +1,6 @@
 import type { components } from './schema'
+import { parseImageQuality } from './image-quality'
+import { isImageResolution } from './image-resolutions'
 import { ApiError, record } from './transport'
 type Schema = components['schemas']
 export type Upstream = Schema['Upstream']
@@ -53,12 +55,18 @@ const parseText = (value: unknown) => {
 }
 export function parseCapabilities(value: unknown): Capabilities {
   const data = record(value)
-  const qualities = list(data, 'qualities', (value) => {
-    if (value !== 'low' && value !== 'medium' && value !== 'high')
-      throw new ApiError('RESPONSE_INVALID')
-    return value
-  })
+  const qualities = list(data, 'qualities', parseImageQuality)
+  const resolutions =
+    data.supported_resolutions === undefined
+      ? undefined
+      : list(data, 'supported_resolutions', (resolution) => {
+          if (!isImageResolution(resolution)) throw new ApiError('RESPONSE_INVALID')
+          return resolution
+        })
+  if (resolutions && (!resolutions.length || new Set(resolutions).size !== resolutions.length))
+    throw new ApiError('RESPONSE_INVALID')
   return {
+    ...(resolutions ? { supported_resolutions: resolutions } : {}),
     ...(data.reasoning_effort === undefined
       ? {}
       : { reasoning_effort: bool(data, 'reasoning_effort') }),
@@ -75,6 +83,10 @@ export function parseCapabilities(value: unknown): Capabilities {
     ...(data.supports_transparent_background === undefined
       ? {}
       : { supports_transparent_background: bool(data, 'supports_transparent_background') }),
+    ...(data.supports_gif === undefined ? {} : { supports_gif: bool(data, 'supports_gif') }),
+    ...(data.supports_complexity === undefined
+      ? {}
+      : { supports_complexity: bool(data, 'supports_complexity') }),
     max_reference_images: integer(data, 'max_reference_images', 0, 2147483647),
     response_format: choice(data, 'response_format', ['', 'b64_json', 'url'] as const),
   }

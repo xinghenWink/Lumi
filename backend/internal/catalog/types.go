@@ -52,6 +52,7 @@ type Channel struct {
 	UpdatedAt           time.Time  `json:"updated_at"`
 }
 type Capabilities struct {
+	SupportedResolutions          []string `json:"supported_resolutions,omitempty"`
 	UseSizePresets                bool     `json:"use_size_presets,omitempty"`
 	ReasoningEffort               bool     `json:"reasoning_effort,omitempty"`
 	Vision                        bool     `json:"vision"`
@@ -62,6 +63,8 @@ type Capabilities struct {
 	MaxN                          int32    `json:"max_n"`
 	SupportsEdit                  bool     `json:"supports_edit"`
 	SupportsTransparentBackground bool     `json:"supports_transparent_background,omitempty"`
+	SupportsGIF                   bool     `json:"supports_gif,omitempty"`
+	SupportsComplexity            bool     `json:"supports_complexity,omitempty"`
 	MaxReferenceImages            int32    `json:"max_reference_images"`
 	ResponseFormat                string   `json:"response_format"`
 }

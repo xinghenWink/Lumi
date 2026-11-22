@@ -92,6 +92,8 @@ export default {
     vision: 'Image understanding',
     maxContext: 'Context token limit',
     qualities: 'Available qualities',
+    advancedQualityPricing:
+      'Advanced qualities use the global prices under Pricing and gifts. You can also set prices for this model.',
     sizes: 'Available sizes',
     sizesHint:
       'Pick a ratio, then a suggested resolution or type width and height. Actual dimensions come from the returned file.',
@@ -111,6 +113,8 @@ export default {
     maxN: 'Maximum images per request',
     supportsEdit: 'Image editing',
     supportsTransparentBackground: 'Transparent edits verified on all enabled routes',
+    supportsComplexity: 'Planning level verified on all enabled routes',
+    supportsGif: 'GIF output verified on all enabled routes',
     maxReferences: 'Maximum reference images',
     responseFormat: 'Image response format',
     base64: 'Base64 image',

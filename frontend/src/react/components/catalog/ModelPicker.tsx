@@ -12,7 +12,15 @@ import { useModels } from '../../features/catalog/models'
 import { ApiNotice } from '../shared/ApiNotice'
 import { Button } from '../ui/button'
 
-export function ModelPicker({ kind, disabled = false }: { kind: ModelKind; disabled?: boolean }) {
+export function ModelPicker({
+  kind,
+  disabled = false,
+  onModelChange,
+}: {
+  kind: ModelKind
+  disabled?: boolean
+  onModelChange?(): void
+}) {
   const { t } = useTranslation()
   const { query, items, selected, select } = useModels(kind)
   return (
@@ -66,7 +74,14 @@ export function ModelPicker({ kind, disabled = false }: { kind: ModelKind; disab
           aria-labelledby={undefined}
           className="z-70 max-h-[min(420px,var(--radix-dropdown-menu-content-available-height))] w-[320px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-xl border border-border bg-card p-1.5 text-foreground shadow-xl"
         >
-          <DropdownMenuRadioGroup value={selected?.id ?? ''} onValueChange={select}>
+          <DropdownMenuRadioGroup
+            value={selected?.id ?? ''}
+            onValueChange={(id) => {
+              if (id === selected?.id) return
+              select(id)
+              onModelChange?.()
+            }}
+          >
             {items.map((model) => (
               <DropdownMenuRadioItem
                 key={model.id}

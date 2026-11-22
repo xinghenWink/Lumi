@@ -4,9 +4,10 @@ import type { APIRequestContext, Locator } from '@playwright/test'
 import { expect, test, type Page } from './test'
 import { record } from '../../src/api/transport'
 import { defaultCapabilities } from '../../src/api/catalog-contracts'
-import { parseImageConfiguration } from '../../src/api/images'
+import { parseImageConfiguration, parseTask } from '../../src/api/images'
 import { observeErrors } from '../browser-errors'
 import { fixturePNG } from '../image-fixture'
+import { drawStroke, isSketchUpload, openSketch } from './sketch'
 
 interface Caller {
   (method: string, path: string, body?: unknown): Promise<Record<string, unknown>>
@@ -214,9 +215,11 @@ test('canvas journey composes, generates from references, persists and edits', a
           capabilities: {
             ...defaultCapabilities('image'),
             qualities: ['medium'],
-            sizes: ['1024x1024', '1536x1024'],
+            sizes: ['1024x1024', '1536x1024', '2016x1344', '4032x2688', 'auto'],
+            supported_resolutions: ['1k', '2k'],
             max_n: 2,
             supports_edit: true,
+            supports_complexity: true,
             max_reference_images: 4,
           },
           routes: [
@@ -371,7 +374,7 @@ test('canvas journey composes, generates from references, persists and edits', a
     await inspector.getByLabel('模型', { exact: true }).selectOption({ label: modelName })
     const parameters = inspector.getByRole('button', { name: '参数', exact: true })
     const summary = inspector.getByTestId('canvas-image-parameter-summary')
-    await expect(summary).toHaveText('1:1 · 1K · 1 张')
+    await expect(summary).toHaveText('自动 · 1 张')
     const run = inspector.getByRole('button', { name: '生成', exact: true })
     // The quote can resize and re-anchor the editor after the model changes.
     await expect(run).toBeEnabled({ timeout: 15_000 })
@@ -386,14 +389,23 @@ test('canvas journey composes, generates from references, persists and edits', a
     await parameters.click()
     await expect(imageParameters).toBeVisible()
     await expect(imageParameters.getByRole('radiogroup', { name: '质量' })).toBeVisible()
-    await expect(imageParameters.getByLabel('分辨率', { exact: true })).toBeVisible()
+    const planning = imageParameters.getByLabel('规划强度', { exact: true })
+    await expect(planning).toHaveValue('')
+    await planning.selectOption('medium')
+    const auto = imageParameters.getByRole('radio', { name: '自动', exact: true })
+    await expect(auto).toBeChecked()
+    await expect(imageParameters.getByLabel('分辨率', { exact: true })).toHaveCount(0)
     expect(await box(inspector)).toEqual(editorBox)
     await imageParameters.getByRole('radio', { name: '3:2', exact: true }).check()
+    const resolution = imageParameters.getByLabel('分辨率', { exact: true })
+    await expect(resolution).toBeVisible()
+    await expect(resolution.locator('option[value="2016x1344"]')).toHaveCount(1)
+    await expect(resolution.locator('option[value="4032x2688"]')).toHaveCount(0)
     await imageParameters.getByRole('radio', { name: '2 张', exact: true }).check()
     await expect(summary).toHaveText('3:2 · 1K · 2 张')
     await imageParameters.getByRole('radio', { name: '按尺寸', exact: true }).check()
     await expect(summary).toHaveText('按尺寸 · 1536 × 1024 · 2 张')
-    await imageParameters.getByRole('radio', { name: '1:1', exact: true }).check()
+    await auto.check()
     await imageParameters.getByRole('radio', { name: '1 张', exact: true }).check()
     await page.keyboard.press('Escape')
     await expect(imageParameters).toBeHidden()
@@ -404,7 +416,16 @@ test('canvas journey composes, generates from references, persists and edits', a
     const cost = Number((await estimate.textContent())?.replace(/\D/g, ''))
     expect(cost).toBeGreaterThan(0)
     const balance = Number((await self('GET', '/me/credits')).total)
+    const runRequest = page.waitForRequest(
+      (request) =>
+        request.url().endsWith('/canvases/' + canvasID + '/runs') && request.method() === 'POST',
+    )
     await run.click()
+    expect((await runRequest).postDataJSON()).toMatchObject({
+      ratio: 'auto',
+      size: 'auto',
+      complexity: 'medium',
+    })
     await expect(nodes('image').locator('img')).toHaveCount(2, { timeout: 30_000 })
     await expect(edges).toHaveCount(3)
     expect(upstream.edits).toBe(1)
@@ -428,13 +449,33 @@ test('canvas journey composes, generates from references, persists and edits', a
     const zoomLabel = await zoom.getAttribute('aria-label')
     await viewSave
     const stored = await self('GET', '/canvases/' + canvasID)
-    expect(stored).toMatchObject({ title, node_count: 4 })
+    expect(stored).toMatchObject({
+      title,
+      node_count: 4,
+      document: {
+        nodes: expect.arrayContaining([
+          expect.objectContaining({
+            generator: expect.objectContaining({
+              ratio: 'auto',
+              size: 'auto',
+              complexity: 'medium',
+            }),
+          }),
+        ]),
+      },
+    })
     await page.reload()
     await expect(nodes()).toHaveCount(4)
     await expect(edges).toHaveCount(3)
     await expect(page.getByLabel('画布名称', { exact: true })).toHaveValue(title)
     await expect(zoom).toHaveAttribute('aria-label', zoomLabel ?? '')
     await expect(nodes('image').locator('img')).toHaveCount(2)
+    await nodes('generator').click()
+    await expect(summary).toHaveText('自动 · 1 张')
+
+    await parameters.click()
+    await expect(planning).toHaveValue('medium')
+    await page.keyboard.press('Escape')
 
     // Undo and redo a deletion.
     await page.keyboard.press('1')
@@ -667,6 +708,61 @@ test('canvas journey composes, generates from references, persists and edits', a
     await page.getByRole('button', { name: '删除画布', exact: true }).click()
     await expect(card).toHaveCount(0)
     expect(await self.status('GET', '/canvases/' + canvasID)).toBe(404)
+
+    await page.unroute('**/api/v1/canvases/*')
+    await page.getByRole('link', { name: '新建画布', exact: true }).click()
+    await expect(page).toHaveURL(/\/canvas\/[0-9a-f-]{36}$/)
+    await expect(viewport).toBeVisible()
+    const sketch = await openSketch(page, 'canvas')
+    await drawStroke(page, sketch.paper, false)
+    let uploads = 0
+    await page.route('**/api/v1/files*', async (route) => {
+      if (isSketchUpload(route.request().url(), route.request().method()) && ++uploads === 1)
+        await route.fulfill({ status: 503, json: { code: 'TEMPORARILY_UNAVAILABLE' } })
+      else await route.continue()
+    })
+    await sketch.confirm.click()
+    await expect(sketch.dialog.getByRole('alert')).toBeVisible()
+    await expect(sketch.confirm).toBeEnabled()
+    await expect(nodes('image')).toHaveCount(0)
+    const sketchUpload = page.waitForResponse(
+      (response) =>
+        isSketchUpload(response.url(), response.request().method()) && response.status() === 201,
+    )
+    const autosaveSketch = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(new URL(page.url()).pathname.replace('/canvas/', '/canvases/')) &&
+        response.request().method() === 'PUT' &&
+        response.ok(),
+    )
+    await sketch.confirm.click({ clickCount: 2 })
+    const sketchFile = record(await (await sketchUpload).json())
+    expect(sketchFile).toMatchObject({ id: expect.any(String), width: 1024, height: 1024 })
+    await expect(sketch.dialog).toBeHidden()
+    expect(uploads).toBe(2)
+    const sketchNode = nodes('image')
+    await expect(sketchNode).toHaveAttribute('data-selected', 'true')
+    const sketchNodeID = await sketchNode.getAttribute('data-node-id')
+    await autosaveSketch
+    await page.reload()
+    await expect(sketchNode).toHaveAttribute('data-node-id', sketchNodeID ?? '')
+    await expect(sketchNode.locator('img')).toBeVisible()
+    await sketchNode.click()
+    await page
+      .getByRole('toolbar', { name: '选中操作' })
+      .getByRole('button', { name: '生成', exact: true })
+      .click()
+    await expect(inspector.getByTestId('canvas-inputs')).toHaveText('1 张参考图 · 0 段文本')
+    await inspector.getByLabel('模型', { exact: true }).selectOption({ label: modelName })
+    await inspector.getByLabel('提示词', { exact: true }).fill('Use the sketch composition')
+    const sketchRun = page.waitForResponse(
+      (response) => response.url().endsWith('/runs') && response.status() === 202,
+    )
+    await run.click()
+    const task = parseTask(record(await (await sketchRun).json()).task)
+    expect(task.reference_file_ids).toEqual([sketchFile.id])
+    await expect(nodes('image').locator('img')).toHaveCount(2, { timeout: 30_000 })
+    expect(upstream.prompts).toContain('Use the sketch composition')
     expect(errors).toEqual([])
   } finally {
     if (oldPricing) await admin('PUT', '/admin/pricing', oldPricing)
@@ -791,5 +887,12 @@ test('canvas on small screens keeps tools reachable and pans by touch', async ({
   await expect(page.getByTestId('canvas-save-state')).toHaveAttribute('data-status', 'saved', {
     timeout: 15_000,
   })
+  const sketch = await openSketch(page, 'canvas')
+  await drawStroke(page, sketch.paper, true)
+  await expect(sketch.confirm).toBeEnabled()
+  await sketch.dialog.getByRole('button', { name: '关闭', exact: true }).click()
+  await sketch.dialog.getByRole('button', { name: '放弃草图', exact: true }).click()
+  await expect(sketch.dialog).toBeHidden()
+  await expect(sketch.trigger).toBeFocused()
   expect(errors).toEqual([])
 })

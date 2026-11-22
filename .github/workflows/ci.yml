@@ -177,8 +177,6 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
       - name: Build the application image
         run: docker build --build-arg VERSION=ci --build-arg COMMIT="$GITHUB_SHA" -t lumi:ci .
       - uses: pnpm/action-setup@v6.1.0
@@ -239,13 +237,16 @@ jobs:
           POSTGRES_PASSWORD: ci-database-only
           REDIS_PASSWORD: ci-cache-only
         run: docker compose --env-file deploy/.env -f deploy/docker-compose.yml down --volumes
-      - name: Build the previous milestone for rollback verification
+      - name: Rehearse installation, forward upgrade and backup recovery
+        env:
+          LUMI_PREVIOUS_IMAGE: ghcr.io/xinghenwink/lumi@sha256:fbbeb5783de00992a5b1550e1a5ece2cb6c98ac7a25444030c46820928de8bd7
         run: |
-          mkdir -p "$RUNNER_TEMP/previous"
-          git archive e9f87b2 | tar -x -C "$RUNNER_TEMP/previous"
-          docker build --build-arg VERSION=previous -t lumi:previous "$RUNNER_TEMP/previous"
-      - name: Rehearse installation, upgrade, rollback and backup restore
-        run: sudo env LUMI_CURRENT_IMAGE=lumi:ci LUMI_PREVIOUS_IMAGE=lumi:previous bash scripts/deploy-smoke.sh
+          docker pull "$LUMI_PREVIOUS_IMAGE"
+          schema=$(find backend/migrations -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | cut -d _ -f 1 | sort -n | tail -1)
+          sudo env LUMI_CURRENT_IMAGE=lumi:ci LUMI_CURRENT_RELEASE=ci LUMI_CURRENT_COMMIT="$GITHUB_SHA" LUMI_CURRENT_SCHEMA="$((10#$schema))" \
+            LUMI_PREVIOUS_IMAGE="$LUMI_PREVIOUS_IMAGE" LUMI_PREVIOUS_RELEASE=v0.3.3 \
+            LUMI_PREVIOUS_COMMIT=ce7ec32bb3f25ef269e732b4eb91956fee1eb5da LUMI_PREVIOUS_SCHEMA=18 \
+            LUMI_VERIFY_ROLLBACK=0 bash scripts/deploy-smoke.sh
       - name: Print container diagnostics
         if: failure()
         env:

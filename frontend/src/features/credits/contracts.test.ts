@@ -68,6 +68,13 @@ describe('credit contracts', () => {
       timezone: 'Asia/Shanghai',
     }
     expect(parseUsage(usage).month_consumed).toBe(0)
+    expect(parseUsage(usage).images_by_quality).toMatchObject({ xhigh: 0, max: 0 })
+    expect(
+      parseUsage({
+        ...usage,
+        images_by_quality: { ...usage.images_by_quality, xhigh: 2, max: 3 },
+      }).images_by_quality,
+    ).toMatchObject({ xhigh: 2, max: 3 })
     expect(() => parseUsage({ ...usage, days: [] })).toThrow()
     expect(() =>
       parseRedeemed({ credits: 5, account: { ...account, total: 20 }, record: {} }),

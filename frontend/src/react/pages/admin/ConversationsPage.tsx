@@ -7,6 +7,7 @@ import { useSession } from '../../features/auth/hooks'
 import { useCursorQuery } from '../../features/accounts/resources'
 import { useTime } from '../../features/accounts/time'
 import { AdminPage } from '../../components/admin/AdminPage'
+import { AdminUserInfo } from '../../components/admin/AdminUserInfo'
 import { DataTable } from '../../components/shared/DataTable'
 import { CursorControls } from '../../components/shared/CursorControls'
 import { ApiNotice } from '../../components/shared/ApiNotice'
@@ -166,20 +167,19 @@ function ConversationList({ initialOwner }: { initialOwner: string }) {
           {query.data?.items.length ? (
             <DataTable
               rows={query.data.items}
+              scrollRegionLabel={t('nav.adminChats')}
               columns={[
                 {
                   key: 'id',
-                  label: t('admin.users.id'),
+                  label: t('ops.conversationId'),
                   render: (row) => (
                     <code className="block min-w-36 break-all text-[10px]">{row.id}</code>
                   ),
                 },
                 {
                   key: 'user',
-                  label: t('ops.owner'),
-                  render: (row) => (
-                    <code className="block min-w-36 break-all text-[10px]">{row.user_id}</code>
-                  ),
+                  label: t('admin.users.userInfo'),
+                  render: (row) => <AdminUserInfo {...row} />,
                 },
                 {
                   key: 'model',
