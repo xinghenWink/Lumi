@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useState } from 'react'
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 import type { QueryClient } from '@tanstack/react-query'
-import { images, type ImageFile } from '../../../api/images'
+import type { ImageFile } from '../../../api/images'
 import { useRuntime } from '../../app/context'
 import type { AppRuntime } from '../../app/runtime'
 import { screenFiles, type Rejections } from './reference-rules'
@@ -206,9 +206,10 @@ export type ReferenceUploads = ReturnType<typeof createReferenceUploads>
 export function useReferenceUploads(options: UploadOptions) {
   const runtime = useRuntime()
   const [uploads] = useState(() =>
-    createReferenceUploads(runtime.session, runtime.queryClient, (file, signal) =>
-      images.upload(file, signal),
-    ),
+    createReferenceUploads(runtime.session, runtime.queryClient, async (file, signal) => {
+      const { images } = await import('../../../api/images')
+      return images.upload(file, signal)
+    }),
   )
   useLayoutEffect(() => {
     uploads.configure(options)
