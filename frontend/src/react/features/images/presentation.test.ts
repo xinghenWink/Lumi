@@ -9,6 +9,9 @@ describe('image presentation', () => {
     expect(taskAspect({ size: 'auto', ratio: '16:9' })).toBeCloseTo(16 / 9)
     expect(taskAspect({ size: 'auto', ratio: '' })).toBe(1)
     expect(
+      taskAspect({ size: 'auto', ratio: 'auto' }, { thumbnail_width: 384, thumbnail_height: 512 }),
+    ).toBe(0.75)
+    expect(
       taskAspect({ size: '0x0', ratio: 'x' }, { thumbnail_width: 0, thumbnail_height: 0 }),
     ).toBe(1)
   })

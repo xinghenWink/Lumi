@@ -75,6 +75,7 @@ SELECT * FROM pricing_rules ORDER BY model_id NULLS FIRST, operation, quality;
 
 -- name: GetEffectivePricing :one
 SELECT * FROM pricing_rules WHERE (model_id=$1 OR model_id IS NULL) AND operation=$2 AND quality=$3
+AND (model_id IS NULL OR enabled)
 ORDER BY model_id NULLS LAST LIMIT 1;
 
 -- name: ClearPricingRules :exec

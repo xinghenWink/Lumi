@@ -50,7 +50,7 @@ func (s *Service) Bootstrap(ctx context.Context, baseURL, key string) error {
 		}
 		for _, model := range []ModelInput{
 			{DisplayName: "ChatGPT", Type: "chat", Enabled: true, IsDefault: true, Capabilities: Capabilities{Stream: true, MaxContextTokens: 32000}, Routes: []RouteInput{{UpstreamID: id, UpstreamModelName: "gpt-5-3-mini", Weight: 1, Enabled: true}}},
-			{DisplayName: "GPT Image", Type: "image", Enabled: true, IsDefault: true, Capabilities: Capabilities{Qualities: []string{"low"}, Sizes: []string{"1024x1024"}, MaxN: 1, SupportsEdit: true, MaxReferenceImages: 1, ResponseFormat: "b64_json"}, Routes: []RouteInput{{UpstreamID: id, UpstreamModelName: "gpt-image-2", Weight: 1, Enabled: true}}},
+			{DisplayName: "GPT Image", Type: "image", Enabled: true, IsDefault: true, Capabilities: Capabilities{Qualities: []string{"low"}, Sizes: []string{"1024x1024", "auto"}, MaxN: 1, SupportsEdit: true, MaxReferenceImages: 1, ResponseFormat: "b64_json"}, Routes: []RouteInput{{UpstreamID: id, UpstreamModelName: "gpt-image-2", Weight: 1, Enabled: true}}},
 		} {
 			if err := modelInput(&model); err != nil {
 				return err

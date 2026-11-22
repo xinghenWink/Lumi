@@ -27,6 +27,14 @@ describe('canvas document rules', () => {
     expect(pendingTasks(sampleDocument())).toEqual([ids.task])
   })
 
+  it('accepts auto image sizing on a saved generator', () => {
+    expect(
+      mutate((d) =>
+        Object.assign(must(must(d.nodes[3]).generator), { size: 'auto', ratio: 'auto' }),
+      ),
+    ).toBe('')
+  })
+
   it('rejects what the server would reject', () => {
     expect(mutate((d) => (d.viewport.zoom = 5))).toBe('viewport')
     expect(mutate((d) => (must(d.nodes[1]).id = ids.group))).toBe('node-id')

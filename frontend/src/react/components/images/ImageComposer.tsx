@@ -1,5 +1,15 @@
-import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { ArrowUp, ImagePlus, Images, Plus, RotateCw, SlidersHorizontal } from 'lucide-react'
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react'
+import { ArrowUp, ImagePlus, Images, Pencil, Plus, RotateCw, SlidersHorizontal } from 'lucide-react'
 import { useStore } from 'zustand'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -31,9 +41,17 @@ const ImageLibrary = lazy(() =>
 export function ImageComposer({
   conversationId,
   layout = 'dock',
+  sketchOpen,
+  sketchTrigger,
+  sketchAttachmentRef,
+  onSketch,
 }: {
   conversationId: string
   layout?: 'panel' | 'dock'
+  sketchOpen: boolean
+  sketchTrigger: RefObject<HTMLButtonElement | null>
+  sketchAttachmentRef: RefObject<((file: File) => void) | null>
+  onSketch(maxBytes: number): void
 }) {
   const runtime = useRuntime()
   const controller = useImageController(),
@@ -61,7 +79,15 @@ export function ImageComposer({
     if (draft.references.length) textarea.current?.focus()
   }, [draft.references.length])
   function patch(value: Parameters<typeof controller.draft>[1]) {
-    controller.draft(conversationId, value)
+    controller.draft(
+      conversationId,
+      'complexity' in value
+        ? { ...value, complexityModelId: value.complexity ? options.model?.id : undefined }
+        : value,
+    )
+  }
+  function resetComplexity() {
+    if (draft.complexity) patch({ complexity: undefined })
   }
   function attach(file: ImageFile) {
     const current = controller.store.getState().drafts[scope] ?? emptyImageDraft
@@ -83,10 +109,19 @@ export function ImageComposer({
     enabled: !locked && options.maxReferences > 0 && !!maxBytes,
     commit: attach,
   })
+  const uploads = upload.uploads
+  useLayoutEffect(() => {
+    sketchAttachmentRef.current = (file) => {
+      if (uploads.add([file]) !== 1) throw new ApiError('IMAGE_REFERENCE_INVALID')
+    }
+    return () => {
+      sketchAttachmentRef.current = null
+    }
+  }, [sketchAttachmentRef, uploads])
   const full = upload.used >= options.maxReferences
   const attachable = !locked && options.maxReferences > 0 && !full && !!maxBytes
   const dragging = useFileDrop({
-    enabled: attachable,
+    enabled: attachable && !sketchOpen,
     title: locked
       ? t('react.dropLocked')
       : !options.maxReferences
@@ -111,6 +146,7 @@ export function ImageComposer({
     options.pricing ||
     !draft.prompt.trim() ||
     !options.models.selected ||
+    !options.size ||
     !options.quote ||
     !options.account.data ||
     insufficient ||
@@ -130,6 +166,8 @@ export function ImageComposer({
         ratio: options.ratio,
         n: options.n,
         reference_file_ids: draft.references,
+        ...(options.outputFormat ? { output_format: options.outputFormat } : {}),
+        ...(options.complexity ? { complexity: options.complexity } : {}),
       }
     }
     const result = await controller.submit(conversationId, body)
@@ -138,18 +176,25 @@ export function ImageComposer({
   const summary = options.quality
     ? [
         t('images.' + options.quality),
-        options.ratio || options.size,
+        options.size === 'auto' ? t('images.auto') : options.ratio || options.size,
+        options.outputFormat === 'gif' ? t('images.outputFormatGif') : '',
         t('react.imageCount', { count: options.n }),
       ]
         .filter(Boolean)
         .join(' · ')
-    : t('images.noPrice')
+    : t(options.noImageSize ? 'images.noImageSize' : 'images.noPrice')
   const cost = (
     <>
       <span>
         {options.quote
           ? t('images.estimate', { cost: options.quote.total_cost })
-          : t(options.pricing ? 'common.loading' : 'images.noPrice')}
+          : t(
+              options.pricing
+                ? 'common.loading'
+                : options.noImageSize
+                  ? 'images.noImageSize'
+                  : 'images.noPrice',
+            )}
       </span>
       <span>
         {options.account.data
@@ -268,6 +313,24 @@ export function ImageComposer({
         />
       </Suspense>
     ) : null
+  const sketchButton = (
+    <Button
+      ref={sketchTrigger}
+      type="button"
+      variant="ghost"
+      size={panel ? 'sm' : 'icon'}
+      className={panel ? 'px-2' : 'size-9 rounded-full'}
+      aria-label={t('images.sketch.title')}
+      title={t('images.sketch.title')}
+      disabled={!attachable}
+      onClick={() => {
+        if (maxBytes) onSketch(maxBytes)
+      }}
+    >
+      <Pencil size={panel ? 14 : 17} aria-hidden="true" />
+      {panel ? t('images.sketch.title') : null}
+    </Button>
+  )
   const parameters = <ImageParameters options={options} disabled={locked} onPatch={patch} />
   const notice = error || localError || options.error
 
@@ -293,7 +356,7 @@ export function ImageComposer({
             </div>
           ) : null}
           <div className="mb-3 -ml-1">
-            <ModelPicker kind="image" disabled={locked} />
+            <ModelPicker kind="image" disabled={locked} onModelChange={resetComplexity} />
           </div>
           <div
             className={cn(
@@ -352,7 +415,7 @@ export function ImageComposer({
                   </span>
                 </button>
               )}
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1">
                 <Button
                   type="button"
                   variant="ghost"
@@ -364,8 +427,9 @@ export function ImageComposer({
                   <Images size={14} />
                   {t('images.library')}
                 </Button>
+                {sketchButton}
                 {options.maxReferences && upload.used ? (
-                  <span className="text-2xs text-muted-foreground tabular-nums">
+                  <span className="ml-auto text-2xs text-muted-foreground tabular-nums">
                     <span aria-hidden="true">
                       {t('react.referenceSlots', {
                         count: upload.used,
@@ -444,7 +508,7 @@ export function ImageComposer({
         />
         <div className="flex min-w-0 items-center gap-0.5 px-2 pt-1 pb-2">
           <div className="min-w-0 flex-1">
-            <ModelPicker kind="image" disabled={locked} />
+            <ModelPicker kind="image" disabled={locked} onModelChange={resetComplexity} />
           </div>
           {fileInput}
           <Button
@@ -470,6 +534,7 @@ export function ImageComposer({
           >
             <Images size={17} />
           </Button>
+          {sketchButton}
           <Button
             type="button"
             variant="ghost"

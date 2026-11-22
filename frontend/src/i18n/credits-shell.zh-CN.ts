@@ -6,6 +6,7 @@ export default {
     creditLedger: '积分流水',
   },
   errors: {
+    PRICING_MODEL_REQUIRED: '请为新增专属价格规则选择一个生图模型。',
     IDEMPOTENCY_KEY_INVALID: '本次操作缺少有效标识，请刷新页面后重试。',
     IDEMPOTENCY_CONFLICT: '这次提交与原操作不一致，请重新填写后提交。',
     CREDITS_INSUFFICIENT: '可用积分不足，请减少数量或兑换积分。',
@@ -26,5 +27,7 @@ export default {
     low: '低',
     medium: '中',
     high: '高',
+    xhigh: '超高（xhigh）',
+    max: '最高（max）',
   },
 }

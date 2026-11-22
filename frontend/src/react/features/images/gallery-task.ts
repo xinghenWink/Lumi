@@ -63,16 +63,21 @@ export async function restoreGalleryTask({
     prompt: task.prompt,
     quality: task.quality,
     size: task.size,
-    ratio: task.ratio,
+    ratio: task.ratio || (task.size === 'auto' ? 'auto' : ''),
     n: task.n,
+    outputFormat: task.output_format,
+    ...(task.complexity ? { complexity: task.complexity, complexityModelId: task.model_id } : {}),
     references: files.map((file) => file.id),
   } satisfies ImageDraft
   const options = resolveImageOptions(draft, configuration, model)
+  if (draft.complexity && !options.supportsComplexity)
+    throw new ApiError('IMAGE_COMPLEXITY_UNSUPPORTED')
   if (
     options.quality !== draft.quality ||
     options.size !== draft.size ||
     options.ratio !== draft.ratio ||
-    options.n !== draft.n
+    options.n !== draft.n ||
+    (draft.outputFormat === 'gif' && !options.supportsGif)
   )
     throw new ApiError('IMAGE_HISTORY_PARAMETERS_UNAVAILABLE')
   if (files.length > options.maxReferences) throw new ApiError('IMAGE_REFERENCES_INVALID')

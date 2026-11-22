@@ -1,3 +1,4 @@
+import { catalog } from '../../../api/catalog'
 import type { AppRuntime } from '../../app/runtime'
 import type {
   ModelInput,
@@ -41,6 +42,20 @@ export function modelInput(row: PlatformModel): ModelInput {
     })),
   }
 }
+export async function listPricingModels(signal: AbortSignal): Promise<PlatformModel[]> {
+  const models = new Map<string, PlatformModel>()
+  let cursor = ''
+  do {
+    const page = await catalog.models(
+      new URLSearchParams({ type: 'image', cursor, limit: '100' }),
+      signal,
+    )
+    for (const model of page.items) models.set(model.id, model)
+    cursor = page.next_cursor
+  } while (cursor)
+  return [...models.values()]
+}
+
 export function invalidateCatalog(runtime: AppRuntime, owner: string | undefined) {
   for (const kind of ['admin-upstreams', 'admin-models', 'models', 'image-options', 'image-quote'])
     void runtime.queryClient.invalidateQueries({ queryKey: ['user', owner, kind] })

@@ -87,6 +87,7 @@ describe('React image submission and subscription compatibility', () => {
       n: 1,
       reference_file_ids: ['source'],
       edit_options: { action: 'markup' as const, guide_file_id: 'guide' },
+      complexity: 'medium' as const,
     }
     const submit = vi
       .spyOn(images, 'submit')

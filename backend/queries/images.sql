@@ -10,7 +10,7 @@ UPDATE image_settings SET max_n=$1,max_references=$2,max_upload_bytes=$3,sizes=$
 SELECT pg_advisory_xact_lock(719005);
 -- name: InsertImageFile :one
 INSERT INTO files(id,user_id,kind,task_id,path,thumbnail_path,mime,size,width,height,thumbnail_width,thumbnail_height,sha256)
-VALUES($1,$2,$3,$4,$5,$6,'image/png',$7,$8,$9,$10,$11,$12) RETURNING *;
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *;
 -- name: GetImageFile :one
 SELECT * FROM files WHERE id=$1 AND deleted_at IS NULL;
 -- name: GetImageReferenceFiles :many
@@ -79,8 +79,8 @@ SELECT * FROM image_tasks WHERE id=$1;
 -- name: LockImageTask :one
 SELECT * FROM image_tasks WHERE id=$1 FOR UPDATE;
 -- name: CreateImageTask :one
-INSERT INTO image_tasks(id,user_id,conversation_id,message_id,user_message_id,operation,model_id,model_name,prompt,params,quality,size,ratio,image_count,reference_file_ids,charge_id,unit_price,total_cost,idempotency_key,request_hash,split_requests,timeout_seconds,edit_action,edit_guide_file_id,queue_deadline)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,now()+make_interval(secs=>sqlc.arg(queue_timeout)::integer)) RETURNING *;
+INSERT INTO image_tasks(id,user_id,conversation_id,message_id,user_message_id,operation,model_id,model_name,prompt,params,quality,size,ratio,image_count,reference_file_ids,charge_id,unit_price,total_cost,idempotency_key,request_hash,split_requests,timeout_seconds,edit_action,edit_guide_file_id,output_format,complexity,queue_deadline)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,now()+make_interval(secs=>sqlc.arg(queue_timeout)::integer)) RETURNING *;
 -- name: CreateImageTaskItem :exec
 INSERT INTO image_task_items(task_id,position) VALUES($1,$2);
 -- name: ListImageTaskItems :many
@@ -126,6 +126,9 @@ AND (sqlc.narg(from_time)::timestamptz IS NULL OR created_at>=sqlc.narg(from_tim
 AND (sqlc.narg(until_time)::timestamptz IS NULL OR created_at<sqlc.narg(until_time)::timestamptz)
 AND (sqlc.narg(before_time)::timestamptz IS NULL OR (created_at,id)<(sqlc.narg(before_time)::timestamptz,sqlc.narg(before_id)::uuid))
 ORDER BY created_at DESC,id DESC LIMIT sqlc.arg(page_limit);
+-- name: ListImageTaskOwners :many
+SELECT id,nickname,email::text AS email FROM users
+WHERE id=ANY(sqlc.arg(user_ids)::uuid[]) AND deleted_at IS NULL;
 -- name: ListImageGallery :many
 SELECT f.*,t.prompt,t.params,t.quality,t.size AS requested_size,t.ratio,t.model_id,t.model_name,t.status AS task_status,t.conversation_id,t.unit_price
 FROM files f JOIN image_tasks t ON t.id=f.task_id

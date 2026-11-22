@@ -73,7 +73,10 @@ SELECT a.user_id,a.permanent_balance,a.daily_balance,coalesce(sum(l.delta) FILTE
 FROM credit_accounts a LEFT JOIN credit_ledger l ON l.user_id=a.user_id
 GROUP BY a.user_id HAVING a.permanent_balance<>coalesce(sum(l.delta) FILTER(WHERE l.bucket='permanent'),0) OR a.daily_balance<>coalesce(sum(l.delta) FILTER(WHERE l.bucket='daily'),0);
 -- name: AdminChatConversations :many
-SELECT c.* FROM conversations c WHERE c.type='chat' AND c.deleted_at IS NULL
+SELECT c.id,c.user_id,c.model_id,c.last_message_at,c.created_at,c.active_run_id,
+  coalesce(u.nickname,'') AS user_nickname,coalesce(u.email,'')::text AS user_email
+FROM conversations c LEFT JOIN users u ON u.id=c.user_id AND u.deleted_at IS NULL
+WHERE c.type='chat' AND c.deleted_at IS NULL
 AND (sqlc.narg(owner)::uuid IS NULL OR c.user_id=sqlc.narg(owner))
 AND (sqlc.narg(cursor_time)::timestamptz IS NULL OR (c.last_message_at,c.id)<(sqlc.narg(cursor_time),sqlc.arg(cursor_id)::uuid))
 ORDER BY c.last_message_at DESC,c.id DESC LIMIT sqlc.arg(page_limit);

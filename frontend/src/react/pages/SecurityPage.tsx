@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { operations, type Preferences } from '../../api/operations'
+import { imageRatios } from '../../api/images'
 import type { User } from '../../api/contracts'
 import { useRuntime } from '../app/context'
 import { useSession } from '../features/auth/hooks'
@@ -170,9 +171,9 @@ function SecurityForm({ user }: { user: User }) {
                       disabled={save.isPending}
                       onChange={(event) => setDraft({ ...draft, image_ratio: event.target.value })}
                     >
-                      {['1:1', '3:2', '2:3', '4:3', '3:4', '16:9', '9:16'].map((ratio) => (
+                      {imageRatios.map((ratio) => (
                         <NativeSelectOption key={ratio} value={ratio}>
-                          {ratio}
+                          {ratio === 'auto' ? t('images.auto') : ratio}
                         </NativeSelectOption>
                       ))}
                     </NativeSelect>

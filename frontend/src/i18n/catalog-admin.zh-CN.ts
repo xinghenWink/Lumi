@@ -70,6 +70,8 @@ export default {
     vision: '支持图片理解',
     maxContext: '上下文 token 上限',
     qualities: '可用质量',
+    advancedQualityPricing:
+      '高级档位使用「价格与赠送」中的全局默认价，也可以为此模型设置专属价格。',
     sizes: '可用尺寸',
     sizesHint: '先选比例，再点选推荐分辨率，或手动输入宽高；结果实际尺寸以返回文件为准。',
     sizeRatio: '比例',
@@ -88,6 +90,8 @@ export default {
     maxN: '每次最多图片数',
     supportsEdit: '支持改图',
     supportsTransparentBackground: '已验证所有启用路由支持透明背景改图',
+    supportsComplexity: '已验证所有启用路由支持规划强度',
+    supportsGif: '已验证所有启用路由支持 GIF 输出',
     maxReferences: '最多参考图数',
     responseFormat: '图片响应格式',
     base64: 'Base64 图片',

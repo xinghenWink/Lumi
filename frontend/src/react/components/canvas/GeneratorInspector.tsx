@@ -174,28 +174,40 @@ function ImageComposer({ node, ...props }: InspectorProps) {
     available,
   )
   const options = useImageOptions(
-    { ...settings, references: inputs.references },
+    {
+      ...settings,
+      references: inputs.references,
+      complexityModelId: settings.model_id ?? undefined,
+    },
     settings.model_id ?? undefined,
   )
   const model = options.model
+  const count = t('react.imageCount', { count: options.n })
   const parameterSummary =
     options.size && options.n
-      ? t('canvas.prompt.imageParameterSummary', {
-          ratio: options.ratio || t('images.custom'),
-          resolution:
-            options.resolution?.toUpperCase() ??
-            (options.size === 'auto' ? t('images.auto') : options.size.replace('x', ' × ')),
-          count: t('react.imageCount', { count: options.n }),
-        })
+      ? options.size === 'auto'
+        ? t('canvas.prompt.imageParameterAutoSummary', { ratio: t('images.auto'), count })
+        : t('canvas.prompt.imageParameterSummary', {
+            ratio: options.ratio || t('images.custom'),
+            resolution: options.resolution
+              ? t('images.resolutionTier.' + options.resolution)
+              : options.size.replace('x', ' × '),
+            count,
+          })
       : ''
   const prompt = buildPrompt(settings.prompt, inputs.texts)
-  function patch(change: Partial<CanvasGeneratorContent>, key = '') {
+  function patch(
+    change: Partial<Omit<CanvasGeneratorContent, 'complexity'>> & {
+      complexity?: CanvasGeneratorContent['complexity']
+    },
+    key = '',
+  ) {
     editor.apply(
       (current) =>
-        updateNode(current, node.id, (item) => ({
-          ...item,
-          generator: { ...(item.generator ?? defaultImage), ...change },
-        })),
+        updateNode(current, node.id, (item) => {
+          const { complexity, ...generator } = { ...(item.generator ?? defaultImage), ...change }
+          return { ...item, generator: { ...generator, ...(complexity ? { complexity } : {}) } }
+        }),
       { key },
     )
   }
@@ -203,15 +215,17 @@ function ImageComposer({ node, ...props }: InspectorProps) {
     ? 'canvas.generator.noModel'
     : missing.length || inputs.unavailable
       ? 'canvas.generator.missingInput'
-      : inputs.references.length && !model.capabilities.supports_edit
-        ? 'canvas.generator.noEdit'
-        : inputs.references.length > options.maxReferences
-          ? 'canvas.generator.tooManyReferences'
-          : !prompt
-            ? 'canvas.generator.emptyPrompt'
-            : new TextEncoder().encode(prompt).length > 64000
-              ? 'canvas.generator.longPrompt'
-              : ''
+      : options.noImageSize
+        ? 'images.noImageSize'
+        : inputs.references.length && !model.capabilities.supports_edit
+          ? 'canvas.generator.noEdit'
+          : inputs.references.length > options.maxReferences
+            ? 'canvas.generator.tooManyReferences'
+            : !prompt
+              ? 'canvas.generator.emptyPrompt'
+              : new TextEncoder().encode(prompt).length > 64000
+                ? 'canvas.generator.longPrompt'
+                : ''
   const insufficient =
     !!options.quote &&
     !!options.account.data &&
@@ -226,6 +240,7 @@ function ImageComposer({ node, ...props }: InspectorProps) {
         node_id: node.id,
         model_id: model.id,
         quality: options.quality as ImageInput['quality'],
+        ...(options.complexity ? { complexity: options.complexity } : {}),
         size: options.size,
         ratio: options.ratio,
         n: options.n,
@@ -241,8 +256,18 @@ function ImageComposer({ node, ...props }: InspectorProps) {
       label={t('canvas.generator.heading')}
       model={model?.id ?? ''}
       options={options.models.items.map((item) => ({ id: item.id, name: item.display_name }))}
-      onModel={(id) => patch({ model_id: id, quality: '', size: '', ratio: '' })}
-      parameters={<ImageParameters options={options} disabled={busy} onPatch={patch} />}
+      onModel={(id) =>
+        patch({ model_id: id, quality: '', size: '', ratio: '', complexity: undefined })
+      }
+      parameters={
+        <ImageParameters
+          options={options}
+          disabled={busy}
+          onPatch={(change) =>
+            patch(change.complexity && model ? { ...change, model_id: model.id } : change)
+          }
+        />
+      }
       parameterSummary={parameterSummary}
       footer={
         <>

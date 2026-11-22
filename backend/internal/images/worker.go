@@ -87,7 +87,11 @@ func (s *Service) saveItem(ctx context.Context, task query.ImageTask, position i
 			raw, err = client.FetchImage(ctx, result.URL)
 		}
 		if err == nil {
-			prepared, err = s.files.PrepareImageResult(ctx, task.UserID, task.ID, raw, resultCheck(ctx, task.EditAction, task.Ratio))
+			resultFormat := task.OutputFormat
+			if task.EditAction != "" && resultFormat == "" {
+				resultFormat = "png"
+			}
+			prepared, err = s.files.PrepareImageResult(ctx, task.UserID, task.ID, raw, resultFormat, resultCheck(ctx, task.EditAction, task.Ratio))
 		}
 		if err != nil {
 			code = "IMAGE_RESULT_INVALID"
@@ -271,7 +275,9 @@ func (s *Service) Execute(ctx context.Context, task query.ImageTask) {
 			fileIDs = []uuid.UUID{*task.EditGuideFileID}
 		}
 		transparent := task.EditAction == editRemoveBackground
-		if transparent && !model.Capabilities.SupportsTransparentBackground {
+		if task.Complexity != "" && !model.Capabilities.SupportsComplexity {
+			code = "IMAGE_COMPLEXITY_UNSUPPORTED"
+		} else if transparent && !model.Capabilities.SupportsTransparentBackground {
 			code = "IMAGE_BACKGROUND_UNSUPPORTED"
 		}
 		refs := make([]upstream.Reference, 0, len(fileIDs))
@@ -282,13 +288,21 @@ func (s *Service) Execute(ctx context.Context, task query.ImageTask) {
 			data, err := s.files.Reference(work, task.UserID, id)
 			if err != nil {
 				code = "FILE_NOT_FOUND"
+				var failure *problem.Error
+				if errors.As(err, &failure) && failure.Code == "FILE_TOO_LARGE" {
+					code = failure.Code
+				}
 				break
 			}
 			refs = append(refs, upstream.Reference{Name: id.String() + ".png", MIME: "image/png", Data: data})
 		}
 		if code == "" {
+			outputFormat := task.OutputFormat
+			if outputFormat == "png" && !model.Capabilities.SupportsGIF {
+				outputFormat = ""
+			}
 			request := upstream.EditRequest{
-				ImageRequest: upstream.ImageRequest{Model: remote, Prompt: editPrompt(task.EditAction, task.Prompt), Quality: task.Quality, Size: task.Size, Count: int(task.ImageCount)},
+				ImageRequest: upstream.ImageRequest{Model: remote, Prompt: editPrompt(task.EditAction, task.Prompt), Quality: task.Quality, Size: task.Size, Count: int(task.ImageCount), OutputFormat: outputFormat, Complexity: task.Complexity},
 				References:   refs, TransparentBackground: transparent,
 			}
 			run := func(position int32, count int) {

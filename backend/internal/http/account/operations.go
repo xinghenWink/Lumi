@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -530,7 +531,7 @@ func (h *Handler) downloadImages(c *gin.Context) {
 			h.fail(c, err)
 			return
 		}
-		entry, err := writer.Create(id.String() + ".png")
+		entry, err := writer.Create(id.String() + filepath.Ext(row.Path))
 		if err != nil {
 			if closeErr := file.Close(); closeErr != nil {
 				h.logger.Debug("close ZIP source failed")

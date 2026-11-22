@@ -69,13 +69,21 @@ test('M6 dashboard, preferences, announcements, exports and system information',
     })
     await page.goto('/me/security')
     await expect(page.getByRole('heading', { name: '个人偏好', exact: true })).toBeVisible()
+    const ratio = page.getByLabel('默认宽高比', { exact: true })
+    await ratio.selectOption('3:2')
     await page.getByLabel('自定义指令', { exact: true }).fill('M6 browser preference')
     await page.getByRole('button', { name: '保存修改', exact: true }).click()
     await expect(page.getByRole('status')).toContainText('修改已保存')
     await page.reload()
+    await expect(ratio).toHaveValue('3:2')
     await expect(page.getByLabel('自定义指令', { exact: true })).toHaveValue(
       'M6 browser preference',
     )
+    await ratio.selectOption({ label: '自动' })
+    await page.getByRole('button', { name: '保存修改', exact: true }).click()
+    await expect(page.getByRole('status')).toContainText('修改已保存')
+    await page.reload()
+    await expect(ratio).toHaveValue('auto')
     const downloadPromise = page.waitForEvent('download')
     await page.getByRole('button', { name: '导出聊天 JSON', exact: true }).click()
     const download = await downloadPromise

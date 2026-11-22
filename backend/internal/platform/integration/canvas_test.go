@@ -67,22 +67,23 @@ func TestCanvasRebuildPersistenceGenerationAndRetention(t *testing.T) {
 
 func TestCanvasRebuildUpgrade(t *testing.T) {
 	f := accountFixtureWithMigrations(t, func(ctx context.Context, pool *pgxpool.Pool) error {
-		return withCanvasUpgradeProvider(ctx, pool, func(p *goose.Provider) error {
+		return withUpgradeProvider(ctx, pool, func(p *goose.Provider) error {
 			if _, err := p.UpTo(ctx, 10); err != nil {
 				return err
 			}
-			// Seed legacy canvas tasks through the current image service before migration 11.
-			if _, err := p.ApplyVersion(ctx, 13, true); err != nil {
-				return err
+			// Seed legacy canvas tasks through the current image and billing services before migration 11.
+			for _, version := range []int64{13, 16, 20, 21, 23} {
+				if _, err := p.ApplyVersion(ctx, version, true); err != nil {
+					return err
+				}
 			}
-			_, err := p.ApplyVersion(ctx, 16, true)
-			return err
+			return nil
 		})
 	})
 	testCanvas(t, f, true)
 }
 
-func withCanvasUpgradeProvider(ctx context.Context, pool *pgxpool.Pool, work func(*goose.Provider) error) (result error) {
+func withUpgradeProvider(ctx context.Context, pool *pgxpool.Pool, work func(*goose.Provider) error) (result error) {
 	conn := stdlib.OpenDB(*pool.Config().ConnConfig)
 	defer func() { result = errors.Join(result, conn.Close()) }()
 	provider, err := goose.NewProvider(goose.DialectPostgres, conn, os.DirFS("../../../migrations"),
@@ -150,7 +151,7 @@ func testCanvas(t *testing.T, f *fixture, upgrade bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	model, err := f.services.Catalog.SaveModel(f.ctx, admin, uuid.Nil, catalog.ModelInput{DisplayName: "画布图片", Type: "image", Enabled: true, Capabilities: catalog.Capabilities{Qualities: []string{"low"}, Sizes: []string{"1024x1024"}, MaxN: 4, SupportsEdit: true, MaxReferenceImages: 4, ResponseFormat: "b64_json"}, Routes: []catalog.RouteInput{{UpstreamID: channel.ID, UpstreamModelName: "canvas-image-model", Weight: 1, Enabled: true}}})
+	model, err := f.services.Catalog.SaveModel(f.ctx, admin, uuid.Nil, catalog.ModelInput{DisplayName: "画布图片", Type: "image", Enabled: true, Capabilities: catalog.Capabilities{Qualities: []string{"low"}, UseSizePresets: true, SupportedResolutions: []string{"1k", "2k"}, MaxN: 4, SupportsEdit: true, MaxReferenceImages: 4, ResponseFormat: "b64_json"}, Routes: []catalog.RouteInput{{UpstreamID: channel.ID, UpstreamModelName: "canvas-image-model", Weight: 1, Enabled: true}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +211,7 @@ func testCanvas(t *testing.T, f *fixture, upgrade bool) {
 	doc.Nodes = []canvas.Node{
 		{ID: imageNode, Kind: canvas.KindImage, W: 400, H: 300, Image: &canvas.ImageContent{State: canvas.StateReady, FileID: &upload.ID}},
 		{ID: textNode, Kind: canvas.KindText, Y: 340, W: 240, H: 120, Text: &canvas.TextContent{Content: "暖色调\n胶片质感"}},
-		{ID: generatorNode, Kind: canvas.KindGenerator, X: 500, W: 320, H: 240, Generator: &canvas.GeneratorContent{Prompt: "一只猫", Count: 1}},
+		{ID: generatorNode, Kind: canvas.KindGenerator, X: 500, W: 320, H: 240, Generator: &canvas.GeneratorContent{Prompt: "一只猫", Quality: "max", Count: 1}},
 	}
 	doc.Edges = []canvas.Edge{{ID: uuid.New(), From: imageNode, To: generatorNode, Kind: canvas.EdgeInput}, {ID: uuid.New(), From: textNode, To: generatorNode, Kind: canvas.EdgeInput}}
 	path := "/api/v1/canvases/" + id.String()
@@ -245,6 +246,9 @@ func testCanvas(t *testing.T, f *fixture, upgrade bool) {
 		if reloaded.Version != board.Version || len(reloaded.Document.Nodes) != 3 {
 			t.Fatal("rejected saves changed the canvas")
 		}
+		if generator := reloaded.Document.Nodes[2].Generator; generator == nil || generator.Quality != "max" {
+			t.Fatal("the reloaded generator lost the selected quality")
+		}
 		page := decodeReply[canvas.Page](t, f.call(t, client, "GET", "/api/v1/canvases", token, nil))
 		if len(page.Items) != 1 || page.Items[0].Cover == nil || page.Items[0].Cover.ID != upload.ID {
 			t.Fatal("list did not expose the cover image")
@@ -256,6 +260,12 @@ func testCanvas(t *testing.T, f *fixture, upgrade bool) {
 		input := canvas.RunInput{Version: board.Version, NodeID: generatorNode, ModelID: model.ID, Quality: "low", Size: "1024x1024", Count: 1}
 		key := uuid.NewString()
 		expectStatus(t, f.call(t, otherClient, "POST", path+"/runs", otherToken, input, key), 404)
+		rejected := input
+		rejected.Size, rejected.Ratio = "4096x4096", "1:1"
+		expectStatus(t, f.call(t, client, "POST", path+"/runs", token, rejected, uuid.NewString()), http.StatusBadRequest)
+		if creditBalance(t, f, member.ID).Total != before.Total {
+			t.Fatal("unsupported 4k canvas run was charged")
+		}
 		submitted := f.call(t, client, "POST", path+"/runs", token, input, key)
 		expectStatus(t, submitted, 202)
 		run := decodeReply[canvas.Run](t, submitted)
@@ -334,7 +344,7 @@ func testCanvas(t *testing.T, f *fixture, upgrade bool) {
 			if _, err := f.pool.Exec(f.ctx, "UPDATE canvases SET document=jsonb_set(document,'{schema}','1') WHERE id=$1", id); err != nil {
 				t.Fatal(err)
 			}
-			if err := withCanvasUpgradeProvider(f.ctx, f.pool, func(p *goose.Provider) error {
+			if err := withUpgradeProvider(f.ctx, f.pool, func(p *goose.Provider) error {
 				_, err := p.Up(f.ctx)
 				return err
 			}); err != nil {
