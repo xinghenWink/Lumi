@@ -11,13 +11,13 @@ verify_rollback=${LUMI_VERIFY_ROLLBACK:-1}
 [[ $verify_rollback == 0 || $verify_rollback == 1 ]] || exit 1
 workspace=$(mktemp -d)
 export COMPOSE_PROJECT_NAME="lumi-m7-smoke-$(openssl rand -hex 4)"
-unset DATABASE_URL REDIS_URL JWT_SECRET ENCRYPTION_KEY ADMIN_PASSWORD LUMI_IMAGE LUMI_VERSION
+unset DATABASE_URL REDIS_URL JWT_SECRET ENCRYPTION_KEY ADMIN_PASSWORD LUMI_IMAGE LUMI_VERSION LUMI_IMAGE_REF
 cleanup() {
   code=$?
   if [[ $code != 0 && -f "$workspace/live/.env" ]]; then
     (cd -- "$workspace/live" && docker compose logs --tail 50 app postgres) || true
   fi
-  for directory in "$workspace/live" "$workspace/restored"; do
+  for directory in "$workspace/live" "$workspace/restored" "$workspace/rollback"; do
     if [[ -f $directory/.env ]]; then (cd -- "$directory" && docker compose down --volumes >/dev/null) || true; fi
   done
   rm -rf -- "$workspace"
@@ -27,9 +27,9 @@ trap cleanup EXIT
 bash "$root/deploy/docker-deploy.sh" "$workspace/live"
 cd -- "$workspace/live"
 sed -i 's/^ADMIN_EMAIL=.*/ADMIN_EMAIL=smoke@lumi.test/' .env
-# Use image references verbatim, including registry digests.
+# Keep the effective image reference in .env so each backup can restore its own version.
 set_image() {
-  printf 'services:\n  app:\n    image: %s\n' "$1" > docker-compose.override.yml
+  sed -i "s|^LUMI_IMAGE_REF=.*|LUMI_IMAGE_REF=$1|" .env
 }
 verify_release() {
   local version=$1 commit=$2 schema=$3
@@ -96,6 +96,10 @@ verify_data() {
 docker compose restart app postgres redis
 docker compose up -d --wait --wait-timeout 180
 verify_data
+if [[ $verify_rollback == 0 ]]; then
+  BACKUP_DIR="$workspace/pre-upgrade" bash "$workspace/live/backup.sh"
+  previous_archive=$(find "$workspace/pre-upgrade" -maxdepth 1 -name '*.tar.gz' -print -quit)
+fi
 set_image "$LUMI_CURRENT_IMAGE"
 docker compose up -d --wait --wait-timeout 180
 verify_data
@@ -110,12 +114,18 @@ if [[ $verify_rollback == 1 ]]; then
   verify_data
   verify_release "${LUMI_CURRENT_RELEASE:-}" "${LUMI_CURRENT_COMMIT:-}" "${LUMI_CURRENT_SCHEMA:-}"
 fi
-# Persist the effective image reference into the backed up compose, not just its override.
-sed -i "s|image: \${LUMI_IMAGE.*|image: $LUMI_CURRENT_IMAGE|" docker-compose.yml
 BACKUP_KEEP=2 bash "$workspace/live/backup.sh"
 archive=$(find "$workspace/live/backups" -maxdepth 1 -name '*.tar.gz' -print -quit)
 docker compose down --volumes
 bash "$workspace/live/restore.sh" "$archive" "$workspace/restored"
 cd -- "$workspace/restored"
 verify_data
+verify_release "${LUMI_CURRENT_RELEASE:-}" "${LUMI_CURRENT_COMMIT:-}" "${LUMI_CURRENT_SCHEMA:-}"
+if [[ $verify_rollback == 0 ]]; then
+  docker compose down --volumes
+  bash "$workspace/live/restore.sh" "$previous_archive" "$workspace/rollback"
+  cd -- "$workspace/rollback"
+  verify_data
+  verify_release "${LUMI_PREVIOUS_RELEASE:-}" "${LUMI_PREVIOUS_COMMIT:-}" "${LUMI_PREVIOUS_SCHEMA:-}"
+fi
 echo 'PASS: deployment, upgrade and fresh restore preserved administrator login, credits and original file bytes.'
