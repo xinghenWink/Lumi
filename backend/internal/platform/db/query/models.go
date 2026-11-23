@@ -384,6 +384,20 @@ type RedeemRecord struct {
 	CreatedAt time.Time
 }
 
+type ReferralCode struct {
+	UserID uuid.UUID
+	Code   string
+}
+
+type RegistrationReferral struct {
+	ID             uuid.UUID
+	InviteeID      uuid.UUID
+	InviterID      uuid.UUID
+	InviterCredits int64
+	InviteeCredits int64
+	CreatedAt      time.Time
+}
+
 type Setting struct {
 	Key       string
 	Value     []byte

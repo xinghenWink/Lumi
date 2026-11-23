@@ -3,6 +3,7 @@ import { ApiError, noContent } from './transport'
 import {
   parseCreditAccount,
   parsePricing,
+  parseReferral,
   parseLedger,
   parseUsage,
   parseRedeemed,
@@ -19,6 +20,9 @@ const root = '/api/v1'
 const adminUser = (id: string) => `${root}/admin/users/${encodeURIComponent(id)}/credits`
 const signalOptions = (signal?: AbortSignal) => (signal ? { signal } : {})
 export const credits = {
+  referral: (signal?: AbortSignal) =>
+    authorized(`${root}/me/referral`, parseReferral, signalOptions(signal)),
+  generateReferral: () => authorized(`${root}/me/referral`, parseReferral, { method: 'PUT' }),
   account: (id?: string, signal?: AbortSignal) =>
     authorized(
       id ? adminUser(id) : `${root}/me/credits`,

@@ -121,7 +121,11 @@ paths:
   /api/v1/auth/register:
     post:
       operationId: register
-      summary: register
+      summary: Register and apply any referral rewards atomically
+      description: >-
+        An invalid or unavailable invite code returns REFERRAL_CODE_INVALID (400).
+        REFERRAL_REWARD_LIMIT (409) means the referral would exceed a balance limit.
+        Both responses roll back account creation and keep a valid email verification code usable on retry.
       parameters:
         - name: X-Lumi-CSRF
           in: header
@@ -842,6 +846,48 @@ paths:
                 $ref: '#/components/schemas/CreditAccount'
         default:
           $ref: '#/components/responses/APIError'
+  /api/v1/me/referral:
+    get:
+      operationId: getMyReferral
+      summary: Read the current user's invite code, link, and referral rewards
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current invite details
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Referral'
+        default:
+          $ref: '#/components/responses/APIError'
+    put:
+      operationId: generateMyReferral
+      summary: Generate the current user's invite code or return the existing code
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      responses:
+        '200':
+          description: Current invite details
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Referral'
+        default:
+          $ref: '#/components/responses/APIError'
   /api/v1/me/credits/ledger:
     get:
       operationId: listMyCreditLedger
@@ -856,6 +902,8 @@ paths:
             type: string
             enum:
               - signup_bonus
+              - referral_inviter_bonus
+              - referral_invitee_bonus
               - daily_grant
               - daily_expire
               - redeem
@@ -1128,7 +1176,7 @@ paths:
       operationId: saveCreditPricing
       summary: >-
         Update gift configuration and replace pricing rules atomically. The six base global rules
-        are required. Omitted xhigh/max global rules retain their saved values.
+        are required. Omitted xhigh/max global rules and referral reward fields retain their saved values.
       security:
         - bearerAuth: []
       parameters:
@@ -1176,6 +1224,8 @@ paths:
             type: string
             enum:
               - signup_bonus
+              - referral_inviter_bonus
+              - referral_invitee_bonus
               - daily_grant
               - daily_expire
               - redeem
@@ -1462,6 +1512,8 @@ paths:
             type: string
             enum:
               - signup_bonus
+              - referral_inviter_bonus
+              - referral_invitee_bonus
               - daily_grant
               - daily_expire
               - redeem
@@ -6318,6 +6370,9 @@ components:
         code:
           type: string
           maxLength: 6
+        invite_code:
+          type: string
+          description: Optional 16-character hexadecimal invite code. Surrounding whitespace and case are ignored.
         accept_terms:
           type: boolean
           enum:
@@ -6783,6 +6838,32 @@ components:
             $ref: '#/components/schemas/AuditRecord'
         next_cursor:
           type: string
+    Referral:
+      type: object
+      additionalProperties: false
+      required:
+        - invite_code
+        - invite_url
+        - referral_inviter_bonus_credits
+        - referral_invitee_bonus_credits
+      properties:
+        invite_code:
+          type: string
+          pattern: '^([A-F0-9]{16})?$'
+          description: Empty until the current user generates a code.
+        invite_url:
+          type: string
+          description: Absolute registration URL, or an empty string before code generation.
+        referral_inviter_bonus_credits:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 1000000000
+        referral_invitee_bonus_credits:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 1000000000
     CreditConfiguration:
       type: object
       additionalProperties: false
@@ -6798,6 +6879,18 @@ components:
           format: int64
           minimum: 0
           maximum: 1000000000
+        referral_inviter_bonus_credits:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 1000000000
+          description: Permanent credits for the inviter. Always returned, initially 0. Omit on write to keep the saved value.
+        referral_invitee_bonus_credits:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 1000000000
+          description: Permanent credits for the new user, in addition to their signup bonus. Always returned, initially 0. Omit on write to keep the saved value.
         daily_free_credits:
           type: integer
           format: int64
@@ -7038,6 +7131,8 @@ components:
           type: string
           enum:
             - signup_bonus
+            - referral_inviter_bonus
+            - referral_invitee_bonus
             - daily_grant
             - daily_expire
             - redeem

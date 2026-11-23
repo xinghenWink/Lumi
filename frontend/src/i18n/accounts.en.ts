@@ -49,6 +49,7 @@ export default {
     nicknamePlaceholder: 'What should we call you?',
     code: 'Verification code',
     codePlaceholder: '6 digits',
+    inviteCode: 'Invite code (optional)',
     sendCode: 'Send code',
     sendingCode: 'Sending…',
     resend: 'Resend in {seconds}s',
@@ -378,6 +379,10 @@ export default {
     LAST_ADMIN_REQUIRED: 'At least one active administrator must remain.',
     REGISTRATION_CLOSED: 'Registration is currently closed.',
     EMAIL_DOMAIN_BLOCKED: 'This email domain cannot register. Use a different email.',
+    REFERRAL_CODE_INVALID:
+      'This invite code is invalid or unavailable. Correct it or clear it and try again.',
+    REFERRAL_REWARD_LIMIT:
+      'This referral would exceed a credit balance limit. Clear the invite code to continue registering.',
     VERIFICATION_INVALID:
       'The code is invalid, expired or has too many attempts. Request a new one.',
     VERIFICATION_NOT_REQUIRED: 'Registration no longer requires a code. Refresh to continue.',

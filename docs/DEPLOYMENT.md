@@ -152,6 +152,8 @@ sudo env LUMI_CURRENT_IMAGE=lumi:m7 LUMI_PREVIOUS_IMAGE=lumi:m6 make deploy-smok
 
 Playwright 包含单用户注册 → 聊天 → 兑换 → 生图 → 管理员调整余额，以及全部既有回归、500 消息、1000 图和登录后的桌面 Lighthouse。Lighthouse 使用本机 / CI 提供的 CPU 和网络，交互事件上界不冒充现场 INP。报告在 `frontend/test-results/`。
 
+邀请奖励随应用启动迁移。升级测试环境后，检查 `PUBLIC_BASE_URL` 是否为好友可访问的域名，在后台为双方设置不同的非零奖励，用已有账号生成链接，并在独立浏览器会话中打开该链接注册。核对双方的永久积分与两类流水，再检查邀请码清空后的普通注册。
+
 ## 正式发布门槛
 
 核对 [M7 验收基线](M7_ACCEPTANCE.md)、[React 迁移验收](REACT_UI_PR7.md#completed-acceptance) 和 [v0.2.0 发布计划](RELEASE_V0.2.0.md)。CI 完整通过，真实上游能力核定、干净目标服务器 HTTPS 部署 / 重启 / 升级回滚 / 恢复验收完成后，为**已验收的同一提交**打 `v0.2.0` 并推送。release workflow 再运行全部 CI，发布 amd64 / arm64 GHCR manifest；两种原生架构按 digest 启动验证通过后创建带完整附件的 GitHub Release **草稿**。等待整个工作流全绿，再将官方镜像固定到目标服务器复验；可按上文使用只读 Packages PAT 或官方离线归档。SSH 凭据不上传 Actions。

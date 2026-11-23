@@ -98,7 +98,10 @@ export interface paths {
     }
     get?: never
     put?: never
-    /** register */
+    /**
+     * Register and apply any referral rewards atomically
+     * @description An invalid or unavailable invite code returns REFERRAL_CODE_INVALID (400). REFERRAL_REWARD_LIMIT (409) means the referral would exceed a balance limit. Both responses roll back account creation and keep a valid email verification code usable on retry.
+     */
     post: operations['register']
     delete?: never
     options?: never
@@ -288,6 +291,24 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/me/referral': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Read the current user's invite code, link, and referral rewards */
+    get: operations['getMyReferral']
+    /** Generate the current user's invite code or return the existing code */
+    put: operations['generateMyReferral']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/me/credits/ledger': {
     parameters: {
       query?: never
@@ -400,7 +421,7 @@ export interface paths {
     }
     /** getCreditPricing */
     get: operations['getCreditPricing']
-    /** Update gift configuration and replace pricing rules atomically. The six base global rules are required. Omitted xhigh/max global rules retain their saved values. */
+    /** Update gift configuration and replace pricing rules atomically. The six base global rules are required. Omitted xhigh/max global rules and referral reward fields retain their saved values. */
     put: operations['saveCreditPricing']
     post?: never
     delete?: never
@@ -2078,6 +2099,8 @@ export interface components {
       password: string
       nickname: string
       code?: string
+      /** @description Optional 16-character hexadecimal invite code. Surrounding whitespace and case are ignored. */
+      invite_code?: string
       /** @enum {boolean} */
       accept_terms: true
       turnstile_token?: string
@@ -2246,9 +2269,29 @@ export interface components {
       items: components['schemas']['AuditRecord'][]
       next_cursor: string
     }
+    Referral: {
+      /** @description Empty until the current user generates a code. */
+      invite_code: string
+      /** @description Absolute registration URL, or an empty string before code generation. */
+      invite_url: string
+      /** Format: int64 */
+      referral_inviter_bonus_credits: number
+      /** Format: int64 */
+      referral_invitee_bonus_credits: number
+    }
     CreditConfiguration: {
       /** Format: int64 */
       signup_bonus_credits: number
+      /**
+       * Format: int64
+       * @description Permanent credits for the inviter. Always returned, initially 0. Omit on write to keep the saved value.
+       */
+      referral_inviter_bonus_credits?: number
+      /**
+       * Format: int64
+       * @description Permanent credits for the new user, in addition to their signup bonus. Always returned, initially 0. Omit on write to keep the saved value.
+       */
+      referral_invitee_bonus_credits?: number
       /** Format: int64 */
       daily_free_credits: number
       /** @description IANA timezone; default Asia/Shanghai. */
@@ -2347,6 +2390,8 @@ export interface components {
       /** @enum {string} */
       type:
         | 'signup_bonus'
+        | 'referral_inviter_bonus'
+        | 'referral_invitee_bonus'
         | 'daily_grant'
         | 'daily_expire'
         | 'redeem'
@@ -3873,11 +3918,59 @@ export interface operations {
       default: components['responses']['APIError']
     }
   }
+  getMyReferral: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Current invite details */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Referral']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  generateMyReferral: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Current invite details */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestID']
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Referral']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
   listMyCreditLedger: {
     parameters: {
       query?: {
         type?:
           | 'signup_bonus'
+          | 'referral_inviter_bonus'
+          | 'referral_invitee_bonus'
           | 'daily_grant'
           | 'daily_expire'
           | 'redeem'
@@ -4124,6 +4217,8 @@ export interface operations {
         user_id?: string
         type?:
           | 'signup_bonus'
+          | 'referral_inviter_bonus'
+          | 'referral_invitee_bonus'
           | 'daily_grant'
           | 'daily_expire'
           | 'redeem'
@@ -4321,6 +4416,8 @@ export interface operations {
         user_id?: string
         type?:
           | 'signup_bonus'
+          | 'referral_inviter_bonus'
+          | 'referral_invitee_bonus'
           | 'daily_grant'
           | 'daily_expire'
           | 'redeem'

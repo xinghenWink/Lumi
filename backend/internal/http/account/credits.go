@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +18,8 @@ import (
 
 func (h *Handler) creditRoutes(protected, admin *gin.RouterGroup) {
 	protected.GET("/me/credits", h.myCredits)
+	protected.GET("/me/referral", h.myReferral)
+	protected.PUT("/me/referral", h.csrf, h.generateReferral)
 	protected.GET("/me/credits/ledger", h.myLedger)
 	protected.GET("/me/credits/stats", h.myUsage)
 	protected.POST("/me/credits/quote", h.csrf, h.quoteCredits)
@@ -36,6 +39,43 @@ func (h *Handler) creditRoutes(protected, admin *gin.RouterGroup) {
 	admin.GET("/redeem-codes/export", h.exportCodes)
 	admin.GET("/redeem-records", h.allRedemptions)
 }
+
+func (h *Handler) myReferral(c *gin.Context) {
+	current, ok := principal(c)
+	if !ok {
+		h.fail(c, problem.Unauthorized())
+		return
+	}
+	result, err := h.services.Credits.Referral(c.Request.Context(), current.User.ID)
+	h.referralReply(c, result, err)
+}
+
+func (h *Handler) generateReferral(c *gin.Context) {
+	current, ok := principal(c)
+	if !ok {
+		h.fail(c, problem.Unauthorized())
+		return
+	}
+	result, err := h.services.Credits.GenerateReferral(c.Request.Context(), current.Actor)
+	h.referralReply(c, result, err)
+}
+
+func (h *Handler) referralReply(c *gin.Context, result credits.Referral, err error) {
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	var link string
+	if result.InviteCode != "" {
+		params := url.Values{"invite_code": {result.InviteCode}}
+		link = strings.TrimRight(h.services.PublicBaseURL, "/") + "/register?" + params.Encode()
+	}
+	c.JSON(http.StatusOK, struct {
+		credits.Referral
+		InviteURL string `json:"invite_url"`
+	}{result, link})
+}
+
 func (h *Handler) myCredits(c *gin.Context) {
 	current, ok := principal(c)
 	if !ok {

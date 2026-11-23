@@ -28,6 +28,9 @@ function AuthForm({ registering }: { registering: boolean }) {
   const [password, setPassword] = useState('')
   const [nickname, setNickname] = useState('')
   const [code, setCode] = useState('')
+  const [inviteCode, setInviteCode] = useState(() =>
+    registering ? (params.get('invite_code') ?? '') : '',
+  )
   const [agreed, setAgreed] = useState(false)
   const [visible, setVisible] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -41,6 +44,11 @@ function AuthForm({ registering }: { registering: boolean }) {
   const challenge = useRef<(() => Promise<Challenge>) | null>(null)
   const key = config.data?.turnstile_site_key ?? ''
   const challengeEnabled = registering && config.data?.turnstile_enabled === true
+  const referralError =
+    error instanceof ApiError &&
+    (error.code === 'REFERRAL_CODE_INVALID' || error.code === 'REFERRAL_REWARD_LIMIT')
+      ? error.code
+      : null
   useEffect(() => {
     if (!challengeEnabled) return
     let active = true
@@ -133,6 +141,7 @@ function AuthForm({ registering }: { registering: boolean }) {
           password,
           nickname: nickname.trim(),
           code,
+          ...(inviteCode.trim() ? { invite_code: inviteCode.trim() } : {}),
           accept_terms: true,
           turnstile_token: (await token('register')) ?? '',
         })
@@ -280,6 +289,30 @@ function AuthForm({ registering }: { registering: boolean }) {
               </Field>
             ) : null}
             {registering ? (
+              <Field id="auth-invite-code" label={t('auth.inviteCode')} invalid={!!referralError}>
+                <Input
+                  id="auth-invite-code"
+                  name="invite_code"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  aria-invalid={referralError ? true : undefined}
+                  aria-describedby={referralError ? 'auth-invite-code-error' : undefined}
+                  value={inviteCode}
+                  disabled={busy}
+                  onChange={(event) => {
+                    setInviteCode(event.target.value)
+                    if (referralError) setError(null)
+                  }}
+                />
+                {referralError ? (
+                  <p id="auth-invite-code-error" role="alert" className="text-sm text-destructive">
+                    {t(`errors.${referralError}`)}
+                  </p>
+                ) : null}
+              </Field>
+            ) : null}
+            {registering ? (
               <div className="flex items-start gap-2.5 text-xs leading-6 text-muted-foreground">
                 <Suspense fallback={<span aria-hidden="true" className="mt-1 size-4 shrink-0" />}>
                   <TermsCheckbox
@@ -322,7 +355,7 @@ function AuthForm({ registering }: { registering: boolean }) {
                 {validation}
               </p>
             ) : null}
-            <ApiNotice error={error} />
+            <ApiNotice error={referralError ? null : error} />
             {notice ? (
               <p role="status" className="text-sm text-primary">
                 {notice}

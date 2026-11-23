@@ -4,6 +4,7 @@ import { CreditOverview } from '../components/credits/CreditOverview'
 import { CreditUsage } from '../components/credits/CreditUsage'
 import { CreditLedger } from '../components/credits/CreditLedger'
 import { RedemptionRecords } from '../components/credits/RedemptionRecords'
+import { ReferralCard } from '../components/credits/ReferralCard'
 import { Button } from '../components/ui/button'
 import { PageStatus } from '../components/shared/PageStatus'
 import { useRouteCopy } from '../i18n/route-copy'
@@ -24,6 +25,7 @@ export default function CreditsPage() {
           <CreditOverview />
           <CreditUsage />
         </div>
+        <ReferralCard />
         <nav aria-label={t('credits.title')} className="mb-5 flex gap-2">
           {['ledger', 'records'].map((value) => (
             <Button

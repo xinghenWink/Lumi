@@ -4,9 +4,12 @@ import { imageResolutions } from './image-resolutions'
 import { ApiError, record } from './transport'
 type Schema = components['schemas']
 export type CreditAccount = Schema['CreditAccount']
-export type CreditPricing = Schema['CreditPricing']
+export type CreditPricing = Omit<Schema['CreditPricing'], 'configuration'> & {
+  configuration: CreditConfiguration
+}
 export type CreditRule = Schema['CreditPricingRule']
-export type CreditConfiguration = Schema['CreditConfiguration']
+export type CreditConfiguration = Required<Schema['CreditConfiguration']>
+export type Referral = Schema['Referral']
 export type CreditAdjustInput = Schema['CreditAdjustInput']
 export type CreditLedgerPage = Schema['CreditLedgerPage']
 export type CreditUsage = Schema['CreditUsage']
@@ -34,6 +37,11 @@ function bool(data: Record<string, unknown>, key: string): boolean {
 }
 function nullable(data: Record<string, unknown>, key: string): string | null {
   return data[key] === null ? null : text(data, key)
+}
+function referralAmount(data: Record<string, unknown>, key: string): number {
+  const amount = number(data, key)
+  if (amount > 1e9) throw new ApiError('RESPONSE_INVALID')
+  return amount
 }
 function list<T>(data: Record<string, unknown>, key: string, parse: (value: unknown) => T): T[] {
   const value = data[key]
@@ -73,6 +81,14 @@ function parseConfiguration(value: unknown): CreditConfiguration {
   if (Object.keys(sizes).length !== imageResolutions.length) throw new ApiError('RESPONSE_INVALID')
   return {
     signup_bonus_credits: number(data, 'signup_bonus_credits'),
+    referral_inviter_bonus_credits:
+      data.referral_inviter_bonus_credits === undefined
+        ? 0
+        : referralAmount(data, 'referral_inviter_bonus_credits'),
+    referral_invitee_bonus_credits:
+      data.referral_invitee_bonus_credits === undefined
+        ? 0
+        : referralAmount(data, 'referral_invitee_bonus_credits'),
     daily_free_credits: number(data, 'daily_free_credits'),
     credits_timezone: text(data, 'credits_timezone'),
     edit_multiplier: text(data, 'edit_multiplier'),
@@ -96,6 +112,19 @@ export function parsePricing(value: unknown): CreditPricing {
     configuration: parseConfiguration(data.configuration),
   }
 }
+export function parseReferral(value: unknown): Referral {
+  const data = record(value)
+  const code = text(data, 'invite_code')
+  const link = text(data, 'invite_url')
+  if ((code && !/^[A-F0-9]{16}$/.test(code)) || Boolean(code) !== Boolean(link))
+    throw new ApiError('RESPONSE_INVALID')
+  return {
+    invite_code: code,
+    invite_url: link,
+    referral_inviter_bonus_credits: referralAmount(data, 'referral_inviter_bonus_credits'),
+    referral_invitee_bonus_credits: referralAmount(data, 'referral_invitee_bonus_credits'),
+  }
+}
 export function parseLedger(value: unknown): CreditLedgerPage {
   const data = record(value)
   return {
@@ -107,6 +136,8 @@ export function parseLedger(value: unknown): CreditLedgerPage {
         user_id: text(row, 'user_id'),
         type: choice(row, 'type', [
           'signup_bonus',
+          'referral_inviter_bonus',
+          'referral_invitee_bonus',
           'daily_grant',
           'daily_expire',
           'redeem',
