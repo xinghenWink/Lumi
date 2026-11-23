@@ -6,7 +6,7 @@
 
 Lumi 把流式聊天、生图与改图、积分兑换和管理后台整合到一个站点。前端嵌入 Go 二进制，配合 PostgreSQL、Redis 和持久文件目录运行，通过 OpenAI 兼容上游调用模型，适合部署自己的 AI 创作服务。
 
-本源码对应 **[v0.3.4](https://github.com/xinghenWink/Lumi/releases/tag/v0.3.4)**。本版本增加自动比例、1K / 2K / 4K 分辨率与计费、草图参考图、GIF 动图、高级画质和规划强度。后台生图任务和会话列表新增用户信息，生图工作台重新报价时会保留质量卡片。正式镜像支持 `linux/amd64` 和 `linux/arm64`。产品仍在 0.x 阶段，见 [版本策略](docs/VERSIONING.md)。
+本源码对应 **[v0.3.5](https://github.com/xinghenWink/Lumi/releases/tag/v0.3.5)**。本版本增加邀请注册奖励，用户可分享专属链接，管理员可分别设置邀请人和被邀请人的永久积分奖励。正式镜像支持 `linux/amd64` 和 `linux/arm64`。产品仍在 0.x 阶段，见 [版本策略](docs/VERSIONING.md)。
 
 从 v0.3.3 升级时，应用会自动执行前向迁移 00019 至 00024。1K / 2K / 4K 的计费倍率均从 1.00 开始，升级后可在「价格与赠送」中调整。升级前备份数据库、图片和密钥，停用旧应用后再启动新版。升级步骤见 [部署手册](docs/DEPLOYMENT.md#升级回滚)。
 
@@ -80,7 +80,7 @@ Lumi 提供平台和管理能力，上游推理服务需要单独准备。默认
 
 ```sh
 curl --fail --location \
-  https://github.com/xinghenWink/Lumi/releases/download/v0.3.4/lumi-deploy.tar.gz \
+  https://github.com/xinghenWink/Lumi/releases/download/v0.3.5/lumi-deploy.tar.gz \
   --output lumi-deploy.tar.gz
 sudo install -d -m 700 /opt/lumi
 sudo tar -xzf lumi-deploy.tar.gz -C /opt/lumi
@@ -92,7 +92,7 @@ sudoedit /opt/lumi/.env
 
 ```dotenv
 LUMI_IMAGE=ghcr.io/xinghenwink/lumi
-LUMI_VERSION=v0.3.4
+LUMI_VERSION=v0.3.5
 ADMIN_EMAIL=admin@example.com
 PUBLIC_BASE_URL=https://lumi.example.com
 COOKIE_SECURE=true

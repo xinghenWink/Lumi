@@ -67,7 +67,15 @@ VALUES ($1,$2,$3,'edit','low','1536x1024',2,43,86,0,86,current_date)`, legacyCha
 	token := f.login(t, client, f.adminEmail, f.adminPassword).AccessToken
 	pricingPath := "/api/v1/admin/pricing"
 	pricing := decodeReply[credits.Pricing](t, f.call(t, client, http.MethodGet, pricingPath, token, nil))
-	expected := credits.Configuration{SizeMultipliers: map[string]string{"1k": "1.00", "2k": "1.00", "4k": "1.00"}, SignupBonusCredits: 31, DailyFreeCredits: 14, CreditsTimezone: "Asia/Shanghai", EditMultiplier: "1.125"}
+	expected := credits.Configuration{
+		SizeMultipliers:             map[string]string{"1k": "1.00", "2k": "1.00", "4k": "1.00"},
+		SignupBonusCredits:          31,
+		ReferralInviterBonusCredits: new(int64),
+		ReferralInviteeBonusCredits: new(int64),
+		DailyFreeCredits:            14,
+		CreditsTimezone:             "Asia/Shanghai",
+		EditMultiplier:              "1.125",
+	}
 	if !reflect.DeepEqual(pricing.Configuration, expected) {
 		t.Fatalf("migration changed unexpected pricing settings: %+v", pricing.Configuration)
 	}
