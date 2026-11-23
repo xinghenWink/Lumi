@@ -56,7 +56,7 @@ type Service struct {
 }
 
 type SignupCredits interface {
-	Signup(context.Context, *query.Queries, uuid.UUID) error
+	Signup(context.Context, *query.Queries, uuid.UUID, string) error
 }
 
 func New(pool *pgxpool.Pool, passwords *password.Hasher, tokens *Tokens, settings Settings, gate Gate, mailer Mailer, credits SignupCredits) *Service {
@@ -77,6 +77,7 @@ type RegisterInput struct {
 	Password       string `json:"password"`
 	Nickname       string `json:"nickname"`
 	Code           string `json:"code"`
+	InviteCode     string `json:"invite_code"`
 	AcceptTerms    bool   `json:"accept_terms"`
 }
 type LoginInput struct {
@@ -274,7 +275,7 @@ func (s *Service) Register(ctx context.Context, input RegisterInput, client Clie
 		if err != nil {
 			return user.DatabaseError("register user", err)
 		}
-		if err := s.credits.Signup(ctx, q, id); err != nil {
+		if err := s.credits.Signup(ctx, q, id, input.InviteCode); err != nil {
 			return err
 		}
 		if err := q.UpdateLogin(ctx, query.UpdateLoginParams{ID: id, LastLoginIp: &client.IP}); err != nil {

@@ -98,6 +98,22 @@ export default {
     pricingDescription: 'Set per-image prices, registration gifts and daily credits.',
     gifts: 'Gift configuration',
     signupBonus: 'Registration gift',
+    referral: {
+      title: 'Invite friends',
+      description:
+        'Share your invite link. When a friend registers, you can both earn permanent credits.',
+      inviterReward: 'Inviter reward credits',
+      inviteeReward: 'New member reward credits',
+      rewardDetails:
+        'For each friend who registers, you earn {inviter} credits and your friend earns {invitee} credits.',
+      generate: 'Generate invite link',
+      generating: 'Generating invite link…',
+      code: 'My invite code',
+      link: 'My invite link',
+      copy: 'Copy invite link',
+      copied: 'Invite link copied.',
+      copyFailed: 'Automatic copying failed. The link is selected so you can copy it manually.',
+    },
     dailyGrant: 'Daily gift',
     creditsTimezone: 'Daily reset timezone',
     giftHint: 'Changes apply to later registrations or resets. Use 0 to disable a gift.',
@@ -176,6 +192,8 @@ export default {
     clipboard: 'Copy redeem code',
     types: {
       signup_bonus: 'Registration gift',
+      referral_inviter_bonus: 'Friend referral reward',
+      referral_invitee_bonus: 'Invited registration reward',
       daily_grant: 'Daily gift',
       daily_expire: 'Daily expiry',
       redeem: 'Redemption',

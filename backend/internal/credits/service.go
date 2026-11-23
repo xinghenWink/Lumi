@@ -250,7 +250,7 @@ func (s *Service) Day(ctx context.Context) (string, int64, error) {
 }
 
 // Signup is called after CreateUser inside the registration transaction.
-func (s *Service) Signup(ctx context.Context, q *query.Queries, id uuid.UUID) error {
+func (s *Service) Signup(ctx context.Context, q *query.Queries, id uuid.UUID, inviteCode string) error {
 	cfg, err := configuration(ctx, q)
 	if err != nil {
 		return err
@@ -259,7 +259,13 @@ func (s *Service) Signup(ctx context.Context, q *query.Queries, id uuid.UUID) er
 	if err != nil {
 		return fmt.Errorf("lock signup credit account: %w", err)
 	}
-	return change(ctx, q, &record, "signup_bonus", "permanent", cfg.SignupBonusCredits, "signup:"+id.String(), "user", &id, nil, "")
+	if err := change(ctx, q, &record, "signup_bonus", "permanent", cfg.SignupBonusCredits, "signup:"+id.String(), "user", &id, nil, ""); err != nil {
+		return err
+	}
+	if code := strings.ToUpper(strings.TrimSpace(inviteCode)); code != "" {
+		return s.rewardReferral(ctx, q, &record, cfg, code)
+	}
+	return nil
 }
 func (s *Service) Initialize(ctx context.Context, q *query.Queries, id, operator uuid.UUID, amount int64, ip netip.Addr) error {
 	if amount < 0 || amount > MaxBalance {

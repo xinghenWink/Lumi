@@ -16,6 +16,8 @@ import { Field } from '../ui/field'
 import { NativeSelect, NativeSelectOption } from '../ui/native-select'
 const types = [
   'signup_bonus',
+  'referral_inviter_bonus',
+  'referral_invitee_bonus',
   'daily_grant',
   'daily_expire',
   'redeem',

@@ -59,7 +59,7 @@ func seed(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			if err := billing.Signup(ctx, q, id); err != nil {
+			if err := billing.Signup(ctx, q, id, ""); err != nil {
 				return err
 			}
 			if _, err := q.CreateSession(ctx, query.CreateSessionParams{ID: session, UserID: id, FamilyID: family, TokenHash: auth.RefreshHash(rand.Text()), Device: "k6", Ip: netip.MustParseAddr("127.0.0.1"), UserAgent: "k6", ExpiresAt: now.Add(time.Hour)}); err != nil {

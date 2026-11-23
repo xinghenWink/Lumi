@@ -8,11 +8,13 @@ import (
 const MaxBalance int64 = 1_000_000_000_000
 
 type Configuration struct {
-	SignupBonusCredits int64             `json:"signup_bonus_credits"`
-	DailyFreeCredits   int64             `json:"daily_free_credits"`
-	CreditsTimezone    string            `json:"credits_timezone"`
-	EditMultiplier     string            `json:"edit_multiplier"`
-	SizeMultipliers    map[string]string `json:"size_multipliers"`
+	SignupBonusCredits          int64             `json:"signup_bonus_credits"`
+	ReferralInviterBonusCredits *int64            `json:"referral_inviter_bonus_credits,omitempty"`
+	ReferralInviteeBonusCredits *int64            `json:"referral_invitee_bonus_credits,omitempty"`
+	DailyFreeCredits            int64             `json:"daily_free_credits"`
+	CreditsTimezone             string            `json:"credits_timezone"`
+	EditMultiplier              string            `json:"edit_multiplier"`
+	SizeMultipliers             map[string]string `json:"size_multipliers"`
 }
 type Account struct {
 	UserID           uuid.UUID `json:"user_id"`
@@ -34,6 +36,11 @@ type Rule struct {
 type Pricing struct {
 	Rules         []Rule        `json:"rules"`
 	Configuration Configuration `json:"configuration"`
+}
+type Referral struct {
+	InviteCode          string `json:"invite_code"`
+	InviterBonusCredits int64  `json:"referral_inviter_bonus_credits"`
+	InviteeBonusCredits int64  `json:"referral_invitee_bonus_credits"`
 }
 type QuoteInput struct {
 	ModelID   *uuid.UUID `json:"model_id"`

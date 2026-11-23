@@ -100,7 +100,7 @@ function PricingForm({ initial }: { initial: CreditPricing }) {
     setRules(ruleDrafts(result))
     setNotice(true)
     runtime.queryClient.setQueryData(['user', user?.id, 'admin-pricing'], result)
-    for (const kind of ['credits', 'admin-users', 'image-quote', 'image-options'])
+    for (const kind of ['credits', 'admin-users', 'image-quote', 'image-options', 'referral'])
       void runtime.queryClient.invalidateQueries({ queryKey: ['user', user?.id, kind] })
   })
   return (
@@ -129,6 +129,22 @@ function PricingForm({ initial }: { initial: CreditPricing }) {
               max={1e9}
               onChange={(daily_free_credits) =>
                 setConfiguration({ ...configuration, daily_free_credits })
+              }
+            />
+            <NumberField
+              label={t('credits.referral.inviterReward')}
+              value={configuration.referral_inviter_bonus_credits}
+              max={1e9}
+              onChange={(referral_inviter_bonus_credits) =>
+                setConfiguration({ ...configuration, referral_inviter_bonus_credits })
+              }
+            />
+            <NumberField
+              label={t('credits.referral.inviteeReward')}
+              value={configuration.referral_invitee_bonus_credits}
+              max={1e9}
+              onChange={(referral_invitee_bonus_credits) =>
+                setConfiguration({ ...configuration, referral_invitee_bonus_credits })
               }
             />
             <Field id={id + '-timezone'} label={t('credits.creditsTimezone')}>

@@ -32,6 +32,12 @@ func configuration(ctx context.Context, q *query.Queries) (Configuration, error)
 	if err := json.Unmarshal(data, &value); err != nil {
 		return value, fmt.Errorf("decode credit configuration: %w", err)
 	}
+	if value.ReferralInviterBonusCredits == nil {
+		value.ReferralInviterBonusCredits = new(int64)
+	}
+	if value.ReferralInviteeBonusCredits == nil {
+		value.ReferralInviteeBonusCredits = new(int64)
+	}
 	if err := validateConfiguration(value); err != nil {
 		return value, err
 	}
@@ -57,6 +63,11 @@ func (s *Service) readConfiguration(ctx context.Context) (Configuration, error) 
 func validateConfiguration(value Configuration) error {
 	if value.SignupBonusCredits < 0 || value.SignupBonusCredits > 1_000_000_000 || value.DailyFreeCredits < 0 || value.DailyFreeCredits > 1_000_000_000 {
 		return problem.Invalid()
+	}
+	for _, amount := range []*int64{value.ReferralInviterBonusCredits, value.ReferralInviteeBonusCredits} {
+		if amount != nil && (*amount < 0 || *amount > 1_000_000_000) {
+			return problem.Invalid()
+		}
 	}
 	if value.CreditsTimezone == "" || value.CreditsTimezone == "Local" || len(value.CreditsTimezone) > 100 {
 		return problem.Invalid()
@@ -175,6 +186,12 @@ func (s *Service) SavePricing(ctx context.Context, actor user.Actor, value Prici
 		var before Pricing
 		if err := readPricing(ctx, q, &before); err != nil {
 			return err
+		}
+		if value.Configuration.ReferralInviterBonusCredits == nil {
+			value.Configuration.ReferralInviterBonusCredits = before.Configuration.ReferralInviterBonusCredits
+		}
+		if value.Configuration.ReferralInviteeBonusCredits == nil {
+			value.Configuration.ReferralInviteeBonusCredits = before.Configuration.ReferralInviteeBonusCredits
 		}
 		// Older clients only submit the original six global rules.
 		rules := slices.Clone(value.Rules)
