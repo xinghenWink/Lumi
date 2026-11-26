@@ -10,6 +10,7 @@ import { useOwnedMutation } from '../../features/accounts/owned-mutation'
 import { invalidateCatalog, modelInput } from '../../features/admin/catalog'
 import { AdminPage } from '../../components/admin/AdminPage'
 import { ModelEditor } from '../../components/admin/ModelEditor'
+import { ModelChannelManager } from '../../components/admin/ModelChannelManager'
 import { DataTable } from '../../components/shared/DataTable'
 import { CursorControls } from '../../components/shared/CursorControls'
 import { ApiNotice } from '../../components/shared/ApiNotice'
@@ -84,13 +85,22 @@ export default function ModelsPage() {
     { t } = useTranslation()
   const [filters, setFilters] = useState({ search: '', state: '', type: '' }),
     [applied, setApplied] = useState(filters)
+  const [channelId, setChannelId] = useState('')
   const [editor, setEditor] = useState<{ model: PlatformModel | null } | null>(null),
     [deleting, setDeleting] = useState<PlatformModel | null>(null),
     [notice, setNotice] = useState('')
   const query = useCursorQuery(
-    ['user', user?.id, 'admin-models', applied],
+    ['user', user?.id, 'admin-models', applied, channelId],
     (cursor, signal) =>
-      catalog.models(new URLSearchParams({ ...applied, cursor, limit: '20' }), signal),
+      catalog.models(
+        new URLSearchParams({
+          ...applied,
+          ...(channelId ? { upstream_id: channelId } : {}),
+          cursor,
+          limit: '20',
+        }),
+        signal,
+      ),
     !!user,
   )
   const remove = useOwnedMutation(user?.id, async (check) => {
@@ -117,6 +127,20 @@ export default function ModelsPage() {
         </Button>
       }
     >
+      <ModelChannelManager
+        channelId={channelId}
+        onSelect={(id) => {
+          query.reset()
+          setChannelId(id)
+        }}
+        onChanged={() => {
+          query.reset()
+          setNotice('')
+          invalidateCatalog(runtime, user?.id)
+          for (const kind of ['admin-pricing', 'admin-audit'])
+            void runtime.queryClient.invalidateQueries({ queryKey: ['user', user?.id, kind] })
+        }}
+      />
       <form
         className="mb-5 flex flex-wrap gap-3"
         onSubmit={(event) => {
@@ -226,6 +250,13 @@ export default function ModelsPage() {
                             }
                           >
                             {route.upstream_name}
+                            {route.upstream_id === channelId ? (
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                {t(
+                                  route.enabled ? 'catalog.enabledState' : 'catalog.disabledState',
+                                )}
+                              </span>
+                            ) : null}
                             <code className="block break-all text-[10px]">
                               {route.upstream_model_name}
                             </code>
@@ -257,7 +288,9 @@ export default function ModelsPage() {
           ) : (
             <div className="p-8 text-center">
               <h2>{t('catalog.noModels')}</h2>
-              <p className="mt-2 text-xs text-muted-foreground">{t('catalog.noModelsHint')}</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {t(channelId ? 'catalog.noChannelModelsHint' : 'catalog.noModelsHint')}
+              </p>
             </div>
           )}
           <CursorControls

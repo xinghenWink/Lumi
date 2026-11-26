@@ -302,6 +302,7 @@ export default {
         save: 'Save platform model',
         delete: 'Delete platform model',
         import: 'Import upstream models',
+        channel_batch: 'Manage channel models in bulk',
       },
       user: {
         create: 'Create user',

@@ -426,6 +426,7 @@ type Upstream struct {
 	OpenUntil           *time.Time
 	LastError           string
 	ProbeUntil          *time.Time
+	DisplayName         string
 }
 
 type UpstreamCall struct {

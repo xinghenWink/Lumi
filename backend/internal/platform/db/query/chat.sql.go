@@ -89,7 +89,7 @@ func (q *Queries) ChatMessageByRequest(ctx context.Context, arg ChatMessageByReq
 }
 
 const chatRouteTargets = `-- name: ChatRouteTargets :many
-SELECT r.id AS route_id,r.upstream_model_name,u.id, u.name, u.base_url, u.api_key_enc, u.timeout_chat_s, u.timeout_image_s, u.proxy_url, u.enabled, u.priority, u.weight, u.circuit_state, u.edit_format, u.note, u.version, u.created_at, u.updated_at, u.consecutive_failures, u.open_until, u.last_error, u.probe_until FROM model_routes r JOIN upstreams u ON r.upstream_id=u.id JOIN models m ON m.id=r.model_id
+SELECT r.id AS route_id,r.upstream_model_name,u.id, u.name, u.base_url, u.api_key_enc, u.timeout_chat_s, u.timeout_image_s, u.proxy_url, u.enabled, u.priority, u.weight, u.circuit_state, u.edit_format, u.note, u.version, u.created_at, u.updated_at, u.consecutive_failures, u.open_until, u.last_error, u.probe_until, u.display_name FROM model_routes r JOIN upstreams u ON r.upstream_id=u.id JOIN models m ON m.id=r.model_id
 WHERE m.id=$1 AND m.type='chat' AND m.enabled AND r.enabled AND u.enabled AND u.api_key_enc<>''
 ORDER BY r.priority,u.priority,r.id LIMIT 20
 `
@@ -117,6 +117,7 @@ type ChatRouteTargetsRow struct {
 	OpenUntil           *time.Time
 	LastError           string
 	ProbeUntil          *time.Time
+	DisplayName         string
 }
 
 func (q *Queries) ChatRouteTargets(ctx context.Context, id uuid.UUID) ([]ChatRouteTargetsRow, error) {
@@ -151,6 +152,7 @@ func (q *Queries) ChatRouteTargets(ctx context.Context, id uuid.UUID) ([]ChatRou
 			&i.OpenUntil,
 			&i.LastError,
 			&i.ProbeUntil,
+			&i.DisplayName,
 		); err != nil {
 			return nil, err
 		}

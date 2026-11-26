@@ -1,10 +1,11 @@
 package account
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/xinghenWink/Lumi/backend/internal/catalog"
-	"net/http"
 )
 
 func (h *Handler) catalogRoutes(protected, admin *gin.RouterGroup) {
@@ -16,6 +17,7 @@ func (h *Handler) catalogRoutes(protected, admin *gin.RouterGroup) {
 	admin.POST("/upstreams/:id/test", h.csrf, h.adminLimit, h.testUpstream)
 	admin.POST("/upstreams/:id/discover", h.csrf, h.adminLimit, h.discoverModels)
 	admin.POST("/upstreams/:id/import", h.csrf, h.adminLimit, h.importModels)
+	admin.POST("/upstreams/:id/models/batch", h.csrf, h.adminLimit, h.batchChannelModels)
 	admin.GET("/models", h.listModels)
 	admin.POST("/models", h.csrf, h.adminLimit, h.saveModel)
 	admin.PUT("/models/:id", h.csrf, h.adminLimit, h.saveModel)
@@ -52,7 +54,34 @@ func (h *Handler) listModels(c *gin.Context) {
 		h.fail(c, err)
 		return
 	}
+	filter.UpstreamID, err = optionalID(c.Query("upstream_id"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
 	result, err := h.services.Catalog.Models(c.Request.Context(), filter)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+func (h *Handler) batchChannelModels(c *gin.Context) {
+	current, ok := principal(c)
+	if !ok {
+		return
+	}
+	id, err := identifier(c.Param("id"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	var input catalog.ChannelModelBatchInput
+	if err := decode(c, &input); err != nil {
+		h.fail(c, err)
+		return
+	}
+	result, err := h.services.Catalog.BatchChannelModels(c.Request.Context(), current.Actor, id, input)
 	if err != nil {
 		h.fail(c, err)
 		return

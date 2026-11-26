@@ -1,3 +1,4 @@
+import { useInfiniteQuery } from '@tanstack/react-query'
 import { catalog } from '../../../api/catalog'
 import type { AppRuntime } from '../../app/runtime'
 import type {
@@ -11,6 +12,7 @@ export function upstreamInput(row: Upstream): UpstreamInput {
   return {
     version: row.version,
     name: row.name,
+    display_name: row.display_name,
     base_url: row.base_url,
     timeout_chat_s: row.timeout_chat_s,
     timeout_image_s: row.timeout_image_s,
@@ -21,6 +23,16 @@ export function upstreamInput(row: Upstream): UpstreamInput {
     edit_format: row.edit_format,
     note: row.note,
   }
+}
+export function useChannelChoices(owner: string | undefined) {
+  return useInfiniteQuery({
+    queryKey: ['user', owner, 'admin-upstreams', 'choices'],
+    enabled: !!owner,
+    initialPageParam: '',
+    queryFn: ({ pageParam, signal }) =>
+      catalog.channels(new URLSearchParams({ cursor: pageParam, limit: '100' }), signal),
+    getNextPageParam: (page) => page.next_cursor || undefined,
+  })
 }
 export function modelInput(row: PlatformModel): ModelInput {
   return {
