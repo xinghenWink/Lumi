@@ -15,6 +15,8 @@ func (h *Handler) canvasRoutes(protected *gin.RouterGroup) {
 	protected.GET("/canvases/:id", h.canvasGet)
 	protected.PUT("/canvases/:id", h.csrf, h.canvasLimit, h.canvasSave)
 	protected.POST("/canvases/:id/runs", h.csrf, h.imageLimit, h.canvasRun)
+	protected.POST("/canvases/:id/video-runs/quote", h.csrf, h.imageLimit, h.canvasVideoQuote)
+	protected.POST("/canvases/:id/video-runs", h.csrf, h.imageLimit, h.canvasVideoRun)
 	protected.POST("/canvases/:id/text-runs", h.csrf, h.canvasLimit, h.canvasTextSubmit)
 	protected.GET("/canvases/:id/text-runs/:run", h.canvasTextResult)
 	protected.POST("/canvases/:id/text-runs/:run/cancel", h.csrf, h.canvasLimit, h.canvasTextResult)

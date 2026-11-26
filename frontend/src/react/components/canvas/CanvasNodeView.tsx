@@ -10,6 +10,7 @@ import type { Rect } from '../../../features/canvas/geometry'
 import { useCanvas, useCanvasImage, useEditor } from '../../features/canvas/context'
 import { openImageGeneration } from '../../features/canvas/actions'
 import { cn } from '../../lib/utils'
+import { CanvasVideoContent } from './CanvasVideoContent'
 
 const stop = (event: { stopPropagation(): void }) => event.stopPropagation()
 
@@ -39,7 +40,7 @@ function Frame({
   const { t } = useTranslation()
   const { editor } = useCanvas()
   const handle = Math.max(10, 12 / zoom)
-  const kind = t('canvas.nodes.' + node.kind)
+  const kind = t(node.kind === 'video' ? 'video.node' : 'canvas.nodes.' + node.kind)
   return (
     <div
       data-node-id={node.id}
@@ -373,6 +374,12 @@ export const CanvasNodeView = memo(function CanvasNodeView(
   props: NodeViewProps & { editing: boolean },
 ) {
   const { node, editing } = props
+  if (node.kind === 'video')
+    return (
+      <Frame {...props} port={node.video?.state === 'ready'} inputPort>
+        <CanvasVideoContent node={node} />
+      </Frame>
+    )
   if (node.kind === 'group')
     return (
       <Frame {...props} className="rounded-2xl border-2 border-dashed border-input bg-muted/30">

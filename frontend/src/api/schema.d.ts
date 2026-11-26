@@ -4,6 +4,38 @@
  */
 
 export interface paths {
+  '/api/v1/canvases/{id}/video-runs/quote': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['quoteCanvasVideo']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/canvases/{id}/video-runs': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['submitCanvasVideo']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/video-options': {
     parameters: {
       query?: never
@@ -3504,7 +3536,7 @@ export interface components {
       /** Format: uuid */
       id: string
       /** @enum {string} */
-      kind: 'image' | 'text' | 'generator' | 'group'
+      kind: 'image' | 'text' | 'generator' | 'group' | 'video'
       x: number
       y: number
       w: number
@@ -3513,6 +3545,7 @@ export interface components {
       /** Format: uuid */
       group_id: string | null
       image?: components['schemas']['CanvasImageContent']
+      video?: components['schemas']['CanvasImageContent']
       text?: components['schemas']['CanvasTextContent']
       generator?: components['schemas']['CanvasGeneratorContent']
       text_settings?: components['schemas']['CanvasTextSettings']
@@ -3628,6 +3661,62 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
+  quoteCanvasVideo: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CanvasVideoQuoteInput']
+      }
+    }
+    responses: {
+      /** @description Current video quote for the saved canvas node. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VideoQuote']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  submitCanvasVideo: {
+    parameters: {
+      query?: never
+      header: {
+        'Idempotency-Key': string
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CanvasVideoRunInput']
+      }
+    }
+    responses: {
+      /** @description Canvas with durable video result slots and accepted task. */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CanvasVideoRun']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
   listVideoOptions: {
     parameters: {
       query?: never

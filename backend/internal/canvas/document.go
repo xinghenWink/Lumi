@@ -39,6 +39,7 @@ const (
 
 const (
 	KindImage     = "image"
+	KindVideo     = "video"
 	KindText      = "text"
 	KindGenerator = "generator"
 	KindGroup     = "group"
@@ -118,6 +119,7 @@ type Node struct {
 	Title        string            `json:"title"`
 	GroupID      *uuid.UUID        `json:"group_id"`
 	Image        *ImageContent     `json:"image,omitempty"`
+	Video        *ImageContent     `json:"video,omitempty"`
 	Text         *TextContent      `json:"text,omitempty"`
 	Generator    *GeneratorContent `json:"generator,omitempty"`
 	TextSettings *TextSettings     `json:"text_settings,omitempty"`
@@ -189,11 +191,14 @@ func Validate(doc Document) error {
 func connectable(from, to, kind string) bool {
 	switch kind {
 	case EdgeInput:
+		if to == KindVideo {
+			return from == KindImage || from == KindText || from == KindVideo
+		}
 		return (from == KindImage || from == KindText || from == KindGroup) &&
 			(to == KindGenerator || to == KindImage || to == KindText)
 	case EdgeResult:
 		return ((from == KindGenerator || from == KindImage) && to == KindImage) ||
-			(from == KindText && to == KindText)
+			(from == KindText && to == KindText) || (from == KindVideo && to == KindVideo)
 	}
 	return false
 }
@@ -218,14 +223,14 @@ func validateNode(node Node, kinds map[uuid.UUID]string) error {
 		return fmt.Errorf("invalid group")
 	}
 	present := 0
-	for _, part := range []bool{node.Image != nil, node.Text != nil, node.Generator != nil} {
+	for _, part := range []bool{node.Image != nil, node.Text != nil, node.Generator != nil, node.Video != nil} {
 		if part {
 			present++
 		}
 	}
 	switch node.Kind {
 	case KindImage:
-		if node.Image == nil || node.Text != nil {
+		if node.Image == nil || node.Text != nil || node.Video != nil {
 			return fmt.Errorf("image content required")
 		}
 		if node.Generator != nil {
@@ -234,6 +239,11 @@ func validateNode(node Node, kinds map[uuid.UUID]string) error {
 			}
 		}
 		return validateImage(*node.Image)
+	case KindVideo:
+		if present != 1 || node.Video == nil || (node.Video.Position != nil && *node.Video.Position >= 4) {
+			return fmt.Errorf("invalid video slot")
+		}
+		return validateImage(*node.Video)
 	case KindText:
 		if present != 1 || node.Text == nil || !multiline(node.Text.Content, MaxText) {
 			return fmt.Errorf("invalid text content")

@@ -32,5 +32,9 @@ INSERT INTO canvas_files(canvas_id,file_id) SELECT $1,unnest(sqlc.arg(file_ids):
 SELECT id FROM files WHERE id=ANY(sqlc.arg(ids)::uuid[]) AND user_id=$1 AND kind IN ('upload','generated');
 -- name: CanvasOwnedTaskIDs :many
 SELECT id FROM image_tasks WHERE id=ANY(sqlc.arg(ids)::uuid[]) AND user_id=$1 AND conversation_id=$2;
+-- name: CanvasOwnedVideoFileIDs :many
+SELECT id FROM files WHERE id=ANY(sqlc.arg(ids)::uuid[]) AND user_id=$1 AND kind IN ('video_upload','video_generated');
+-- name: CanvasOwnedVideoTaskIDs :many
+SELECT id FROM video_tasks WHERE id=ANY(sqlc.arg(ids)::uuid[]) AND user_id=$1 AND canvas_id=$2;
 -- name: CanvasVisibleFiles :many
 SELECT * FROM files WHERE id=ANY(sqlc.arg(ids)::uuid[]) AND user_id=$1 AND deleted_at IS NULL AND kind IN ('upload','generated');

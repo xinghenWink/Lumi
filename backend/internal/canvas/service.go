@@ -223,6 +223,25 @@ func (s *Service) Save(ctx context.Context, actor user.Actor, id uuid.UUID, inpu
 			return problem.New("CANVAS_CONFLICT", 409)
 		}
 		files := input.Document.FileIDs()
+		videoFiles, videoTasks := videoReferences(input.Document)
+		if len(videoFiles) > 0 {
+			owned, err := q.CanvasOwnedVideoFileIDs(ctx, query.CanvasOwnedVideoFileIDsParams{UserID: actor.ID, Ids: videoFiles})
+			if err != nil {
+				return fmt.Errorf("check canvas video files: %w", err)
+			}
+			if len(owned) != len(videoFiles) {
+				return problem.Invalid()
+			}
+		}
+		if len(videoTasks) > 0 {
+			owned, err := q.CanvasOwnedVideoTaskIDs(ctx, query.CanvasOwnedVideoTaskIDsParams{UserID: actor.ID, CanvasID: &id, Ids: videoTasks})
+			if err != nil {
+				return fmt.Errorf("check canvas video tasks: %w", err)
+			}
+			if len(owned) != len(videoTasks) {
+				return problem.Invalid()
+			}
+		}
 		owned, err := q.CanvasOwnedFileIDs(ctx, query.CanvasOwnedFileIDsParams{UserID: actor.ID, Ids: files})
 		if err != nil {
 			return fmt.Errorf("check canvas files: %w", err)
@@ -258,6 +277,7 @@ func (s *Service) Save(ctx context.Context, actor user.Actor, id uuid.UUID, inpu
 		if err != nil {
 			return fmt.Errorf("save canvas: %w", err)
 		}
+		files = append(files, videoFiles...)
 		if err := q.DeleteStaleCanvasFiles(ctx, query.DeleteStaleCanvasFilesParams{CanvasID: id, FileIds: files}); err != nil {
 			return fmt.Errorf("drop canvas file references: %w", err)
 		}
@@ -302,6 +322,9 @@ func (s *Service) Delete(ctx context.Context, actor user.Actor, id uuid.UUID) er
 func (s *Service) view(ctx context.Context, q *query.Queries, row query.Canvas, viewer uuid.UUID) (Canvas, error) {
 	doc, err := Decode(row.Document)
 	if err != nil {
+		return Canvas{}, err
+	}
+	if err := resolveVideoSlots(ctx, q, &doc); err != nil {
 		return Canvas{}, err
 	}
 	ids := doc.FileIDs()

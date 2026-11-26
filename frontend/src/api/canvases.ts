@@ -4,6 +4,7 @@ import { ApiError, noContent, record } from './transport'
 import { parseFile, parseTask } from './images'
 import { parseImageComplexity } from './image-complexity'
 import { parseImageQuality } from './image-quality'
+import { parseVideoQuote, parseVideoTask } from './videos'
 
 type S = components['schemas']
 export type Canvas = S['Canvas']
@@ -56,7 +57,7 @@ function parseNode(v: unknown): CanvasNode {
   const d = record(v)
   const node: CanvasNode = {
     id: str(d.id),
-    kind: choice(d.kind, ['image', 'text', 'generator', 'group']),
+    kind: choice(d.kind, ['image', 'text', 'generator', 'group', 'video']),
     x: real(d.x),
     y: real(d.y),
     w: real(d.w),
@@ -64,9 +65,10 @@ function parseNode(v: unknown): CanvasNode {
     title: str(d.title),
     group_id: nullableText(d.group_id),
   }
-  if (d.image !== undefined) {
-    const i = record(d.image)
-    node.image = {
+  for (const kind of ['image', 'video'] as const) {
+    if (d[kind] === undefined) continue
+    const i = record(d[kind])
+    node[kind] = {
       state: choice(i.state, ['empty', 'ready', 'pending', 'failed']),
       file_id: nullableText(i.file_id),
       task_id: nullableText(i.task_id),
@@ -188,6 +190,21 @@ function parseTextRun(value: unknown): CanvasTextRun {
 }
 
 export const canvases = {
+  videoQuote: (id: string, body: S['CanvasVideoQuoteInput']) =>
+    authorized(
+      '/api/v1/canvases/' + encodeURIComponent(id) + '/video-runs/quote',
+      parseVideoQuote,
+      { method: 'POST', body },
+    ),
+  videoRun: (id: string, body: S['CanvasVideoRunInput'], idempotencyKey: string) =>
+    authorized(
+      '/api/v1/canvases/' + encodeURIComponent(id) + '/video-runs',
+      (value) => {
+        const row = record(value)
+        return { canvas: parseCanvas(row.canvas), task: parseVideoTask(row.task) }
+      },
+      { method: 'POST', body, idempotencyKey },
+    ),
   list: (q: URLSearchParams, signal?: AbortSignal) =>
     authorized(root + '?' + q, parseCanvasPage, signalOptions(signal)),
   create: (id: string, title = '') =>
