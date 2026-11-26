@@ -4,6 +4,118 @@
  */
 
 export interface paths {
+  '/api/v1/video-options': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['listVideoOptions']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/video-tasks/quote': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['quoteVideoTask']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/video-tasks': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['listVideoTasks']
+    put?: never
+    post: operations['submitVideoTask']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/video-tasks/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['getVideoTask']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/video-assets': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['listVideoAssets']
+    put?: never
+    post: operations['uploadVideoAsset']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/video-assets/{id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['getVideoAsset']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/video-media/{id}/{kind}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['getVideoMedia']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/video-credit-pool': {
     parameters: {
       query?: never
@@ -3516,6 +3628,239 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
+  listVideoOptions: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description listVideoOptions */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VideoOptions']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  quoteVideoTask: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['VideoInput']
+      }
+    }
+    responses: {
+      /** @description quoteVideoTask */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VideoQuote']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listVideoTasks: {
+    parameters: {
+      query?: {
+        cursor?: string
+        canvas_id?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description listVideoTasks */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VideoTaskPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  submitVideoTask: {
+    parameters: {
+      query?: never
+      header: {
+        'Idempotency-Key': string
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['VideoSubmission']
+      }
+    }
+    responses: {
+      /** @description submitVideoTask */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VideoTask']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getVideoTask: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description getVideoTask */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VideoTask']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listVideoAssets: {
+    parameters: {
+      query?: {
+        cursor?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description listVideoAssets */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VideoAssetPage']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  uploadVideoAsset: {
+    parameters: {
+      query: {
+        kind: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/octet-stream': string
+      }
+    }
+    responses: {
+      /** @description uploadVideoAsset */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VideoAsset']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getVideoAsset: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description getVideoAsset */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VideoAsset']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getVideoMedia: {
+    parameters: {
+      query: {
+        owner?: string
+        task?: string
+        expires: string
+        sig: string
+      }
+      header?: {
+        Range?: string
+      }
+      path: {
+        id: string
+        kind: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Complete media content. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/octet-stream': string
+        }
+      }
+      /** @description Partial media content. */
+      206: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/octet-stream': string
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
   getVideoCreditPool: {
     parameters: {
       query?: never

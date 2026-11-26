@@ -49,6 +49,9 @@ func awaitDeployment(ctx context.Context, store *deployment.Store) error {
 
 func runApplicationWorkers(ctx context.Context, accounts *account.Services, database *pgxpool.Pool, cache *platformredis.Client, logger *slog.Logger) {
 	defer startImageWorkers(ctx, accounts.Images)()
+	if accounts.Videos != nil {
+		defer startVideoWorkers(ctx, accounts.Videos)()
+	}
 	textDone := make(chan struct{})
 	go func() { defer close(textDone); accounts.Canvas.WorkText(ctx, accounts.Chat, logger) }()
 	defer func() { <-textDone }()

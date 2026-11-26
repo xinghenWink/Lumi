@@ -1,5 +1,5 @@
 import { useStore } from 'zustand'
-import { Image, MessageSquare } from 'lucide-react'
+import { Image, MessageSquare, Video } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useRuntime } from '../../app/context'
@@ -7,7 +7,7 @@ import { useRuntime } from '../../app/context'
 export function ModeTabs() {
   const { t } = useTranslation()
   const runtime = useRuntime()
-  const image = useLocation().pathname.startsWith('/create')
+  const path = useLocation().pathname
   const lastChat = useStore(runtime.chat.store, (state) => state.lastOpened)
   const imageConversation = useStore(runtime.imageNavigation, (state) => state.lastOpened)
   return (
@@ -22,8 +22,9 @@ export function ModeTabs() {
           key: 'chat.imageMode',
           icon: Image,
         },
+        { to: '/video', key: 'video.short', icon: Video },
       ].map(({ to, key, icon: Icon }) => {
-        const active = image === (key === 'chat.imageMode')
+        const active = path.split('/')[1] === to.split('/')[1]
         return (
           <Link
             key={key}

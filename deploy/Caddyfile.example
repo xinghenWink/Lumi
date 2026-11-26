@@ -1,6 +1,14 @@
 # Replace the hostname; Caddy obtains and renews HTTPS certificates automatically.
 lumi.example.com {
-    request_body {
+    @videoUpload {
+        method POST
+        path /api/v1/video-assets
+    }
+    @otherRequests not path /api/v1/video-assets
+    request_body @videoUpload {
+        max_size 104857600
+    }
+    request_body @otherRequests {
         max_size 30MB
     }
     header Strict-Transport-Security "max-age=31536000"

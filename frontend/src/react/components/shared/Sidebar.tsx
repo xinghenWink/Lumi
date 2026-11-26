@@ -9,6 +9,7 @@ import {
   Plus,
   Shield,
   Workflow,
+  Video,
 } from 'lucide-react'
 import { useId } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
@@ -64,6 +65,7 @@ export function Sidebar({
   const links = [
     { to: '/chat', key: 'nav.chat', icon: MessageSquare },
     { to: '/create', key: 'nav.image', icon: Image },
+    { to: '/video', key: 'video.title', icon: Video },
     { to: '/canvas', key: 'nav.canvas', icon: Workflow },
     { to: '/me/images', key: 'nav.gallery', icon: LayoutGrid },
     { to: '/me/credits', key: 'nav.credits', icon: Coins },

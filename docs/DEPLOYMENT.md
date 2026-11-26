@@ -2,6 +2,12 @@
 
 适用 Linux / Docker Engine + Compose v2；建议初始 2 vCPU / 2 GB 用于应用，PostgreSQL / Redis 另计资源。镜像用固定版本或 digest。部署包不包含密钥。
 
+## 视频生成
+
+迁移 00027 和 00028 增加视频模型、视频积分、任务和媒体字段。更新前备份数据库和 `/data` 媒体目录。发布新镜像时同步升级 Web 与 worker。独立视频余额默认从零开始，管理员在「视频定价与积分」选择扣费来源，再通过调账、批量发放或视频兑换码发放积分。
+
+生产镜像提供 FFmpeg 和 ffprobe。直接运行 Go 二进制时，将这两个程序加入服务进程的 PATH。参考素材需要上游能访问配置的 `PUBLIC_BASE_URL` HTTPS 地址。更新反代配置，使 `/api/v1/video-assets` 允许 100 MiB 上传，并避免记录 `/api/v1/video-media` 的签名查询参数。运行时继续使用现有 `/data/images`，备份及恢复要包含该目录。真实渠道验收见 [视频契约](UPSTREAM_CONTRACT.md#视频直连与-new-api)。
+
 ## 首次部署
 
 从 GitHub Release 下载 `lumi-deploy.tar.gz`（私有仓库需先完成认证），安全传输至服务器。全新 Ubuntu 上确认 Docker / Compose 可用；Bash、OpenSSL、curl、tar、coreutils、flock 为脚本前提。

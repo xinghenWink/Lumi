@@ -34,11 +34,13 @@ WHERE id = $1 AND deleted_at IS NULL;
 -- name: ListUsersForPurge :many
 SELECT * FROM users WHERE deleted_at < now() - interval '30 days'
 AND NOT EXISTS(SELECT 1 FROM credit_charges c WHERE c.user_id=users.id AND NOT c.settled)
+AND NOT EXISTS(SELECT 1 FROM video_tasks t WHERE t.user_id=users.id AND t.status IN ('queued','running'))
 ORDER BY deleted_at, id LIMIT $1 FOR UPDATE SKIP LOCKED;
 
 -- name: PurgeDeletedUser :exec
 DELETE FROM users WHERE users.id = $1 AND users.deleted_at < now() - interval '30 days'
-AND NOT EXISTS(SELECT 1 FROM credit_charges c WHERE c.user_id=users.id AND NOT c.settled);
+AND NOT EXISTS(SELECT 1 FROM credit_charges c WHERE c.user_id=users.id AND NOT c.settled)
+AND NOT EXISTS(SELECT 1 FROM video_tasks t WHERE t.user_id=users.id AND t.status IN ('queued','running'));
 
 -- name: CountActiveAdmins :one
 SELECT count(*) FROM users WHERE role = 'admin' AND status = 'active' AND deleted_at IS NULL;

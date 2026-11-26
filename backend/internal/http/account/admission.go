@@ -15,7 +15,7 @@ func admitReads(limit int) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.FullPath()
 		if c.Request.Method != http.MethodGet || strings.HasSuffix(path, "/events") ||
-			strings.HasPrefix(path, "/api/v1/files/") || strings.HasSuffix(path, "/export") {
+			strings.HasPrefix(path, "/api/v1/files/") || strings.HasPrefix(path, "/api/v1/video-media/") || strings.HasSuffix(path, "/export") {
 			c.Next()
 			return
 		}
