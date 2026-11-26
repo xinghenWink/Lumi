@@ -168,7 +168,23 @@ test('video workspace and canvas recover and play billed results', async ({
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true)
 
-    expect(submits).toHaveLength(1)
+    await page.goto('/canvas')
+    await page.getByRole('link', { name: '新建画布', exact: true }).click()
+    await expect(page).toHaveURL(/\/canvas\/[0-9a-f-]{36}$/)
+    await page.getByRole('button', { name: '添加节点', exact: true }).click()
+    await page.getByRole('menuitem', { name: '视频节点', exact: true }).click()
+    const node = page.locator('[data-kind="video"]').first()
+    await node.getByRole('button', { name: '打开视频生成' }).click()
+    await page
+      .getByRole('textbox', { name: '描述你想生成的视频，输入 @ 选择素材' })
+      .fill('Canvas video fixture')
+    await page.getByRole('button', { name: '生成视频', exact: true }).click()
+    await page.getByRole('button', { name: '确认生成', exact: true }).click()
+    await expect(node.locator('video')).toBeVisible({ timeout: 20_000 })
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await page.reload()
+    await expect(node.locator('video')).toBeVisible()
+    expect(submits).toHaveLength(2)
   } finally {
     upstream.closeAllConnections()
     await new Promise<void>((resolve, reject) =>

@@ -25,6 +25,7 @@ export const LIMITS = {
 
 export const DEFAULT_SIZE: Record<CanvasNodeKind, { w: number; h: number }> = {
   image: { w: 280, h: 280 },
+  video: { w: 320, h: 180 },
   text: { w: 260, h: 140 },
   generator: { w: 320, h: 236 },
   group: { w: 480, h: 360 },
@@ -73,6 +74,13 @@ export function imageNode(
   }
 }
 
+export function videoNode(at: Placement, id = newId()): CanvasNode {
+  return {
+    ...frame('video', at, id),
+    video: { state: 'empty', file_id: null, task_id: null, position: null, error_code: '' },
+  }
+}
+
 /** Sizes an image node to the file's aspect ratio within a bounding box. */
 export function fitImage(width: number, height: number, box = 320) {
   if (width <= 0 || height <= 0) return { w: box, h: box }
@@ -115,8 +123,10 @@ export function connectable(
   if (kind === 'result')
     return (
       ((from === 'image' || from === 'generator') && to === 'image') ||
-      (from === 'text' && to === 'text')
+      (from === 'text' && to === 'text') ||
+      (from === 'video' && to === 'video')
     )
+  if (to === 'video') return from === 'image' || from === 'text' || from === 'video'
   return (
     (from === 'image' || from === 'text' || from === 'group') &&
     (to === 'image' || to === 'generator' || to === 'text')
@@ -154,9 +164,12 @@ function nodeProblem(node: CanvasNode, kinds: Map<string, CanvasNodeKind>): stri
       (settings.model_id !== null && !uuid.test(settings.model_id)))
   )
     return 'text'
-  const parts = [node.image, node.text, node.generator].filter((part) => part !== undefined)
+  const parts = [node.image, node.text, node.generator, node.video].filter(
+    (part) => part !== undefined,
+  )
   if (node.kind === 'group') return parts.length ? 'content' : ''
-  if (node.kind === 'image' ? !node.image || !!node.text : parts.length !== 1) return 'content'
+  if (node.kind === 'image' ? !node.image || !!node.text || !!node.video : parts.length !== 1)
+    return 'content'
   if (node.kind === 'text') {
     const text = node.text
     if (
@@ -184,9 +197,12 @@ function nodeProblem(node: CanvasNode, kinds: Map<string, CanvasNodeKind>): stri
     if (!Number.isInteger(g.n) || g.n < 1 || g.n > LIMITS.count) return 'count'
     if (node.kind === 'generator') return ''
   }
-  const image = node.image
+  const image = node.kind === 'video' ? node.video : node.image
   if (!image || !codePattern.test(image.error_code)) return 'image'
-  if (image.position !== null && (image.position < 0 || image.position >= LIMITS.count))
+  if (
+    image.position !== null &&
+    (image.position < 0 || image.position >= (node.kind === 'video' ? 4 : LIMITS.count))
+  )
     return 'position'
   if (image.position !== null && image.task_id === null) return 'position'
   if (image.state === 'empty')

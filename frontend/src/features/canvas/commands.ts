@@ -105,8 +105,11 @@ export function canConnect(doc: CanvasDocument, from: string, to: string) {
   const nodes = nodeMap(doc)
   const source = nodes.get(from)
   const target = nodes.get(to)
-  if (!canGenerate(target) || !connectable(source?.kind, target?.kind, 'input')) return false
+  const acceptsInput =
+    target?.kind === 'video' ? target.video?.state !== 'pending' : canGenerate(target)
+  if (!acceptsInput || !connectable(source?.kind, target?.kind, 'input')) return false
   if (source?.kind === 'image' && source.image?.state !== 'ready') return false
+  if (source?.kind === 'video' && source.video?.state !== 'ready') return false
   if (source?.text?.state === 'pending') return false
   return !doc.edges.some((edge) => edge.kind === 'input' && edge.from === from && edge.to === to)
 }
@@ -204,7 +207,10 @@ export function extractFragment(doc: CanvasDocument, ids: Iterable<string>): Fra
     doc.nodes
       .filter(
         (node) =>
-          picked.has(node.id) && node.image?.state !== 'pending' && node.text?.state !== 'pending',
+          picked.has(node.id) &&
+          node.image?.state !== 'pending' &&
+          node.text?.state !== 'pending' &&
+          node.video?.state !== 'pending',
       )
       .map((node) => node.id),
   )
@@ -239,6 +245,7 @@ export function insertFragment(
       group_id: node.group_id ? (ids.get(node.group_id) ?? null) : null,
     }
     if (node.image) copy.image = { ...node.image, task_id: null, position: null }
+    if (node.video) copy.video = { ...node.video, task_id: null, position: null }
     if (node.text) copy.text = { content: node.text.content }
     for (const settings of ['generator', 'text_settings'] as const) {
       const value = copy[settings]

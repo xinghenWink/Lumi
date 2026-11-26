@@ -24,6 +24,7 @@ import {
   fitImage,
   generatorNode,
   imageNode,
+  videoNode,
   textNode,
 } from '../../../features/canvas/document'
 import {
@@ -120,13 +121,14 @@ export function addGenerator(editor: CanvasEditor, at = stageCenter(editor)) {
   if (place(editor, node)) editor.openInspector(node.id)
 }
 
-export type CreateKind = 'text' | 'image' | 'generator' | 'group'
+export type CreateKind = 'text' | 'image' | 'generator' | 'group' | 'video'
 
 export function createAt(editor: CanvasEditor, kind: CreateKind, at: Point, source?: string) {
   const node = {
     text: textNode,
     image: (point: Point) => imageNode(point, { state: 'empty' }),
     generator: generatorNode,
+    video: videoNode,
     group: groupNode,
   }[kind](at)
   const created = editor.apply((doc) => {

@@ -1,3 +1,4 @@
+import { Video } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Frame, ImagePlus, Sparkles, Type } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -12,6 +13,7 @@ export interface CreateMenuAnchor {
 const items = [
   { kind: 'text', icon: Type, label: 'canvas.nodes.text' },
   { kind: 'image', icon: ImagePlus, label: 'canvas.nodes.image' },
+  { kind: 'video', icon: Video, label: 'video.node' },
   { kind: 'generator', icon: Sparkles, label: 'canvas.nodes.generator' },
   { kind: 'group', icon: Frame, label: 'canvas.nodes.group' },
 ] as const

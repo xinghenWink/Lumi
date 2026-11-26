@@ -72,6 +72,65 @@ func (q *Queries) CanvasOwnedTaskIDs(ctx context.Context, arg CanvasOwnedTaskIDs
 	return items, nil
 }
 
+const canvasOwnedVideoFileIDs = `-- name: CanvasOwnedVideoFileIDs :many
+SELECT id FROM files WHERE id=ANY($2::uuid[]) AND user_id=$1 AND kind IN ('video_upload','video_generated')
+`
+
+type CanvasOwnedVideoFileIDsParams struct {
+	UserID uuid.UUID
+	Ids    []uuid.UUID
+}
+
+func (q *Queries) CanvasOwnedVideoFileIDs(ctx context.Context, arg CanvasOwnedVideoFileIDsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, canvasOwnedVideoFileIDs, arg.UserID, arg.Ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const canvasOwnedVideoTaskIDs = `-- name: CanvasOwnedVideoTaskIDs :many
+SELECT id FROM video_tasks WHERE id=ANY($3::uuid[]) AND user_id=$1 AND canvas_id=$2
+`
+
+type CanvasOwnedVideoTaskIDsParams struct {
+	UserID   uuid.UUID
+	CanvasID *uuid.UUID
+	Ids      []uuid.UUID
+}
+
+func (q *Queries) CanvasOwnedVideoTaskIDs(ctx context.Context, arg CanvasOwnedVideoTaskIDsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, canvasOwnedVideoTaskIDs, arg.UserID, arg.CanvasID, arg.Ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const canvasVisibleFiles = `-- name: CanvasVisibleFiles :many
 SELECT id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at, duration_ms FROM files WHERE id=ANY($2::uuid[]) AND user_id=$1 AND deleted_at IS NULL AND kind IN ('upload','generated')
 `

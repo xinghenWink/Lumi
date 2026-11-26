@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import type { CanvasNode, CanvasViewport as Viewport } from '../../../api/canvases'
 import { images } from '../../../api/images'
+import { videoAPI } from '../../../api/videos'
 import {
   aspectResize,
   canConnect,
@@ -223,15 +224,30 @@ export function CanvasViewport({
           ),
         ),
       ]
-      void Promise.allSettled(unknown.map((id) => images.file(id))).then((results) => {
+      const videoFiles = [
+        ...new Set(
+          fragment.nodes.flatMap((node) => (node.video?.file_id ? [node.video.file_id] : [])),
+        ),
+      ]
+      void Promise.all([
+        Promise.allSettled(unknown.map((id) => images.file(id))),
+        Promise.allSettled(videoFiles.map((id) => videoAPI.asset(id))),
+      ]).then(([results, videoResults]) => {
         const readable = new Set(Object.keys(editor.state.files))
         const found = results.flatMap((result) =>
           result.status === 'fulfilled' ? [result.value] : [],
         )
         editor.addFiles(found)
         for (const file of found) readable.add(file.id)
+        const readableVideos = new Set(
+          videoResults.flatMap((result) =>
+            result.status === 'fulfilled' ? [result.value.id] : [],
+          ),
+        )
         const nodes = fragment.nodes.filter(
-          (node) => !node.image?.file_id || readable.has(node.image.file_id),
+          (node) =>
+            (!node.image?.file_id || readable.has(node.image.file_id)) &&
+            (!node.video?.file_id || readableVideos.has(node.video.file_id)),
         )
         const kept = new Set(nodes.map((node) => node.id))
         pasteFragment(editor, {
@@ -275,7 +291,14 @@ export function CanvasViewport({
   }
 
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.button > 1 || isEditable(event.target)) return
+    // React portal events can bubble through the canvas independently of DOM containment.
+    if (
+      !(event.target instanceof Element) ||
+      !event.currentTarget.contains(event.target) ||
+      event.button > 1 ||
+      isEditable(event.target)
+    )
+      return
     if (menu) onMenu(null)
     const point = local(event)
     pointers.current.set(event.pointerId, point)

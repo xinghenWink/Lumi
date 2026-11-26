@@ -16,13 +16,33 @@ import {
   reparent,
   ungroup,
 } from './commands'
-import { documentProblem, emptyDocument, LIMITS, textNode } from './document'
+import { documentProblem, emptyDocument, LIMITS, textNode, videoNode } from './document'
 import { ids, must, sampleDocument, sequence } from './test-fixtures'
 
 const find = (doc: ReturnType<typeof sampleDocument>, id: string) =>
   doc.nodes.find((node) => node.id === id)
 
 describe('canvas commands', () => {
+  it('connects text, images and ready videos to a video node', () => {
+    const doc = sampleDocument()
+    const target = videoNode({ x: 900, y: 90 }, '25876eca-7a4f-4ee3-8046-6a8adfb1aaa1')
+    const source = videoNode({ x: 600, y: 90 }, '25876eca-7a4f-4ee3-8046-6a8adfb1aaa2')
+    const ready = {
+      ...source,
+      video: {
+        state: 'ready' as const,
+        file_id: '25876eca-7a4f-4ee3-8046-6a8adfb1aaa3',
+        task_id: null,
+        position: null,
+        error_code: '',
+      },
+    }
+    const board = { ...doc, nodes: [...doc.nodes, target, ready] }
+    expect(canConnect(board, ids.image, target.id)).toBe(true)
+    expect(canConnect(board, ids.text, target.id)).toBe(true)
+    expect(canConnect(board, ready.id, target.id)).toBe(true)
+    expect(canConnect(board, target.id, ids.generator)).toBe(false)
+  })
   it('moves group members with their frame', () => {
     const doc = moveNodes(sampleDocument(), [ids.group], 10, -5)
     expect(find(doc, ids.group)).toMatchObject({ x: -30, y: -85 })

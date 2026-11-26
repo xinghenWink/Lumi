@@ -10,6 +10,45 @@ info:
 servers:
   - url: /
 paths:
+  /api/v1/canvases/{id}/video-runs/quote:
+    post:
+      operationId: quoteCanvasVideo
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CanvasVideoQuoteInput' }
+      responses:
+        '200':
+          description: Current video quote for the saved canvas node.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VideoQuote' }
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/canvases/{id}/video-runs:
+    post:
+      operationId: submitCanvasVideo
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CanvasVideoRunInput' }
+      responses:
+        '202':
+          description: Canvas with durable video result slots and accepted task.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CanvasVideoRun' }
+        default:
+          $ref: '#/components/responses/APIError'
   /api/v1/video-options:
     get:
       operationId: listVideoOptions
@@ -9679,6 +9718,7 @@ components:
             - text
             - generator
             - group
+            - video
         x:
           type: number
           minimum: -1000000
@@ -9704,6 +9744,8 @@ components:
             - 'null'
           format: uuid
         image:
+          $ref: '#/components/schemas/CanvasImageContent'
+        video:
           $ref: '#/components/schemas/CanvasImageContent'
         text:
           $ref: '#/components/schemas/CanvasTextContent'
