@@ -74,8 +74,11 @@ func (s *Service) Import(ctx context.Context, actor user.Actor, id uuid.UUID, in
 			if !errors.Is(err, pgx.ErrNoRows) {
 				return fmt.Errorf("check previous model import: %w", err)
 			}
-			proposal := ModelInput{DisplayName: model.DisplayName, Type: model.Type, Capabilities: model.Capabilities, Routes: []RouteInput{{UpstreamID: id, UpstreamModelName: model.RemoteID, Priority: channel.Priority, Weight: channel.Weight, Enabled: true}}}
+			proposal := ModelInput{DisplayName: model.DisplayName, Type: model.Type, Capabilities: model.Capabilities, Routes: []RouteInput{{UpstreamID: id, UpstreamModelName: model.RemoteID, Priority: channel.Priority, Weight: channel.Weight, Enabled: model.Type != "video" || model.VideoProtocol != "", VideoProtocol: model.VideoProtocol, VideoProfile: model.VideoProfile}}}
 			if err := modelInput(&proposal); err != nil {
+				return err
+			}
+			if err := s.validateVideoRoutes(proposal); err != nil {
 				return err
 			}
 			view, _, err := writeModel(ctx, q, uuid.Nil, proposal)

@@ -24,6 +24,8 @@ const types = [
   'admin_adjust',
   'image_charge',
   'image_refund',
+  'video_charge',
+  'video_refund',
 ]
 export function CreditLedger({ admin = false, userId }: { admin?: boolean; userId?: string }) {
   const { user } = useSession(),
@@ -95,7 +97,7 @@ export function CreditLedger({ admin = false, userId }: { admin?: boolean; userI
             <NativeSelectOption value="">{t('credits.allTypes')}</NativeSelectOption>
             {types.map((type) => (
               <NativeSelectOption key={type} value={type}>
-                {t(`credits.types.${type}`)}
+                {t(type.startsWith('video_') ? 'video.' + type : `credits.types.${type}`)}
               </NativeSelectOption>
             ))}
           </NativeSelect>
@@ -169,13 +171,19 @@ export function CreditLedger({ admin = false, userId }: { admin?: boolean; userI
                 key: 'type',
                 label: t('credits.type'),
                 className: 'whitespace-nowrap',
-                render: (row) => t(`credits.types.${row.type}`),
+                render: (row) =>
+                  t(
+                    row.type.startsWith('video_')
+                      ? 'video.' + row.type
+                      : `credits.types.${row.type}`,
+                  ),
               },
               {
                 key: 'bucket',
                 label: t('credits.bucket'),
                 className: 'whitespace-nowrap',
-                render: (row) => t('credits.' + row.bucket),
+                render: (row) =>
+                  t(row.bucket === 'video' ? 'video.videoPool' : 'credits.' + row.bucket),
               },
               {
                 key: 'delta',

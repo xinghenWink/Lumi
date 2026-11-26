@@ -51,6 +51,27 @@ function list<T>(data: Record<string, unknown>, key: string, parse: (value: unkn
   if (!Array.isArray(value)) throw new ApiError('RESPONSE_INVALID')
   return value.map(parse)
 }
+export function parseVideoProfile(value: unknown): Schema['VideoProfile'] {
+  const row = record(value)
+  return {
+    mode: choice(row, 'mode', ['text', 'first_frame', 'first_last', 'reference']),
+    ratios: list(row, 'ratios', parseText),
+    resolutions: list(row, 'resolutions', (value) =>
+      choice({ value }, 'value', ['480p', '720p', '768p', '1080p', '2k', '4k']),
+    ),
+    durations: list(row, 'durations', (value) => integer({ value }, 'value', 1, 30)),
+    max_images: integer(row, 'max_images', 0, 30),
+    max_videos: integer(row, 'max_videos', 0, 10),
+    max_audio: integer(row, 'max_audio', 0, 10),
+    max_references: integer(row, 'max_references', 0, 50),
+    ...(row.allow_audio_only === undefined
+      ? {}
+      : { allow_audio_only: bool(row, 'allow_audio_only') }),
+  }
+}
+function parseVideoCapabilities(value: unknown) {
+  return { profiles: list(record(value), 'profiles', parseVideoProfile) }
+}
 const parseText = (value: unknown) => {
   if (typeof value !== 'string') throw new ApiError('RESPONSE_INVALID')
   return value
@@ -69,6 +90,7 @@ export function parseCapabilities(value: unknown): Capabilities {
     throw new ApiError('RESPONSE_INVALID')
   return {
     ...(resolutions ? { supported_resolutions: resolutions } : {}),
+    ...(data.video === undefined ? {} : { video: parseVideoCapabilities(data.video) }),
     ...(data.reasoning_effort === undefined
       ? {}
       : { reasoning_effort: bool(data, 'reasoning_effort') }),
@@ -127,7 +149,7 @@ export function parsePublicModel(value: unknown): PublicModel {
   return {
     id: text(d, 'id'),
     display_name: text(d, 'display_name'),
-    type: choice(d, 'type', ['chat', 'image'] as const),
+    type: choice(d, 'type', ['chat', 'image', 'video'] as const),
     description: text(d, 'description'),
     icon: text(d, 'icon'),
     sort_order: integer(d, 'sort_order', 0, 10000),
@@ -147,6 +169,15 @@ export function parseModel(value: unknown): PlatformModel {
       const route = record(value)
       return {
         id: text(route, 'id'),
+        ...(route.video_protocol === undefined
+          ? {}
+          : { video_protocol: text(route, 'video_protocol') }),
+        ...(route.video_profile === undefined
+          ? {}
+          : { video_profile: text(route, 'video_profile') }),
+        ...(route.video_capabilities === undefined
+          ? {}
+          : { video_capabilities: parseVideoCapabilities(route.video_capabilities) }),
         upstream_id: text(route, 'upstream_id'),
         upstream_model_name: text(route, 'upstream_model_name'),
         priority: integer(route, 'priority', 0, 10000),
@@ -197,6 +228,24 @@ export function parseConnectionTest(value: unknown): ConnectionTest {
 }
 export function defaultCapabilities(kind: ModelKind): Capabilities {
   return {
+    ...(kind === 'video'
+      ? {
+          video: {
+            profiles: [
+              {
+                mode: 'text' as const,
+                ratios: ['16:9'],
+                resolutions: ['720p' as const],
+                durations: [5],
+                max_images: 0,
+                max_videos: 0,
+                max_audio: 0,
+                max_references: 0,
+              },
+            ],
+          },
+        }
+      : {}),
     vision: false,
     stream: kind === 'chat',
     max_context_tokens: kind === 'chat' ? 4096 : 0,

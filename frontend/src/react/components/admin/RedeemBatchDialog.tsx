@@ -7,7 +7,7 @@ import { useSession } from '../../features/auth/hooks'
 import { useOwnedMutation } from '../../features/accounts/owned-mutation'
 import { createMutationKey } from '../../features/accounts/resources'
 import { ModalDialog } from '../ui/modal-dialog'
-import { Field, textareaClass } from '../ui/field'
+import { Field, selectClass, textareaClass } from '../ui/field'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { ApiNotice } from '../shared/ApiNotice'
@@ -30,6 +30,7 @@ export function RedeemBatchDialog({
     credits: '',
     maxUses: '1',
     expires: '',
+    bucket: 'permanent' as 'video' | 'permanent',
   })
   const [key] = useState(createMutationKey)
   const mutation = useOwnedMutation(user?.id, async (check) => {
@@ -48,6 +49,7 @@ export function RedeemBatchDialog({
       credits: Number(form.credits),
       max_uses: Number(form.maxUses),
       expires_at: expires,
+      ...(form.bucket === 'video' ? { credit_bucket: form.bucket } : {}),
     }
     if (!body.name || ![body.quantity, body.credits, body.max_uses].every(Number.isSafeInteger))
       throw new ApiError('INVALID_INPUT')
@@ -73,6 +75,19 @@ export function RedeemBatchDialog({
           mutation.mutate()
         }}
       >
+        <Field id={id + '-wallet'} label={t('credits.bucket')}>
+          <select
+            id={id + '-wallet'}
+            className={selectClass}
+            value={form.bucket}
+            onChange={(event) =>
+              setForm({ ...form, bucket: event.target.value === 'video' ? 'video' : 'permanent' })
+            }
+          >
+            <option value="permanent">{t('credits.permanent')}</option>
+            <option value="video">{t('video.videoPool')}</option>
+          </select>
+        </Field>
         <Field id={id + '-name'} label={t('credits.batchName')}>
           <Input
             id={id + '-name'}

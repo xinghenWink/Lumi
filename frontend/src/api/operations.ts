@@ -199,11 +199,25 @@ export const operations = {
       method: 'POST',
       body: { note },
     }),
-  batchUsers: (ids: string[], action: string, amount: number, note: string, key: string) =>
+  batchUsers: (
+    ids: string[],
+    action: string,
+    amount: number,
+    note: string,
+    key: string,
+    bucket: 'permanent' | 'video' = 'permanent',
+  ) =>
     authorized('/api/v1/admin/users/batch', noContent, {
       method: 'POST',
       idempotencyKey: key,
-      body: { ids, action, amount, note, confirm: action === 'delete' },
+      body: {
+        ids,
+        action,
+        amount,
+        note,
+        confirm: action === 'delete',
+        ...(action === 'grant' && bucket === 'video' ? { bucket } : {}),
+      },
     }),
   exportUsers: async (query: URLSearchParams) =>
     downloadResponse(

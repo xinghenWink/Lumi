@@ -118,6 +118,7 @@ type CreditAccount struct {
 	DailyBalance     int64
 	DailyResetOn     *time.Time
 	Version          int64
+	VideoBalance     int64
 }
 
 type CreditCharge struct {
@@ -327,6 +328,9 @@ type ModelRoute struct {
 	Priority          int32
 	Weight            int32
 	Enabled           bool
+	VideoProtocol     string
+	VideoProfile      string
+	VideoCapabilities []byte
 }
 
 type PasswordReset struct {
@@ -348,16 +352,17 @@ type PricingRule struct {
 }
 
 type RedeemBatch struct {
-	ID        uuid.UUID
-	Name      string
-	Note      string
-	Prefix    string
-	Quantity  int32
-	Credits   int64
-	MaxUses   int32
-	ExpiresAt *time.Time
-	CreatedBy uuid.UUID
-	CreatedAt time.Time
+	ID           uuid.UUID
+	Name         string
+	Note         string
+	Prefix       string
+	Quantity     int32
+	Credits      int64
+	MaxUses      int32
+	ExpiresAt    *time.Time
+	CreatedBy    uuid.UUID
+	CreatedAt    time.Time
+	CreditBucket string
 }
 
 type RedeemCode struct {
@@ -372,16 +377,18 @@ type RedeemCode struct {
 	Enabled       bool
 	ExpiresAt     *time.Time
 	CreatedAt     time.Time
+	CreditBucket  string
 }
 
 type RedeemRecord struct {
-	ID        uuid.UUID
-	CodeID    uuid.UUID
-	UserID    uuid.UUID
-	CodeTail  string
-	Credits   int64
-	Ip        netip.Addr
-	CreatedAt time.Time
+	ID           uuid.UUID
+	CodeID       uuid.UUID
+	UserID       uuid.UUID
+	CodeTail     string
+	Credits      int64
+	Ip           netip.Addr
+	CreatedAt    time.Time
+	CreditBucket string
 }
 
 type ReferralCode struct {
@@ -493,4 +500,17 @@ type VerificationCode struct {
 	CreatedAt time.Time
 	ExpiresAt time.Time
 	UsedAt    *time.Time
+}
+
+type VideoCreditSetting struct {
+	Singleton bool
+	Pool      string
+	Version   int64
+}
+
+type VideoPricing struct {
+	ModelID uuid.UUID
+	Mode    string
+	Rates   []byte
+	Version int64
 }

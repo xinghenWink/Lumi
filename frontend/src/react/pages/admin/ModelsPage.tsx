@@ -166,9 +166,9 @@ export default function ModelsPage() {
           onChange={(event) => setFilters({ ...filters, type: event.target.value })}
         >
           <option value="">{t('catalog.allTypes')}</option>
-          {['chat', 'image'].map((type) => (
+          {['chat', 'image', 'video'].map((type) => (
             <option key={type} value={type}>
-              {t(`catalog.${type}`)}
+              {t(type === 'video' ? 'video.short' : `catalog.${type}`)}
             </option>
           ))}
         </select>
@@ -228,7 +228,7 @@ export default function ModelsPage() {
                 {
                   key: 'type',
                   label: t('catalog.type'),
-                  render: (row) => t(`catalog.${row.type}`),
+                  render: (row) => t(row.type === 'video' ? 'video.short' : `catalog.${row.type}`),
                 },
                 {
                   key: 'state',

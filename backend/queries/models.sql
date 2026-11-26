@@ -81,8 +81,8 @@ JOIN upstreams u ON u.id=r.upstream_id WHERE r.model_id=$1 ORDER BY r.priority,r
 DELETE FROM model_routes WHERE model_id=$1;
 
 -- name: CreateModelRoute :exec
-INSERT INTO model_routes (id,model_id,upstream_id,upstream_model_name,priority,weight,enabled)
-VALUES ($1,$2,$3,$4,$5,$6,$7);
+INSERT INTO model_routes (id,model_id,upstream_id,upstream_model_name,priority,weight,enabled,video_protocol,video_profile,video_capabilities)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
 
 -- name: FindImportedModel :one
 SELECT m.* FROM model_routes r JOIN models m ON m.id=r.model_id

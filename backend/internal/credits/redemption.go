@@ -27,41 +27,44 @@ import (
 )
 
 type BatchInput struct {
-	Name      string     `json:"name"`
-	Note      string     `json:"note"`
-	Prefix    string     `json:"prefix"`
-	Quantity  int32      `json:"quantity"`
-	Credits   int64      `json:"credits"`
-	MaxUses   int32      `json:"max_uses"`
-	ExpiresAt *time.Time `json:"expires_at"`
+	CreditBucket string     `json:"credit_bucket,omitempty"`
+	Name         string     `json:"name"`
+	Note         string     `json:"note"`
+	Prefix       string     `json:"prefix"`
+	Quantity     int32      `json:"quantity"`
+	Credits      int64      `json:"credits"`
+	MaxUses      int32      `json:"max_uses"`
+	ExpiresAt    *time.Time `json:"expires_at"`
 }
 type Batch struct {
-	ID        uuid.UUID  `json:"id"`
-	Name      string     `json:"name"`
-	Note      string     `json:"note"`
-	Prefix    string     `json:"prefix"`
-	Quantity  int32      `json:"quantity"`
-	Credits   int64      `json:"credits"`
-	MaxUses   int32      `json:"max_uses"`
-	ExpiresAt *time.Time `json:"expires_at"`
-	CreatedAt time.Time  `json:"created_at"`
+	CreditBucket string     `json:"credit_bucket,omitempty"`
+	ID           uuid.UUID  `json:"id"`
+	Name         string     `json:"name"`
+	Note         string     `json:"note"`
+	Prefix       string     `json:"prefix"`
+	Quantity     int32      `json:"quantity"`
+	Credits      int64      `json:"credits"`
+	MaxUses      int32      `json:"max_uses"`
+	ExpiresAt    *time.Time `json:"expires_at"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 type BatchPage struct {
 	Items      []Batch `json:"items"`
 	NextCursor string  `json:"next_cursor"`
 }
 type Code struct {
-	ID        uuid.UUID  `json:"id"`
-	BatchID   uuid.UUID  `json:"batch_id"`
-	Code      string     `json:"code"`
-	Tail      string     `json:"tail"`
-	Credits   int64      `json:"credits"`
-	MaxUses   int32      `json:"max_uses"`
-	UsedCount int32      `json:"used_count"`
-	Enabled   bool       `json:"enabled"`
-	Status    string     `json:"status"`
-	ExpiresAt *time.Time `json:"expires_at"`
-	CreatedAt time.Time  `json:"created_at"`
+	CreditBucket string     `json:"credit_bucket,omitempty"`
+	ID           uuid.UUID  `json:"id"`
+	BatchID      uuid.UUID  `json:"batch_id"`
+	Code         string     `json:"code"`
+	Tail         string     `json:"tail"`
+	Credits      int64      `json:"credits"`
+	MaxUses      int32      `json:"max_uses"`
+	UsedCount    int32      `json:"used_count"`
+	Enabled      bool       `json:"enabled"`
+	Status       string     `json:"status"`
+	ExpiresAt    *time.Time `json:"expires_at"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 type CodeFilter struct {
 	BatchID                *uuid.UUID
@@ -73,13 +76,14 @@ type CodePage struct {
 	NextCursor string `json:"next_cursor"`
 }
 type RedeemRecord struct {
-	ID        uuid.UUID `json:"id"`
-	CodeID    uuid.UUID `json:"code_id"`
-	UserID    uuid.UUID `json:"user_id"`
-	CodeTail  string    `json:"code_tail"`
-	Credits   int64     `json:"credits"`
-	IP        string    `json:"ip,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	CreditBucket string    `json:"credit_bucket,omitempty"`
+	ID           uuid.UUID `json:"id"`
+	CodeID       uuid.UUID `json:"code_id"`
+	UserID       uuid.UUID `json:"user_id"`
+	CodeTail     string    `json:"code_tail"`
+	Credits      int64     `json:"credits"`
+	IP           string    `json:"ip,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 type RecordFilter struct {
 	UserID, CodeID *uuid.UUID
@@ -134,16 +138,24 @@ func generateCode(prefix string) (string, error) {
 	return code, nil
 }
 func batchView(record query.RedeemBatch) Batch {
-	return Batch{ID: record.ID, Name: record.Name, Note: record.Note, Prefix: record.Prefix, Quantity: record.Quantity, Credits: record.Credits, MaxUses: record.MaxUses, ExpiresAt: user.UTCTime(record.ExpiresAt), CreatedAt: record.CreatedAt.UTC()}
+	return Batch{CreditBucket: record.CreditBucket, ID: record.ID, Name: record.Name, Note: record.Note, Prefix: record.Prefix, Quantity: record.Quantity, Credits: record.Credits, MaxUses: record.MaxUses, ExpiresAt: user.UTCTime(record.ExpiresAt), CreatedAt: record.CreatedAt.UTC()}
 }
 func recordView(record query.RedeemRecord, admin bool) RedeemRecord {
-	result := RedeemRecord{ID: record.ID, CodeID: record.CodeID, UserID: record.UserID, CodeTail: record.CodeTail, Credits: record.Credits, CreatedAt: record.CreatedAt.UTC()}
+	result := RedeemRecord{CreditBucket: record.CreditBucket, ID: record.ID, CodeID: record.CodeID, UserID: record.UserID, CodeTail: record.CodeTail, Credits: record.Credits, CreatedAt: record.CreatedAt.UTC()}
 	if admin {
 		result.IP = record.Ip.String()
 	}
 	return result
 }
 func (s *Service) CreateBatch(ctx context.Context, actor user.Actor, key string, input BatchInput) (Batch, error) {
+	if input.CreditBucket != "" && input.CreditBucket != "permanent" && input.CreditBucket != "video" {
+		return Batch{}, problem.Invalid()
+	}
+	bucket := input.CreditBucket
+	if bucket != "video" {
+		bucket = "permanent"
+		input.CreditBucket = ""
+	}
 	input.Name = strings.TrimSpace(input.Name)
 	input.Note = strings.TrimSpace(input.Note)
 	input.Prefix = strings.ToUpper(strings.TrimSpace(input.Prefix))
@@ -169,7 +181,7 @@ func (s *Service) CreateBatch(ctx context.Context, actor user.Actor, key string,
 			if input.ExpiresAt != nil && !input.ExpiresAt.After(s.now()) {
 				return Batch{}, problem.Invalid()
 			}
-			batch, err := q.CreateRedeemBatch(ctx, query.CreateRedeemBatchParams{ID: id, Name: input.Name, Note: input.Note, Prefix: input.Prefix, Quantity: input.Quantity, Credits: input.Credits, MaxUses: input.MaxUses, ExpiresAt: input.ExpiresAt, CreatedBy: actor.ID})
+			batch, err := q.CreateRedeemBatch(ctx, query.CreateRedeemBatchParams{ID: id, Name: input.Name, Note: input.Note, Prefix: input.Prefix, Quantity: input.Quantity, Credits: input.Credits, MaxUses: input.MaxUses, ExpiresAt: input.ExpiresAt, CreatedBy: actor.ID, CreditBucket: bucket})
 			if err != nil {
 				return Batch{}, fmt.Errorf("create redeem batch: %w", err)
 			}
@@ -190,7 +202,7 @@ func (s *Service) CreateBatch(ctx context.Context, actor user.Actor, key string,
 				if err != nil {
 					return Batch{}, err
 				}
-				if err := q.CreateRedeemCode(ctx, query.CreateRedeemCodeParams{ID: codeID, BatchID: id, CodeHash: codeHash(canonical), CodeEncrypted: encrypted, Tail: canonical[len(canonical)-4:], Credits: input.Credits, MaxUses: input.MaxUses, ExpiresAt: input.ExpiresAt}); err != nil {
+				if err := q.CreateRedeemCode(ctx, query.CreateRedeemCodeParams{ID: codeID, BatchID: id, CodeHash: codeHash(canonical), CodeEncrypted: encrypted, Tail: canonical[len(canonical)-4:], Credits: input.Credits, MaxUses: input.MaxUses, ExpiresAt: input.ExpiresAt, CreditBucket: bucket}); err != nil {
 					return Batch{}, fmt.Errorf("store redeem code: %w", err)
 				}
 			}
@@ -276,7 +288,7 @@ func (s *Service) Codes(ctx context.Context, filter CodeFilter) (CodePage, error
 		} else if record.UsedCount >= record.MaxUses {
 			status = "used"
 		}
-		result.Items = append(result.Items, Code{ID: record.ID, BatchID: record.BatchID, Code: code, Tail: record.Tail, Credits: record.Credits, MaxUses: record.MaxUses, UsedCount: record.UsedCount, Enabled: record.Enabled, Status: status, ExpiresAt: user.UTCTime(record.ExpiresAt), CreatedAt: record.CreatedAt.UTC()})
+		result.Items = append(result.Items, Code{CreditBucket: record.CreditBucket, ID: record.ID, BatchID: record.BatchID, Code: code, Tail: record.Tail, Credits: record.Credits, MaxUses: record.MaxUses, UsedCount: record.UsedCount, Enabled: record.Enabled, Status: status, ExpiresAt: user.UTCTime(record.ExpiresAt), CreatedAt: record.CreatedAt.UTC()})
 	}
 	return result, nil
 }
@@ -384,13 +396,13 @@ func (s *Service) Redeem(ctx context.Context, owner uuid.UUID, ip netip.Addr, ke
 			if err != nil {
 				return RedeemResult{}, err
 			}
-			if err := change(ctx, q, &account, "redeem", "permanent", record.Credits, operation.String(), "redeem_code", &record.ID, nil, ""); err != nil {
+			if err := change(ctx, q, &account, "redeem", record.CreditBucket, record.Credits, operation.String(), "redeem_code", &record.ID, nil, ""); err != nil {
 				return RedeemResult{}, err
 			}
 			if err := q.IncrementRedeemUses(ctx, record.ID); err != nil {
 				return RedeemResult{}, fmt.Errorf("consume redeem use: %w", err)
 			}
-			receipt, err := q.CreateRedeemRecord(ctx, query.CreateRedeemRecordParams{ID: operation, CodeID: record.ID, UserID: owner, CodeTail: record.Tail, Credits: record.Credits, Ip: ip})
+			receipt, err := q.CreateRedeemRecord(ctx, query.CreateRedeemRecordParams{ID: operation, CodeID: record.ID, UserID: owner, CodeTail: record.Tail, Credits: record.Credits, Ip: ip, CreditBucket: record.CreditBucket})
 			if err != nil {
 				return RedeemResult{}, fmt.Errorf("record redemption: %w", err)
 			}

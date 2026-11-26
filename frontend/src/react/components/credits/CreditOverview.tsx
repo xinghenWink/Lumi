@@ -116,11 +116,12 @@ export function CreditOverview({ userId }: { userId?: string }) {
             {[
               { key: 'daily', value: query.data.daily_balance, icon: Gift },
               { key: 'permanent', value: query.data.permanent_balance, icon: Wallet },
+              { key: 'video', value: query.data.video_balance ?? 0, icon: Wallet },
             ].map(({ key, value, icon: Icon }) => (
               <div key={key}>
                 <span className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Icon size={14} />
-                  {t('credits.' + key)}
+                  {t(key === 'video' ? 'video.videoBalance' : 'credits.' + key)}
                 </span>
                 <strong
                   data-testid={key + '-balance'}
@@ -129,7 +130,7 @@ export function CreditOverview({ userId }: { userId?: string }) {
                   {number(value)}
                 </strong>
                 <p className="mt-1 text-2xs leading-5 text-muted-foreground">
-                  {t('credits.' + key + 'Hint')}
+                  {t(key === 'video' ? 'video.poolHint' : 'credits.' + key + 'Hint')}
                 </p>
               </div>
             ))}
@@ -215,13 +216,18 @@ export function CreditOverview({ userId }: { userId?: string }) {
                 onChange={(event) =>
                   setForm({
                     ...form,
-                    bucket: event.target.value === 'daily' ? 'daily' : 'permanent',
+                    bucket:
+                      event.target.value === 'video'
+                        ? 'video'
+                        : event.target.value === 'daily'
+                          ? 'daily'
+                          : 'permanent',
                   })
                 }
               >
-                {['permanent', 'daily'].map((bucket) => (
+                {['permanent', 'daily', 'video'].map((bucket) => (
                   <NativeSelectOption key={bucket} value={bucket}>
-                    {t('credits.' + bucket)}
+                    {t(bucket === 'video' ? 'video.videoPool' : 'credits.' + bucket)}
                   </NativeSelectOption>
                 ))}
               </NativeSelect>

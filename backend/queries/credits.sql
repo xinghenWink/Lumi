@@ -46,7 +46,7 @@ FROM locked l LEFT JOIN changed c ON c.user_id=l.user_id;
 SELECT * FROM users WHERE id=$1 FOR SHARE;
 
 -- name: SaveCreditAccount :exec
-UPDATE credit_accounts SET permanent_balance=$2, daily_balance=$3, daily_reset_on=$4, version=version+1 WHERE user_id=$1;
+UPDATE credit_accounts SET permanent_balance=$2, daily_balance=$3, daily_reset_on=$4, video_balance=$5, version=version+1 WHERE user_id=$1;
 
 -- name: AppendCreditLedger :exec
 INSERT INTO credit_ledger (id,user_id,type,bucket,delta,bucket_balance_after,total_after,ref_type,ref_id,idempotency_key,operator_id,note)

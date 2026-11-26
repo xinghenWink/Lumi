@@ -67,6 +67,7 @@ export function parseCreditAccount(value: unknown): CreditAccount {
   return {
     user_id: text(data, 'user_id'),
     permanent_balance: permanent,
+    ...(data.video_balance === undefined ? {} : { video_balance: number(data, 'video_balance') }),
     daily_balance: daily,
     total,
     daily_reset_on: text(data, 'daily_reset_on'),
@@ -144,8 +145,10 @@ export function parseLedger(value: unknown): CreditLedgerPage {
           'admin_adjust',
           'image_charge',
           'image_refund',
+          'video_charge',
+          'video_refund',
         ]),
-        bucket: choice(row, 'bucket', ['daily', 'permanent']),
+        bucket: choice(row, 'bucket', ['daily', 'permanent', 'video']),
         delta: number(row, 'delta', true),
         bucket_balance_after: number(row, 'bucket_balance_after'),
         total_after: number(row, 'total_after'),
@@ -186,6 +189,9 @@ function parseRedemption(value: unknown): Schema['RedeemRecord'] {
     code_id: text(data, 'code_id'),
     user_id: text(data, 'user_id'),
     code_tail: text(data, 'code_tail'),
+    ...(data.credit_bucket === undefined
+      ? {}
+      : { credit_bucket: choice(data, 'credit_bucket', ['permanent', 'video']) }),
     credits: number(data, 'credits'),
     created_at: text(data, 'created_at'),
     ...(data.ip !== undefined ? { ip: text(data, 'ip') } : {}),
@@ -210,6 +216,9 @@ export function parseBatch(value: unknown): RedeemBatch {
     name: text(data, 'name'),
     note: text(data, 'note'),
     prefix: text(data, 'prefix'),
+    ...(data.credit_bucket === undefined
+      ? {}
+      : { credit_bucket: choice(data, 'credit_bucket', ['permanent', 'video']) }),
     quantity: number(data, 'quantity'),
     credits: number(data, 'credits'),
     max_uses: number(data, 'max_uses'),
@@ -232,6 +241,9 @@ export function parseCodes(value: unknown): RedeemCodePage {
         batch_id: text(row, 'batch_id'),
         code: text(row, 'code'),
         tail: text(row, 'tail'),
+        ...(row.credit_bucket === undefined
+          ? {}
+          : { credit_bucket: choice(row, 'credit_bucket', ['permanent', 'video']) }),
         credits: number(row, 'credits'),
         max_uses: number(row, 'max_uses'),
         used_count: number(row, 'used_count'),

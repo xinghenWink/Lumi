@@ -16,6 +16,16 @@ import (
 )
 
 func (s *Service) BatchGrant(ctx context.Context, actor user.Actor, ids []uuid.UUID, key string, amount int64, note string) error {
+	return s.BatchGrantBucket(ctx, actor, ids, key, amount, note, "permanent")
+}
+
+func (s *Service) BatchGrantBucket(ctx context.Context, actor user.Actor, ids []uuid.UUID, key string, amount int64, note, bucket string) error {
+	if bucket == "" {
+		bucket = "permanent"
+	}
+	if bucket != "permanent" && bucket != "video" {
+		return problem.Invalid()
+	}
 	if len(ids) < 1 || len(ids) > 100 || amount < 1 || amount > MaxBalance || !validation.Text(note, 1, 200) {
 		return problem.Invalid()
 	}
@@ -34,7 +44,11 @@ func (s *Service) BatchGrant(ctx context.Context, actor user.Actor, ids []uuid.U
 			IDs    []uuid.UUID
 			Amount int64
 			Note   string
-		}{ids, amount, note}
+			Bucket string `json:",omitempty"`
+		}{ids, amount, note, ""}
+		if bucket == "video" {
+			request.Bucket = bucket
+		}
 		_, err := idempotent(ctx, q, actor.ID, key, "batch_grant", request, func(operation uuid.UUID) (bool, error) {
 			cfg, err := configuration(ctx, q)
 			if err != nil {
@@ -48,10 +62,10 @@ func (s *Service) BatchGrant(ctx context.Context, actor user.Actor, ids []uuid.U
 				if err != nil {
 					return false, err
 				}
-				if err := change(ctx, q, &record, "admin_adjust", "permanent", amount, operation.String()+":"+id.String(), "user", &id, &actor.ID, note); err != nil {
+				if err := change(ctx, q, &record, "admin_adjust", bucket, amount, operation.String()+":"+id.String(), "user", &id, &actor.ID, note); err != nil {
 					return false, err
 				}
-				if err := audit.Write(ctx, q, audit.Entry{ActorID: &actor.ID, Action: "credits.batch_grant", TargetType: "user", TargetID: &id, After: map[string]int64{"amount": amount}, IP: actor.IP}); err != nil {
+				if err := audit.Write(ctx, q, audit.Entry{ActorID: &actor.ID, Action: "credits.batch_grant", TargetType: "user", TargetID: &id, After: map[string]any{"amount": amount, "bucket": bucket}, IP: actor.IP}); err != nil {
 					return false, err
 				}
 			}

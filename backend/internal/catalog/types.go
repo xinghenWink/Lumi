@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/xinghenWink/Lumi/backend/internal/upstream"
+	"github.com/xinghenWink/Lumi/backend/internal/upstream/video"
 )
 
 type Page[T any] struct {
@@ -56,28 +57,32 @@ type Channel struct {
 	UpdatedAt           time.Time  `json:"updated_at"`
 }
 type Capabilities struct {
-	SupportedResolutions          []string `json:"supported_resolutions,omitempty"`
-	UseSizePresets                bool     `json:"use_size_presets,omitempty"`
-	ReasoningEffort               bool     `json:"reasoning_effort,omitempty"`
-	Vision                        bool     `json:"vision"`
-	Stream                        bool     `json:"stream"`
-	MaxContextTokens              int32    `json:"max_context_tokens"`
-	Qualities                     []string `json:"qualities"`
-	Sizes                         []string `json:"sizes"`
-	MaxN                          int32    `json:"max_n"`
-	SupportsEdit                  bool     `json:"supports_edit"`
-	SupportsTransparentBackground bool     `json:"supports_transparent_background,omitempty"`
-	SupportsGIF                   bool     `json:"supports_gif,omitempty"`
-	SupportsComplexity            bool     `json:"supports_complexity,omitempty"`
-	MaxReferenceImages            int32    `json:"max_reference_images"`
-	ResponseFormat                string   `json:"response_format"`
+	Video                         *video.Capabilities `json:"video,omitempty"`
+	SupportedResolutions          []string            `json:"supported_resolutions,omitempty"`
+	UseSizePresets                bool                `json:"use_size_presets,omitempty"`
+	ReasoningEffort               bool                `json:"reasoning_effort,omitempty"`
+	Vision                        bool                `json:"vision"`
+	Stream                        bool                `json:"stream"`
+	MaxContextTokens              int32               `json:"max_context_tokens"`
+	Qualities                     []string            `json:"qualities"`
+	Sizes                         []string            `json:"sizes"`
+	MaxN                          int32               `json:"max_n"`
+	SupportsEdit                  bool                `json:"supports_edit"`
+	SupportsTransparentBackground bool                `json:"supports_transparent_background,omitempty"`
+	SupportsGIF                   bool                `json:"supports_gif,omitempty"`
+	SupportsComplexity            bool                `json:"supports_complexity,omitempty"`
+	MaxReferenceImages            int32               `json:"max_reference_images"`
+	ResponseFormat                string              `json:"response_format"`
 }
 type RouteInput struct {
-	UpstreamID        uuid.UUID `json:"upstream_id"`
-	UpstreamModelName string    `json:"upstream_model_name"`
-	Priority          int32     `json:"priority"`
-	Weight            int32     `json:"weight"`
-	Enabled           bool      `json:"enabled"`
+	VideoProtocol     string              `json:"video_protocol,omitempty"`
+	VideoProfile      string              `json:"video_profile,omitempty"`
+	VideoCapabilities *video.Capabilities `json:"video_capabilities,omitempty"`
+	UpstreamID        uuid.UUID           `json:"upstream_id"`
+	UpstreamModelName string              `json:"upstream_model_name"`
+	Priority          int32               `json:"priority"`
+	Weight            int32               `json:"weight"`
+	Enabled           bool                `json:"enabled"`
 }
 type Route struct {
 	RouteInput
@@ -130,10 +135,12 @@ type ConnectionTest struct {
 	ModelCount int    `json:"model_count"`
 }
 type ImportModel struct {
-	RemoteID     string       `json:"remote_id"`
-	DisplayName  string       `json:"display_name"`
-	Type         string       `json:"type"`
-	Capabilities Capabilities `json:"capabilities"`
+	VideoProtocol string       `json:"video_protocol,omitempty"`
+	VideoProfile  string       `json:"video_profile,omitempty"`
+	RemoteID      string       `json:"remote_id"`
+	DisplayName   string       `json:"display_name"`
+	Type          string       `json:"type"`
+	Capabilities  Capabilities `json:"capabilities"`
 }
 type ImportInput struct {
 	Version int64         `json:"version"`

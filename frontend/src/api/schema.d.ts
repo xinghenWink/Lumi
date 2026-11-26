@@ -4,6 +4,70 @@
  */
 
 export interface paths {
+  '/api/v1/video-credit-pool': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['getVideoCreditPool']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/video-protocols': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['listVideoProtocols']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/video-credit-pool': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['getAdminVideoCreditPool']
+    put: operations['saveVideoCreditPool']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/admin/video-pricing/{model}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['getVideoPricing']
+    put: operations['saveVideoPricing']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/healthz': {
     parameters: {
       query?: never
@@ -1796,6 +1860,8 @@ export interface components {
       ids: string[]
     }
     BatchUsersInput: {
+      /** @enum {string} */
+      bucket?: 'permanent' | 'video'
       ids: string[]
       /** @enum {string} */
       action: 'enable' | 'disable' | 'delete' | 'grant'
@@ -2331,6 +2397,7 @@ export interface components {
     CreditAccount: {
       /** Format: uuid */
       user_id: string
+      video_balance?: number
       /** Format: int64 */
       permanent_balance: number
       /** Format: int64 */
@@ -2395,7 +2462,7 @@ export interface components {
        * @default permanent
        * @enum {string}
        */
-      bucket: 'daily' | 'permanent'
+      bucket: 'daily' | 'permanent' | 'video'
       /** @enum {string} */
       action: 'add' | 'subtract' | 'set'
       /** Format: int64 */
@@ -2418,8 +2485,10 @@ export interface components {
         | 'admin_adjust'
         | 'image_charge'
         | 'image_refund'
+        | 'video_charge'
+        | 'video_refund'
       /** @enum {string} */
-      bucket: 'daily' | 'permanent'
+      bucket: 'daily' | 'permanent' | 'video'
       /** Format: int64 */
       delta: number
       /** Format: int64 */
@@ -2467,6 +2536,8 @@ export interface components {
       code: string
     }
     RedeemRecord: {
+      /** @enum {string} */
+      credit_bucket?: 'permanent' | 'video'
       /** Format: uuid */
       id: string
       /** Format: uuid */
@@ -2491,6 +2562,8 @@ export interface components {
       record: components['schemas']['RedeemRecord']
     }
     RedeemBatchInput: {
+      /** @enum {string} */
+      credit_bucket?: 'permanent' | 'video'
       name: string
       note?: string
       prefix?: string
@@ -2507,6 +2580,8 @@ export interface components {
       expires_at?: string | null
     }
     RedeemBatch: {
+      /** @enum {string} */
+      credit_bucket?: 'permanent' | 'video'
       /** Format: uuid */
       id: string
       name: string
@@ -2528,6 +2603,8 @@ export interface components {
       next_cursor: string
     }
     RedeemCode: {
+      /** @enum {string} */
+      credit_bucket?: 'permanent' | 'video'
       /** Format: uuid */
       id: string
       /** Format: uuid */
@@ -2626,7 +2703,147 @@ export interface components {
       items: components['schemas']['Upstream'][]
       next_cursor: string
     }
+    CanvasVideoQuoteInput: components['schemas']['VideoInput'] & {
+      version: number
+      /** Format: uuid */
+      node_id: string
+    }
+    CanvasVideoRunInput: components['schemas']['CanvasVideoQuoteInput'] & {
+      confirmed_quote: components['schemas']['VideoQuote']
+    }
+    CanvasVideoRun: {
+      canvas: components['schemas']['Canvas']
+      task: components['schemas']['VideoTask']
+    }
+    /** @enum {string} */
+    VideoMode: 'text' | 'first_frame' | 'first_last' | 'reference'
+    /** @enum {string} */
+    VideoRole:
+      'first_frame' | 'last_frame' | 'reference_image' | 'reference_video' | 'reference_audio'
+    /** @enum {string} */
+    VideoResolution: '480p' | '720p' | '768p' | '1080p' | '2k' | '4k'
+    VideoProfile: {
+      mode: components['schemas']['VideoMode']
+      ratios: string[]
+      resolutions: components['schemas']['VideoResolution'][]
+      durations: number[]
+      max_images: number
+      max_videos: number
+      max_audio: number
+      max_references: number
+      allow_audio_only?: boolean
+    }
+    VideoCapabilities: {
+      profiles: components['schemas']['VideoProfile'][]
+    }
+    VideoRef: {
+      /** Format: uuid */
+      file_id: string
+      role: components['schemas']['VideoRole']
+      token?: string
+    }
+    VideoInput: {
+      mode: components['schemas']['VideoMode']
+      /** Format: uuid */
+      model_id: string
+      ratio: string
+      resolution: components['schemas']['VideoResolution']
+      duration_seconds: number
+      count: number
+      generate_audio: boolean
+      prompt: string
+      references: components['schemas']['VideoRef'][]
+    }
+    VideoSubmission: components['schemas']['VideoInput'] & {
+      confirmed_quote: components['schemas']['VideoQuote']
+    }
+    VideoQuote: {
+      /** @enum {string} */
+      pool: 'video' | 'permanent'
+      /** @enum {string} */
+      mode: 'second' | 'clip'
+      unit_price: number
+      total_cost: number
+      count: number
+      pricing_version: number
+      pool_version: number
+    }
+    VideoRate: {
+      resolution: components['schemas']['VideoResolution']
+      duration_seconds?: number
+      has_video_reference: boolean
+      credits: number
+    }
+    VideoPricing: {
+      /** Format: uuid */
+      model_id: string
+      /** @enum {string} */
+      mode: 'second' | 'clip'
+      rates: components['schemas']['VideoRate'][]
+      version: number
+    }
+    VideoCreditPool: {
+      /** @enum {string} */
+      pool: 'video' | 'permanent'
+      version: number
+    }
+    VideoOption: {
+      model: components['schemas']['PublicModel']
+      profiles: components['schemas']['VideoProfile'][]
+      pricing: components['schemas']['VideoPricing']
+    }
+    VideoOptions: {
+      items: components['schemas']['VideoOption'][]
+    }
+    VideoItem: {
+      position: number
+      /** @enum {string} */
+      status: 'queued' | 'running' | 'succeeded' | 'failed'
+      error_code?: string
+      /** Format: uuid */
+      file_id?: string
+    }
+    VideoTask: {
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      canvas_id?: string
+      model_name: string
+      input: components['schemas']['VideoInput']
+      quote: components['schemas']['VideoQuote']
+      /** @enum {string} */
+      status: 'queued' | 'running' | 'succeeded' | 'partial' | 'failed'
+      refunded: number
+      items: components['schemas']['VideoItem'][]
+      /** Format: date-time */
+      created_at: string
+      /** Format: date-time */
+      updated_at: string
+    }
+    VideoTaskPage: {
+      items: components['schemas']['VideoTask'][]
+      next_cursor: string
+    }
+    VideoAsset: {
+      /** Format: uuid */
+      id: string
+      /** @enum {string} */
+      kind: 'upload' | 'generated' | 'video_upload' | 'video_generated' | 'audio_upload'
+      mime: string
+      width: number
+      height: number
+      size: number
+      duration_ms: number
+      url: string
+      /** Format: date-time */
+      created_at: string
+    }
+    VideoAssetPage: {
+      items: components['schemas']['VideoAsset'][]
+      next_cursor: string
+    }
     ModelCapabilities: {
+      video?: components['schemas']['VideoCapabilities']
       /** @description Chat model accepts explicit reasoning effort. */
       reasoning_effort?: boolean
       /** @description Supported tiers for fixed-size image requests. Unset legacy models keep their existing size constraints. An update that omits the list preserves any saved selection. Automatic sizing follows the existing auto policy. */
@@ -2651,6 +2868,9 @@ export interface components {
       response_format: '' | 'b64_json' | 'url'
     }
     ModelRouteInput: {
+      video_protocol?: string
+      video_profile?: string
+      video_capabilities?: components['schemas']['VideoCapabilities']
       /** Format: uuid */
       upstream_id: string
       upstream_model_name: string
@@ -2659,6 +2879,9 @@ export interface components {
       enabled: boolean
     }
     ModelRoute: {
+      video_protocol?: string
+      video_profile?: string
+      video_capabilities?: components['schemas']['VideoCapabilities']
       /** Format: uuid */
       upstream_id: string
       upstream_model_name: string
@@ -2676,7 +2899,7 @@ export interface components {
       /** @description Model name with the preferred channel's public name appended in parentheses when configured. */
       display_name: string
       /** @enum {string} */
-      type: 'chat' | 'image'
+      type: 'chat' | 'image' | 'video'
       description: string
       icon: string
       sort_order: number
@@ -2688,7 +2911,7 @@ export interface components {
       id: string
       display_name: string
       /** @enum {string} */
-      type: 'chat' | 'image'
+      type: 'chat' | 'image' | 'video'
       description: string
       icon: string
       sort_order: number
@@ -2706,7 +2929,7 @@ export interface components {
       version: number
       display_name: string
       /** @enum {string} */
-      type: 'chat' | 'image'
+      type: 'chat' | 'image' | 'video'
       description: string
       icon: string
       sort_order: number
@@ -2743,7 +2966,9 @@ export interface components {
         remote_id: string
         display_name: string
         /** @enum {string} */
-        type: 'chat' | 'image'
+        type: 'chat' | 'image' | 'video'
+        video_protocol?: string
+        video_profile?: string
         capabilities: components['schemas']['ModelCapabilities']
       }[]
     }
@@ -3291,6 +3516,149 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
+  getVideoCreditPool: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description getVideoCreditPool */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VideoCreditPool']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  listVideoProtocols: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Registered video protocols and supported profile names. */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            items: {
+              protocol: string
+              profiles: string[]
+            }[]
+          }
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getAdminVideoCreditPool: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description getAdminVideoCreditPool */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VideoCreditPool']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  saveVideoCreditPool: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['VideoCreditPool']
+      }
+    }
+    responses: {
+      /** @description saveVideoCreditPool */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VideoCreditPool']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  getVideoPricing: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        model: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description getVideoPricing */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VideoPricing']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
+  saveVideoPricing: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        model: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['VideoPricing']
+      }
+    }
+    responses: {
+      /** @description saveVideoPricing */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['VideoPricing']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
   getLiveness: {
     parameters: {
       query?: never
@@ -4010,6 +4378,8 @@ export interface operations {
           | 'admin_adjust'
           | 'image_charge'
           | 'image_refund'
+          | 'video_charge'
+          | 'video_refund'
         from?: string
         until?: string
         cursor?: string
@@ -4258,6 +4628,8 @@ export interface operations {
           | 'admin_adjust'
           | 'image_charge'
           | 'image_refund'
+          | 'video_charge'
+          | 'video_refund'
         from?: string
         until?: string
         cursor?: string
@@ -4457,6 +4829,8 @@ export interface operations {
           | 'admin_adjust'
           | 'image_charge'
           | 'image_refund'
+          | 'video_charge'
+          | 'video_refund'
         from?: string
         until?: string
         cursor?: string
@@ -4510,7 +4884,7 @@ export interface operations {
   listAvailableModels: {
     parameters: {
       query: {
-        type: 'chat' | 'image'
+        type: 'chat' | 'image' | 'video'
       }
       header?: never
       path?: never
@@ -4750,7 +5124,7 @@ export interface operations {
         state?: 'enabled' | 'disabled'
         cursor?: string
         limit?: number
-        type?: 'chat' | 'image'
+        type?: 'chat' | 'image' | 'video'
         /** @description Filter by any route bound to this upstream, including disabled routes. */
         upstream_id?: string
       }

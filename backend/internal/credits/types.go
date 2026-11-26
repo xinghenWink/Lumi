@@ -17,6 +17,7 @@ type Configuration struct {
 	SizeMultipliers             map[string]string `json:"size_multipliers"`
 }
 type Account struct {
+	VideoBalance     int64     `json:"video_balance"`
 	UserID           uuid.UUID `json:"user_id"`
 	PermanentBalance int64     `json:"permanent_balance"`
 	DailyBalance     int64     `json:"daily_balance"`

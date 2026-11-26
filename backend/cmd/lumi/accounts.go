@@ -24,6 +24,7 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/platform/secrets"
 	"github.com/xinghenWink/Lumi/backend/internal/settings"
 	"github.com/xinghenWink/Lumi/backend/internal/upstream"
+	"github.com/xinghenWink/Lumi/backend/internal/upstream/video"
 	"github.com/xinghenWink/Lumi/backend/internal/user"
 )
 
@@ -70,5 +71,6 @@ func configureAccounts(ctx context.Context, cfg config.Config, pool, interactive
 			return nil, fmt.Errorf("bootstrap upstream: %w", err)
 		}
 	}
+	models.SetVideoRegistry(video.Builtins(upstream.NetworkPolicy{AllowPrivate: cfg.UpstreamAllowPrivate}))
 	return &account.Services{Deployment: deployment.NewService(deployment.NewStore(pool), version, commit), Operations: operations.New(pool), Mailer: sender, PublicBaseURL: cfg.PublicBaseURL, Version: version, Commit: commit, BuildTime: buildTime, Auth: auth.New(interactive, passwords, tokens, configuration, cache, sender, billing), Users: users, Settings: configuration, Audit: audit.New(pool), Gate: cache, Credits: billing, Catalog: models, Chat: conversations, Files: files, Images: images.New(pool, billing, models, files, cache, logger), Canvas: canvas.New(pool, files)}, nil
 }

@@ -5,7 +5,7 @@ import { useSession } from '../../features/auth/hooks'
 import { useOwnedMutation } from '../../features/accounts/owned-mutation'
 import { createMutationKey } from '../../features/accounts/resources'
 import { ModalDialog } from '../ui/modal-dialog'
-import { Field } from '../ui/field'
+import { Field, selectClass } from '../ui/field'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { ApiNotice } from '../shared/ApiNotice'
@@ -26,10 +26,11 @@ export function UserBatchDialog({
     id = useId()
   const [amount, setAmount] = useState('1'),
     [note, setNote] = useState(''),
+    [bucket, setBucket] = useState<'permanent' | 'video'>('permanent'),
     [key] = useState(createMutationKey)
   const mutation = useOwnedMutation(user?.id, async (check) => {
-    const body = { ids, action, amount: Number(amount), note: note.trim() }
-    await operations.batchUsers(ids, action, body.amount, body.note, key.forPayload(body))
+    const body = { ids, action, amount: Number(amount), note: note.trim(), bucket }
+    await operations.batchUsers(ids, action, body.amount, body.note, key.forPayload(body), bucket)
     check()
     key.complete()
     onSaved()
@@ -53,6 +54,19 @@ export function UserBatchDialog({
       >
         {action === 'grant' ? (
           <>
+            <Field id={id + '-wallet'} label={t('credits.bucket')}>
+              <select
+                id={id + '-wallet'}
+                className={selectClass}
+                value={bucket}
+                onChange={(event) =>
+                  setBucket(event.target.value === 'video' ? 'video' : 'permanent')
+                }
+              >
+                <option value="permanent">{t('credits.permanent')}</option>
+                <option value="video">{t('video.videoPool')}</option>
+              </select>
+            </Field>
             <Field id={id + '-amount'} label={t('ops.amount')}>
               <Input
                 id={id + '-amount'}

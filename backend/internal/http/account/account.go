@@ -105,6 +105,7 @@ func Routes(services *Services, security Security, logger *slog.Logger) func(*gi
 		h.catalogRoutes(protected, admin)
 		h.chatRoutes(protected, admin)
 		h.imageRoutes(protected, admin)
+		h.videoConfigRoutes(protected, admin)
 		h.m6Routes(protected, admin)
 		h.canvasRoutes(protected)
 		h.deploymentRoutes(admin)

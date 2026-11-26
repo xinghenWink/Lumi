@@ -14,20 +14,21 @@ import (
 )
 
 const createRedeemBatch = `-- name: CreateRedeemBatch :one
-INSERT INTO redeem_batches (id,name,note,prefix,quantity,credits,max_uses,expires_at,created_by)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, name, note, prefix, quantity, credits, max_uses, expires_at, created_by, created_at
+INSERT INTO redeem_batches (id,name,note,prefix,quantity,credits,max_uses,expires_at,created_by,credit_bucket)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id, name, note, prefix, quantity, credits, max_uses, expires_at, created_by, created_at, credit_bucket
 `
 
 type CreateRedeemBatchParams struct {
-	ID        uuid.UUID
-	Name      string
-	Note      string
-	Prefix    string
-	Quantity  int32
-	Credits   int64
-	MaxUses   int32
-	ExpiresAt *time.Time
-	CreatedBy uuid.UUID
+	ID           uuid.UUID
+	Name         string
+	Note         string
+	Prefix       string
+	Quantity     int32
+	Credits      int64
+	MaxUses      int32
+	ExpiresAt    *time.Time
+	CreatedBy    uuid.UUID
+	CreditBucket string
 }
 
 func (q *Queries) CreateRedeemBatch(ctx context.Context, arg CreateRedeemBatchParams) (RedeemBatch, error) {
@@ -41,6 +42,7 @@ func (q *Queries) CreateRedeemBatch(ctx context.Context, arg CreateRedeemBatchPa
 		arg.MaxUses,
 		arg.ExpiresAt,
 		arg.CreatedBy,
+		arg.CreditBucket,
 	)
 	var i RedeemBatch
 	err := row.Scan(
@@ -54,13 +56,14 @@ func (q *Queries) CreateRedeemBatch(ctx context.Context, arg CreateRedeemBatchPa
 		&i.ExpiresAt,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.CreditBucket,
 	)
 	return i, err
 }
 
 const createRedeemCode = `-- name: CreateRedeemCode :exec
-INSERT INTO redeem_codes (id,batch_id,code_hash,code_encrypted,tail,credits,max_uses,expires_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+INSERT INTO redeem_codes (id,batch_id,code_hash,code_encrypted,tail,credits,max_uses,expires_at,credit_bucket)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 `
 
 type CreateRedeemCodeParams struct {
@@ -72,6 +75,7 @@ type CreateRedeemCodeParams struct {
 	Credits       int64
 	MaxUses       int32
 	ExpiresAt     *time.Time
+	CreditBucket  string
 }
 
 func (q *Queries) CreateRedeemCode(ctx context.Context, arg CreateRedeemCodeParams) error {
@@ -84,21 +88,23 @@ func (q *Queries) CreateRedeemCode(ctx context.Context, arg CreateRedeemCodePara
 		arg.Credits,
 		arg.MaxUses,
 		arg.ExpiresAt,
+		arg.CreditBucket,
 	)
 	return err
 }
 
 const createRedeemRecord = `-- name: CreateRedeemRecord :one
-INSERT INTO redeem_records (id,code_id,user_id,code_tail,credits,ip) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, code_id, user_id, code_tail, credits, ip, created_at
+INSERT INTO redeem_records (id,code_id,user_id,code_tail,credits,ip,credit_bucket) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, code_id, user_id, code_tail, credits, ip, created_at, credit_bucket
 `
 
 type CreateRedeemRecordParams struct {
-	ID       uuid.UUID
-	CodeID   uuid.UUID
-	UserID   uuid.UUID
-	CodeTail string
-	Credits  int64
-	Ip       netip.Addr
+	ID           uuid.UUID
+	CodeID       uuid.UUID
+	UserID       uuid.UUID
+	CodeTail     string
+	Credits      int64
+	Ip           netip.Addr
+	CreditBucket string
 }
 
 func (q *Queries) CreateRedeemRecord(ctx context.Context, arg CreateRedeemRecordParams) (RedeemRecord, error) {
@@ -109,6 +115,7 @@ func (q *Queries) CreateRedeemRecord(ctx context.Context, arg CreateRedeemRecord
 		arg.CodeTail,
 		arg.Credits,
 		arg.Ip,
+		arg.CreditBucket,
 	)
 	var i RedeemRecord
 	err := row.Scan(
@@ -119,6 +126,7 @@ func (q *Queries) CreateRedeemRecord(ctx context.Context, arg CreateRedeemRecord
 		&i.Credits,
 		&i.Ip,
 		&i.CreatedAt,
+		&i.CreditBucket,
 	)
 	return i, err
 }
@@ -158,7 +166,7 @@ func (q *Queries) IncrementRedeemUses(ctx context.Context, id uuid.UUID) error {
 }
 
 const listRedeemBatches = `-- name: ListRedeemBatches :many
-SELECT id, name, note, prefix, quantity, credits, max_uses, expires_at, created_by, created_at FROM redeem_batches
+SELECT id, name, note, prefix, quantity, credits, max_uses, expires_at, created_by, created_at, credit_bucket FROM redeem_batches
 WHERE ($1::timestamptz IS NULL OR (created_at,id)<($1,$2::uuid))
 ORDER BY created_at DESC,id DESC LIMIT $3
 `
@@ -189,6 +197,7 @@ func (q *Queries) ListRedeemBatches(ctx context.Context, arg ListRedeemBatchesPa
 			&i.ExpiresAt,
 			&i.CreatedBy,
 			&i.CreatedAt,
+			&i.CreditBucket,
 		); err != nil {
 			return nil, err
 		}
@@ -201,7 +210,7 @@ func (q *Queries) ListRedeemBatches(ctx context.Context, arg ListRedeemBatchesPa
 }
 
 const listRedeemCodes = `-- name: ListRedeemCodes :many
-SELECT id, batch_id, code_hash, code_encrypted, tail, credits, max_uses, used_count, enabled, expires_at, created_at FROM redeem_codes
+SELECT id, batch_id, code_hash, code_encrypted, tail, credits, max_uses, used_count, enabled, expires_at, created_at, credit_bucket FROM redeem_codes
 WHERE ($1::uuid IS NULL OR batch_id=$1)
 AND ($2::text='' OR code_hash=$2)
 AND ($3::text='' OR
@@ -250,6 +259,7 @@ func (q *Queries) ListRedeemCodes(ctx context.Context, arg ListRedeemCodesParams
 			&i.Enabled,
 			&i.ExpiresAt,
 			&i.CreatedAt,
+			&i.CreditBucket,
 		); err != nil {
 			return nil, err
 		}
@@ -262,7 +272,7 @@ func (q *Queries) ListRedeemCodes(ctx context.Context, arg ListRedeemCodesParams
 }
 
 const listRedeemRecords = `-- name: ListRedeemRecords :many
-SELECT id, code_id, user_id, code_tail, credits, ip, created_at FROM redeem_records
+SELECT id, code_id, user_id, code_tail, credits, ip, created_at, credit_bucket FROM redeem_records
 WHERE ($1::uuid IS NULL OR user_id=$1)
 AND ($2::uuid IS NULL OR code_id=$2)
 AND ($3::timestamptz IS NULL OR (created_at,id)<($3,$4::uuid))
@@ -300,6 +310,7 @@ func (q *Queries) ListRedeemRecords(ctx context.Context, arg ListRedeemRecordsPa
 			&i.Credits,
 			&i.Ip,
 			&i.CreatedAt,
+			&i.CreditBucket,
 		); err != nil {
 			return nil, err
 		}
@@ -312,7 +323,7 @@ func (q *Queries) ListRedeemRecords(ctx context.Context, arg ListRedeemRecordsPa
 }
 
 const lockRedeemCode = `-- name: LockRedeemCode :one
-SELECT id, batch_id, code_hash, code_encrypted, tail, credits, max_uses, used_count, enabled, expires_at, created_at FROM redeem_codes WHERE id=$1 FOR UPDATE
+SELECT id, batch_id, code_hash, code_encrypted, tail, credits, max_uses, used_count, enabled, expires_at, created_at, credit_bucket FROM redeem_codes WHERE id=$1 FOR UPDATE
 `
 
 func (q *Queries) LockRedeemCode(ctx context.Context, id uuid.UUID) (RedeemCode, error) {
@@ -330,12 +341,13 @@ func (q *Queries) LockRedeemCode(ctx context.Context, id uuid.UUID) (RedeemCode,
 		&i.Enabled,
 		&i.ExpiresAt,
 		&i.CreatedAt,
+		&i.CreditBucket,
 	)
 	return i, err
 }
 
 const lockRedeemCodeByHash = `-- name: LockRedeemCodeByHash :one
-SELECT id, batch_id, code_hash, code_encrypted, tail, credits, max_uses, used_count, enabled, expires_at, created_at FROM redeem_codes WHERE code_hash=$1 FOR UPDATE
+SELECT id, batch_id, code_hash, code_encrypted, tail, credits, max_uses, used_count, enabled, expires_at, created_at, credit_bucket FROM redeem_codes WHERE code_hash=$1 FOR UPDATE
 `
 
 func (q *Queries) LockRedeemCodeByHash(ctx context.Context, codeHash string) (RedeemCode, error) {
@@ -353,6 +365,7 @@ func (q *Queries) LockRedeemCodeByHash(ctx context.Context, codeHash string) (Re
 		&i.Enabled,
 		&i.ExpiresAt,
 		&i.CreatedAt,
+		&i.CreditBucket,
 	)
 	return i, err
 }

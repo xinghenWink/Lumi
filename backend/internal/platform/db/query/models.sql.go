@@ -45,8 +45,8 @@ func (q *Queries) ClearModelRoutes(ctx context.Context, modelID uuid.UUID) error
 }
 
 const createModelRoute = `-- name: CreateModelRoute :exec
-INSERT INTO model_routes (id,model_id,upstream_id,upstream_model_name,priority,weight,enabled)
-VALUES ($1,$2,$3,$4,$5,$6,$7)
+INSERT INTO model_routes (id,model_id,upstream_id,upstream_model_name,priority,weight,enabled,video_protocol,video_profile,video_capabilities)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 `
 
 type CreateModelRouteParams struct {
@@ -57,6 +57,9 @@ type CreateModelRouteParams struct {
 	Priority          int32
 	Weight            int32
 	Enabled           bool
+	VideoProtocol     string
+	VideoProfile      string
+	VideoCapabilities []byte
 }
 
 func (q *Queries) CreateModelRoute(ctx context.Context, arg CreateModelRouteParams) error {
@@ -68,6 +71,9 @@ func (q *Queries) CreateModelRoute(ctx context.Context, arg CreateModelRoutePara
 		arg.Priority,
 		arg.Weight,
 		arg.Enabled,
+		arg.VideoProtocol,
+		arg.VideoProfile,
+		arg.VideoCapabilities,
 	)
 	return err
 }
@@ -325,7 +331,7 @@ func (q *Queries) ListChannelModelMembership(ctx context.Context, upstreamID uui
 }
 
 const listModelRoutes = `-- name: ListModelRoutes :many
-SELECT r.id, r.model_id, r.upstream_id, r.upstream_model_name, r.priority, r.weight, r.enabled,u.name AS upstream_name,u.enabled AS upstream_enabled FROM model_routes r
+SELECT r.id, r.model_id, r.upstream_id, r.upstream_model_name, r.priority, r.weight, r.enabled, r.video_protocol, r.video_profile, r.video_capabilities,u.name AS upstream_name,u.enabled AS upstream_enabled FROM model_routes r
 JOIN upstreams u ON u.id=r.upstream_id WHERE r.model_id=$1 ORDER BY r.priority,r.id
 `
 
@@ -337,6 +343,9 @@ type ListModelRoutesRow struct {
 	Priority          int32
 	Weight            int32
 	Enabled           bool
+	VideoProtocol     string
+	VideoProfile      string
+	VideoCapabilities []byte
 	UpstreamName      string
 	UpstreamEnabled   bool
 }
@@ -358,6 +367,9 @@ func (q *Queries) ListModelRoutes(ctx context.Context, modelID uuid.UUID) ([]Lis
 			&i.Priority,
 			&i.Weight,
 			&i.Enabled,
+			&i.VideoProtocol,
+			&i.VideoProfile,
+			&i.VideoCapabilities,
 			&i.UpstreamName,
 			&i.UpstreamEnabled,
 		); err != nil {

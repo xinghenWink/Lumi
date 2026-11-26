@@ -39,6 +39,12 @@ func validSize(value string) bool {
 	return true
 }
 func validCapabilities(kind string, c Capabilities) bool {
+	if kind == "video" {
+		return c.Video != nil && c.Video.Valid()
+	}
+	if c.Video != nil {
+		return false
+	}
 	if (c.SupportsTransparentBackground && (kind != "image" || !c.SupportsEdit)) || ((c.SupportsGIF || c.SupportsComplexity) && kind != "image") {
 		return false
 	}
@@ -93,6 +99,12 @@ func modelInput(input *ModelInput) error {
 		route := &input.Routes[i]
 		route.UpstreamModelName = strings.TrimSpace(route.UpstreamModelName)
 		key := route.UpstreamID.String() + ":" + route.UpstreamModelName
+		if route.VideoProtocol != "" {
+			key += ":" + route.VideoProtocol + ":" + route.VideoProfile
+		}
+		if (input.Type != "video" && (route.VideoProtocol != "" || route.VideoProfile != "" || route.VideoCapabilities != nil)) || (input.Type == "video" && ((route.Enabled && route.VideoProtocol == "") || len(route.VideoProtocol) > 40 || len(route.VideoProfile) > 40 || (route.VideoCapabilities != nil && !route.VideoCapabilities.Valid()))) {
+			return problem.Invalid()
+		}
 		if route.UpstreamID == uuid.Nil || !validation.Text(route.UpstreamModelName, 1, 200) || !validRank(route.Priority, route.Weight) || seen[key] {
 			return problem.Invalid()
 		}
@@ -140,7 +152,11 @@ func modelView(ctx context.Context, q *query.Queries, row query.Model) (Model, e
 	}
 	result := Model{PublicModel: public, Enabled: row.Enabled, Version: row.Version, CreatedAt: row.CreatedAt.UTC(), UpdatedAt: row.UpdatedAt.UTC(), Routes: make([]Route, 0, len(routes))}
 	for _, route := range routes {
-		result.Routes = append(result.Routes, Route{ID: route.ID, UpstreamName: route.UpstreamName, UpstreamEnabled: route.UpstreamEnabled, RouteInput: RouteInput{UpstreamID: route.UpstreamID, UpstreamModelName: route.UpstreamModelName, Priority: route.Priority, Weight: route.Weight, Enabled: route.Enabled}})
+		r := RouteInput{UpstreamID: route.UpstreamID, UpstreamModelName: route.UpstreamModelName, Priority: route.Priority, Weight: route.Weight, Enabled: route.Enabled, VideoProtocol: route.VideoProtocol, VideoProfile: route.VideoProfile}
+		if err := json.Unmarshal(route.VideoCapabilities, &r.VideoCapabilities); err != nil {
+			return result, fmt.Errorf("decode video route capabilities: %w", err)
+		}
+		result.Routes = append(result.Routes, Route{ID: route.ID, UpstreamName: route.UpstreamName, UpstreamEnabled: route.UpstreamEnabled, RouteInput: r})
 	}
 	return result, nil
 }
@@ -179,7 +195,7 @@ func (s *Service) Models(ctx context.Context, filter Filter) (Page[Model], error
 	return result, nil
 }
 func (s *Service) Public(ctx context.Context, kind string) ([]PublicModel, error) {
-	if kind != "chat" && kind != "image" {
+	if kind != "chat" && kind != "image" && kind != "video" {
 		return nil, problem.Invalid()
 	}
 	rows, err := s.queries.ListPublicModels(ctx, query.ListPublicModelsParams{ModelType: kind})
@@ -277,7 +293,11 @@ func writeModel(ctx context.Context, q *query.Queries, id uuid.UUID, input Model
 		if err != nil {
 			return Model{}, nil, err
 		}
-		if err := q.CreateModelRoute(ctx, query.CreateModelRouteParams{ID: routeID, ModelID: id, UpstreamID: route.UpstreamID, UpstreamModelName: route.UpstreamModelName, Priority: route.Priority, Weight: route.Weight, Enabled: route.Enabled}); err != nil {
+		caps, err := json.Marshal(route.VideoCapabilities)
+		if err != nil {
+			return Model{}, nil, fmt.Errorf("encode video route capabilities: %w", err)
+		}
+		if err := q.CreateModelRoute(ctx, query.CreateModelRouteParams{ID: routeID, ModelID: id, UpstreamID: route.UpstreamID, UpstreamModelName: route.UpstreamModelName, Priority: route.Priority, Weight: route.Weight, Enabled: route.Enabled, VideoProtocol: route.VideoProtocol, VideoProfile: route.VideoProfile, VideoCapabilities: caps}); err != nil {
 			return Model{}, nil, fmt.Errorf("bind model route: %w", err)
 		}
 	}
@@ -286,6 +306,9 @@ func writeModel(ctx context.Context, q *query.Queries, id uuid.UUID, input Model
 }
 func (s *Service) SaveModel(ctx context.Context, actor user.Actor, id uuid.UUID, input ModelInput) (Model, error) {
 	if err := modelInput(&input); err != nil {
+		return Model{}, err
+	}
+	if err := s.validateVideoRoutes(input); err != nil {
 		return Model{}, err
 	}
 	var result Model

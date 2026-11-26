@@ -23,15 +23,17 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/platform/secrets"
 	"github.com/xinghenWink/Lumi/backend/internal/platform/validation"
 	"github.com/xinghenWink/Lumi/backend/internal/upstream"
+	"github.com/xinghenWink/Lumi/backend/internal/upstream/video"
 	"github.com/xinghenWink/Lumi/backend/internal/user"
 )
 
 type Service struct {
-	pool    *pgxpool.Pool
-	queries *query.Queries
-	vault   *secrets.Vault
-	policy  upstream.NetworkPolicy
-	logger  *slog.Logger
+	videoRegistry *video.Registry
+	pool          *pgxpool.Pool
+	queries       *query.Queries
+	vault         *secrets.Vault
+	policy        upstream.NetworkPolicy
+	logger        *slog.Logger
 }
 
 func New(pool *pgxpool.Pool, vault *secrets.Vault, policy upstream.NetworkPolicy, logger *slog.Logger) *Service {
@@ -51,7 +53,7 @@ func validRank(priority, weight int32) bool {
 	return priority >= 0 && priority <= 10000 && weight >= 1 && weight <= 10000
 }
 func validFilter(filter Filter) bool {
-	return filter.Limit >= 1 && filter.Limit <= 100 && len(filter.Search) <= 100 && (filter.State == "" || filter.State == "enabled" || filter.State == "disabled") && (filter.Kind == "" || filter.Kind == "chat" || filter.Kind == "image")
+	return filter.Limit >= 1 && filter.Limit <= 100 && len(filter.Search) <= 100 && (filter.State == "" || filter.State == "enabled" || filter.State == "disabled") && (filter.Kind == "" || filter.Kind == "chat" || filter.Kind == "image" || filter.Kind == "video")
 }
 func (s *Service) Channels(ctx context.Context, filter Filter) (Page[Channel], error) {
 	if !validFilter(filter) {
