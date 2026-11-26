@@ -12,6 +12,15 @@ import (
 	"github.com/google/uuid"
 )
 
+const bumpPlatformModelVersions = `-- name: BumpPlatformModelVersions :exec
+UPDATE models SET version=version+1, updated_at=now() WHERE id=ANY($1::uuid[])
+`
+
+func (q *Queries) BumpPlatformModelVersions(ctx context.Context, modelIds []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, bumpPlatformModelVersions, modelIds)
+	return err
+}
+
 const clearDefaultModel = `-- name: ClearDefaultModel :exec
 UPDATE models SET is_default=false,version=version+1,updated_at=now() WHERE type=$1 AND is_default AND id<>$2
 `
@@ -110,21 +119,35 @@ func (q *Queries) CreatePlatformModel(ctx context.Context, arg CreatePlatformMod
 	return i, err
 }
 
-const deleteModelPricing = `-- name: DeleteModelPricing :exec
-DELETE FROM pricing_rules WHERE model_id=$1
+const deleteChannelModelRoutes = `-- name: DeleteChannelModelRoutes :exec
+DELETE FROM model_routes WHERE upstream_id=$1 AND model_id=ANY($2::uuid[])
 `
 
-func (q *Queries) DeleteModelPricing(ctx context.Context, modelID *uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteModelPricing, modelID)
+type DeleteChannelModelRoutesParams struct {
+	UpstreamID uuid.UUID
+	ModelIds   []uuid.UUID
+}
+
+func (q *Queries) DeleteChannelModelRoutes(ctx context.Context, arg DeleteChannelModelRoutesParams) error {
+	_, err := q.db.Exec(ctx, deleteChannelModelRoutes, arg.UpstreamID, arg.ModelIds)
 	return err
 }
 
-const deletePlatformModel = `-- name: DeletePlatformModel :exec
-DELETE FROM models WHERE id=$1
+const deleteModelsPricing = `-- name: DeleteModelsPricing :exec
+DELETE FROM pricing_rules WHERE model_id=ANY($1::uuid[])
 `
 
-func (q *Queries) DeletePlatformModel(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deletePlatformModel, id)
+func (q *Queries) DeleteModelsPricing(ctx context.Context, modelIds []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteModelsPricing, modelIds)
+	return err
+}
+
+const deletePlatformModels = `-- name: DeletePlatformModels :exec
+DELETE FROM models WHERE id=ANY($1::uuid[])
+`
+
+func (q *Queries) DeletePlatformModels(ctx context.Context, modelIds []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deletePlatformModels, modelIds)
 	return err
 }
 
@@ -211,17 +234,21 @@ SELECT id, display_name, type, description, icon, sort_order, enabled, is_defaul
 WHERE ($1::text = '' OR display_name ILIKE '%' || $1::text || '%' OR id::text=$1::text)
 AND ($2::text = '' OR type=$2)
 AND ($3::text = '' OR enabled=($3::text='enabled'))
-AND ($4::timestamptz IS NULL OR (created_at,id) < ($4::timestamptz,$5::uuid))
-ORDER BY created_at DESC,id DESC LIMIT $6
+AND ($4::uuid IS NULL OR EXISTS (
+    SELECT 1 FROM model_routes r WHERE r.model_id=models.id AND r.upstream_id=$4::uuid
+))
+AND ($5::timestamptz IS NULL OR (created_at,id) < ($5::timestamptz,$6::uuid))
+ORDER BY created_at DESC,id DESC LIMIT $7
 `
 
 type ListAdminModelsParams struct {
-	Search      string
-	KindFilter  string
-	StateFilter string
-	CursorTime  *time.Time
-	CursorID    *uuid.UUID
-	PageLimit   int32
+	Search         string
+	KindFilter     string
+	StateFilter    string
+	UpstreamFilter *uuid.UUID
+	CursorTime     *time.Time
+	CursorID       *uuid.UUID
+	PageLimit      int32
 }
 
 func (q *Queries) ListAdminModels(ctx context.Context, arg ListAdminModelsParams) ([]Model, error) {
@@ -229,6 +256,7 @@ func (q *Queries) ListAdminModels(ctx context.Context, arg ListAdminModelsParams
 		arg.Search,
 		arg.KindFilter,
 		arg.StateFilter,
+		arg.UpstreamFilter,
 		arg.CursorTime,
 		arg.CursorID,
 		arg.PageLimit,
@@ -254,6 +282,38 @@ func (q *Queries) ListAdminModels(ctx context.Context, arg ListAdminModelsParams
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listChannelModelMembership = `-- name: ListChannelModelMembership :many
+SELECT DISTINCT r.model_id, EXISTS (
+    SELECT 1 FROM model_routes other WHERE other.model_id=r.model_id AND other.upstream_id<>r.upstream_id
+) AS shared
+FROM model_routes r WHERE r.upstream_id=$1 ORDER BY r.model_id
+`
+
+type ListChannelModelMembershipRow struct {
+	ModelID uuid.UUID
+	Shared  bool
+}
+
+func (q *Queries) ListChannelModelMembership(ctx context.Context, upstreamID uuid.UUID) ([]ListChannelModelMembershipRow, error) {
+	rows, err := q.db.Query(ctx, listChannelModelMembership, upstreamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListChannelModelMembershipRow{}
+	for rows.Next() {
+		var i ListChannelModelMembershipRow
+		if err := rows.Scan(&i.ModelID, &i.Shared); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -312,35 +372,51 @@ func (q *Queries) ListModelRoutes(ctx context.Context, modelID uuid.UUID) ([]Lis
 }
 
 const listPublicModels = `-- name: ListPublicModels :many
-SELECT m.id, m.display_name, m.type, m.description, m.icon, m.sort_order, m.enabled, m.is_default, m.capabilities, m.version, m.created_at, m.updated_at FROM models m WHERE m.type=$1 AND m.enabled
-AND (m.type<>'chat' OR m.capabilities @> '{"stream":true}'::jsonb) AND EXISTS (
-    SELECT 1 FROM model_routes r JOIN upstreams u ON u.id=r.upstream_id
+SELECT m.id, m.display_name, m.type, m.description, m.icon, m.sort_order, m.enabled, m.is_default, m.capabilities, m.version, m.created_at, m.updated_at, preferred.display_name AS channel_display_name FROM models m
+JOIN LATERAL (
+    SELECT u.display_name FROM model_routes r JOIN upstreams u ON u.id=r.upstream_id
     WHERE r.model_id=m.id AND r.enabled AND u.enabled AND u.api_key_enc<>''
-) ORDER BY m.sort_order,m.id LIMIT 1000
+    ORDER BY r.priority,u.priority,u.id,r.id LIMIT 1
+) preferred ON true
+WHERE m.type=$1::text AND m.enabled
+AND ($2::uuid IS NULL OR m.id=$2::uuid)
+AND (m.type<>'chat' OR m.capabilities @> '{"stream":true}'::jsonb)
+ORDER BY m.sort_order,m.id LIMIT 1000
 `
 
-func (q *Queries) ListPublicModels(ctx context.Context, type_ string) ([]Model, error) {
-	rows, err := q.db.Query(ctx, listPublicModels, type_)
+type ListPublicModelsParams struct {
+	ModelType string
+	ModelID   *uuid.UUID
+}
+
+type ListPublicModelsRow struct {
+	Model              Model
+	ChannelDisplayName string
+}
+
+func (q *Queries) ListPublicModels(ctx context.Context, arg ListPublicModelsParams) ([]ListPublicModelsRow, error) {
+	rows, err := q.db.Query(ctx, listPublicModels, arg.ModelType, arg.ModelID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Model{}
+	items := []ListPublicModelsRow{}
 	for rows.Next() {
-		var i Model
+		var i ListPublicModelsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.DisplayName,
-			&i.Type,
-			&i.Description,
-			&i.Icon,
-			&i.SortOrder,
-			&i.Enabled,
-			&i.IsDefault,
-			&i.Capabilities,
-			&i.Version,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.Model.ID,
+			&i.Model.DisplayName,
+			&i.Model.Type,
+			&i.Model.Description,
+			&i.Model.Icon,
+			&i.Model.SortOrder,
+			&i.Model.Enabled,
+			&i.Model.IsDefault,
+			&i.Model.Capabilities,
+			&i.Model.Version,
+			&i.Model.CreatedAt,
+			&i.Model.UpdatedAt,
+			&i.ChannelDisplayName,
 		); err != nil {
 			return nil, err
 		}
@@ -374,6 +450,73 @@ func (q *Queries) LockPlatformModel(ctx context.Context, id uuid.UUID) (Model, e
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const setChannelModelRoutesEnabled = `-- name: SetChannelModelRoutesEnabled :many
+WITH changed AS (
+    UPDATE model_routes SET enabled=$1::boolean
+    WHERE upstream_id=$2 AND model_id=ANY($3::uuid[])
+    AND enabled<>$1::boolean RETURNING model_id
+)
+SELECT DISTINCT model_id FROM changed ORDER BY model_id
+`
+
+type SetChannelModelRoutesEnabledParams struct {
+	Enabled    bool
+	UpstreamID uuid.UUID
+	ModelIds   []uuid.UUID
+}
+
+func (q *Queries) SetChannelModelRoutesEnabled(ctx context.Context, arg SetChannelModelRoutesEnabledParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, setChannelModelRoutesEnabled, arg.Enabled, arg.UpstreamID, arg.ModelIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var model_id uuid.UUID
+		if err := rows.Scan(&model_id); err != nil {
+			return nil, err
+		}
+		items = append(items, model_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setPlatformModelsEnabled = `-- name: SetPlatformModelsEnabled :many
+UPDATE models SET enabled=$1::boolean, is_default=is_default AND $1::boolean,
+    version=version+1, updated_at=now()
+WHERE id=ANY($2::uuid[]) AND enabled<>$1::boolean
+RETURNING id
+`
+
+type SetPlatformModelsEnabledParams struct {
+	Enabled  bool
+	ModelIds []uuid.UUID
+}
+
+func (q *Queries) SetPlatformModelsEnabled(ctx context.Context, arg SetPlatformModelsEnabledParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, setPlatformModelsEnabled, arg.Enabled, arg.ModelIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updatePlatformModel = `-- name: UpdatePlatformModel :one

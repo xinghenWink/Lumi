@@ -793,7 +793,7 @@ func (q *Queries) ImageQueuePositions(ctx context.Context, ids []uuid.UUID) ([]I
 }
 
 const imageRouteTargets = `-- name: ImageRouteTargets :many
-SELECT u.id, u.name, u.base_url, u.api_key_enc, u.timeout_chat_s, u.timeout_image_s, u.proxy_url, u.enabled, u.priority, u.weight, u.circuit_state, u.edit_format, u.note, u.version, u.created_at, u.updated_at, u.consecutive_failures, u.open_until, u.last_error, u.probe_until,r.upstream_model_name FROM model_routes r JOIN upstreams u ON u.id=r.upstream_id JOIN models m ON m.id=r.model_id
+SELECT u.id, u.name, u.base_url, u.api_key_enc, u.timeout_chat_s, u.timeout_image_s, u.proxy_url, u.enabled, u.priority, u.weight, u.circuit_state, u.edit_format, u.note, u.version, u.created_at, u.updated_at, u.consecutive_failures, u.open_until, u.last_error, u.probe_until, u.display_name,r.upstream_model_name FROM model_routes r JOIN upstreams u ON u.id=r.upstream_id JOIN models m ON m.id=r.model_id
 WHERE m.id=$1 AND m.type='image' AND m.enabled AND r.enabled AND u.enabled AND u.api_key_enc<>''
 ORDER BY r.priority,u.priority,r.id LIMIT 1
 `
@@ -819,6 +819,7 @@ type ImageRouteTargetsRow struct {
 	OpenUntil           *time.Time
 	LastError           string
 	ProbeUntil          *time.Time
+	DisplayName         string
 	UpstreamModelName   string
 }
 
@@ -852,6 +853,7 @@ func (q *Queries) ImageRouteTargets(ctx context.Context, id uuid.UUID) ([]ImageR
 			&i.OpenUntil,
 			&i.LastError,
 			&i.ProbeUntil,
+			&i.DisplayName,
 			&i.UpstreamModelName,
 		); err != nil {
 			return nil, err

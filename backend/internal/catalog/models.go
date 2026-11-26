@@ -113,6 +113,22 @@ func publicView(row query.Model) (PublicModel, error) {
 	}
 	return PublicModel{ID: row.ID, DisplayName: row.DisplayName, Type: row.Type, Description: row.Description, Icon: row.Icon, SortOrder: row.SortOrder, IsDefault: row.IsDefault, Capabilities: capabilities}, nil
 }
+
+func modelDisplayName(name, channel string) string {
+	if channel == "" || strings.HasSuffix(name, "（"+channel+"）") || strings.HasSuffix(name, "("+channel+")") {
+		return name
+	}
+	return name + "（" + channel + "）"
+}
+
+func publicModelWithChannel(row query.ListPublicModelsRow) (PublicModel, error) {
+	model, err := publicView(row.Model)
+	if err != nil {
+		return PublicModel{}, err
+	}
+	model.DisplayName = modelDisplayName(model.DisplayName, row.ChannelDisplayName)
+	return model, nil
+}
 func modelView(ctx context.Context, q *query.Queries, row query.Model) (Model, error) {
 	public, err := publicView(row)
 	if err != nil {
@@ -140,7 +156,7 @@ func (s *Service) Models(ctx context.Context, filter Filter) (Page[Model], error
 	if err != nil {
 		return Page[Model]{}, err
 	}
-	rows, err := s.queries.ListAdminModels(ctx, query.ListAdminModelsParams{Search: filter.Search, KindFilter: filter.Kind, StateFilter: filter.State, CursorTime: cursor.Time, CursorID: &cursor.ID, PageLimit: filter.Limit + 1})
+	rows, err := s.queries.ListAdminModels(ctx, query.ListAdminModelsParams{Search: filter.Search, KindFilter: filter.Kind, StateFilter: filter.State, UpstreamFilter: filter.UpstreamID, CursorTime: cursor.Time, CursorID: &cursor.ID, PageLimit: filter.Limit + 1})
 	if err != nil {
 		return Page[Model]{}, fmt.Errorf("list platform models: %w", err)
 	}
@@ -166,14 +182,14 @@ func (s *Service) Public(ctx context.Context, kind string) ([]PublicModel, error
 	if kind != "chat" && kind != "image" {
 		return nil, problem.Invalid()
 	}
-	rows, err := s.queries.ListPublicModels(ctx, kind)
+	rows, err := s.queries.ListPublicModels(ctx, query.ListPublicModelsParams{ModelType: kind})
 	if err != nil {
 		return nil, fmt.Errorf("read available platform models: %w", err)
 	}
 	result := make([]PublicModel, 0, len(rows))
 	hasDefault := false
 	for _, row := range rows {
-		model, err := publicView(row)
+		model, err := publicModelWithChannel(row)
 		if err != nil {
 			return nil, err
 		}
@@ -309,14 +325,8 @@ func (s *Service) DeleteModel(ctx context.Context, actor user.Actor, id uuid.UUI
 		if err != nil {
 			return err
 		}
-		if err := q.LockCreditConfiguration(ctx); err != nil {
-			return fmt.Errorf("lock model pricing: %w", err)
-		}
-		if err := q.DeleteModelPricing(ctx, &id); err != nil {
-			return fmt.Errorf("delete model price overrides: %w", err)
-		}
-		if err := q.DeletePlatformModel(ctx, id); err != nil {
-			return fmt.Errorf("delete platform model: %w", err)
+		if err := deleteModels(ctx, q, []uuid.UUID{id}); err != nil {
+			return err
 		}
 		return audit.Write(ctx, q, audit.Entry{ActorID: &actor.ID, Action: "model.delete", TargetType: "model", TargetID: &id, Before: before, IP: actor.IP})
 	})

@@ -32,6 +32,7 @@ export function UpstreamDialog({
       : {
           version: 0,
           name: '',
+          display_name: '',
           base_url: '',
           timeout_chat_s: 120,
           timeout_image_s: 180,
@@ -46,12 +47,20 @@ export function UpstreamDialog({
   const [clearKey, setClearKey] = useState(false)
   const mutation = useOwnedMutation(user?.id, async (check) => {
     const key = keyInput.current?.value.trim() ?? ''
-    if (!form.name.trim() || !form.base_url.trim() || (!row && !key) || (clearKey && form.enabled))
+    const displayName = form.display_name?.trim() ?? ''
+    if (
+      !form.name.trim() ||
+      !form.base_url.trim() ||
+      [...displayName].length > 80 ||
+      (!row && !key) ||
+      (clearKey && form.enabled)
+    )
       throw new ApiError('INVALID_INPUT')
     await catalog.saveChannel(
       {
         ...form,
         name: form.name.trim(),
+        display_name: displayName,
         base_url: form.base_url.trim(),
         api_key: clearKey ? '' : key || null,
       },
@@ -86,6 +95,18 @@ export function UpstreamDialog({
               maxLength={80}
               required
               onChange={(event) => setForm({ ...form, name: event.target.value })}
+            />
+          </Field>
+          <Field
+            id={id + '-display-name'}
+            label={t('catalog.channelDisplayName')}
+            hint={t('catalog.channelDisplayNameHint')}
+          >
+            <Input
+              id={id + '-display-name'}
+              aria-describedby={id + '-display-name-hint'}
+              value={form.display_name ?? ''}
+              onChange={(event) => setForm({ ...form, display_name: event.target.value })}
             />
           </Field>
           <Field id={id + '-url'} label={t('catalog.baseURL')}>

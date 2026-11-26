@@ -27,6 +27,7 @@ export const auditActions = [
   'model.save',
   'model.delete',
   'model.import',
+  'model.channel_batch',
   'image.delete',
   'image.refund',
   'chat.content_view',

@@ -1851,6 +1851,43 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UpstreamImportInput'
+  /api/v1/admin/upstreams/{id}/models/batch:
+    post:
+      operationId: batchUpstreamModels
+      summary: Enable, disable, or delete platform models by upstream channel
+      description: >-
+        Acts on all models bound to the channel. For shared models, only the routes
+        for this channel are changed. Counts reflect distinct models actually affected.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Lumi-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            const: '1'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpstreamModelBatchInput'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamModelBatchResult'
+        default:
+          $ref: '#/components/responses/APIError'
   /api/v1/admin/models:
     get:
       operationId: listPlatformModels
@@ -1892,6 +1929,13 @@ paths:
             enum:
               - chat
               - image
+        - name: upstream_id
+          in: query
+          required: false
+          description: Filter by any route bound to this upstream, including disabled routes.
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: Success
@@ -7544,6 +7588,12 @@ components:
           type: string
           minLength: 1
           maxLength: 80
+        display_name:
+          type:
+            - string
+            - 'null'
+          maxLength: 80
+          description: Public channel name. Omitted or null preserves the saved value on updates. An empty string clears it.
         base_url:
           type: string
           format: uri
@@ -7608,6 +7658,10 @@ components:
           type: string
           minLength: 1
           maxLength: 80
+        display_name:
+          type: string
+          maxLength: 80
+          description: Public channel name. An empty value adds no model-name suffix.
         base_url:
           type: string
           format: uri
@@ -7670,6 +7724,7 @@ components:
       required:
         - version
         - name
+        - display_name
         - base_url
         - timeout_chat_s
         - timeout_image_s
@@ -7683,6 +7738,31 @@ components:
         - api_key_configured
         - created_at
         - updated_at
+    UpstreamModelBatchInput:
+      type: object
+      additionalProperties: false
+      properties:
+        action:
+          type: string
+          enum:
+            - enable
+            - disable
+            - delete
+      required:
+        - action
+    UpstreamModelBatchResult:
+      type: object
+      additionalProperties: false
+      properties:
+        affected_exclusive_models:
+          type: integer
+          minimum: 0
+        affected_shared_models:
+          type: integer
+          minimum: 0
+      required:
+        - affected_exclusive_models
+        - affected_shared_models
     UpstreamPage:
       type: object
       additionalProperties: false
@@ -7839,6 +7919,7 @@ components:
           format: uuid
         display_name:
           type: string
+          description: Model name with the preferred channel's public name appended in parentheses when configured.
         type:
           type: string
           enum:

@@ -1,9 +1,10 @@
 package catalog
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/xinghenWink/Lumi/backend/internal/upstream"
-	"time"
 )
 
 type Page[T any] struct {
@@ -13,10 +14,12 @@ type Page[T any] struct {
 type Filter struct {
 	Search, State, Kind, Cursor string
 	Limit                       int32
+	UpstreamID                  *uuid.UUID
 }
 type ChannelInput struct {
 	Version       int64   `json:"version"`
 	Name          string  `json:"name"`
+	DisplayName   *string `json:"display_name"`
 	BaseURL       string  `json:"base_url"`
 	APIKey        *string `json:"api_key"`
 	TimeoutChatS  int32   `json:"timeout_chat_s"`
@@ -38,6 +41,7 @@ type Channel struct {
 	ID                  uuid.UUID  `json:"id"`
 	Version             int64      `json:"version"`
 	Name                string     `json:"name"`
+	DisplayName         string     `json:"display_name"`
 	BaseURL             string     `json:"base_url"`
 	APIKeyConfigured    bool       `json:"api_key_configured"`
 	TimeoutChatS        int32      `json:"timeout_chat_s"`
@@ -134,4 +138,13 @@ type ImportModel struct {
 type ImportInput struct {
 	Version int64         `json:"version"`
 	Models  []ImportModel `json:"models"`
+}
+
+type ChannelModelBatchInput struct {
+	Action string `json:"action"`
+}
+
+type ChannelModelBatchResult struct {
+	AffectedExclusiveModels int `json:"affected_exclusive_models"`
+	AffectedSharedModels    int `json:"affected_shared_models"`
 }

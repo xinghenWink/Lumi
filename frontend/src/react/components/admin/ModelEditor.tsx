@@ -1,5 +1,4 @@
 import { useId, useState } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2 } from 'lucide-react'
 import { catalog } from '../../../api/catalog'
@@ -15,7 +14,7 @@ import {
 } from '../../../api/catalog-contracts'
 import { useSession } from '../../features/auth/hooks'
 import { useOwnedMutation } from '../../features/accounts/owned-mutation'
-import { modelInput } from '../../features/admin/catalog'
+import { modelInput, useChannelChoices } from '../../features/admin/catalog'
 import { ModalDialog } from '../ui/modal-dialog'
 import { Field, selectClass, textareaClass } from '../ui/field'
 import { Input } from '../ui/input'
@@ -54,15 +53,7 @@ export function ModelEditor({
           routes: [],
         },
   )
-  const channels = useInfiniteQuery({
-    queryKey: ['user', user?.id, 'admin-upstreams', 'choices'],
-    enabled: !!user,
-    initialPageParam: '',
-    queryFn: ({ pageParam, signal }) =>
-      catalog.channels(new URLSearchParams({ cursor: pageParam, limit: '100' }), signal),
-    getNextPageParam: (page) => page.next_cursor || undefined,
-    staleTime: 0,
-  })
+  const channels = useChannelChoices(user?.id)
   const choices = new Map(
     model?.routes.map((route) => [route.upstream_id, route.upstream_name]) ?? [],
   )

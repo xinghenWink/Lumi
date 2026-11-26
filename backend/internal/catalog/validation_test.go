@@ -2,6 +2,20 @@ package catalog
 
 import "testing"
 
+func TestModelDisplayName(t *testing.T) {
+	for _, tc := range []struct{ name, channel, want string }{
+		{"Model", "", "Model"},
+		{"Model", "公开渠道", "Model（公开渠道）"},
+		{"Model（公开渠道）", "公开渠道", "Model（公开渠道）"},
+		{"Model (公开渠道)", "公开渠道", "Model (公开渠道)"},
+		{"Model (Preview)", "公开渠道", "Model (Preview)（公开渠道）"},
+	} {
+		if got := modelDisplayName(tc.name, tc.channel); got != tc.want {
+			t.Errorf("modelDisplayName(%q, %q) = %q, want %q", tc.name, tc.channel, got, tc.want)
+		}
+	}
+}
+
 func TestCapabilityBoundaries(t *testing.T) {
 	if !validCapabilities("chat", Capabilities{MaxContextTokens: 32768, Stream: true}) {
 		t.Fatal("valid chat capabilities rejected")

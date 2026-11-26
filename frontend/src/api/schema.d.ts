@@ -639,6 +639,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/admin/upstreams/{id}/models/batch': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Enable, disable, or delete platform models by upstream channel
+     * @description Acts on all models bound to the channel. For shared models, only the routes for this channel are changed. Counts reflect distinct models actually affected.
+     */
+    post: operations['batchUpstreamModels']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/admin/models': {
     parameters: {
       query?: never
@@ -2542,6 +2562,8 @@ export interface components {
     UpstreamInput: {
       version: number
       name: string
+      /** @description Public channel name. Omitted or null preserves the saved value on updates. An empty string clears it. */
+      display_name?: string | null
       /**
        * Format: uri
        * @description HTTP or HTTPS base URL, including /v1 when required; no credentials, query or fragment.
@@ -2562,6 +2584,8 @@ export interface components {
     Upstream: {
       version: number
       name: string
+      /** @description Public channel name. An empty value adds no model-name suffix. */
+      display_name: string
       /**
        * Format: uri
        * @description HTTP or HTTPS base URL, including /v1 when required; no credentials, query or fragment.
@@ -2589,6 +2613,14 @@ export interface components {
       /** Format: date-time */
       open_until?: string | null
       last_error?: string
+    }
+    UpstreamModelBatchInput: {
+      /** @enum {string} */
+      action: 'enable' | 'disable' | 'delete'
+    }
+    UpstreamModelBatchResult: {
+      affected_exclusive_models: number
+      affected_shared_models: number
     }
     UpstreamPage: {
       items: components['schemas']['Upstream'][]
@@ -2641,6 +2673,7 @@ export interface components {
     PublicModel: {
       /** Format: uuid */
       id: string
+      /** @description Model name with the preferred channel's public name appended in parentheses when configured. */
       display_name: string
       /** @enum {string} */
       type: 'chat' | 'image'
@@ -4681,6 +4714,35 @@ export interface operations {
       default: components['responses']['APIError']
     }
   }
+  batchUpstreamModels: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Lumi-CSRF': '1'
+      }
+      path: {
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpstreamModelBatchInput']
+      }
+    }
+    responses: {
+      /** @description Success */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UpstreamModelBatchResult']
+        }
+      }
+      default: components['responses']['APIError']
+    }
+  }
   listPlatformModels: {
     parameters: {
       query?: {
@@ -4689,6 +4751,8 @@ export interface operations {
         cursor?: string
         limit?: number
         type?: 'chat' | 'image'
+        /** @description Filter by any route bound to this upstream, including disabled routes. */
+        upstream_id?: string
       }
       header?: never
       path?: never

@@ -14,6 +14,8 @@ export type ModelKind = PublicModel['type']
 export type ImportInput = Schema['UpstreamImportInput']
 export type Discovery = Schema['UpstreamDiscovery']
 export type ConnectionTest = Schema['UpstreamConnectionTest']
+export type UpstreamModelBatchAction = Schema['UpstreamModelBatchInput']['action']
+export type UpstreamModelBatchResult = Schema['UpstreamModelBatchResult']
 function text(data: Record<string, unknown>, key: string): string {
   const value = data[key]
   if (typeof value !== 'string') throw new ApiError('RESPONSE_INVALID')
@@ -105,6 +107,7 @@ export function parseUpstream(value: unknown): Upstream {
     id: text(d, 'id'),
     version: integer(d, 'version', 1),
     name: text(d, 'name'),
+    display_name: text(d, 'display_name'),
     base_url: text(d, 'base_url'),
     api_key_configured: bool(d, 'api_key_configured'),
     timeout_chat_s: integer(d, 'timeout_chat_s', 1, 600),
@@ -167,6 +170,13 @@ export const parsePublicCatalog = (value: unknown) => ({
 export const parseImportResult = (value: unknown) => ({
   items: list(record(value), 'items', parseModel),
 })
+export function parseUpstreamModelBatchResult(value: unknown): UpstreamModelBatchResult {
+  const d = record(value)
+  return {
+    affected_exclusive_models: integer(d, 'affected_exclusive_models'),
+    affected_shared_models: integer(d, 'affected_shared_models'),
+  }
+}
 export function parseDiscovery(value: unknown): Discovery {
   const d = record(value)
   return {

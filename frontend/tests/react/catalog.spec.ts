@@ -41,8 +41,12 @@ test('React real channel configuration import routing and safe model selection',
     throw new Error('M3 requires real application dependencies')
   const suffix = randomUUID().slice(0, 8),
     channelName = `验收渠道-${info.project.name}-${suffix}`
+  const initialDisplayName = `创作渠道-${suffix}`,
+    displayName = `精选渠道-${suffix}`
   const chatName = `Lumi 对话-${suffix}`,
     imageName = `Lumi 图像-${suffix}`
+  const publicChatName = `${chatName}（${displayName}）`,
+    publicImageName = `${imageName}（${displayName}）`
   const wireChat = `wire-text-${suffix}`,
     wireImage = `wire-image-${suffix}`
   const key = randomBytes(24).toString('base64url'),
@@ -91,21 +95,30 @@ test('React real channel configuration import routing and safe model selection',
     await page.getByRole('button', { name: '新增渠道', exact: true }).click()
     let dialog = page.getByRole('dialog')
     await dialog.getByLabel('渠道名称', { exact: true }).fill(channelName)
+    await dialog.getByLabel('渠道显示名称', { exact: true }).fill(initialDisplayName)
     await dialog.getByLabel('Base URL', { exact: true }).fill(endpoint)
     await dialog.getByLabel('API Key', { exact: true }).fill(key)
     await dialog.getByRole('button', { name: '保存渠道', exact: true }).click()
     await expect(dialog).not.toBeVisible()
     let channelRow = page.getByRole('row').filter({ hasText: channelName })
     await expect(channelRow).toBeVisible()
+    await expect(channelRow.getByText(initialDisplayName, { exact: true })).toBeVisible()
     await channelRow.getByRole('button', { name: '测试连接', exact: true }).click()
     await expect(channelRow.getByRole('status')).toContainText('连接成功')
     await channelRow.getByRole('button', { name: `编辑渠道 ${channelName}`, exact: true }).click()
     dialog = page.getByRole('dialog')
     await expect(dialog.getByLabel('API Key', { exact: true })).toHaveValue('')
+    const channelDisplayInput = dialog.getByLabel('渠道显示名称', { exact: true })
+    await expect(channelDisplayInput).toHaveValue(initialDisplayName)
+    await channelDisplayInput.fill(displayName)
     await dialog.getByLabel('备注', { exact: true }).fill('E2E preserved secret')
     await dialog.getByRole('button', { name: '保存渠道', exact: true }).click()
     await expect(dialog).not.toBeVisible()
     await expect(channelRow.getByRole('status')).not.toBeVisible()
+    await page.getByRole('searchbox').fill(displayName)
+    await page.getByRole('button', { name: '搜索', exact: true }).click()
+    await expect(page.getByRole('row')).toHaveCount(2)
+    await expect(channelRow.getByText(displayName, { exact: true })).toBeVisible()
     await channelRow.getByRole('button', { name: '测试连接', exact: true }).click()
     await expect(channelRow.getByRole('status')).toContainText('连接成功')
     await channelRow.getByRole('button', { name: '同步模型', exact: true }).click()
@@ -162,15 +175,15 @@ test('React real channel configuration import routing and safe model selection',
     )
     await login(member, memberEmail, password)
     const publicBody = JSON.stringify(await (await publicResponse).json())
-    for (const secret of [key, wireChat, wireImage, endpoint, 'upstream_id', 'routes'])
+    for (const secret of [key, wireChat, wireImage, endpoint, channelName, 'upstream_id', 'routes'])
       expect(publicBody).not.toContain(secret)
     const picker = member.getByRole('button', { name: '选择模型', exact: true })
-    await expect(picker).toContainText(chatName)
+    await expect(picker).toContainText(publicChatName)
     await member
       .getByRole('navigation', { name: '创作模式' })
       .getByRole('link', { name: '生图', exact: true })
       .click()
-    await expect(picker).toContainText(imageName)
+    await expect(picker).toContainText(publicImageName)
     if (info.project.name.includes('mobile'))
       await member.getByRole('button', { name: '生图参数', exact: true }).click()
     await expect(member.getByLabel('规划强度', { exact: true })).toHaveValue('')
@@ -179,14 +192,14 @@ test('React real channel configuration import routing and safe model selection',
       .getByRole('navigation', { name: '创作模式' })
       .getByRole('link', { name: '聊天', exact: true })
       .click()
-    await expect(picker).toContainText(chatName)
+    await expect(picker).toContainText(publicChatName)
     // Keep the menu above the model selector inside the bottom composer.
     await picker.scrollIntoViewIfNeeded()
     const triggerBox = await picker.boundingBox()
     await picker.focus()
     await member.keyboard.press('ArrowDown')
     const menu = member.getByRole('menu', { name: '可用模型', exact: true })
-    const selectedModel = menu.getByRole('menuitemradio', { name: chatName, exact: true })
+    const selectedModel = menu.getByRole('menuitemradio', { name: publicChatName, exact: true })
     await expect(selectedModel).toBeVisible()
     await expect(selectedModel).toHaveAttribute('aria-checked', 'true')
     const menuBox = await menu.boundingBox()
@@ -205,6 +218,17 @@ test('React real channel configuration import routing and safe model selection',
       animations: 'disabled',
     })
     await member.keyboard.press('Escape')
+    await member.goto('/canvas')
+    await member.getByRole('link', { name: '新建画布', exact: true }).click()
+    await member
+      .getByRole('toolbar', { name: '画布工具', exact: true })
+      .getByRole('button', { name: '添加生成节点（G）', exact: true })
+      .click()
+    const canvasModel = member.getByTestId('canvas-inspector').getByLabel('模型', { exact: true })
+    await expect(
+      canvasModel.getByRole('option', { name: publicImageName, exact: true }),
+    ).toHaveCount(1)
+    await member.goto('/chat')
     await page.goto('/admin/upstreams')
     channelRow = page.getByRole('row').filter({ hasText: channelName })
     await channelRow.getByRole('button', { name: '停用', exact: true }).click()
@@ -215,7 +239,7 @@ test('React real channel configuration import routing and safe model selection',
     await channelRow.getByRole('button', { name: '启用', exact: true }).click()
     await expect(channelRow.getByText('已启用', { exact: true })).toBeVisible()
     await member.reload()
-    await expect(picker).toContainText(chatName)
+    await expect(picker).toContainText(publicChatName)
     await channelRow.getByRole('button', { name: `编辑渠道 ${channelName}`, exact: true }).click()
     dialog = page.getByRole('dialog')
     await expect(
@@ -238,31 +262,59 @@ test('React real channel configuration import routing and safe model selection',
     await channelRow.getByRole('button', { name: '测试连接', exact: true }).click()
     await expect(channelRow.getByRole('status')).toContainText('连接成功')
     await member.reload()
-    await expect(picker).toContainText(chatName)
+    await expect(picker).toContainText(publicChatName)
     await noOverflow(page)
     await page.screenshot({
       path: info.outputPath('upstream-connections.png'),
       animations: 'disabled',
     })
+    await page.goto('/admin/models')
+    const channelSelect = page.getByLabel('按渠道管理', { exact: true })
+    await channelSelect.selectOption({ label: `${channelName}（${displayName}）` })
+    await expect(page.getByRole('row')).toHaveCount(3)
+    await page.getByRole('searchbox').fill(chatName)
+    await page.getByRole('button', { name: '搜索', exact: true }).click()
+    await expect(page.getByRole('row')).toHaveCount(2)
+    await page.getByRole('button', { name: '切换深色主题', exact: true }).click()
+    const deleteAll = page.getByRole('button', { name: '全部删除', exact: true })
+    await deleteAll.focus()
+    await page.keyboard.press('Enter')
+    dialog = page.getByRole('dialog', { name: '全部删除', exact: true })
+    await expect(dialog).toContainText(channelName)
+    await expect(dialog).toContainText('当前筛选和分页之外')
+    await noOverflow(page)
+    await page.screenshot({
+      path: info.outputPath('channel-batch-dark.png'),
+      animations: 'disabled',
+    })
+    await page.keyboard.press('Escape')
+    await expect(dialog).not.toBeVisible()
+    await expect(deleteAll).toBeFocused()
+    await expect(page.getByRole('row')).toHaveCount(2)
+    async function batch(action: string) {
+      await page.getByRole('button', { name: action, exact: true }).click()
+      const dialog = page.getByRole('dialog', { name: action, exact: true })
+      await dialog.getByRole('button', { name: '确认操作', exact: true }).click()
+      await expect(dialog).not.toBeVisible()
+      await expect(page.getByRole('status')).toContainText('已处理 2 个独占模型和 0 个共享模型')
+    }
+    await batch('全部停用')
+    await member.reload()
+    await expect(picker).toBeDisabled()
+    await batch('全部启用')
+    await member.reload()
+    await expect(picker).toContainText(publicChatName)
+    await batch('全部删除')
+    await page.getByRole('searchbox').clear()
+    await page.getByRole('button', { name: '搜索', exact: true }).click()
+    await expect(page.getByText('此渠道下没有符合当前筛选条件的模型。')).toBeVisible()
+    await member.reload()
+    await expect(picker).toBeDisabled()
+    await page.goto('/admin/upstreams')
     await channelRow.getByRole('button', { name: `删除渠道 ${channelName}`, exact: true }).click()
     dialog = page.getByRole('dialog')
     await dialog.getByRole('button', { name: '确认删除', exact: true }).click()
     await expect(dialog).not.toBeVisible()
-    await member.reload()
-    await expect(picker).toBeDisabled()
-    await page.goto('/admin/models')
-    await page.getByRole('searchbox').fill(suffix)
-    await page.getByRole('button', { name: '搜索', exact: true }).click()
-    for (const name of [chatName, imageName]) {
-      await page
-        .getByRole('row')
-        .filter({ hasText: name })
-        .getByRole('button', { name: `删除模型 ${name}`, exact: true })
-        .click()
-      dialog = page.getByRole('dialog')
-      await dialog.getByRole('button', { name: '确认删除', exact: true }).click()
-      await expect(dialog).not.toBeVisible()
-    }
     expect(authorization.length).toBeGreaterThan(3)
     expect(authorization.every((value) => value === `Bearer ${key}`)).toBe(true)
     expect(errors).toEqual([])

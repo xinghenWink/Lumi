@@ -198,7 +198,7 @@ func (q *Queries) AdminChatConversations(ctx context.Context, arg AdminChatConve
 }
 
 const availableModelRoutes = `-- name: AvailableModelRoutes :many
-SELECT u.id, u.name, u.base_url, u.api_key_enc, u.timeout_chat_s, u.timeout_image_s, u.proxy_url, u.enabled, u.priority, u.weight, u.circuit_state, u.edit_format, u.note, u.version, u.created_at, u.updated_at, u.consecutive_failures, u.open_until, u.last_error, u.probe_until,r.upstream_model_name,r.priority AS route_priority,r.weight AS route_weight
+SELECT u.id, u.name, u.base_url, u.api_key_enc, u.timeout_chat_s, u.timeout_image_s, u.proxy_url, u.enabled, u.priority, u.weight, u.circuit_state, u.edit_format, u.note, u.version, u.created_at, u.updated_at, u.consecutive_failures, u.open_until, u.last_error, u.probe_until, u.display_name,r.upstream_model_name,r.priority AS route_priority,r.weight AS route_weight
 FROM model_routes r JOIN upstreams u ON u.id=r.upstream_id
 WHERE r.model_id=$1 AND r.enabled AND u.enabled AND u.api_key_enc<>'' AND (u.open_until IS NULL OR u.open_until<=now())
 ORDER BY r.priority,u.priority,r.id LIMIT 100
@@ -241,6 +241,7 @@ func (q *Queries) AvailableModelRoutes(ctx context.Context, modelID uuid.UUID) (
 			&i.Upstream.OpenUntil,
 			&i.Upstream.LastError,
 			&i.Upstream.ProbeUntil,
+			&i.Upstream.DisplayName,
 			&i.UpstreamModelName,
 			&i.RoutePriority,
 			&i.RouteWeight,

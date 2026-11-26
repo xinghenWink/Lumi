@@ -45,7 +45,7 @@ func configError(err error) error {
 	return err
 }
 func baseChannelView(row query.Upstream) Channel {
-	return Channel{ID: row.ID, Version: row.Version, Name: row.Name, BaseURL: row.BaseUrl, APIKeyConfigured: row.ApiKeyEnc != "", TimeoutChatS: row.TimeoutChatS, TimeoutImageS: row.TimeoutImageS, ProxyURL: row.ProxyUrl, Enabled: row.Enabled, Priority: row.Priority, Weight: row.Weight, EditFormat: row.EditFormat, Note: row.Note, CreatedAt: row.CreatedAt.UTC(), UpdatedAt: row.UpdatedAt.UTC()}
+	return Channel{ID: row.ID, Version: row.Version, Name: row.Name, DisplayName: row.DisplayName, BaseURL: row.BaseUrl, APIKeyConfigured: row.ApiKeyEnc != "", TimeoutChatS: row.TimeoutChatS, TimeoutImageS: row.TimeoutImageS, ProxyURL: row.ProxyUrl, Enabled: row.Enabled, Priority: row.Priority, Weight: row.Weight, EditFormat: row.EditFormat, Note: row.Note, CreatedAt: row.CreatedAt.UTC(), UpdatedAt: row.UpdatedAt.UTC()}
 }
 func validRank(priority, weight int32) bool {
 	return priority >= 0 && priority <= 10000 && weight >= 1 && weight <= 10000
@@ -83,6 +83,13 @@ func (s *Service) Channels(ctx context.Context, filter Filter) (Page[Channel], e
 func channelInput(input *ChannelInput) error {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Note = strings.TrimSpace(input.Note)
+	if input.DisplayName != nil {
+		displayName := strings.TrimSpace(*input.DisplayName)
+		if !validation.Text(displayName, 0, 80) {
+			return problem.Invalid()
+		}
+		input.DisplayName = &displayName
+	}
 	parsed, err := upstream.ParseURL(input.BaseURL)
 	if err != nil || !validation.Text(input.Name, 1, 80) || !validation.Text(input.Note, 0, 500) || !validRank(input.Priority, input.Weight) || input.TimeoutChatS < 1 || input.TimeoutChatS > 600 || input.TimeoutImageS < 1 || input.TimeoutImageS > 600 || (input.EditFormat != "multipart" && input.EditFormat != "json") {
 		return problem.Invalid()
@@ -118,6 +125,7 @@ func (s *Service) SaveChannel(ctx context.Context, actor user.Actor, id uuid.UUI
 		}
 		var before any
 		encrypted := ""
+		displayName := ""
 		if creating {
 			var err error
 			id, err = validation.NewID()
@@ -137,6 +145,10 @@ func (s *Service) SaveChannel(ctx context.Context, actor user.Actor, id uuid.UUI
 			}
 			before = channelView(old)
 			encrypted = old.ApiKeyEnc
+			displayName = old.DisplayName
+		}
+		if input.DisplayName != nil {
+			displayName = *input.DisplayName
 		}
 		if input.APIKey != nil {
 			var err error
@@ -151,9 +163,9 @@ func (s *Service) SaveChannel(ctx context.Context, actor user.Actor, id uuid.UUI
 		var row query.Upstream
 		var err error
 		if creating {
-			row, err = q.CreateUpstream(ctx, query.CreateUpstreamParams{ID: id, Name: input.Name, BaseUrl: input.BaseURL, ApiKeyEnc: encrypted, TimeoutChatS: input.TimeoutChatS, TimeoutImageS: input.TimeoutImageS, ProxyUrl: input.ProxyURL, Enabled: input.Enabled, Priority: input.Priority, Weight: input.Weight, EditFormat: input.EditFormat, Note: input.Note})
+			row, err = q.CreateUpstream(ctx, query.CreateUpstreamParams{ID: id, Name: input.Name, DisplayName: displayName, BaseUrl: input.BaseURL, ApiKeyEnc: encrypted, TimeoutChatS: input.TimeoutChatS, TimeoutImageS: input.TimeoutImageS, ProxyUrl: input.ProxyURL, Enabled: input.Enabled, Priority: input.Priority, Weight: input.Weight, EditFormat: input.EditFormat, Note: input.Note})
 		} else {
-			row, err = q.UpdateUpstream(ctx, query.UpdateUpstreamParams{ID: id, Name: input.Name, BaseUrl: input.BaseURL, ApiKeyEnc: encrypted, TimeoutChatS: input.TimeoutChatS, TimeoutImageS: input.TimeoutImageS, ProxyUrl: input.ProxyURL, Enabled: input.Enabled, Priority: input.Priority, Weight: input.Weight, EditFormat: input.EditFormat, Note: input.Note})
+			row, err = q.UpdateUpstream(ctx, query.UpdateUpstreamParams{ID: id, Name: input.Name, DisplayName: displayName, BaseUrl: input.BaseURL, ApiKeyEnc: encrypted, TimeoutChatS: input.TimeoutChatS, TimeoutImageS: input.TimeoutImageS, ProxyUrl: input.ProxyURL, Enabled: input.Enabled, Priority: input.Priority, Weight: input.Weight, EditFormat: input.EditFormat, Note: input.Note})
 		}
 		if err != nil {
 			return fmt.Errorf("save channel: %w", configError(err))
@@ -295,7 +307,11 @@ func (s *Service) Discover(ctx context.Context, actor user.Actor, id uuid.UUID) 
 
 // Config fingerprints bind cursors to the submitted filters, never draft UI input.
 func filterFingerprint(filter Filter) (string, error) {
-	encoded, err := json.Marshal([]string{filter.Search, filter.State, filter.Kind})
+	values := []string{filter.Search, filter.State, filter.Kind}
+	if filter.UpstreamID != nil {
+		values = append(values, filter.UpstreamID.String())
+	}
+	encoded, err := json.Marshal(values)
 	if err != nil {
 		return "", fmt.Errorf("encode model filters: %w", err)
 	}

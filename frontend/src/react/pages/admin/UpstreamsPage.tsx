@@ -225,6 +225,20 @@ export default function UpstreamsPage() {
                   ),
                 },
                 {
+                  key: 'display_name',
+                  label: t('catalog.channelDisplayName'),
+                  render: (row) =>
+                    row.display_name ? (
+                      <span className="block min-w-28 max-w-56 wrap-break-word">
+                        {row.display_name}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {t('catalog.channelDisplayNameUnset')}
+                      </span>
+                    ),
+                },
+                {
                   key: 'url',
                   label: t('catalog.baseURL'),
                   render: (row) => (

@@ -163,7 +163,12 @@ export default {
         test: '测试上游连接',
         discover: '读取上游模型',
       },
-      model: { save: '保存平台模型', delete: '删除平台模型', import: '导入上游模型' },
+      model: {
+        save: '保存平台模型',
+        delete: '删除平台模型',
+        import: '导入上游模型',
+        channel_batch: '按渠道批量管理模型',
+      },
       user: {
         create: '新增用户',
         update: '修改用户',

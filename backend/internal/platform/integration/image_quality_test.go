@@ -22,13 +22,16 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/platform/validation"
 	"github.com/xinghenWink/Lumi/backend/internal/upstream"
 	"github.com/xinghenWink/Lumi/backend/internal/user"
-	"github.com/xinghenWink/Lumi/backend/migrations"
 )
 
 func TestAdvancedImageQualities(t *testing.T) {
 	f := accountFixtureWithMigrations(t, func(ctx context.Context, pool *pgxpool.Pool) error {
 		return withUpgradeProvider(ctx, pool, func(p *goose.Provider) error {
-			_, err := p.UpTo(ctx, 21)
+			if _, err := p.UpTo(ctx, 21); err != nil {
+				return err
+			}
+			// The current catalog service needs the display-name column while seeding legacy image data.
+			_, err := p.ApplyVersion(ctx, 26, true)
 			return err
 		})
 	})
@@ -172,7 +175,10 @@ func TestAdvancedImageQualities(t *testing.T) {
 	if err := query.New(f.pool).CreateImageTaskItem(f.ctx, query.CreateImageTaskItemParams{TaskID: legacyID}); err != nil {
 		t.Fatal(err)
 	}
-	if err := migrations.Up(f.ctx, f.pool); err != nil {
+	if err := withUpgradeProvider(f.ctx, f.pool, func(p *goose.Provider) error {
+		_, err := p.Up(f.ctx)
+		return err
+	}); err != nil {
 		t.Fatal(err)
 	}
 	legacy := finish(legacyID, "low", "generate", 5)

@@ -9,10 +9,12 @@ import {
   parseConnectionTest,
   parsePublicCatalog,
   parseImportResult,
+  parseUpstreamModelBatchResult,
   type UpstreamInput,
   type ModelInput,
   type ImportInput,
   type ModelKind,
+  type UpstreamModelBatchAction,
 } from './catalog-contracts'
 const root = '/api/v1/admin'
 const options = (signal?: AbortSignal) => (signal ? { signal } : {})
@@ -32,6 +34,11 @@ export const catalog = {
     authorized(`${channel(id)}/discover`, parseDiscovery, { method: 'POST', ...options(signal) }),
   import: (id: string, body: ImportInput) =>
     authorized(`${channel(id)}/import`, parseImportResult, { method: 'POST', body }),
+  batchChannelModels: (id: string, action: UpstreamModelBatchAction) =>
+    authorized(`${channel(id)}/models/batch`, parseUpstreamModelBatchResult, {
+      method: 'POST',
+      body: { action },
+    }),
   models: (query: URLSearchParams, signal?: AbortSignal) =>
     authorized(`${root}/models?${query}`, parseModels, options(signal)),
   saveModel: (body: ModelInput, id?: string) =>
