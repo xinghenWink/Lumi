@@ -52,6 +52,12 @@ jobs:
         run: |
           make sqlc api
           git diff --exit-code -- backend/internal/platform/db/query frontend/src/api/schema.d.ts
+      - name: Install video fixture tools
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
       - run: make test-integration
       - run: make build
       - name: Install Chrome and its system dependencies
@@ -158,6 +164,12 @@ jobs:
             printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
           fi
           pnpm --filter @lumi/frontend exec playwright install --with-deps chrome
+      - name: Install video fixture tools
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
       - name: Run full native React Chrome acceptance
         run: node scripts/native-e2e.mjs test:e2e:react
       - uses: actions/upload-artifact@v7.0.2

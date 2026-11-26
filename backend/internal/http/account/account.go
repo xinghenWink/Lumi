@@ -32,6 +32,7 @@ import (
 	"github.com/xinghenWink/Lumi/backend/internal/platform/validation"
 	"github.com/xinghenWink/Lumi/backend/internal/settings"
 	"github.com/xinghenWink/Lumi/backend/internal/user"
+	"github.com/xinghenWink/Lumi/backend/internal/videos"
 )
 
 type Services struct {
@@ -54,6 +55,7 @@ type Services struct {
 	Images        *images.Service
 	Files         *media.Store
 	Canvas        *canvas.Service
+	Videos        *videos.Service
 }
 type Security struct {
 	Origins        []string
@@ -106,6 +108,7 @@ func Routes(services *Services, security Security, logger *slog.Logger) func(*gi
 		h.chatRoutes(protected, admin)
 		h.imageRoutes(protected, admin)
 		h.videoConfigRoutes(protected, admin)
+		h.videoRoutes(api, protected)
 		h.m6Routes(protected, admin)
 		h.canvasRoutes(protected)
 		h.deploymentRoutes(admin)

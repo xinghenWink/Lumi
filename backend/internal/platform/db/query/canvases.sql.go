@@ -73,7 +73,7 @@ func (q *Queries) CanvasOwnedTaskIDs(ctx context.Context, arg CanvasOwnedTaskIDs
 }
 
 const canvasVisibleFiles = `-- name: CanvasVisibleFiles :many
-SELECT id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at FROM files WHERE id=ANY($2::uuid[]) AND user_id=$1 AND deleted_at IS NULL AND kind IN ('upload','generated')
+SELECT id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at, duration_ms FROM files WHERE id=ANY($2::uuid[]) AND user_id=$1 AND deleted_at IS NULL AND kind IN ('upload','generated')
 `
 
 type CanvasVisibleFilesParams struct {
@@ -107,6 +107,7 @@ func (q *Queries) CanvasVisibleFiles(ctx context.Context, arg CanvasVisibleFiles
 			&i.CreatedAt,
 			&i.DeletedAt,
 			&i.PurgedAt,
+			&i.DurationMs,
 		); err != nil {
 			return nil, err
 		}

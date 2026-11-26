@@ -10,6 +10,153 @@ info:
 servers:
   - url: /
 paths:
+  /api/v1/video-options:
+    get:
+      operationId: listVideoOptions
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: listVideoOptions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VideoOptions' }
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/video-tasks/quote:
+    post:
+      operationId: quoteVideoTask
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VideoInput' }
+      responses:
+        '200':
+          description: quoteVideoTask
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VideoQuote' }
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/video-tasks:
+    get:
+      operationId: listVideoTasks
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+        - { name: canvas_id, in: query, required: false, schema: { type: string } }
+      responses:
+        '200':
+          description: listVideoTasks
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VideoTaskPage' }
+        default:
+          $ref: '#/components/responses/APIError'
+    post:
+      operationId: submitVideoTask
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VideoSubmission' }
+      responses:
+        '202':
+          description: submitVideoTask
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VideoTask' }
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/video-tasks/{id}:
+    get:
+      operationId: getVideoTask
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: getVideoTask
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VideoTask' }
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/video-assets:
+    get:
+      operationId: listVideoAssets
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        '200':
+          description: listVideoAssets
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VideoAssetPage' }
+        default:
+          $ref: '#/components/responses/APIError'
+    post:
+      operationId: uploadVideoAsset
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: kind, in: query, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        '201':
+          description: uploadVideoAsset
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VideoAsset' }
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/video-assets/{id}:
+    get:
+      operationId: getVideoAsset
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: getVideoAsset
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VideoAsset' }
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/video-media/{id}/{kind}:
+    get:
+      operationId: getVideoMedia
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: kind, in: path, required: true, schema: { type: string } }
+        - { name: owner, in: query, required: false, schema: { type: string } }
+        - { name: task, in: query, required: false, schema: { type: string } }
+        - { name: expires, in: query, required: true, schema: { type: string } }
+        - { name: sig, in: query, required: true, schema: { type: string } }
+        - { name: Range, in: header, required: false, schema: { type: string } }
+      responses:
+        '206':
+          description: Partial media content.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '200':
+          description: Complete media content.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        default:
+          $ref: '#/components/responses/APIError'
   /api/v1/video-credit-pool:
     get:
       operationId: getVideoCreditPool

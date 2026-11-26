@@ -211,6 +211,7 @@ type File struct {
 	CreatedAt       time.Time
 	DeletedAt       *time.Time
 	PurgedAt        *time.Time
+	DurationMs      int64
 }
 
 type ImageSetting struct {
@@ -513,4 +514,41 @@ type VideoPricing struct {
 	Mode    string
 	Rates   []byte
 	Version int64
+}
+
+type VideoTask struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	CanvasID       *uuid.UUID
+	ModelID        uuid.UUID
+	ModelName      string
+	Request        []byte
+	ReferencesIds  []uuid.UUID
+	Routes         []byte
+	Quote          []byte
+	IdempotencyKey string
+	RequestHash    string
+	Status         string
+	Refunded       int64
+	Deadline       time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type VideoTaskItem struct {
+	TaskID         uuid.UUID
+	Position       int32
+	Status         string
+	RouteIndex     int32
+	RemoteID       string
+	RouteID        *uuid.UUID
+	ChannelID      *uuid.UUID
+	ChannelVersion *int64
+	Protocol       string
+	Profile        string
+	ErrorCode      string
+	FileID         *uuid.UUID
+	NextRun        time.Time
+	LeaseUntil     *time.Time
+	LeaseToken     *uuid.UUID
 }

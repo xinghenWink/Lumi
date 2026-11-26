@@ -383,6 +383,9 @@ func (s *Store) Cleanup(ctx context.Context, days int32) error {
 	if err := s.q.RedactPurgedImageOwners(ctx); err != nil {
 		return fmt.Errorf("redact purged image owners: %w", err)
 	}
+	if err := s.q.RedactPurgedVideoOwners(ctx); err != nil {
+		return fmt.Errorf("redact purged video owners: %w", err)
+	}
 	return s.cleanupOrphans(ctx)
 }
 func (s *Store) cleanupOrphans(ctx context.Context) error {
@@ -395,7 +398,7 @@ func (s *Store) cleanupOrphans(ctx context.Context) error {
 		if walkErr != nil {
 			return walkErr
 		}
-		if entry.IsDir() || !entry.Type().IsRegular() || (!strings.HasSuffix(path, ".png") && !strings.HasSuffix(path, ".webp") && !strings.HasSuffix(path, ".gif") && !strings.HasSuffix(path, ".tmp")) {
+		if entry.IsDir() || !entry.Type().IsRegular() || (!strings.HasSuffix(path, ".png") && !strings.HasSuffix(path, ".webp") && !strings.HasSuffix(path, ".gif") && !strings.HasSuffix(path, ".tmp") && !strings.HasSuffix(path, ".mp4") && !strings.HasSuffix(path, ".mp3") && !strings.HasSuffix(path, ".wav")) {
 			return nil
 		}
 		info, err := entry.Info()

@@ -229,6 +229,7 @@ AND (NOT EXISTS(SELECT 1 FROM users u WHERE u.id=f.user_id)
  OR (f.kind='edit_guide' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE t.edit_guide_file_id=f.id))
  OR (f.kind='avatar' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM users u WHERE u.avatar_file_id=f.id)))
 AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE t.status IN ('queued','running') AND (f.id=ANY(t.reference_file_ids) OR f.id=t.edit_guide_file_id))
+AND NOT EXISTS(SELECT 1 FROM video_tasks t WHERE f.id=ANY(t.references_ids) AND (t.status IN ('queued','running') OR f.kind='upload'))
 FOR UPDATE OF f SKIP LOCKED)
 UPDATE files f SET deleted_at=now() FROM expired WHERE f.id=expired.id
 `
@@ -435,7 +436,7 @@ func (q *Queries) GetImageConversation(ctx context.Context, arg GetImageConversa
 }
 
 const getImageEditGuide = `-- name: GetImageEditGuide :one
-SELECT id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at FROM files WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL AND kind='edit_guide' FOR SHARE
+SELECT id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at, duration_ms FROM files WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL AND kind='edit_guide' FOR SHARE
 `
 
 type GetImageEditGuideParams struct {
@@ -463,12 +464,13 @@ func (q *Queries) GetImageEditGuide(ctx context.Context, arg GetImageEditGuidePa
 		&i.CreatedAt,
 		&i.DeletedAt,
 		&i.PurgedAt,
+		&i.DurationMs,
 	)
 	return i, err
 }
 
 const getImageFile = `-- name: GetImageFile :one
-SELECT id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at FROM files WHERE id=$1 AND deleted_at IS NULL
+SELECT id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at, duration_ms FROM files WHERE id=$1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetImageFile(ctx context.Context, id uuid.UUID) (File, error) {
@@ -491,12 +493,13 @@ func (q *Queries) GetImageFile(ctx context.Context, id uuid.UUID) (File, error) 
 		&i.CreatedAt,
 		&i.DeletedAt,
 		&i.PurgedAt,
+		&i.DurationMs,
 	)
 	return i, err
 }
 
 const getImageReferenceFiles = `-- name: GetImageReferenceFiles :many
-SELECT id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at FROM files WHERE id=ANY($2::uuid[]) AND user_id=$1 AND deleted_at IS NULL AND kind IN ('upload','generated') FOR SHARE
+SELECT id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at, duration_ms FROM files WHERE id=ANY($2::uuid[]) AND user_id=$1 AND deleted_at IS NULL AND kind IN ('upload','generated') FOR SHARE
 `
 
 type GetImageReferenceFilesParams struct {
@@ -530,6 +533,7 @@ func (q *Queries) GetImageReferenceFiles(ctx context.Context, arg GetImageRefere
 			&i.CreatedAt,
 			&i.DeletedAt,
 			&i.PurgedAt,
+			&i.DurationMs,
 		); err != nil {
 			return nil, err
 		}
@@ -952,7 +956,7 @@ func (q *Queries) ImageTaskByKey(ctx context.Context, arg ImageTaskByKeyParams) 
 
 const insertImageFile = `-- name: InsertImageFile :one
 INSERT INTO files(id,user_id,kind,task_id,path,thumbnail_path,mime,size,width,height,thumbnail_width,thumbnail_height,sha256)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at, duration_ms
 `
 
 type InsertImageFileParams struct {
@@ -1005,6 +1009,7 @@ func (q *Queries) InsertImageFile(ctx context.Context, arg InsertImageFileParams
 		&i.CreatedAt,
 		&i.DeletedAt,
 		&i.PurgedAt,
+		&i.DurationMs,
 	)
 	return i, err
 }
@@ -1067,7 +1072,7 @@ func (q *Queries) ListImageConversations(ctx context.Context, arg ListImageConve
 }
 
 const listImageGallery = `-- name: ListImageGallery :many
-SELECT f.id, f.user_id, f.kind, f.task_id, f.path, f.thumbnail_path, f.mime, f.size, f.width, f.height, f.thumbnail_width, f.thumbnail_height, f.sha256, f.created_at, f.deleted_at, f.purged_at,t.prompt,t.params,t.quality,t.size AS requested_size,t.ratio,t.model_id,t.model_name,t.status AS task_status,t.conversation_id,t.unit_price
+SELECT f.id, f.user_id, f.kind, f.task_id, f.path, f.thumbnail_path, f.mime, f.size, f.width, f.height, f.thumbnail_width, f.thumbnail_height, f.sha256, f.created_at, f.deleted_at, f.purged_at, f.duration_ms,t.prompt,t.params,t.quality,t.size AS requested_size,t.ratio,t.model_id,t.model_name,t.status AS task_status,t.conversation_id,t.unit_price
 FROM files f JOIN image_tasks t ON t.id=f.task_id
 WHERE f.user_id=$1 AND f.kind='generated' AND f.deleted_at IS NULL
 AND ($2::text='' OR t.quality=$2::text)
@@ -1106,6 +1111,7 @@ type ListImageGalleryRow struct {
 	CreatedAt       time.Time
 	DeletedAt       *time.Time
 	PurgedAt        *time.Time
+	DurationMs      int64
 	Prompt          string
 	Params          []byte
 	Quality         string
@@ -1153,6 +1159,7 @@ func (q *Queries) ListImageGallery(ctx context.Context, arg ListImageGalleryPara
 			&i.CreatedAt,
 			&i.DeletedAt,
 			&i.PurgedAt,
+			&i.DurationMs,
 			&i.Prompt,
 			&i.Params,
 			&i.Quality,
@@ -1175,7 +1182,7 @@ func (q *Queries) ListImageGallery(ctx context.Context, arg ListImageGalleryPara
 }
 
 const listImageReferenceLibrary = `-- name: ListImageReferenceLibrary :many
-SELECT id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at FROM files WHERE user_id=$1 AND deleted_at IS NULL AND kind IN ('upload','generated')
+SELECT id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at, duration_ms FROM files WHERE user_id=$1 AND deleted_at IS NULL AND kind IN ('upload','generated')
 AND ($2::timestamptz IS NULL OR (created_at,id)<($2::timestamptz,$3::uuid))
 ORDER BY created_at DESC,id DESC LIMIT $4
 `
@@ -1218,6 +1225,7 @@ func (q *Queries) ListImageReferenceLibrary(ctx context.Context, arg ListImageRe
 			&i.CreatedAt,
 			&i.DeletedAt,
 			&i.PurgedAt,
+			&i.DurationMs,
 		); err != nil {
 			return nil, err
 		}
@@ -1547,7 +1555,7 @@ func (q *Queries) MarkImageFilePurged(ctx context.Context, id uuid.UUID) error {
 }
 
 const pendingImageFilesCleanup = `-- name: PendingImageFilesCleanup :many
-SELECT id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at FROM files WHERE deleted_at IS NOT NULL AND purged_at IS NULL ORDER BY deleted_at,id LIMIT 100
+SELECT id, user_id, kind, task_id, path, thumbnail_path, mime, size, width, height, thumbnail_width, thumbnail_height, sha256, created_at, deleted_at, purged_at, duration_ms FROM files WHERE deleted_at IS NOT NULL AND purged_at IS NULL ORDER BY deleted_at,id LIMIT 100
 `
 
 func (q *Queries) PendingImageFilesCleanup(ctx context.Context) ([]File, error) {
@@ -1576,6 +1584,7 @@ func (q *Queries) PendingImageFilesCleanup(ctx context.Context) ([]File, error) 
 			&i.CreatedAt,
 			&i.DeletedAt,
 			&i.PurgedAt,
+			&i.DurationMs,
 		); err != nil {
 			return nil, err
 		}

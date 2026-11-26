@@ -46,6 +46,7 @@ AND (NOT EXISTS(SELECT 1 FROM users u WHERE u.id=f.user_id)
  OR (f.kind='edit_guide' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE t.edit_guide_file_id=f.id))
  OR (f.kind='avatar' AND f.created_at<now()-interval '1 day' AND NOT EXISTS(SELECT 1 FROM users u WHERE u.avatar_file_id=f.id)))
 AND NOT EXISTS(SELECT 1 FROM image_tasks t WHERE t.status IN ('queued','running') AND (f.id=ANY(t.reference_file_ids) OR f.id=t.edit_guide_file_id))
+AND NOT EXISTS(SELECT 1 FROM video_tasks t WHERE f.id=ANY(t.references_ids) AND (t.status IN ('queued','running') OR f.kind='upload'))
 FOR UPDATE OF f SKIP LOCKED)
 UPDATE files f SET deleted_at=now() FROM expired WHERE f.id=expired.id;
 -- name: RedactPurgedImageOwners :exec

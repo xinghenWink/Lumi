@@ -10,6 +10,7 @@ const ResetPasswordPage = lazy(() => import('../pages/ResetPasswordPage'))
 const LegalPage = lazy(() => import('../pages/LegalPage'))
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
 const ImagePage = lazy(() => import('../pages/ImagePage'))
+const VideoPage = lazy(() => import('../pages/VideoPage'))
 const VideoPricingPage = lazy(() => import('../pages/admin/VideoPricingPage'))
 const ImageGalleryPage = lazy(() => import('../pages/ImageGalleryPage'))
 const CanvasListPage = lazy(() => import('../pages/CanvasListPage'))
@@ -105,6 +106,7 @@ const router = createBrowserRouter([
             path,
             element: pending(<ImagePage />),
           })),
+          { path: '/video', element: pending(<VideoPage />) },
           { path: '/canvas', element: pending(<CanvasListPage />) },
           { path: '/me/chats', element: pending(<ChatHistoryPage />) },
           { path: '/me/images', element: pending(<ImageGalleryPage />) },

@@ -24,7 +24,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags=production -t
     -o /out/lumi ./cmd/lumi
 
 FROM alpine:3.22 AS runtime
-RUN apk add --no-cache ca-certificates tzdata \
+RUN apk add --no-cache ca-certificates tzdata ffmpeg \
     && addgroup -g 10001 lumi \
     && adduser -D -H -u 10001 -G lumi lumi \
     && mkdir -p /data/images && chown -R lumi:lumi /data
