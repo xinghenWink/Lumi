@@ -48,6 +48,11 @@ export function modelInput(row: PlatformModel): ModelInput {
     routes: row.routes.map((route) => ({
       upstream_id: route.upstream_id,
       upstream_model_name: route.upstream_model_name,
+      ...(route.video_protocol === undefined ? {} : { video_protocol: route.video_protocol }),
+      ...(route.video_profile === undefined ? {} : { video_profile: route.video_profile }),
+      ...(route.video_capabilities === undefined
+        ? {}
+        : { video_capabilities: route.video_capabilities }),
       priority: route.priority,
       weight: route.weight,
       enabled: route.enabled,
@@ -69,6 +74,14 @@ export async function listPricingModels(signal: AbortSignal): Promise<PlatformMo
 }
 
 export function invalidateCatalog(runtime: AppRuntime, owner: string | undefined) {
-  for (const kind of ['admin-upstreams', 'admin-models', 'models', 'image-options', 'image-quote'])
+  for (const kind of [
+    'admin-upstreams',
+    'admin-models',
+    'models',
+    'image-options',
+    'image-quote',
+    'video-options',
+    'admin-video-models',
+  ])
     void runtime.queryClient.invalidateQueries({ queryKey: ['user', owner, kind] })
 }

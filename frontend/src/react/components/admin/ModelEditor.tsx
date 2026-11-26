@@ -24,6 +24,7 @@ import { Label } from '../ui/label'
 import { ApiNotice } from '../shared/ApiNotice'
 import { CheckField, NumberField, unboundedCount } from './AdminFields'
 import { SizePicker } from './SizePicker'
+import { VideoBinding, VideoCapabilitiesEditor } from './VideoCapabilities'
 
 export function ModelEditor({
   model,
@@ -127,7 +128,12 @@ export function ModelEditor({
                 disabled={!!model}
                 className={selectClass}
                 onChange={(event) => {
-                  const type = event.target.value === 'image' ? 'image' : 'chat',
+                  const type =
+                      event.target.value === 'video'
+                        ? 'video'
+                        : event.target.value === 'image'
+                          ? 'image'
+                          : 'chat',
                     capabilities: Capabilities = {
                       ...defaultCapabilities(type),
                       ...(type === 'image'
@@ -139,6 +145,7 @@ export function ModelEditor({
               >
                 <option value="chat">{t('catalog.chat')}</option>
                 <option value="image">{t('catalog.image')}</option>
+                <option value="video">{t('video.short')}</option>
               </select>
             </Field>
           </div>
@@ -185,7 +192,12 @@ export function ModelEditor({
           </div>
           <section className="space-y-4 rounded-xl border border-border p-4">
             <h2 className="font-semibold">{t('catalog.capabilities')}</h2>
-            {form.type === 'chat' ? (
+            {form.type === 'video' ? (
+              <VideoCapabilitiesEditor
+                profiles={form.capabilities.video?.profiles ?? []}
+                change={(profiles) => changeCaps({ video: { profiles } })}
+              />
+            ) : form.type === 'chat' ? (
               <>
                 <div className="flex flex-wrap gap-6">
                   <CheckField
@@ -430,6 +442,50 @@ export function ModelEditor({
                     />
                   </Field>
                 </div>
+                {form.type === 'video' ? (
+                  <>
+                    <VideoBinding
+                      {...(route.video_protocol === undefined
+                        ? {}
+                        : { protocol: route.video_protocol })}
+                      {...(route.video_profile === undefined
+                        ? {}
+                        : { profile: route.video_profile })}
+                      change={(video_protocol, video_profile) =>
+                        changeRoute(index, { video_protocol, video_profile })
+                      }
+                    />
+                    <CheckField
+                      label={t('video.useOverride')}
+                      checked={!!route.video_capabilities}
+                      onChange={(enabled) => {
+                        if (enabled)
+                          changeRoute(index, {
+                            video_capabilities: structuredClone(
+                              form.capabilities.video ?? { profiles: [] },
+                            ),
+                          })
+                        else
+                          setForm({
+                            ...form,
+                            routes: form.routes.map((item, i) => {
+                              if (i !== index) return item
+                              const { video_capabilities: previous, ...remaining } = item
+                              return previous ? remaining : item
+                            }),
+                          })
+                      }}
+                    />
+                    {route.video_capabilities ? (
+                      <VideoCapabilitiesEditor
+                        profiles={route.video_capabilities.profiles}
+                        change={(profiles) =>
+                          changeRoute(index, { video_capabilities: { profiles } })
+                        }
+                      />
+                    ) : null}
+                  </>
+                ) : null}
                 <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-[1fr_1fr_auto_auto]">
                   <NumberField
                     label={t('catalog.priority')}

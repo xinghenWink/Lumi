@@ -17,6 +17,8 @@ import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { ApiNotice } from '../shared/ApiNotice'
 import { CheckField } from './AdminFields'
+import { VideoBinding, VideoCapabilitiesEditor } from './VideoCapabilities'
+import type { VideoProfile } from '../../../api/videos'
 
 function ImportForm({
   discovery,
@@ -36,6 +38,9 @@ function ImportForm({
       selected: false,
       name: row.id.slice(0, 80),
       type: 'chat' as ModelKind,
+      protocol: '',
+      profile: '',
+      capabilities: defaultCapabilities('video').video,
     })),
   )
   const [search, setSearch] = useState('')
@@ -50,7 +55,16 @@ function ImportForm({
         remote_id: row.id,
         display_name: row.name.trim(),
         type: row.type,
-        capabilities: defaultCapabilities(row.type),
+        capabilities:
+          row.type === 'video'
+            ? {
+                ...defaultCapabilities(row.type),
+                ...(row.capabilities ? { video: row.capabilities } : {}),
+              }
+            : defaultCapabilities(row.type),
+        ...(row.type === 'video' && row.protocol
+          ? { video_protocol: row.protocol, video_profile: row.profile }
+          : {}),
       })),
     })
     check()
@@ -124,7 +138,15 @@ function ImportForm({
                         setCandidates((rows) =>
                           rows.map((item) =>
                             item.id === row.id
-                              ? { ...item, type: event.target.value === 'image' ? 'image' : 'chat' }
+                              ? {
+                                  ...item,
+                                  type:
+                                    event.target.value === 'video'
+                                      ? 'video'
+                                      : event.target.value === 'image'
+                                        ? 'image'
+                                        : 'chat',
+                                }
                               : item,
                           ),
                         )
@@ -132,8 +154,34 @@ function ImportForm({
                     >
                       <option value="chat">{t('catalog.chat')}</option>
                       <option value="image">{t('catalog.image')}</option>
+                      <option value="video">{t('video.short')}</option>
                     </select>
                   </Field>
+                  {row.type === 'video' ? (
+                    <div className="grid gap-3 sm:col-span-2">
+                      <VideoBinding
+                        protocol={row.protocol}
+                        profile={row.profile}
+                        change={(protocol, profile) =>
+                          setCandidates((rows) =>
+                            rows.map((item) =>
+                              item.id === row.id ? { ...item, protocol, profile } : item,
+                            ),
+                          )
+                        }
+                      />
+                      <VideoCapabilitiesEditor
+                        profiles={row.capabilities?.profiles ?? []}
+                        change={(profiles: VideoProfile[]) =>
+                          setCandidates((rows) =>
+                            rows.map((item) =>
+                              item.id === row.id ? { ...item, capabilities: { profiles } } : item,
+                            ),
+                          )
+                        }
+                      />
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </section>

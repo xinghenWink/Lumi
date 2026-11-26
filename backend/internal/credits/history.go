@@ -13,7 +13,7 @@ import (
 
 func validLedgerType(value string) bool {
 	switch value {
-	case "", "signup_bonus", "daily_grant", "daily_expire", "redeem", "admin_adjust", "image_charge", "image_refund", "referral_inviter_bonus", "referral_invitee_bonus":
+	case "", "signup_bonus", "daily_grant", "daily_expire", "redeem", "admin_adjust", "image_charge", "image_refund", "video_charge", "video_refund", "referral_inviter_bonus", "referral_invitee_bonus":
 		return true
 	}
 	return false

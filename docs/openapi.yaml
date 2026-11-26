@@ -10,6 +10,101 @@ info:
 servers:
   - url: /
 paths:
+  /api/v1/video-credit-pool:
+    get:
+      operationId: getVideoCreditPool
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: getVideoCreditPool
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VideoCreditPool' }
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/video-protocols:
+    get:
+      operationId: listVideoProtocols
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Registered video protocols and supported profile names.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [protocol, profiles]
+                      properties:
+                        protocol: { type: string }
+                        profiles: { type: array, items: { type: string } }
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/video-credit-pool:
+    get:
+      operationId: getAdminVideoCreditPool
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: getAdminVideoCreditPool
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VideoCreditPool' }
+        default:
+          $ref: '#/components/responses/APIError'
+    put:
+      operationId: saveVideoCreditPool
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VideoCreditPool' }
+      responses:
+        '200':
+          description: saveVideoCreditPool
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VideoCreditPool' }
+        default:
+          $ref: '#/components/responses/APIError'
+  /api/v1/admin/video-pricing/{model}:
+    get:
+      operationId: getVideoPricing
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: model, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: getVideoPricing
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VideoPricing' }
+        default:
+          $ref: '#/components/responses/APIError'
+    put:
+      operationId: saveVideoPricing
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: model, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VideoPricing' }
+      responses:
+        '200':
+          description: saveVideoPricing
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VideoPricing' }
+        default:
+          $ref: '#/components/responses/APIError'
   /healthz:
     get:
       operationId: getLiveness
@@ -910,6 +1005,8 @@ paths:
               - admin_adjust
               - image_charge
               - image_refund
+              - video_charge
+              - video_refund
         - name: from
           in: query
           required: false
@@ -1232,6 +1329,8 @@ paths:
               - admin_adjust
               - image_charge
               - image_refund
+              - video_charge
+              - video_refund
         - name: from
           in: query
           required: false
@@ -1520,6 +1619,8 @@ paths:
               - admin_adjust
               - image_charge
               - image_refund
+              - video_charge
+              - video_refund
         - name: from
           in: query
           required: false
@@ -1626,6 +1727,7 @@ paths:
             enum:
               - chat
               - image
+              - video
       responses:
         '200':
           description: Success
@@ -1929,6 +2031,7 @@ paths:
             enum:
               - chat
               - image
+              - video
         - name: upstream_id
           in: query
           required: false
@@ -5562,6 +5665,7 @@ components:
       type: object
       additionalProperties: false
       properties:
+        bucket: { type: string, enum: [permanent, video] }
         ids:
           type: array
           items:
@@ -6983,6 +7087,7 @@ components:
         user_id:
           type: string
           format: uuid
+        video_balance: { type: integer, minimum: 0 }
         permanent_balance:
           type: integer
           format: int64
@@ -7132,6 +7237,7 @@ components:
           enum:
             - daily
             - permanent
+            - video
           default: permanent
         action:
           type: string
@@ -7183,11 +7289,14 @@ components:
             - admin_adjust
             - image_charge
             - image_refund
+            - video_charge
+            - video_refund
         bucket:
           type: string
           enum:
             - daily
             - permanent
+            - video
         delta:
           type: integer
           format: int64
@@ -7324,6 +7433,7 @@ components:
         - credits
         - created_at
       properties:
+        credit_bucket: { type: string, enum: [permanent, video] }
         id:
           type: string
           format: uuid
@@ -7383,6 +7493,7 @@ components:
         - quantity
         - credits
       properties:
+        credit_bucket: { type: string, enum: [permanent, video] }
         name:
           type: string
           minLength: 1
@@ -7429,6 +7540,7 @@ components:
         - expires_at
         - created_at
       properties:
+        credit_bucket: { type: string, enum: [permanent, video] }
         id:
           type: string
           format: uuid
@@ -7490,6 +7602,7 @@ components:
         - expires_at
         - created_at
       properties:
+        credit_bucket: { type: string, enum: [permanent, video] }
         id:
           type: string
           format: uuid
@@ -7776,10 +7889,189 @@ components:
       required:
         - items
         - next_cursor
+    CanvasVideoQuoteInput:
+      allOf:
+        - $ref: '#/components/schemas/VideoInput'
+        - type: object
+          required: [version, node_id]
+          properties:
+            version: { type: integer }
+            node_id: { type: string, format: uuid }
+    CanvasVideoRunInput:
+      allOf:
+        - $ref: '#/components/schemas/CanvasVideoQuoteInput'
+        - type: object
+          required: [confirmed_quote]
+          properties:
+            confirmed_quote: { $ref: '#/components/schemas/VideoQuote' }
+    CanvasVideoRun:
+      type: object
+      required: [canvas, task]
+      properties:
+        canvas: { $ref: '#/components/schemas/Canvas' }
+        task: { $ref: '#/components/schemas/VideoTask' }
+    VideoMode: { type: string, enum: [text, first_frame, first_last, reference] }
+    VideoRole:
+      {
+        type: string,
+        enum: [first_frame, last_frame, reference_image, reference_video, reference_audio],
+      }
+    VideoResolution: { type: string, enum: [480p, 720p, 768p, 1080p, 2k, 4k] }
+    VideoProfile:
+      type: object
+      required:
+        [mode, ratios, resolutions, durations, max_images, max_videos, max_audio, max_references]
+      properties:
+        mode: { $ref: '#/components/schemas/VideoMode' }
+        ratios: { type: array, items: { type: string } }
+        resolutions: { type: array, items: { $ref: '#/components/schemas/VideoResolution' } }
+        durations: { type: array, items: { type: integer } }
+        max_images: { type: integer }
+        max_videos: { type: integer }
+        max_audio: { type: integer }
+        max_references: { type: integer }
+        allow_audio_only: { type: boolean }
+    VideoCapabilities:
+      type: object
+      required: [profiles]
+      properties:
+        profiles: { type: array, items: { $ref: '#/components/schemas/VideoProfile' } }
+    VideoRef:
+      type: object
+      required: [file_id, role]
+      properties:
+        file_id: { type: string, format: uuid }
+        role: { $ref: '#/components/schemas/VideoRole' }
+        token: { type: string }
+    VideoInput:
+      type: object
+      required:
+        [
+          mode,
+          model_id,
+          ratio,
+          resolution,
+          duration_seconds,
+          count,
+          generate_audio,
+          prompt,
+          references,
+        ]
+      properties:
+        mode: { $ref: '#/components/schemas/VideoMode' }
+        model_id: { type: string, format: uuid }
+        ratio: { type: string }
+        resolution: { $ref: '#/components/schemas/VideoResolution' }
+        duration_seconds: { type: integer }
+        count: { type: integer, minimum: 1, maximum: 4 }
+        generate_audio: { type: boolean }
+        prompt: { type: string }
+        references: { type: array, items: { $ref: '#/components/schemas/VideoRef' } }
+    VideoSubmission:
+      allOf:
+        - $ref: '#/components/schemas/VideoInput'
+        - type: object
+          required: [confirmed_quote]
+          properties:
+            confirmed_quote: { $ref: '#/components/schemas/VideoQuote' }
+    VideoQuote:
+      type: object
+      required: [pool, mode, unit_price, total_cost, count, pricing_version, pool_version]
+      properties:
+        pool: { type: string, enum: [video, permanent] }
+        mode: { type: string, enum: [second, clip] }
+        unit_price: { type: integer }
+        total_cost: { type: integer }
+        count: { type: integer }
+        pricing_version: { type: integer }
+        pool_version: { type: integer }
+    VideoRate:
+      type: object
+      required: [resolution, has_video_reference, credits]
+      properties:
+        resolution: { $ref: '#/components/schemas/VideoResolution' }
+        duration_seconds: { type: integer }
+        has_video_reference: { type: boolean }
+        credits: { type: integer }
+    VideoPricing:
+      type: object
+      required: [model_id, mode, rates, version]
+      properties:
+        model_id: { type: string, format: uuid }
+        mode: { type: string, enum: [second, clip] }
+        rates: { type: array, items: { $ref: '#/components/schemas/VideoRate' } }
+        version: { type: integer }
+    VideoCreditPool:
+      type: object
+      required: [pool, version]
+      properties:
+        pool: { type: string, enum: [video, permanent] }
+        version: { type: integer }
+    VideoOption:
+      type: object
+      required: [model, profiles, pricing]
+      properties:
+        model: { $ref: '#/components/schemas/PublicModel' }
+        profiles: { type: array, items: { $ref: '#/components/schemas/VideoProfile' } }
+        pricing: { $ref: '#/components/schemas/VideoPricing' }
+    VideoOptions:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/VideoOption' } }
+    VideoItem:
+      type: object
+      required: [position, status]
+      properties:
+        position: { type: integer }
+        status: { type: string, enum: [queued, running, succeeded, failed] }
+        error_code: { type: string }
+        file_id: { type: string, format: uuid }
+    VideoTask:
+      type: object
+      required: [id, model_name, input, quote, status, refunded, items, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        canvas_id: { type: string, format: uuid }
+        model_name: { type: string }
+        input: { $ref: '#/components/schemas/VideoInput' }
+        quote: { $ref: '#/components/schemas/VideoQuote' }
+        status: { type: string, enum: [queued, running, succeeded, partial, failed] }
+        refunded: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/VideoItem' } }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    VideoTaskPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/VideoTask' } }
+        next_cursor: { type: string }
+    VideoAsset:
+      type: object
+      required: [id, kind, mime, width, height, size, duration_ms, url, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        kind:
+          { type: string, enum: [upload, generated, video_upload, video_generated, audio_upload] }
+        mime: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        size: { type: integer }
+        duration_ms: { type: integer }
+        url: { type: string }
+        created_at: { type: string, format: date-time }
+    VideoAssetPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/VideoAsset' } }
+        next_cursor: { type: string }
     ModelCapabilities:
       type: object
       additionalProperties: false
       properties:
+        video: { $ref: '#/components/schemas/VideoCapabilities' }
         reasoning_effort:
           type: boolean
           description: Chat model accepts explicit reasoning effort.
@@ -7850,6 +8142,9 @@ components:
       type: object
       additionalProperties: false
       properties:
+        video_protocol: { type: string }
+        video_profile: { type: string }
+        video_capabilities: { $ref: '#/components/schemas/VideoCapabilities' }
         upstream_id:
           type: string
           format: uuid
@@ -7877,6 +8172,9 @@ components:
       type: object
       additionalProperties: false
       properties:
+        video_protocol: { type: string }
+        video_profile: { type: string }
+        video_capabilities: { $ref: '#/components/schemas/VideoCapabilities' }
         upstream_id:
           type: string
           format: uuid
@@ -7925,6 +8223,7 @@ components:
           enum:
             - chat
             - image
+            - video
         description:
           type: string
         icon:
@@ -7960,6 +8259,7 @@ components:
           enum:
             - chat
             - image
+            - video
         description:
           type: string
         icon:
@@ -8019,6 +8319,7 @@ components:
           enum:
             - chat
             - image
+            - video
         description:
           type: string
           maxLength: 500
@@ -8150,6 +8451,9 @@ components:
                 enum:
                   - chat
                   - image
+                  - video
+              video_protocol: { type: string }
+              video_profile: { type: string }
               capabilities:
                 $ref: '#/components/schemas/ModelCapabilities'
             required:

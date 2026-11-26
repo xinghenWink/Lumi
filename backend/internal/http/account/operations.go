@@ -199,6 +199,7 @@ func (h *Handler) batchUsers(c *gin.Context) {
 		Amount  int64       `json:"amount"`
 		Note    string      `json:"note"`
 		Confirm bool        `json:"confirm"`
+		Bucket  string      `json:"bucket,omitempty"`
 	}
 	if err := decode(c, &input); err != nil {
 		h.fail(c, err)
@@ -206,7 +207,7 @@ func (h *Handler) batchUsers(c *gin.Context) {
 	}
 	var err error
 	if input.Action == "grant" {
-		err = h.services.Credits.BatchGrant(c.Request.Context(), p.Actor, input.IDs, c.GetHeader("Idempotency-Key"), input.Amount, input.Note)
+		err = h.services.Credits.BatchGrantBucket(c.Request.Context(), p.Actor, input.IDs, c.GetHeader("Idempotency-Key"), input.Amount, input.Note, input.Bucket)
 	} else {
 		if input.Action == "delete" && !input.Confirm {
 			h.fail(c, problem.Invalid())

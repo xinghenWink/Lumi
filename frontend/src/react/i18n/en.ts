@@ -1,9 +1,11 @@
 import messages from '../../i18n/resources.en'
 import { catalog } from './catalog'
+import { video, videoErrors } from './video.en'
 import deployment from '../../i18n/deployment.en'
 
 export default {
-  ...catalog(messages),
+  ...catalog({ ...messages, errors: { ...messages.errors, ...videoErrors } }),
+  video,
   deployment,
   announcement: {
     title: 'System announcements',

@@ -14,9 +14,9 @@ interface ModelSelection {
 }
 export function createModelSelectionStore() {
   return createStore<ModelSelection>()((set) => ({
-    selected: { chat: '', image: '' },
+    selected: { chat: '', image: '', video: '' },
     select: (kind, id) => set((state) => ({ selected: { ...state.selected, [kind]: id } })),
-    reset: () => set({ selected: { chat: '', image: '' } }),
+    reset: () => set({ selected: { chat: '', image: '', video: '' } }),
   }))
 }
 export function useModels(kind: ModelKind) {

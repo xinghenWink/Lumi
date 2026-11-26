@@ -1,8 +1,10 @@
 import messages from '../../i18n/resources.zh-CN'
 import { catalog } from './catalog'
+import { video, videoErrors } from './video.zh-CN'
 
 export default {
-  ...catalog(messages),
+  ...catalog({ ...messages, errors: { ...messages.errors, ...videoErrors } }),
+  video,
   react: {
     title: '今天想创造什么？',
     description: '让想法自由生长，Lumi 陪你一起探索。',

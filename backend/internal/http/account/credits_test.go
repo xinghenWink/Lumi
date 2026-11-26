@@ -18,8 +18,11 @@ func TestCSVFormulaInjection(t *testing.T) {
 func TestCSVTranslations(t *testing.T) {
 	for _, locale := range []string{"zh-CN", "en"} {
 		catalog, err := loadCSVCatalog(locale)
-		if err != nil || len(catalog.LedgerHeaders) != 12 || len(catalog.CodeHeaders) != 9 || len(catalog.Types) != 9 || len(catalog.States) != 4 {
+		if err != nil || len(catalog.LedgerHeaders) != 12 || len(catalog.CodeHeaders) != 9 || len(catalog.Types) != 11 || len(catalog.Buckets) != 3 || len(catalog.States) != 4 {
 			t.Fatalf("CSV translations locale=%s error=%v", locale, err)
+		}
+		if catalog.Types["video_charge"] == "" || catalog.Types["video_refund"] == "" || catalog.Buckets["video"] == "" {
+			t.Fatalf("missing video credit translations for %s", locale)
 		}
 		if catalog.Types["referral_inviter_bonus"] == "" || catalog.Types["referral_invitee_bonus"] == "" {
 			t.Fatalf("missing referral ledger translations for %s", locale)

@@ -10,6 +10,7 @@ const ResetPasswordPage = lazy(() => import('../pages/ResetPasswordPage'))
 const LegalPage = lazy(() => import('../pages/LegalPage'))
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
 const ImagePage = lazy(() => import('../pages/ImagePage'))
+const VideoPricingPage = lazy(() => import('../pages/admin/VideoPricingPage'))
 const ImageGalleryPage = lazy(() => import('../pages/ImageGalleryPage'))
 const CanvasListPage = lazy(() => import('../pages/CanvasListPage'))
 const CanvasPage = lazy(() => import('../pages/CanvasPage'))
@@ -51,6 +52,7 @@ const adminPages: Record<string, ReactNode> = {
   '/admin/image-settings': <ImageSettingsPage />,
   '/admin/image-tasks': <ImageTasksPage />,
   '/admin/pricing': <PricingPage />,
+  '/admin/video-pricing': <VideoPricingPage />,
   '/admin/dashboard': <DashboardPage />,
   '/admin/conversations': <ConversationsPage />,
   '/admin/announcements': <AnnouncementsPage />,

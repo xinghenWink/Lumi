@@ -139,10 +139,10 @@ func accountView(record query.CreditAccount, cfg Configuration, now time.Time) (
 	if record.DailyResetOn != nil {
 		date = record.DailyResetOn.Format(time.DateOnly)
 	}
-	return Account{UserID: record.UserID, PermanentBalance: record.PermanentBalance, DailyBalance: record.DailyBalance, Total: record.PermanentBalance + record.DailyBalance, DailyResetOn: date, NextResetAt: next.UTC(), Timezone: cfg.CreditsTimezone, Version: record.Version}, nil
+	return Account{VideoBalance: record.VideoBalance, UserID: record.UserID, PermanentBalance: record.PermanentBalance, DailyBalance: record.DailyBalance, Total: record.PermanentBalance + record.DailyBalance, DailyResetOn: date, NextResetAt: next.UTC(), Timezone: cfg.CreditsTimezone, Version: record.Version}, nil
 }
 func saveAccount(ctx context.Context, q *query.Queries, account *query.CreditAccount) error {
-	if err := q.SaveCreditAccount(ctx, query.SaveCreditAccountParams{UserID: account.UserID, PermanentBalance: account.PermanentBalance, DailyBalance: account.DailyBalance, DailyResetOn: account.DailyResetOn}); err != nil {
+	if err := q.SaveCreditAccount(ctx, query.SaveCreditAccountParams{UserID: account.UserID, PermanentBalance: account.PermanentBalance, DailyBalance: account.DailyBalance, DailyResetOn: account.DailyResetOn, VideoBalance: account.VideoBalance}); err != nil {
 		return fmt.Errorf("save credit account: %w", err)
 	}
 	account.Version++
@@ -155,6 +155,8 @@ func change(ctx context.Context, q *query.Queries, account *query.CreditAccount,
 	balance := &account.PermanentBalance
 	if bucket == "daily" {
 		balance = &account.DailyBalance
+	} else if bucket == "video" {
+		balance = &account.VideoBalance
 	} else if bucket != "permanent" {
 		return problem.Invalid()
 	}
@@ -172,7 +174,11 @@ func change(ctx context.Context, q *query.Queries, account *query.CreditAccount,
 	if err != nil {
 		return err
 	}
-	if err := q.AppendCreditLedger(ctx, query.AppendCreditLedgerParams{ID: id, UserID: account.UserID, Type: kind, Bucket: bucket, Delta: delta, BucketBalanceAfter: *balance, TotalAfter: account.PermanentBalance + account.DailyBalance, RefType: refType, RefID: refID, IdempotencyKey: key, OperatorID: operator, Note: note}); err != nil {
+	total := account.PermanentBalance + account.DailyBalance
+	if bucket == "video" {
+		total = account.VideoBalance
+	}
+	if err := q.AppendCreditLedger(ctx, query.AppendCreditLedgerParams{ID: id, UserID: account.UserID, Type: kind, Bucket: bucket, Delta: delta, BucketBalanceAfter: *balance, TotalAfter: total, RefType: refType, RefID: refID, IdempotencyKey: key, OperatorID: operator, Note: note}); err != nil {
 		return fmt.Errorf("append credit ledger: %w", err)
 	}
 	return nil
@@ -288,7 +294,7 @@ func (s *Service) Adjust(ctx context.Context, actor user.Actor, target uuid.UUID
 		input.Bucket = "permanent"
 	}
 	input.Note = strings.TrimSpace(input.Note)
-	if input.Amount < 0 || input.Amount > MaxBalance || (input.Bucket != "daily" && input.Bucket != "permanent") || (input.Action != "add" && input.Action != "subtract" && input.Action != "set") || !validation.Text(input.Note, 1, 200) {
+	if input.Amount < 0 || input.Amount > MaxBalance || (input.Bucket != "daily" && input.Bucket != "permanent" && input.Bucket != "video") || (input.Action != "add" && input.Action != "subtract" && input.Action != "set") || !validation.Text(input.Note, 1, 200) {
 		return Account{}, problem.Invalid()
 	}
 	var result Account
@@ -323,8 +329,11 @@ func (s *Service) Adjust(ctx context.Context, actor user.Actor, target uuid.UUID
 			}
 			if input.Action == "set" {
 				balance := record.PermanentBalance
-				if input.Bucket == "daily" {
+				switch input.Bucket {
+				case "daily":
 					balance = record.DailyBalance
+				case "video":
+					balance = record.VideoBalance
 				}
 				delta -= balance
 			}

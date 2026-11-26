@@ -40,6 +40,7 @@ export const adminGroups: NavigationGroup[] = [
       { path: '/admin/image-tasks', key: 'nav.imageTasks', icon: Image },
       { path: '/admin/image-settings', key: 'nav.imageSettings', icon: Settings2 },
       { path: '/admin/pricing', key: 'nav.pricing', icon: Coins },
+      { path: '/admin/video-pricing', key: 'video.adminTitle', icon: Coins },
     ],
   },
   {
@@ -60,6 +61,7 @@ export function routeTitle(path: string): string {
     .flatMap((group) => group.items)
     .find((item) => path === item.path || path.startsWith(item.path + '/'))
   if (admin) return admin.key
+  if (path.startsWith('/video')) return 'video.title'
   if (path.startsWith('/create')) return 'nav.image'
   if (path === '/canvas' || path.startsWith('/canvas/')) return 'nav.canvas'
   if (path.startsWith('/me/images')) return 'nav.gallery'

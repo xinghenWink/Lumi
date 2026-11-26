@@ -350,7 +350,7 @@ func (q *Queries) ListPricingRules(ctx context.Context) ([]PricingRule, error) {
 }
 
 const lockCreditAccount = `-- name: LockCreditAccount :one
-SELECT user_id, permanent_balance, daily_balance, daily_reset_on, version FROM credit_accounts WHERE user_id = $1 FOR UPDATE
+SELECT user_id, permanent_balance, daily_balance, daily_reset_on, version, video_balance FROM credit_accounts WHERE user_id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockCreditAccount(ctx context.Context, userID uuid.UUID) (CreditAccount, error) {
@@ -362,6 +362,7 @@ func (q *Queries) LockCreditAccount(ctx context.Context, userID uuid.UUID) (Cred
 		&i.DailyBalance,
 		&i.DailyResetOn,
 		&i.Version,
+		&i.VideoBalance,
 	)
 	return i, err
 }
@@ -479,13 +480,13 @@ const readCreditAccount = `-- name: ReadCreditAccount :one
 WITH owner AS MATERIALIZED (
     SELECT u.id FROM users u WHERE u.id=$1 AND u.deleted_at IS NULL FOR SHARE OF u
 ), locked AS MATERIALIZED (
-    SELECT a.user_id, a.permanent_balance, a.daily_balance, a.daily_reset_on, a.version FROM credit_accounts a JOIN owner o ON o.id=a.user_id FOR UPDATE OF a
+    SELECT a.user_id, a.permanent_balance, a.daily_balance, a.daily_reset_on, a.version, a.video_balance FROM credit_accounts a JOIN owner o ON o.id=a.user_id FOR UPDATE OF a
 ), changed AS (
     UPDATE credit_accounts a SET daily_balance=$2::bigint,
         daily_reset_on=$3::date,
         version=a.version+1+(CASE WHEN l.daily_balance>0 THEN 1 ELSE 0 END)+(CASE WHEN $2::bigint>0 THEN 1 ELSE 0 END)
     FROM locked l WHERE a.user_id=l.user_id AND (l.daily_reset_on IS NULL OR l.daily_reset_on<$3::date)
-    RETURNING a.user_id, a.permanent_balance, a.daily_balance, a.daily_reset_on, a.version
+    RETURNING a.user_id, a.permanent_balance, a.daily_balance, a.daily_reset_on, a.version, a.video_balance
 ), expired AS (
     INSERT INTO credit_ledger(id,user_id,type,bucket,delta,bucket_balance_after,total_after,idempotency_key)
     SELECT $4::uuid,l.user_id,'daily_expire','daily',-l.daily_balance,0,l.permanent_balance,
@@ -553,7 +554,7 @@ func (q *Queries) ReadCreditConfigurationLock(ctx context.Context) error {
 }
 
 const readCurrentCreditAccount = `-- name: ReadCurrentCreditAccount :one
-SELECT a.user_id, a.permanent_balance, a.daily_balance, a.daily_reset_on, a.version FROM credit_accounts a JOIN users u ON u.id=a.user_id
+SELECT a.user_id, a.permanent_balance, a.daily_balance, a.daily_reset_on, a.version, a.video_balance FROM credit_accounts a JOIN users u ON u.id=a.user_id
 WHERE a.user_id=$1 AND u.deleted_at IS NULL
   AND a.daily_reset_on>=$2::date
 `
@@ -573,12 +574,13 @@ func (q *Queries) ReadCurrentCreditAccount(ctx context.Context, arg ReadCurrentC
 		&i.DailyBalance,
 		&i.DailyResetOn,
 		&i.Version,
+		&i.VideoBalance,
 	)
 	return i, err
 }
 
 const saveCreditAccount = `-- name: SaveCreditAccount :exec
-UPDATE credit_accounts SET permanent_balance=$2, daily_balance=$3, daily_reset_on=$4, version=version+1 WHERE user_id=$1
+UPDATE credit_accounts SET permanent_balance=$2, daily_balance=$3, daily_reset_on=$4, video_balance=$5, version=version+1 WHERE user_id=$1
 `
 
 type SaveCreditAccountParams struct {
@@ -586,6 +588,7 @@ type SaveCreditAccountParams struct {
 	PermanentBalance int64
 	DailyBalance     int64
 	DailyResetOn     *time.Time
+	VideoBalance     int64
 }
 
 func (q *Queries) SaveCreditAccount(ctx context.Context, arg SaveCreditAccountParams) error {
@@ -594,6 +597,7 @@ func (q *Queries) SaveCreditAccount(ctx context.Context, arg SaveCreditAccountPa
 		arg.PermanentBalance,
 		arg.DailyBalance,
 		arg.DailyResetOn,
+		arg.VideoBalance,
 	)
 	return err
 }
